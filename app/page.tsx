@@ -2867,10 +2867,7 @@ export default function HomePage() {
         closeNotifications();
       } else if (event.key === "Escape" && workspaceMenuOpen) {
         event.preventDefault();
-        setWorkspaceMenuOpen(false);
-        window.requestAnimationFrame(() =>
-          window.requestAnimationFrame(() => workspaceMenuButtonRef.current?.focus()),
-        );
+        closeWorkspaceMenu();
       }
     }
 
@@ -2941,6 +2938,47 @@ export default function HomePage() {
       }
     };
   }, [notificationsOpen]);
+
+  useEffect(() => {
+    if (!workspaceMenuOpen) return;
+
+    const panel = workspaceMenuPanelRef.current;
+    if (!panel) return;
+
+    const isMobileSheet = window.matchMedia("(max-width: 680px)").matches;
+    const previousOverflow = document.body.style.overflow;
+    if (isMobileSheet) {
+      document.body.style.overflow = "hidden";
+    }
+
+    function keepFocusInWorkspaceMenu(event: KeyboardEvent) {
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("hidden"));
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    panel.addEventListener("keydown", keepFocusInWorkspaceMenu);
+    return () => {
+      panel.removeEventListener("keydown", keepFocusInWorkspaceMenu);
+      if (isMobileSheet) {
+        document.body.style.overflow = previousOverflow;
+      }
+    };
+  }, [workspaceMenuOpen]);
 
   useEffect(() => {
     if (!overlayOpen) return;
@@ -6194,6 +6232,13 @@ export default function HomePage() {
     );
   }
 
+  function closeWorkspaceMenu() {
+    setWorkspaceMenuOpen(false);
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => workspaceMenuButtonRef.current?.focus()),
+    );
+  }
+
   function openNotification(item: NotificationItem) {
     markNotificationRead(item.id);
     setNotificationsOpen(false);
@@ -6841,13 +6886,22 @@ export default function HomePage() {
               </button>
 
               {workspaceMenuOpen && (
-                <div
-                  className="workspace-menu-panel"
-                  id="workspace-control-center"
-                  role="dialog"
-                  aria-label="工作区控制中心"
-                  ref={workspaceMenuPanelRef}
-                >
+                <>
+                  <button
+                    className="workspace-menu-backdrop"
+                    type="button"
+                    tabIndex={-1}
+                    aria-label="关闭工作区控制中心"
+                    onClick={closeWorkspaceMenu}
+                  />
+                  <div
+                    className="workspace-menu-panel"
+                    id="workspace-control-center"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="工作区控制中心"
+                    ref={workspaceMenuPanelRef}
+                  >
                   <header className="workspace-menu-heading">
                     <span className="workspace-menu-avatar">M</span>
                     <div>
@@ -6860,12 +6914,7 @@ export default function HomePage() {
                     <button
                       type="button"
                       aria-label="关闭工作区控制中心"
-                      onClick={() => {
-                        setWorkspaceMenuOpen(false);
-                        window.requestAnimationFrame(() =>
-                          workspaceMenuButtonRef.current?.focus(),
-                        );
-                      }}
+                      onClick={closeWorkspaceMenu}
                     >
                       <X size={16} />
                     </button>
@@ -6972,7 +7021,8 @@ export default function HomePage() {
                       邀请成员
                     </button>
                   </footer>
-                </div>
+                  </div>
+                </>
               )}
             </div>
 

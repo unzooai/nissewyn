@@ -17861,6 +17861,10 @@ body {
   z-index: 72;
 }
 
+.workspace-menu-backdrop {
+  display: none;
+}
+
 .workspace-menu-trigger {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr) 15px;
@@ -17966,6 +17970,18 @@ body {
   from {
     opacity: 0;
     transform: translateY(-5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes workspace-menu-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
   }
 
   to {
@@ -18300,23 +18316,74 @@ body {
 
   .workspace-menu-panel {
     position: fixed;
-    top: 76px;
-    right: 10px;
-    left: 10px;
-    width: auto;
-    max-height: calc(100dvh - 156px);
-    overflow-y: auto;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    width: 100%;
+    max-height: min(84dvh, 720px);
+    padding-bottom: env(safe-area-inset-bottom);
+    overflow: hidden;
+    flex-direction: column;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -24px 70px rgba(27, 43, 65, 0.22);
+    transform-origin: bottom center;
+    animation: workspace-menu-sheet-in 220ms
+      cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .workspace-menu-panel::before {
+    display: block;
+    width: 38px;
+    height: 4px;
+    margin: 8px auto 1px;
+    flex: 0 0 4px;
+    border-radius: 999px;
+    background: #d3dce6;
+    content: "";
+  }
+
+  .workspace-menu-backdrop {
+    position: fixed;
+    z-index: 79;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: rgba(31, 43, 58, 0.22);
+    cursor: default;
+    backdrop-filter: blur(3px);
+    animation: notification-backdrop-in 180ms ease-out both;
   }
 
   .workspace-menu-heading {
-    position: sticky;
+    position: static;
     z-index: 1;
     top: 0;
+    flex: 0 0 auto;
+  }
+
+  .workspace-menu-summary {
+    flex: 0 0 auto;
+  }
+
+  .workspace-menu-nav {
+    min-height: 0;
+    overflow-y: auto;
+    flex: 1 1 auto;
   }
 
   .workspace-menu-footer {
-    position: sticky;
+    position: static;
     bottom: 0;
+    flex: 0 0 auto;
   }
 }
 

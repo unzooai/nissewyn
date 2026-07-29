@@ -308,11 +308,14 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /workspaceMenuOpen/);
   assert.match(page, /workspaceMenuWrapRef/);
   assert.match(page, /workspaceMenuPanelRef/);
+  assert.match(page, /className="workspace-menu-backdrop"/);
+  assert.match(page, /function closeWorkspaceMenu/);
+  assert.match(page, /keepFocusInWorkspaceMenu/);
   assert.match(page, /function openWorkspaceSection/);
   assert.match(page, /function openWorkspaceBudget/);
   assert.match(page, /function openWorkspaceInvite/);
   assert.match(page, /aria-label="打开工作区控制中心"/);
-  assert.match(page, /role="dialog"\s+aria-label="工作区控制中心"/);
+  assert.match(page, /aria-modal="true"\s+aria-label="工作区控制中心"/);
   assert.match(page, /id="settings-usage"/);
   assert.match(page, /id="settings-team"/);
   assert.match(page, /id="settings-connectors"/);
@@ -441,6 +444,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.clarity-search-result-icon/);
   assert.match(css, /\.workspace-menu-trigger/);
   assert.match(css, /\.workspace-menu-panel/);
+  assert.match(css, /@keyframes workspace-menu-sheet-in/);
+  assert.match(css, /\.workspace-menu-backdrop/);
   assert.match(css, /\.workspace-menu-summary/);
   assert.match(css, /\.workspace-menu-nav/);
   assert.match(css, /\.workspace-menu-footer/);
