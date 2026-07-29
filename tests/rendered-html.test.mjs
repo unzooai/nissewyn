@@ -60,6 +60,11 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function duplicateTask/);
   assert.match(page, /function confirmDeleteTask/);
   assert.match(page, /function recordActivity/);
+  assert.match(page, /type ApprovalRisk =/);
+  assert.match(page, /function requestRejectApproval/);
+  assert.match(page, /function confirmRejectApproval/);
+  assert.match(page, /rejectedApproval/);
+  assert.match(page, /拒绝后自动暂停任务/);
   assert.match(page, /function exportActivity/);
   assert.match(page, /function exportWorkspace/);
   assert.match(page, /async function importWorkspace/);
@@ -103,6 +108,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.composer-schedule-detail/);
   assert.match(css, /\.schedule-timezone/);
   assert.match(css, /\.confirm-delete-dialog/);
+  assert.match(css, /\.approval-context-grid/);
+  assert.match(css, /\.approval-policy-review/);
+  assert.match(css, /\.approval-reject-dialog/);
   assert.match(css, /\.task-detail-heading-actions/);
   assert.match(css, /\.activity-filter-tabs/);
   assert.match(css, /\.activity-export/);

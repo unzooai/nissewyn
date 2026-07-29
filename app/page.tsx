@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
+  AlertTriangle,
+  Ban,
   Bell,
   Brain,
   CalendarDays,
@@ -18,6 +20,7 @@ import {
   History,
   Home,
   ListChecks,
+  Link2,
   Mail,
   Pause,
   Pencil,
@@ -29,6 +32,7 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  Timer,
   Trash2,
   Upload,
   X,
@@ -53,6 +57,7 @@ type WorkspaceBackup = {
   approvalIds: string[];
   activity: ActivityItem[];
 };
+type ApprovalRisk = "低风险" | "中风险" | "高风险";
 type ActivityKind = "任务" | "审批" | "系统";
 type ActivityFilter = "全部" | ActivityKind;
 type ActivityTone = "blue" | "violet" | "green" | "amber" | "red" | "neutral";
@@ -93,6 +98,22 @@ type TaskItem = {
   scheduleDay?: Weekday;
   requiresApproval?: boolean;
   pinned?: boolean;
+};
+
+type ApprovalItem = {
+  id: string;
+  taskId: string;
+  title: string;
+  reason: string;
+  impact: string;
+  action: string;
+  target: string;
+  scope: string;
+  risk: ApprovalRisk;
+  requestedAt: string;
+  expiresAt: string;
+  policy: string;
+  icon: typeof Send;
 };
 
 type SearchResult = {
@@ -305,29 +326,50 @@ const initialTasks: TaskItem[] = [
   },
 ];
 
-const initialApprovals = [
+const initialApprovals: ApprovalItem[] = [
   {
     id: "send-summary",
+    taskId: "competitor",
     title: "把竞品摘要发送到领导沟通群",
     reason: "摘要已经生成，下一步会通过邮件连接器发送到群组。",
     impact: "发送后，群内 3 位成员可以看到这份摘要。",
     action: "发送摘要",
+    target: "领导沟通群 · 3 人",
+    scope: "仅发送本次摘要",
+    risk: "中风险",
+    requestedAt: "8 分钟前",
+    expiresAt: "今天 18:00",
+    policy: "外部发送保护",
     icon: Send,
   },
   {
     id: "browser-access",
+    taskId: "competitor",
     title: "读取工作浏览器的登录状态",
     reason: "目标页面需要登录，系统想使用当前浏览器的会话继续访问。",
     impact: "只用于本次任务，任务结束后自动失效。",
     action: "允许本次访问",
+    target: "当前工作浏览器",
+    scope: "只读会话 · 单次任务",
+    risk: "高风险",
+    requestedAt: "12 分钟前",
+    expiresAt: "30 分钟后",
+    policy: "凭证访问保护",
     icon: Globe2,
   },
   {
     id: "write-report",
+    taskId: "weekly-report",
     title: "把报告保存到项目目录",
     reason: "系统准备把生成的报告写入当前项目。",
     impact: "将新增文件 competitor-report.md，不会修改其他文件。",
     action: "允许保存",
+    target: "项目目录 / competitor-report.md",
+    scope: "仅新增 1 个 Markdown 文件",
+    risk: "低风险",
+    requestedAt: "16 分钟前",
+    expiresAt: "今天 20:00",
+    policy: "本机文件写入保护",
     icon: FileText,
   },
 ];
@@ -486,6 +528,7 @@ export default function HomePage() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+  const [rejectApprovalId, setRejectApprovalId] = useState<string | null>(null);
   const [workspaceResetOpen, setWorkspaceResetOpen] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
   const [tasksReady, setTasksReady] = useState(false);
@@ -511,6 +554,8 @@ export default function HomePage() {
     approvals.find((item) => item.id === selectedApprovalId) ?? approvals[0];
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
   const deletingTask = tasks.find((task) => task.id === deleteTaskId) ?? null;
+  const rejectedApproval =
+    approvals.find((item) => item.id === rejectApprovalId) ?? null;
   const primaryTask = tasks.find((task) => task.id === "competitor") ?? initialTasks[0];
   const activityTask = tasks.find((task) => task.id === activityTaskId) ?? null;
   const activitySummaryTask = activityTask ?? primaryTask;
@@ -664,6 +709,7 @@ export default function HomePage() {
         !composerOpen &&
         !selectedTask &&
         !deletingTask &&
+        !rejectedApproval &&
         !workspaceResetOpen
       ) {
         event.preventDefault();
@@ -687,13 +733,20 @@ export default function HomePage() {
   }, [
     composerOpen,
     deletingTask,
+    rejectedApproval,
     searchOpen,
     selectedTask,
     workspaceResetOpen,
   ]);
 
   useEffect(() => {
-    if (!composerOpen && !selectedTask && !deletingTask && !workspaceResetOpen) {
+    if (
+      !composerOpen &&
+      !selectedTask &&
+      !deletingTask &&
+      !rejectedApproval &&
+      !workspaceResetOpen
+    ) {
       return;
     }
     const previousOverflow = document.body.style.overflow;
@@ -702,6 +755,7 @@ export default function HomePage() {
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       setDeleteTaskId(null);
+      setRejectApprovalId(null);
       setComposerOpen(false);
       setEditingTaskId(null);
       setSelectedTaskId(null);
@@ -713,7 +767,13 @@ export default function HomePage() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [composerOpen, deletingTask, selectedTask, workspaceResetOpen]);
+  }, [
+    composerOpen,
+    deletingTask,
+    rejectedApproval,
+    selectedTask,
+    workspaceResetOpen,
+  ]);
 
   const searchedTasks = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -936,6 +996,7 @@ export default function HomePage() {
       setActivityFilter("全部");
       setActivityTaskId(null);
       setSelectedTaskId(null);
+      setRejectApprovalId(null);
       setNotificationsOpen(false);
       recordActivity({
         title: "工作区备份已恢复",
@@ -965,6 +1026,7 @@ export default function HomePage() {
     setActivityTaskId(null);
     setSelectedTaskId(null);
     setDeleteTaskId(null);
+    setRejectApprovalId(null);
     setNotificationsOpen(false);
     setWorkspaceResetOpen(false);
     recordActivity({
@@ -991,30 +1053,108 @@ export default function HomePage() {
 
   function approveCurrent() {
     if (!selectedApproval) return;
+    const approved = selectedApproval;
+    const relatedTask = tasks.find((task) => task.id === approved.taskId);
+    const shouldResume = relatedTask?.status === "待确认";
     setApprovals((items) => items.filter((item) => item.id !== selectedApproval.id));
     setSelectedApprovalId(
       approvals.find((item) => item.id !== selectedApproval.id)?.id ?? "",
     );
+    setTasks((items) =>
+      items.map((task) =>
+        task.id === approved.taskId
+          ? {
+              ...task,
+              status: shouldResume ? "运行中" : task.status,
+              progress: shouldResume ? Math.min(99, task.progress + 4) : task.progress,
+              updated: shouldResume ? "刚刚获得确认" : "刚刚批准操作",
+            }
+          : task,
+      ),
+    );
+    if (approved.taskId === "competitor" && shouldResume) {
+      setIsRunning(true);
+    }
     recordActivity({
-      title: `已批准：${selectedApproval.title}`,
-      detail: selectedApproval.impact,
+      title: `已批准：${approved.title}`,
+      detail: `${approved.impact} 授权范围：${approved.scope}。`,
       icon: "shield",
       tone: "green",
       kind: "审批",
+      taskId: approved.taskId,
     });
-    setNotice(`已允许：${selectedApproval.title}`);
+    setNotice(
+      shouldResume
+        ? `已允许操作，任务“${relatedTask?.title}”继续运行`
+        : `已允许：${approved.title}`,
+    );
   }
 
   function holdCurrent() {
     if (!selectedApproval) return;
+    const held = selectedApproval;
+    const currentIndex = approvals.findIndex((item) => item.id === held.id);
+    const nextApproval =
+      approvals.length > 1
+        ? approvals[(currentIndex + 1) % approvals.length]
+        : undefined;
+    setApprovals((items) => [
+      ...items.filter((item) => item.id !== held.id),
+      held,
+    ]);
+    setSelectedApprovalId(nextApproval?.id ?? held.id);
     recordActivity({
-      title: `已暂缓：${selectedApproval.title}`,
+      title: `稍后处理：${held.title}`,
       detail: "操作仍保留在待确认列表中，没有执行任何外部动作。",
       icon: "clock",
       tone: "amber",
       kind: "审批",
+      taskId: held.taskId,
     });
-    setNotice("已暂不执行，这项操作会继续留在待确认列表中");
+    setNotice(
+      nextApproval
+        ? "已移到队尾，正在查看下一项待确认操作"
+        : "这项操作会继续留在待确认列表中",
+    );
+  }
+
+  function requestRejectApproval() {
+    if (!selectedApproval) return;
+    setRejectApprovalId(selectedApproval.id);
+  }
+
+  function confirmRejectApproval() {
+    if (!rejectedApproval) return;
+    const rejected = rejectedApproval;
+    const relatedTask = tasks.find((task) => task.id === rejected.taskId);
+    setApprovals((items) => items.filter((item) => item.id !== rejected.id));
+    setSelectedApprovalId(
+      approvals.find((item) => item.id !== rejected.id)?.id ?? "",
+    );
+    setTasks((items) =>
+      items.map((task) =>
+        task.id === rejected.taskId
+          ? {
+              ...task,
+              status: "已暂停",
+              updated: "因审批拒绝暂停",
+            }
+          : task,
+      ),
+    );
+    if (rejected.taskId === "competitor") {
+      setIsRunning(false);
+    }
+    setRejectApprovalId(null);
+    recordActivity({
+      title: `已拒绝：${rejected.title}`,
+      detail: `未执行任何外部操作，关联任务“${relatedTask?.title ?? rejected.taskId}”已暂停。`,
+      icon: "shield",
+      tone: "red",
+      kind: "审批",
+      taskId: rejected.taskId,
+    });
+    setNotice(`已拒绝操作，任务“${relatedTask?.title ?? rejected.taskId}”已暂停`);
   }
 
   function createTask(event: React.FormEvent<HTMLFormElement>) {
@@ -1763,35 +1903,30 @@ export default function HomePage() {
                     <div className="decision-boundary" aria-label="本次操作边界">
                       <span>
                         <small>执行对象</small>
-                        <strong>
-                          {selectedApproval.id === "send-summary" && "领导沟通群"}
-                          {selectedApproval.id === "browser-access" && "工作浏览器"}
-                          {selectedApproval.id === "write-report" && "项目目录"}
-                        </strong>
+                        <strong>{selectedApproval.target}</strong>
                       </span>
                       <span>
                         <small>影响范围</small>
-                        <strong>
-                          {selectedApproval.id === "send-summary" && "3 人可见"}
-                          {selectedApproval.id === "browser-access" && "仅本次任务"}
-                          {selectedApproval.id === "write-report" && "新增 1 个文件"}
-                        </strong>
+                        <strong>{selectedApproval.scope}</strong>
                       </span>
                       <span>
-                        <small>安全检查</small>
-                        <strong className="verified-boundary">
-                          <CheckCircle2 size={13} />
-                          已通过
+                        <small>风险等级</small>
+                        <strong className={`approval-risk risk-${selectedApproval.risk}`}>
+                          {selectedApproval.risk}
                         </strong>
                       </span>
                     </div>
 
                     <div className="attention-actions">
-                      <button className="confirm" type="button" onClick={approveCurrent}>
-                        <Check size={16} />
-                        {selectedApproval.action}
+                      <button
+                        className="confirm"
+                        type="button"
+                        onClick={() => openView("approvals")}
+                      >
+                        <ShieldCheck size={16} />
+                        查看并确认
                       </button>
-                      <button type="button" onClick={holdCurrent}>暂不执行</button>
+                      <button type="button" onClick={holdCurrent}>稍后处理</button>
                     </div>
 
                     <button
@@ -1940,7 +2075,7 @@ export default function HomePage() {
               <>
                 <div className="approval-queue">
                   <div className="approval-queue-heading">
-                    <span>等待处理</span>
+                    <span>审批队列</span>
                     <strong>{approvals.length} 项</strong>
                   </div>
                   {approvals.map((item) => (
@@ -1951,9 +2086,14 @@ export default function HomePage() {
                       onClick={() => setSelectedApprovalId(item.id)}
                     >
                       <item.icon size={17} />
-                      <span>
-                        <strong>{item.title}</strong>
-                        <small>{item.reason}</small>
+                      <span className="approval-queue-copy">
+                        <span className="approval-queue-topline">
+                          <strong>{item.title}</strong>
+                          <em className={`approval-risk risk-${item.risk}`}>
+                            {item.risk}
+                          </em>
+                        </span>
+                        <small>{item.target} · {item.requestedAt}</small>
                       </span>
                       <ChevronRight size={16} />
                     </button>
@@ -1962,27 +2102,106 @@ export default function HomePage() {
 
                 {selectedApproval && (
                   <div className="approval-detail">
-                    <span className="approval-kicker">
-                      <ShieldCheck size={15} />
-                      等待你的确认
-                    </span>
-                    <h2>{selectedApproval.title}</h2>
-                    <p>{selectedApproval.reason}</p>
+                    <div className="approval-review-heading">
+                      <div>
+                        <span className="approval-kicker">
+                          <ShieldCheck size={15} />
+                          等待你的确认
+                        </span>
+                        <em
+                          className={`approval-risk risk-${selectedApproval.risk}`}
+                        >
+                          {selectedApproval.risk}
+                        </em>
+                      </div>
+                      <h2>{selectedApproval.title}</h2>
+                      <p>{selectedApproval.reason}</p>
+                    </div>
+
+                    <div className="approval-context-grid">
+                      <div>
+                        <Link2 size={16} />
+                        <span>
+                          <small>关联任务</small>
+                          <button
+                            type="button"
+                            onClick={() => openTask(selectedApproval.taskId)}
+                          >
+                            {tasks.find((task) => task.id === selectedApproval.taskId)
+                              ?.title ?? selectedApproval.taskId}
+                            <ChevronRight size={13} />
+                          </button>
+                        </span>
+                      </div>
+                      <div>
+                        <selectedApproval.icon size={16} />
+                        <span>
+                          <small>执行对象</small>
+                          <strong>{selectedApproval.target}</strong>
+                        </span>
+                      </div>
+                      <div>
+                        <ShieldCheck size={16} />
+                        <span>
+                          <small>授权范围</small>
+                          <strong>{selectedApproval.scope}</strong>
+                        </span>
+                      </div>
+                      <div>
+                        <Timer size={16} />
+                        <span>
+                          <small>请求时间 · 失效时间</small>
+                          <strong>
+                            {selectedApproval.requestedAt} · {selectedApproval.expiresAt}
+                          </strong>
+                        </span>
+                      </div>
+                    </div>
+
                     <div className="approval-explanation">
-                      <strong>确认后会发生什么</strong>
-                      <p>{selectedApproval.impact}</p>
+                      <span>
+                        <AlertTriangle size={17} />
+                      </span>
+                      <div>
+                        <strong>批准后会发生什么</strong>
+                        <p>{selectedApproval.impact}</p>
+                      </div>
                     </div>
-                    <div className="approval-scope">
-                      <span><Check size={14} /> 只允许这一次</span>
-                      <span><Check size={14} /> 操作会写入运行记录</span>
-                      <span><Check size={14} /> 可以随时暂停任务</span>
+
+                    <div className="approval-policy-review">
+                      <div>
+                        <span>
+                          <ShieldCheck size={17} />
+                        </span>
+                        <div>
+                          <strong>策略检查已通过</strong>
+                          <small>{selectedApproval.policy}</small>
+                        </div>
+                      </div>
+                      <div className="approval-scope">
+                        <span><Check size={14} /> 只允许这一次</span>
+                        <span><Check size={14} /> 决策写入审计记录</span>
+                        <span><Check size={14} /> 拒绝后自动暂停任务</span>
+                      </div>
                     </div>
+
                     <div className="approval-detail-actions">
                       <button className="confirm" type="button" onClick={approveCurrent}>
                         <Check size={16} />
                         {selectedApproval.action}
                       </button>
-                      <button type="button" onClick={holdCurrent}>暂不执行</button>
+                      <button type="button" onClick={holdCurrent}>
+                        <Timer size={16} />
+                        稍后处理
+                      </button>
+                      <button
+                        className="danger"
+                        type="button"
+                        onClick={requestRejectApproval}
+                      >
+                        <Ban size={16} />
+                        拒绝操作
+                      </button>
                     </div>
                   </div>
                 )}
@@ -2690,6 +2909,73 @@ export default function HomePage() {
               <button className="danger" type="button" onClick={confirmDeleteTask}>
                 <Trash2 size={15} />
                 确认删除
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {rejectedApproval && (
+        <div
+          className="clarity-dialog-backdrop"
+          onMouseDown={() => setRejectApprovalId(null)}
+        >
+          <section
+            className="approval-reject-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="approval-reject-title"
+            aria-describedby="approval-reject-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="approval-reject-close"
+              type="button"
+              aria-label="关闭拒绝确认"
+              onClick={() => setRejectApprovalId(null)}
+            >
+              <X size={17} />
+            </button>
+            <span className="approval-reject-icon">
+              <Ban size={21} />
+            </span>
+            <span className="approval-reject-eyebrow">拒绝操作</span>
+            <h2 id="approval-reject-title">确认不允许这次操作？</h2>
+            <p id="approval-reject-description">
+              系统不会执行“{rejectedApproval.title}”，并会暂停关联任务，等待你修改任务或重新启动。
+            </p>
+            <div className="approval-reject-facts">
+              <span>
+                <small>执行对象</small>
+                <strong>{rejectedApproval.target}</strong>
+              </span>
+              <span>
+                <small>授权范围</small>
+                <strong>{rejectedApproval.scope}</strong>
+              </span>
+              <span>
+                <small>关联任务</small>
+                <strong>
+                  {tasks.find((task) => task.id === rejectedApproval.taskId)?.title ??
+                    rejectedApproval.taskId}
+                </strong>
+              </span>
+            </div>
+            <div className="approval-reject-note">
+              <ShieldCheck size={16} />
+              <span>拒绝决定会写入审计记录，不会发生任何外部操作。</span>
+            </div>
+            <div className="approval-reject-actions">
+              <button type="button" onClick={() => setRejectApprovalId(null)}>
+                返回审核
+              </button>
+              <button
+                className="danger"
+                type="button"
+                onClick={confirmRejectApproval}
+              >
+                <Ban size={15} />
+                确认拒绝
               </button>
             </div>
           </section>
