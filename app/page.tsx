@@ -5308,6 +5308,13 @@ export default function HomePage() {
       setNotice("所选任务中没有可以继续的任务");
       return;
     }
+    if (
+      !requireOnline(
+        `设备离线，未继续所选的 ${targetIds.size} 个任务；任务仍保持原状态`,
+      )
+    ) {
+      return;
+    }
     setTasks((items) =>
       items.map((task) =>
         targetIds.has(task.id)
@@ -5887,6 +5894,13 @@ export default function HomePage() {
     if (inviteSavingRef.current) return;
     setInviteFormSubmitted(true);
     if (teamInviteFormHasErrors) return;
+    if (
+      !requireOnline(
+        "设备离线，邀请尚未发送；已填写的姓名、邮箱和角色仍保留在表单中",
+      )
+    ) {
+      return;
+    }
 
     inviteSavingRef.current = true;
     setIsSendingInvite(true);
@@ -5944,6 +5958,13 @@ export default function HomePage() {
       setNotice("成员角色没有变化");
       return;
     }
+    if (
+      !requireOnline(
+        `设备离线，${selectedTeamMember.name}的角色仍保持不变；恢复网络后可以保存`,
+      )
+    ) {
+      return;
+    }
     const previousRole = selectedTeamMember.role;
     setTeamMembers((members) =>
       members.map((member) =>
@@ -5964,6 +5985,13 @@ export default function HomePage() {
 
   function resendTeamInvite() {
     if (!selectedTeamMember || selectedTeamMember.status !== "已邀请") return;
+    if (
+      !requireOnline(
+        `设备离线，尚未向${selectedTeamMember.name}重新发送邀请`,
+      )
+    ) {
+      return;
+    }
     setTeamMembers((members) =>
       members.map((member) =>
         member.id === selectedTeamMember.id
@@ -5983,6 +6011,13 @@ export default function HomePage() {
 
   function confirmRemoveTeamMember() {
     if (!selectedTeamMember || selectedTeamMember.role === "所有者") return;
+    if (
+      !requireOnline(
+        `设备离线，${selectedTeamMember.name}仍保留工作区访问权限；恢复网络后可以移除`,
+      )
+    ) {
+      return;
+    }
     const removedMember = selectedTeamMember;
     setTeamMembers((members) =>
       members.filter((member) => member.id !== removedMember.id),
@@ -7746,12 +7781,16 @@ export default function HomePage() {
                     暂停
                   </button>
                   <button
+                    className={!isOnline ? "is-network-paused" : undefined}
                     type="button"
                     disabled={resumableSelectedTaskCount === 0}
                     onClick={bulkResumeTasks}
+                    title={
+                      isOnline ? undefined : "恢复网络后可以继续所选任务"
+                    }
                   >
-                    <Play size={15} />
-                    继续
+                    {isOnline ? <Play size={15} /> : <Globe2 size={15} />}
+                    {isOnline ? "继续" : "联网后继续"}
                   </button>
                   <button
                     type="button"
@@ -9695,6 +9734,16 @@ export default function HomePage() {
               </div>
             </header>
 
+            {!isOnline && (
+              <div className="team-network-note" role="status">
+                <Globe2 size={17} />
+                <span>
+                  <strong>当前设备离线</strong>
+                  <small>邀请内容会保留，恢复网络后再发送。</small>
+                </span>
+              </div>
+            )}
+
             <div className="team-invite-fields">
               <label
                 className={
@@ -9813,16 +9862,22 @@ export default function HomePage() {
                 取消
               </button>
               <button
-                className="primary"
+                className={`primary${!isOnline ? " is-offline" : ""}`}
                 type="submit"
                 disabled={isSendingInvite}
               >
                 {isSendingInvite ? (
                   <LoaderCircle className="is-spinning" size={16} />
+                ) : !isOnline ? (
+                  <Globe2 size={16} />
                 ) : (
                   <Send size={16} />
                 )}
-                {isSendingInvite ? "正在发送" : "发送邀请"}
+                {isSendingInvite
+                  ? "正在发送"
+                  : isOnline
+                    ? "发送邀请"
+                    : "联网后发送"}
               </button>
             </footer>
           </form>
@@ -9868,6 +9923,16 @@ export default function HomePage() {
                 {selectedTeamMember.status}
               </span>
             </header>
+
+            {!isOnline && selectedTeamMember.role !== "所有者" && (
+              <div className="team-network-note member" role="status">
+                <Globe2 size={17} />
+                <span>
+                  <strong>成员权限保持不变</strong>
+                  <small>角色、邀请与访问权限会在恢复网络后才能更新。</small>
+                </span>
+              </div>
+            )}
 
             <div className="team-member-facts">
               <span>
@@ -9952,11 +10017,11 @@ export default function HomePage() {
                     取消
                   </button>
                   <button
-                    className="danger"
+                    className={`danger${!isOnline ? " is-offline" : ""}`}
                     type="button"
                     onClick={confirmRemoveTeamMember}
                   >
-                    确认移除
+                    {isOnline ? "确认移除" : "联网后移除"}
                   </button>
                 </div>
               </div>
@@ -9982,19 +10047,27 @@ export default function HomePage() {
                       移除成员
                     </button>
                     {selectedTeamMember.status === "已邀请" && (
-                      <button type="button" onClick={resendTeamInvite}>
-                        <Mail size={15} />
-                        重发邀请
+                      <button
+                        className={!isOnline ? "is-offline" : undefined}
+                        type="button"
+                        onClick={resendTeamInvite}
+                      >
+                        {isOnline ? <Mail size={15} /> : <Globe2 size={15} />}
+                        {isOnline ? "重发邀请" : "联网后重发"}
                       </button>
                     )}
                     <button
-                      className="primary"
+                      className={`primary${!isOnline ? " is-offline" : ""}`}
                       type="button"
                       data-overlay-initial-focus
                       onClick={saveTeamMemberRole}
                     >
-                      <CheckCircle2 size={15} />
-                      保存角色
+                      {isOnline ? (
+                        <CheckCircle2 size={15} />
+                      ) : (
+                        <Globe2 size={15} />
+                      )}
+                      {isOnline ? "保存角色" : "联网后保存"}
                     </button>
                   </>
                 )}

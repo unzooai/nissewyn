@@ -13713,6 +13713,49 @@ body {
   color: #25866a;
 }
 
+.team-network-note {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  margin: 16px 22px 0;
+  padding: 10px 12px;
+  border: 1px solid #ecd2a8;
+  border-radius: 7px;
+  background: #fffbf3;
+  color: #b36e1b;
+}
+
+.team-network-note > svg {
+  justify-self: center;
+}
+
+.team-network-note > span,
+.team-network-note strong,
+.team-network-note small {
+  display: block;
+  min-width: 0;
+}
+
+.team-network-note strong {
+  color: #5a4226;
+  font-size: 11px;
+  font-weight: 820;
+}
+
+.team-network-note small {
+  margin-top: 3px;
+  color: #7a674e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.team-network-note.member + .team-member-facts {
+  margin-top: 14px;
+  border-top: 1px solid #e3e9ef;
+}
+
 .team-form-error-summary {
   display: flex;
   align-items: center;
@@ -13756,6 +13799,14 @@ body {
   border-color: #2f68b5;
   background: #356fbf;
   color: #ffffff;
+}
+
+.team-dialog-actions > .primary.is-offline,
+.team-member-actions > button.is-offline {
+  border-color: #e2c28e;
+  background: #fff9ee;
+  color: #9b641e;
+  box-shadow: none;
 }
 
 .team-dialog-actions > button:disabled {
@@ -13936,6 +13987,12 @@ body {
   color: #ffffff;
 }
 
+.team-member-remove-confirm .danger.is-offline {
+  border-color: #e2c28e;
+  background: #fff9ee;
+  color: #9b641e;
+}
+
 @media (max-width: 980px) {
   .settings-team-table-head,
   .settings-team-row {
@@ -14091,6 +14148,11 @@ body {
     margin-left: 17px;
   }
 
+  .team-network-note {
+    margin-right: 17px;
+    margin-left: 17px;
+  }
+
   .team-dialog-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -14242,6 +14304,13 @@ body {
   background: #edf5fc;
   color: #285f9e;
   transform: translateY(-1px);
+}
+
+.task-bulk-actions > button.is-network-paused,
+.task-bulk-actions > button.is-network-paused:hover:not(:disabled) {
+  border-color: #e2c28e;
+  background: #fff9ee;
+  color: #9b641e;
 }
 
 .task-bulk-actions > button:disabled {

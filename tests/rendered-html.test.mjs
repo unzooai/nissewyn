@@ -66,6 +66,11 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /保存，联网后运行/);
   assert.match(page, /设备离线，未执行批准操作/);
   assert.match(page, /设备离线，无法测试/);
+  assert.match(page, /设备离线，未继续所选的/);
+  assert.match(page, /邀请尚未发送；已填写的姓名/);
+  assert.match(page, /角色仍保持不变；恢复网络后可以保存/);
+  assert.match(page, /成员权限保持不变/);
+  assert.match(page, /className="team-network-note"/);
   assert.match(page, /function toggleDesktopNotifications/);
   assert.match(page, /window\.Notification\.requestPermission/);
   assert.match(page, /new window\.Notification/);
@@ -296,6 +301,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.network-status-banner/);
   assert.match(css, /\.clarity-sidebar-status > i\.offline/);
   assert.match(css, /\.task-offline-note/);
+  assert.match(css, /\.team-network-note/);
+  assert.match(css, /\.is-network-paused/);
+  assert.match(css, /\.primary\.is-offline/);
   assert.match(css, /@keyframes notification-sheet-in/);
   assert.match(css, /\.notification-backdrop/);
   assert.match(css, /\.settings-connectors-center/);
