@@ -118,6 +118,8 @@ type PendingWorkspaceImport = {
   fileSize: number;
 };
 type ApprovalRisk = "低风险" | "中风险" | "高风险";
+type ApprovalRiskFilter = "全部" | ApprovalRisk;
+type BulkApprovalDecision = "approve" | "reject";
 type ActivityKind = "任务" | "审批" | "系统";
 type ActivityFilter = "全部" | ActivityKind;
 type ActivitySort = "最新优先" | "最早优先";
@@ -545,6 +547,12 @@ const navItems: Array<{
 ];
 
 const taskFilters: TaskFilter[] = ["全部", "运行中", "待确认", "已暂停", "已完成"];
+const approvalRiskFilters: ApprovalRiskFilter[] = [
+  "全部",
+  "高风险",
+  "中风险",
+  "低风险",
+];
 const artifactFilters: ArtifactFilter[] = [
   "全部",
   "重点",
@@ -988,6 +996,13 @@ export default function HomePage() {
   const [selectedStep, setSelectedStep] = useState("analyze");
   const [approvals, setApprovals] = useState(initialApprovals);
   const [selectedApprovalId, setSelectedApprovalId] = useState(initialApprovals[0].id);
+  const [approvalListQuery, setApprovalListQuery] = useState("");
+  const [approvalRiskFilter, setApprovalRiskFilter] =
+    useState<ApprovalRiskFilter>("全部");
+  const [selectedApprovalIds, setSelectedApprovalIds] = useState<string[]>([]);
+  const [bulkApprovalDecision, setBulkApprovalDecision] =
+    useState<BulkApprovalDecision | null>(null);
+  const [approvalRejectReason, setApprovalRejectReason] = useState("");
   const [activityLog, setActivityLog] = useState<ActivityItem[]>(initialActivityItems);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("全部");
   const [activityTaskId, setActivityTaskId] = useState<string | null>(null);
@@ -1080,6 +1095,54 @@ export default function HomePage() {
   const pageTitle = viewTitles[activeView];
   const selectedApproval =
     approvals.find((item) => item.id === selectedApprovalId) ?? approvals[0];
+  const normalizedApprovalQuery = approvalListQuery.trim().toLowerCase();
+  const filteredApprovals = useMemo(
+    () =>
+      approvals.filter((approval) => {
+        const relatedTaskTitle =
+          tasks.find((task) => task.id === approval.taskId)?.title ?? "";
+        const matchesRisk =
+          approvalRiskFilter === "全部" ||
+          approval.risk === approvalRiskFilter;
+        const matchesQuery =
+          !normalizedApprovalQuery ||
+          [
+            approval.title,
+            approval.reason,
+            approval.target,
+            approval.scope,
+            approval.policy,
+            relatedTaskTitle,
+          ].some((value) =>
+            value.toLowerCase().includes(normalizedApprovalQuery),
+          );
+        return matchesRisk && matchesQuery;
+      }),
+    [approvalRiskFilter, approvals, normalizedApprovalQuery, tasks],
+  );
+  const selectedApprovals = approvals.filter((approval) =>
+    selectedApprovalIds.includes(approval.id),
+  );
+  const selectedVisibleApprovalCount = filteredApprovals.filter((approval) =>
+    selectedApprovalIds.includes(approval.id),
+  ).length;
+  const allVisibleApprovalsSelected =
+    filteredApprovals.length > 0 &&
+    selectedVisibleApprovalCount === filteredApprovals.length;
+  const bulkApprovableApprovals = selectedApprovals.filter(
+    (approval) => approval.risk !== "高风险",
+  );
+  const selectedHighRiskApprovalCount =
+    selectedApprovals.length - bulkApprovableApprovals.length;
+  const selectedApprovalTaskCount = new Set(
+    selectedApprovals.map((approval) => approval.taskId),
+  ).size;
+  const approvalRiskCounts: Record<ApprovalRiskFilter, number> = {
+    全部: approvals.length,
+    高风险: approvals.filter((approval) => approval.risk === "高风险").length,
+    中风险: approvals.filter((approval) => approval.risk === "中风险").length,
+    低风险: approvals.filter((approval) => approval.risk === "低风险").length,
+  };
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
   const selectedConnector =
     connectorCatalog.find((connector) => connector.id === selectedConnectorId) ??
@@ -1109,8 +1172,10 @@ export default function HomePage() {
     approvals.find((item) => item.id === rejectApprovalId) ?? null;
   const activeOverlayKind = pendingWorkspaceImport
     ? "import"
-    : bulkDeleteOpen
-      ? "bulk-delete"
+    : bulkApprovalDecision
+      ? "bulk-approval"
+      : bulkDeleteOpen
+        ? "bulk-delete"
     : deletingTask
     ? "delete"
     : rejectedApproval
@@ -1458,6 +1523,7 @@ export default function HomePage() {
         (event.metaKey || event.ctrlKey) &&
         event.key.toLowerCase() === "k" &&
         !composerOpen &&
+        !bulkApprovalDecision &&
         !bulkDeleteOpen &&
         !teamInviteOpen &&
         !selectedTeamMember &&
@@ -1495,6 +1561,7 @@ export default function HomePage() {
       window.removeEventListener("keydown", handleSearchShortcut);
     };
   }, [
+    bulkApprovalDecision,
     composerOpen,
     bulkDeleteOpen,
     deletingTask,
@@ -1538,6 +1605,7 @@ export default function HomePage() {
 
     const selectorByKind = {
       import: ".workspace-import-dialog",
+      "bulk-approval": ".bulk-approval-dialog",
       "bulk-delete": ".bulk-delete-dialog",
       delete: ".confirm-delete-dialog",
       reject: ".approval-reject-dialog",
@@ -1568,12 +1636,16 @@ export default function HomePage() {
     function closeTopOverlay() {
       if (activeOverlayKind === "import") {
         setPendingWorkspaceImport(null);
+      } else if (activeOverlayKind === "bulk-approval") {
+        setBulkApprovalDecision(null);
+        setApprovalRejectReason("");
       } else if (activeOverlayKind === "bulk-delete") {
         setBulkDeleteOpen(false);
       } else if (activeOverlayKind === "delete") {
         setDeleteTaskId(null);
       } else if (activeOverlayKind === "reject") {
         setRejectApprovalId(null);
+        setApprovalRejectReason("");
       } else if (activeOverlayKind === "temporary") {
         setTemporaryModeOpen(false);
       } else if (activeOverlayKind === "reset") {
@@ -2269,6 +2341,11 @@ export default function HomePage() {
     setMemberRemoveConfirm(false);
     setApprovals(restoredApprovals);
     setSelectedApprovalId(restoredApprovals[0]?.id ?? "");
+    setApprovalListQuery("");
+    setApprovalRiskFilter("全部");
+    setSelectedApprovalIds([]);
+    setBulkApprovalDecision(null);
+    setApprovalRejectReason("");
     setActivityLog(backup.activity.slice(0, 100));
     setIsRunning(restoredPrimary.status !== "已暂停");
     setSelectedStep("analyze");
@@ -2319,6 +2396,11 @@ export default function HomePage() {
     setInviteFormSubmitted(false);
     setApprovals(initialApprovals.map((item) => ({ ...item })));
     setSelectedApprovalId(initialApprovals[0].id);
+    setApprovalListQuery("");
+    setApprovalRiskFilter("全部");
+    setSelectedApprovalIds([]);
+    setBulkApprovalDecision(null);
+    setApprovalRejectReason("");
     setActivityLog(initialActivityItems.map((item) => ({ ...item })));
     setIsRunning(true);
     setSelectedStep("analyze");
@@ -2399,6 +2481,177 @@ export default function HomePage() {
     scrollApprovalIntoView();
   }
 
+  function approvalMatchesFilters(approval: ApprovalItem) {
+    const relatedTaskTitle =
+      tasks.find((task) => task.id === approval.taskId)?.title ?? "";
+    return (
+      (approvalRiskFilter === "全部" ||
+        approval.risk === approvalRiskFilter) &&
+      (!normalizedApprovalQuery ||
+        [
+          approval.title,
+          approval.reason,
+          approval.target,
+          approval.scope,
+          approval.policy,
+          relatedTaskTitle,
+        ].some((value) =>
+          value.toLowerCase().includes(normalizedApprovalQuery),
+        ))
+    );
+  }
+
+  function getNextApprovalAfterRemoving(removedIds: Set<string>) {
+    const remaining = approvals.filter(
+      (approval) => !removedIds.has(approval.id),
+    );
+    return (
+      remaining.find((approval) => approvalMatchesFilters(approval)) ??
+      remaining[0]
+    );
+  }
+
+  function toggleApprovalSelection(approvalId: string) {
+    setSelectedApprovalIds((selectedIds) =>
+      selectedIds.includes(approvalId)
+        ? selectedIds.filter((id) => id !== approvalId)
+        : [...selectedIds, approvalId],
+    );
+  }
+
+  function toggleAllVisibleApprovals() {
+    const visibleIds = filteredApprovals.map((approval) => approval.id);
+    setSelectedApprovalIds((selectedIds) => {
+      if (allVisibleApprovalsSelected) {
+        return selectedIds.filter((id) => !visibleIds.includes(id));
+      }
+      return Array.from(new Set([...selectedIds, ...visibleIds]));
+    });
+  }
+
+  function requestBulkApprovalDecision(decision: BulkApprovalDecision) {
+    if (selectedApprovals.length === 0) return;
+    if (decision === "approve" && bulkApprovableApprovals.length === 0) {
+      setNotice("高风险操作必须逐项审核，不能批量批准");
+      return;
+    }
+    setApprovalRejectReason("");
+    setBulkApprovalDecision(decision);
+  }
+
+  function confirmBulkApprove() {
+    if (bulkApprovableApprovals.length === 0) return;
+    const approvedIds = new Set(
+      bulkApprovableApprovals.map((approval) => approval.id),
+    );
+    const affectedTaskIds = new Set(
+      bulkApprovableApprovals.map((approval) => approval.taskId),
+    );
+    const nextApproval = getNextApprovalAfterRemoving(approvedIds);
+    const highRiskIds = selectedApprovals
+      .filter((approval) => approval.risk === "高风险")
+      .map((approval) => approval.id);
+    const competitorShouldResume =
+      affectedTaskIds.has("competitor") &&
+      tasks.find((task) => task.id === "competitor")?.status === "待确认";
+
+    setApprovals((items) =>
+      items.filter((approval) => !approvedIds.has(approval.id)),
+    );
+    setSelectedApprovalId(nextApproval?.id ?? "");
+    setSelectedApprovalIds(highRiskIds);
+    setTasks((items) =>
+      items.map((task) => {
+        if (!affectedTaskIds.has(task.id)) return task;
+        const shouldResume = task.status === "待确认";
+        return {
+          ...task,
+          status: shouldResume ? "运行中" : task.status,
+          progress: shouldResume
+            ? Math.min(99, task.progress + 4)
+            : task.progress,
+          updated: shouldResume ? "刚刚批量批准" : "刚刚批准操作",
+        };
+      }),
+    );
+    if (competitorShouldResume) {
+      setIsRunning(true);
+    }
+    bulkApprovableApprovals.forEach((approval) => {
+      recordActivity({
+        title: `已批准：${approval.title}`,
+        detail: `${approval.impact} 授权范围：${approval.scope}。批量决策已记录。`,
+        icon: "shield",
+        tone: "green",
+        kind: "审批",
+        taskId: approval.taskId,
+      });
+    });
+    setBulkApprovalDecision(null);
+    setNotice(
+      selectedHighRiskApprovalCount
+        ? `已批准 ${bulkApprovableApprovals.length} 项，${selectedHighRiskApprovalCount} 项高风险操作保留待审`
+        : `已批准 ${bulkApprovableApprovals.length} 项操作`,
+    );
+    if (nextApproval) {
+      scrollApprovalIntoView();
+    } else {
+      scrollWorkspaceTop();
+    }
+  }
+
+  function confirmBulkReject() {
+    const reason = approvalRejectReason.trim();
+    if (selectedApprovals.length === 0 || reason.length < 4) return;
+    const rejected = [...selectedApprovals];
+    const rejectedIds = new Set(rejected.map((approval) => approval.id));
+    const affectedTaskIds = new Set(
+      rejected.map((approval) => approval.taskId),
+    );
+    const nextApproval = getNextApprovalAfterRemoving(rejectedIds);
+
+    setApprovals((items) =>
+      items.filter((approval) => !rejectedIds.has(approval.id)),
+    );
+    setSelectedApprovalId(nextApproval?.id ?? "");
+    setSelectedApprovalIds([]);
+    setTasks((items) =>
+      items.map((task) =>
+        affectedTaskIds.has(task.id)
+          ? {
+              ...task,
+              status: "已暂停",
+              updated: "因批量审批拒绝暂停",
+            }
+          : task,
+      ),
+    );
+    if (affectedTaskIds.has("competitor")) {
+      setIsRunning(false);
+    }
+    rejected.forEach((approval) => {
+      const relatedTask = tasks.find((task) => task.id === approval.taskId);
+      recordActivity({
+        title: `已拒绝：${approval.title}`,
+        detail: `未执行外部操作，关联任务“${relatedTask?.title ?? approval.taskId}”已暂停。原因：${reason}`,
+        icon: "shield",
+        tone: "red",
+        kind: "审批",
+        taskId: approval.taskId,
+      });
+    });
+    setBulkApprovalDecision(null);
+    setApprovalRejectReason("");
+    setNotice(
+      `已拒绝 ${rejected.length} 项操作，暂停 ${affectedTaskIds.size} 个关联任务`,
+    );
+    if (nextApproval) {
+      scrollApprovalIntoView();
+    } else {
+      scrollWorkspaceTop();
+    }
+  }
+
   function approveCurrent() {
     if (!selectedApproval) return;
     const approved = selectedApproval;
@@ -2409,6 +2662,9 @@ export default function HomePage() {
     );
     setApprovals((items) => items.filter((item) => item.id !== selectedApproval.id));
     setSelectedApprovalId(nextApproval?.id ?? "");
+    setSelectedApprovalIds((selectedIds) =>
+      selectedIds.filter((id) => id !== approved.id),
+    );
     setTasks((items) =>
       items.map((task) =>
         task.id === approved.taskId
@@ -2477,16 +2733,21 @@ export default function HomePage() {
 
   function requestRejectApproval() {
     if (!selectedApproval) return;
+    setApprovalRejectReason("");
     setRejectApprovalId(selectedApproval.id);
   }
 
   function confirmRejectApproval() {
-    if (!rejectedApproval) return;
+    const reason = approvalRejectReason.trim();
+    if (!rejectedApproval || reason.length < 4) return;
     const rejected = rejectedApproval;
     const relatedTask = tasks.find((task) => task.id === rejected.taskId);
     const nextApproval = approvals.find((item) => item.id !== rejected.id);
     setApprovals((items) => items.filter((item) => item.id !== rejected.id));
     setSelectedApprovalId(nextApproval?.id ?? "");
+    setSelectedApprovalIds((selectedIds) =>
+      selectedIds.filter((id) => id !== rejected.id),
+    );
     setTasks((items) =>
       items.map((task) =>
         task.id === rejected.taskId
@@ -2502,9 +2763,10 @@ export default function HomePage() {
       setIsRunning(false);
     }
     setRejectApprovalId(null);
+    setApprovalRejectReason("");
     recordActivity({
       title: `已拒绝：${rejected.title}`,
-      detail: `未执行任何外部操作，关联任务“${relatedTask?.title ?? rejected.taskId}”已暂停。`,
+      detail: `未执行任何外部操作，关联任务“${relatedTask?.title ?? rejected.taskId}”已暂停。原因：${reason}`,
       icon: "shield",
       tone: "red",
       kind: "审批",
@@ -3165,6 +3427,11 @@ export default function HomePage() {
     if (view !== "tasks") {
       setSelectedTaskIds([]);
       setBulkDeleteOpen(false);
+    }
+    if (view !== "approvals") {
+      setSelectedApprovalIds([]);
+      setBulkApprovalDecision(null);
+      setApprovalRejectReason("");
     }
     if (view === "activity") {
       setActivityTaskId(null);
@@ -4419,32 +4686,216 @@ export default function HomePage() {
           <section className="approvals-view">
             {approvals.length ? (
               <>
+                <div className="approval-inbox-toolbar">
+                  <div className="approval-inbox-overview">
+                    <span>
+                      <ShieldCheck size={20} />
+                    </span>
+                    <div>
+                      <small>审批收件箱</small>
+                      <strong>{approvals.length} 项操作等待决定</strong>
+                    </div>
+                    <div className="approval-risk-summary" aria-label="待确认风险分布">
+                      <span>
+                        <i className="risk-dot high" />
+                        高风险 {approvalRiskCounts["高风险"]}
+                      </span>
+                      <span>
+                        <i className="risk-dot medium" />
+                        中风险 {approvalRiskCounts["中风险"]}
+                      </span>
+                      <span>
+                        <i className="risk-dot low" />
+                        低风险 {approvalRiskCounts["低风险"]}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="approval-inbox-controls">
+                    <label className="approval-list-search">
+                      <Search size={16} />
+                      <input
+                        type="search"
+                        aria-label="搜索待确认操作"
+                        autoComplete="off"
+                        placeholder="搜索操作、对象或关联任务"
+                        value={approvalListQuery}
+                        onChange={(event) =>
+                          setApprovalListQuery(event.target.value)
+                        }
+                      />
+                      {approvalListQuery && (
+                        <button
+                          type="button"
+                          aria-label="清除审批搜索"
+                          onClick={() => setApprovalListQuery("")}
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </label>
+                    <div
+                      className="approval-risk-filters"
+                      role="tablist"
+                      aria-label="审批风险筛选"
+                    >
+                      {approvalRiskFilters.map((filter) => (
+                        <button
+                          className={approvalRiskFilter === filter ? "active" : ""}
+                          key={filter}
+                          type="button"
+                          role="tab"
+                          aria-selected={approvalRiskFilter === filter}
+                          onClick={() => setApprovalRiskFilter(filter)}
+                        >
+                          {filter}
+                          <span>{approvalRiskCounts[filter]}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <span className="approval-result-count" aria-live="polite">
+                      显示 {filteredApprovals.length} / {approvals.length} 项
+                    </span>
+                  </div>
+                </div>
+
+                {selectedApprovals.length > 0 && (
+                  <section
+                    className="approval-bulk-bar"
+                    role="toolbar"
+                    aria-label="批量审批操作"
+                  >
+                    <div className="approval-bulk-summary">
+                      <span>
+                        <ListChecks size={17} />
+                      </span>
+                      <span>
+                        <strong>已选择 {selectedApprovals.length} 项操作</strong>
+                        <small>
+                          {selectedHighRiskApprovalCount
+                            ? `${selectedHighRiskApprovalCount} 项高风险操作只能逐项批准`
+                            : `涉及 ${selectedApprovalTaskCount} 个任务`}
+                        </small>
+                      </span>
+                    </div>
+                    <div className="approval-bulk-actions">
+                      <button
+                        className="approval-bulk-select-all"
+                        type="button"
+                        onClick={toggleAllVisibleApprovals}
+                      >
+                        <ListChecks size={15} />
+                        {allVisibleApprovalsSelected ? "取消全选" : "全选当前"}
+                      </button>
+                      <button
+                        className="approve"
+                        type="button"
+                        disabled={bulkApprovableApprovals.length === 0}
+                        onClick={() => requestBulkApprovalDecision("approve")}
+                      >
+                        <Check size={15} />
+                        批量批准
+                        {bulkApprovableApprovals.length > 0 &&
+                          ` ${bulkApprovableApprovals.length}`}
+                      </button>
+                      <button
+                        className="reject"
+                        type="button"
+                        onClick={() => requestBulkApprovalDecision("reject")}
+                      >
+                        <Ban size={15} />
+                        批量拒绝 {selectedApprovals.length}
+                      </button>
+                      <button
+                        className="approval-bulk-clear"
+                        type="button"
+                        aria-label="清除审批选择"
+                        title="清除选择"
+                        onClick={() => setSelectedApprovalIds([])}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </section>
+                )}
+
                 <div className="approval-queue">
                   <div className="approval-queue-heading">
-                    <span>审批队列</span>
-                    <strong>{approvals.length} 项</strong>
-                  </div>
-                  {approvals.map((item) => (
-                    <button
-                      className={selectedApproval?.id === item.id ? "selected" : ""}
-                      key={item.id}
-                      type="button"
-                      aria-pressed={selectedApproval?.id === item.id}
-                      onClick={() => chooseApproval(item.id)}
-                    >
-                      <item.icon size={17} />
-                      <span className="approval-queue-copy">
-                        <span className="approval-queue-topline">
-                          <strong>{item.title}</strong>
-                          <em className={`approval-risk risk-${item.risk}`}>
-                            {item.risk}
-                          </em>
-                        </span>
-                        <small>{item.target} · {item.requestedAt}</small>
+                    <label className="approval-selection-control approval-select-all">
+                      <input
+                        type="checkbox"
+                        aria-label="选择当前筛选中的全部审批"
+                        checked={allVisibleApprovalsSelected}
+                        ref={(input) => {
+                          if (input) {
+                            input.indeterminate =
+                              selectedVisibleApprovalCount > 0 &&
+                              !allVisibleApprovalsSelected;
+                          }
+                        }}
+                        onChange={toggleAllVisibleApprovals}
+                      />
+                      <span aria-hidden="true">
+                        <Check size={13} />
                       </span>
-                      <ChevronRight size={16} />
-                    </button>
+                    </label>
+                    <span>审批队列</span>
+                    <strong>{filteredApprovals.length} 项</strong>
+                  </div>
+                  {filteredApprovals.map((item) => (
+                    <div
+                      className={`approval-queue-row-shell ${
+                        selectedApproval?.id === item.id ? "selected" : ""
+                      } ${selectedApprovalIds.includes(item.id) ? "is-checked" : ""}`}
+                      key={item.id}
+                    >
+                      <label className="approval-selection-control">
+                        <input
+                          type="checkbox"
+                          aria-label={`选择审批：${item.title}`}
+                          checked={selectedApprovalIds.includes(item.id)}
+                          onChange={() => toggleApprovalSelection(item.id)}
+                        />
+                        <span aria-hidden="true">
+                          <Check size={13} />
+                        </span>
+                      </label>
+                      <button
+                        className="approval-queue-main"
+                        type="button"
+                        aria-pressed={selectedApproval?.id === item.id}
+                        aria-label={`查看审批：${item.title}`}
+                        onClick={() => chooseApproval(item.id)}
+                      >
+                        <item.icon size={17} />
+                        <span className="approval-queue-copy">
+                          <span className="approval-queue-topline">
+                            <strong>{item.title}</strong>
+                            <em className={`approval-risk risk-${item.risk}`}>
+                              {item.risk}
+                            </em>
+                          </span>
+                          <small>{item.target} · {item.requestedAt}</small>
+                        </span>
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
                   ))}
+                  {filteredApprovals.length === 0 && (
+                    <div className="approval-queue-empty">
+                      <Search size={22} />
+                      <strong>没有匹配的待确认操作</strong>
+                      <small>换一个关键词或风险等级，待确认操作不会被移除。</small>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setApprovalListQuery("");
+                          setApprovalRiskFilter("全部");
+                        }}
+                      >
+                        清除筛选
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {selectedApproval && (
@@ -6772,6 +7223,180 @@ export default function HomePage() {
         </div>
       )}
 
+      {bulkApprovalDecision && selectedApprovals.length > 0 && (
+        <div
+          className="clarity-dialog-backdrop"
+          onMouseDown={() => {
+            setBulkApprovalDecision(null);
+            setApprovalRejectReason("");
+          }}
+        >
+          <section
+            className={`bulk-approval-dialog is-${bulkApprovalDecision}`}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="bulk-approval-title"
+            aria-describedby="bulk-approval-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="bulk-approval-close"
+              type="button"
+              aria-label="关闭批量审批确认"
+              onClick={() => {
+                setBulkApprovalDecision(null);
+                setApprovalRejectReason("");
+              }}
+            >
+              <X size={17} />
+            </button>
+            <span className="bulk-approval-icon">
+              {bulkApprovalDecision === "approve" ? (
+                <Check size={21} />
+              ) : (
+                <Ban size={21} />
+              )}
+            </span>
+            <span className="bulk-approval-eyebrow">
+              {bulkApprovalDecision === "approve"
+                ? "批量批准操作"
+                : "批量拒绝操作"}
+            </span>
+            <h2 id="bulk-approval-title">
+              {bulkApprovalDecision === "approve"
+                ? `批准 ${bulkApprovableApprovals.length} 项操作？`
+                : `拒绝 ${selectedApprovals.length} 项操作？`}
+            </h2>
+            <p id="bulk-approval-description">
+              {bulkApprovalDecision === "approve"
+                ? "每项授权都只在原申请范围内生效，并会分别写入审计记录。"
+                : "系统不会执行这些外部操作，关联任务将暂停并等待修改。"}
+            </p>
+
+            <div className="bulk-approval-facts">
+              <span>
+                <small>当前选择</small>
+                <strong>{selectedApprovals.length} 项</strong>
+              </span>
+              <span>
+                <small>
+                  {bulkApprovalDecision === "approve" ? "可以批准" : "将拒绝"}
+                </small>
+                <strong>
+                  {bulkApprovalDecision === "approve"
+                    ? bulkApprovableApprovals.length
+                    : selectedApprovals.length}{" "}
+                  项
+                </strong>
+              </span>
+              <span>
+                <small>关联任务</small>
+                <strong>{selectedApprovalTaskCount} 个</strong>
+              </span>
+            </div>
+
+            <div className="bulk-approval-list" aria-label="批量审批项目">
+              {(bulkApprovalDecision === "approve"
+                ? bulkApprovableApprovals
+                : selectedApprovals
+              )
+                .slice(0, 4)
+                .map((approval) => (
+                  <span key={approval.id}>
+                    <span>
+                      <strong>{approval.title}</strong>
+                      <small>{approval.target}</small>
+                    </span>
+                    <em className={`risk-${approval.risk}`}>
+                      {approval.risk}
+                    </em>
+                  </span>
+                ))}
+              {(bulkApprovalDecision === "approve"
+                ? bulkApprovableApprovals.length
+                : selectedApprovals.length) > 4 && (
+                <small>
+                  另有{" "}
+                  {(bulkApprovalDecision === "approve"
+                    ? bulkApprovableApprovals.length
+                    : selectedApprovals.length) - 4}{" "}
+                  项操作
+                </small>
+              )}
+            </div>
+
+            {bulkApprovalDecision === "approve" &&
+              selectedHighRiskApprovalCount > 0 && (
+                <div className="bulk-approval-protected-note">
+                  <ShieldCheck size={16} />
+                  <span>
+                    {selectedHighRiskApprovalCount} 项高风险操作不会被批量批准，将保留在队列中逐项审核。
+                  </span>
+                </div>
+              )}
+
+            {bulkApprovalDecision === "reject" && (
+              <label className="approval-reject-reason">
+                <span>
+                  <strong>拒绝原因</strong>
+                  <small>将写入每一条审批记录</small>
+                </span>
+                <textarea
+                  data-overlay-initial-focus
+                  aria-label="批量拒绝原因"
+                  maxLength={120}
+                  placeholder="例如：执行对象不正确，需要重新确认授权范围"
+                  value={approvalRejectReason}
+                  onChange={(event) =>
+                    setApprovalRejectReason(event.target.value)
+                  }
+                />
+                <small>{approvalRejectReason.trim().length} / 120，至少 4 个字</small>
+              </label>
+            )}
+
+            <div className="bulk-approval-actions">
+              <button
+                type="button"
+                data-overlay-initial-focus={
+                  bulkApprovalDecision === "approve" ? true : undefined
+                }
+                onClick={() => {
+                  setBulkApprovalDecision(null);
+                  setApprovalRejectReason("");
+                }}
+              >
+                返回检查
+              </button>
+              <button
+                className={
+                  bulkApprovalDecision === "approve" ? "confirm" : "danger"
+                }
+                type="button"
+                disabled={
+                  bulkApprovalDecision === "reject" &&
+                  approvalRejectReason.trim().length < 4
+                }
+                onClick={
+                  bulkApprovalDecision === "approve"
+                    ? confirmBulkApprove
+                    : confirmBulkReject
+                }
+              >
+                {bulkApprovalDecision === "approve" ? (
+                  <Check size={15} />
+                ) : (
+                  <Ban size={15} />
+                )}
+                {bulkApprovalDecision === "approve"
+                  ? `批准 ${bulkApprovableApprovals.length} 项`
+                  : `拒绝 ${selectedApprovals.length} 项`}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {bulkDeleteOpen && (
         <div
           className="clarity-dialog-backdrop"
@@ -6921,7 +7546,10 @@ export default function HomePage() {
       {rejectedApproval && (
         <div
           className="clarity-dialog-backdrop"
-          onMouseDown={() => setRejectApprovalId(null)}
+          onMouseDown={() => {
+            setRejectApprovalId(null);
+            setApprovalRejectReason("");
+          }}
         >
           <section
             className="approval-reject-dialog"
@@ -6935,7 +7563,10 @@ export default function HomePage() {
               className="approval-reject-close"
               type="button"
               aria-label="关闭拒绝确认"
-              onClick={() => setRejectApprovalId(null)}
+              onClick={() => {
+                setRejectApprovalId(null);
+                setApprovalRejectReason("");
+              }}
             >
               <X size={17} />
             </button>
@@ -6964,6 +7595,23 @@ export default function HomePage() {
                 </strong>
               </span>
             </div>
+            <label className="approval-reject-reason">
+              <span>
+                <strong>拒绝原因</strong>
+                <small>将写入这条审批的审计记录</small>
+              </span>
+              <textarea
+                data-overlay-initial-focus
+                aria-label="拒绝原因"
+                maxLength={120}
+                placeholder="例如：执行对象不正确，需要重新确认授权范围"
+                value={approvalRejectReason}
+                onChange={(event) =>
+                  setApprovalRejectReason(event.target.value)
+                }
+              />
+              <small>{approvalRejectReason.trim().length} / 120，至少 4 个字</small>
+            </label>
             <div className="approval-reject-note">
               <ShieldCheck size={16} />
               <span>拒绝决定会写入审计记录，不会发生任何外部操作。</span>
@@ -6971,14 +7619,17 @@ export default function HomePage() {
             <div className="approval-reject-actions">
               <button
                 type="button"
-                data-overlay-initial-focus
-                onClick={() => setRejectApprovalId(null)}
+                onClick={() => {
+                  setRejectApprovalId(null);
+                  setApprovalRejectReason("");
+                }}
               >
                 返回审核
               </button>
               <button
                 className="danger"
                 type="button"
+                disabled={approvalRejectReason.trim().length < 4}
                 onClick={confirmRejectApproval}
               >
                 <Ban size={15} />
