@@ -8158,3 +8158,279 @@ body {
     padding-left: 0;
   }
 }
+
+/* Mobile workspace: persistent navigation and a compact operational header. */
+.clarity-nav button > small,
+.clarity-mobile-topbar {
+  display: none;
+}
+
+@media (max-width: 680px) {
+  .clarity-shell {
+    display: block;
+    min-height: 100dvh;
+  }
+
+  .clarity-sidebar {
+    position: fixed;
+    z-index: 70;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: block;
+    width: 100%;
+    height: calc(68px + env(safe-area-inset-bottom));
+    padding: 5px 6px env(safe-area-inset-bottom);
+    border-top: 1px solid rgba(125, 145, 169, 0.22);
+    border-right: 0;
+    border-bottom: 0;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 -12px 32px rgba(33, 51, 77, 0.1);
+    backdrop-filter: blur(18px);
+  }
+
+  .clarity-sidebar .clarity-brand,
+  .clarity-sidebar-status {
+    display: none;
+  }
+
+  .clarity-nav {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 2px;
+    width: min(100%, 560px);
+    height: 58px;
+    margin: 0 auto;
+  }
+
+  .clarity-nav button {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 58px;
+    padding: 5px 2px 4px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border-radius: 7px;
+    color: #748092;
+  }
+
+  .clarity-nav button > svg {
+    width: 19px;
+    height: 19px;
+    flex: 0 0 auto;
+  }
+
+  .clarity-nav button > span {
+    display: none;
+  }
+
+  .clarity-nav button > small {
+    display: block;
+    overflow: hidden;
+    color: inherit;
+    font-size: 11px;
+    font-weight: 670;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .clarity-nav button:hover {
+    background: #f3f6f9;
+    color: #314052;
+    transform: none;
+  }
+
+  .clarity-nav button.active {
+    background: #eef8f4;
+    color: #08795d;
+    box-shadow: none;
+  }
+
+  .clarity-nav button.active::after {
+    position: absolute;
+    top: -5px;
+    width: 22px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: #16a77e;
+    content: "";
+  }
+
+  .clarity-nav button em {
+    top: 2px;
+    right: calc(50% - 21px);
+    min-width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+    font-size: 11px;
+    line-height: 12px;
+  }
+
+  .clarity-main {
+    width: 100%;
+    padding: 14px 10px calc(94px + env(safe-area-inset-bottom));
+  }
+
+  .clarity-mobile-topbar {
+    position: sticky;
+    z-index: 35;
+    top: 0;
+    display: flex;
+    min-height: 58px;
+    margin: -14px -10px 17px;
+    padding: 7px 10px;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(125, 145, 169, 0.18);
+    background: rgba(250, 252, 255, 0.94);
+    box-shadow: 0 8px 24px rgba(42, 58, 81, 0.055);
+    backdrop-filter: blur(18px);
+  }
+
+  .clarity-mobile-brand {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #172332;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .clarity-mobile-brand > img {
+    display: block;
+    width: 31px;
+    height: 31px;
+    filter: drop-shadow(0 5px 6px rgba(19, 50, 43, 0.11));
+  }
+
+  .clarity-mobile-brand > span,
+  .clarity-mobile-brand strong,
+  .clarity-mobile-brand small {
+    display: block;
+    min-width: 0;
+  }
+
+  .clarity-mobile-brand strong {
+    font-size: 13px;
+    font-weight: 820;
+    line-height: 1.1;
+  }
+
+  .clarity-mobile-brand small {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 4px;
+    color: #718077;
+    font-size: 11px;
+    font-weight: 610;
+    line-height: 1;
+  }
+
+  .clarity-mobile-brand small > i {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #c3cad1;
+    box-shadow: 0 0 0 3px rgba(195, 202, 209, 0.18);
+  }
+
+  .clarity-mobile-brand small > i.online {
+    background: #16b785;
+    box-shadow: 0 0 0 3px rgba(22, 183, 133, 0.13);
+  }
+
+  .clarity-mobile-create {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid #132031;
+    border-radius: 7px;
+    background: #132031;
+    color: #ffffff;
+    cursor: pointer;
+    box-shadow: 0 9px 20px rgba(19, 32, 49, 0.17);
+  }
+
+  .clarity-mobile-create:active {
+    transform: translateY(1px);
+  }
+
+  .clarity-header {
+    gap: 15px;
+    margin-bottom: 17px;
+  }
+
+  .clarity-page-title h1 {
+    max-width: 350px;
+    font-size: 22px;
+    line-height: 1.24;
+  }
+
+  .clarity-header-actions {
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 8px;
+  }
+
+  .clarity-header-actions .clarity-primary-button {
+    display: none;
+  }
+
+  .clarity-search,
+  .clarity-icon-button {
+    min-height: 44px;
+  }
+
+  .clarity-toast,
+  .clarity-shell:has(.task-detail-drawer) .clarity-toast {
+    right: 10px;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+    left: 10px;
+  }
+
+  .clarity-main > *,
+  .artifacts-view,
+  .artifact-overview,
+  .artifact-toolbar,
+  .artifact-workspace,
+  .artifact-list,
+  .artifact-preview,
+  .artifact-preview-empty {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .artifacts-view,
+  .artifact-overview,
+  .artifact-toolbar,
+  .artifact-workspace,
+  .artifact-list,
+  .artifact-preview,
+  .artifact-preview-empty {
+    width: 100%;
+  }
+
+  .artifact-filter-tabs {
+    width: 100%;
+    max-width: 100%;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  .artifact-filter-tabs::-webkit-scrollbar {
+    display: none;
+  }
+}

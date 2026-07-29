@@ -315,13 +315,18 @@ function getNextRunLabel(task: TaskItem) {
   return task.status === "已完成" ? "已完成" : "创建后立即运行";
 }
 
-const navItems: Array<{ id: ViewId; label: string; icon: typeof Home }> = [
-  { id: "home", label: "首页", icon: Home },
-  { id: "tasks", label: "任务", icon: ListChecks },
-  { id: "approvals", label: "待确认", icon: ShieldCheck },
-  { id: "artifacts", label: "成果", icon: Files },
-  { id: "activity", label: "运行记录", icon: History },
-  { id: "settings", label: "设置", icon: Settings2 },
+const navItems: Array<{
+  id: ViewId;
+  label: string;
+  mobileLabel: string;
+  icon: typeof Home;
+}> = [
+  { id: "home", label: "首页", mobileLabel: "首页", icon: Home },
+  { id: "tasks", label: "任务", mobileLabel: "任务", icon: ListChecks },
+  { id: "approvals", label: "待确认", mobileLabel: "确认", icon: ShieldCheck },
+  { id: "artifacts", label: "成果", mobileLabel: "成果", icon: Files },
+  { id: "activity", label: "运行记录", mobileLabel: "记录", icon: History },
+  { id: "settings", label: "设置", mobileLabel: "设置", icon: Settings2 },
 ];
 
 const taskFilters: TaskFilter[] = ["全部", "运行中", "待确认", "已暂停", "已完成"];
@@ -1790,6 +1795,18 @@ export default function HomePage() {
     setNotice("已进入临时会话，关闭页面前可以随时重新开启保存");
   }
 
+  function scrollWorkspaceTop() {
+    window.requestAnimationFrame(() => {
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      window.scrollTo({
+        top: 0,
+        behavior: reduceMotion ? "auto" : "smooth",
+      });
+    });
+  }
+
   function openView(view: ViewId) {
     setActiveView(view);
     if (view === "activity") {
@@ -1802,6 +1819,7 @@ export default function HomePage() {
     }
     setNotificationsOpen(false);
     setSelectedTaskId(null);
+    scrollWorkspaceTop();
   }
 
   function openTask(taskId: string) {
@@ -1815,6 +1833,7 @@ export default function HomePage() {
     setActiveView("activity");
     setSelectedTaskId(null);
     setNotificationsOpen(false);
+    scrollWorkspaceTop();
   }
 
   function openTaskArtifacts(taskId: string) {
@@ -1825,6 +1844,7 @@ export default function HomePage() {
     setActiveView("artifacts");
     setSelectedTaskId(null);
     setNotificationsOpen(false);
+    scrollWorkspaceTop();
   }
 
   function chooseArtifactFilter(filter: ArtifactFilter) {
@@ -1998,11 +2018,13 @@ export default function HomePage() {
               key={item.id}
               type="button"
               aria-label={item.label}
+              aria-current={activeView === item.id ? "page" : undefined}
               title={item.label}
               onClick={() => openView(item.id)}
             >
               <item.icon size={18} />
               <span>{item.label}</span>
+              <small>{item.mobileLabel}</small>
               {item.id === "approvals" && approvals.length > 0 && (
                 <em>{approvals.length}</em>
               )}
@@ -2022,6 +2044,34 @@ export default function HomePage() {
       </aside>
 
       <section className="clarity-main">
+        <div className="clarity-mobile-topbar">
+          <button
+            className="clarity-mobile-brand"
+            type="button"
+            aria-label="返回首页"
+            onClick={() => openView("home")}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/unzoo-one-mark.svg" alt="" />
+            <span>
+              <strong>Unzoo One</strong>
+              <small>
+                <i className={isRunning ? "online" : ""} />
+                {isRunning ? "系统运行正常" : "任务已暂停"}
+              </small>
+            </span>
+          </button>
+          <button
+            className="clarity-mobile-create"
+            type="button"
+            aria-label="新建任务"
+            title="新建任务"
+            onClick={beginCreateTask}
+          >
+            <Plus size={19} />
+          </button>
+        </div>
+
         <header className="clarity-header">
           <div className="clarity-page-title">
             <span>{pageTitle.eyebrow}</span>

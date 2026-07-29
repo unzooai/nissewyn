@@ -71,8 +71,13 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function toggleArtifactStar/);
   assert.match(page, /function requestToggleLocalPersistence/);
   assert.match(page, /function confirmTemporaryMode/);
+  assert.match(page, /function scrollWorkspaceTop/);
   assert.match(page, /temporaryModeOpen/);
   assert.match(page, /关闭页面后保留工作区/);
+  assert.match(page, /mobileLabel/);
+  assert.match(page, /clarity-mobile-topbar/);
+  assert.match(page, /clarity-mobile-create/);
+  assert.match(page, /aria-current=/);
   assert.match(page, /function requestRejectApproval/);
   assert.match(page, /function confirmRejectApproval/);
   assert.match(page, /rejectedApproval/);
@@ -129,6 +134,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.task-detail-artifacts/);
   assert.match(css, /\.temporary-session-dialog/);
   assert.match(css, /\.workspace-data-summary\.is-temporary/);
+  assert.match(css, /\.clarity-mobile-topbar/);
+  assert.match(css, /grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(css, /\.task-detail-heading-actions/);
   assert.match(css, /\.activity-filter-tabs/);
   assert.match(css, /\.activity-export/);
