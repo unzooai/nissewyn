@@ -263,6 +263,15 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /放弃这次角色修改/);
   assert.match(page, /function saveUsageBudget/);
   assert.match(page, /function exportUsageReport/);
+  assert.match(page, /function requireBudgetCapacity/);
+  assert.match(page, /usageBudgetRequiresConfirmation/);
+  assert.match(page, /usagePauseConfirmed/);
+  assert.match(page, /我已确认立即暂停/);
+  assert.match(page, /新建、继续和重试任务都会被预算保护阻止/);
+  assert.match(page, /usageDraftAlertCreditLevel/);
+  assert.match(page, /budgetRunBlocked/);
+  assert.match(page, /保存为已暂停/);
+  assert.match(page, /任务会先保存，不会运行/);
   assert.match(page, /usage: usageSettings/);
   assert.match(page, /aria-label="本月 AI 额度使用"/);
   assert.match(page, /function scrollWorkspaceTop/);
@@ -316,7 +325,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function focusTaskComposerSection/);
   assert.match(page, /className="task-composer-progress"/);
   assert.match(page, /className="task-composer-workspace"/);
-  assert.match(page, /className="task-composer-launch-preview"/);
+  assert.match(page, /className={`task-composer-launch-preview/);
   assert.match(page, /!editingTaskId && \(/);
   assert.match(page, /type TaskSchedule =/);
   assert.match(page, /type Weekday =/);
@@ -449,6 +458,13 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.usage-breakdown-list/);
   assert.match(css, /\.usage-budget-dialog/);
   assert.match(css, /\.usage-budget-warning/);
+  assert.match(css, /\.usage-meter-status/);
+  assert.match(css, /\.usage-budget-insights/);
+  assert.match(css, /\.usage-budget-impact/);
+  assert.match(css, /\.usage-budget-confirm:has\(input:checked\)/);
+  assert.match(css, /\.usage-budget-actions\s*\{[^}]*position:\s*sticky/s);
+  assert.match(css, /\.task-budget-note/);
+  assert.match(css, /\.task-composer-launch-preview\.is-budget-blocked/);
   assert.match(page, /handleOverlayKeyDown/);
   assert.match(page, /data-overlay-initial-focus/);
   assert.match(page, /notificationWrapRef/);

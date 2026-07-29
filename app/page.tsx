@@ -2400,6 +2400,7 @@ export default function HomePage() {
   const [usagePauseDraft, setUsagePauseDraft] = useState(
     defaultUsageSettings.pauseAtLimit,
   );
+  const [usagePauseConfirmed, setUsagePauseConfirmed] = useState(false);
   const [settingsDiscardTarget, setSettingsDiscardTarget] =
     useState<SettingsDraftTarget | null>(null);
   const [connectorStates, setConnectorStates] = useState<ConnectorState>(
@@ -2802,20 +2803,35 @@ export default function HomePage() {
     (total, item) => total + item.credits,
     0,
   );
+  const usageRunningTaskCount = tasks.filter(
+    (task) => task.status === "运行中",
+  ).length;
   const forecastCredits =
     usedCredits +
-    tasks.filter((task) => task.status === "运行中").length * 65 +
+    usageRunningTaskCount * 65 +
     tasks.filter((task) => task.schedule !== "仅运行一次").length * 22;
-  const usagePercent = Math.min(
-    100,
-    Math.round((usedCredits / usageSettings.monthlyBudget) * 100),
+  const usagePercent = Math.round(
+    (usedCredits / usageSettings.monthlyBudget) * 100,
   );
+  const usageProgressPercent = Math.min(100, usagePercent);
   const budgetExceeded = usedCredits >= usageSettings.monthlyBudget;
+  const budgetRunBlocked =
+    usageSettings.pauseAtLimit && budgetExceeded;
   const budgetAlertReached =
     usagePercent >= usageSettings.alertThreshold || budgetExceeded;
+  const remainingCredits = Math.max(
+    0,
+    usageSettings.monthlyBudget - usedCredits,
+  );
+  const alertCreditLevel = Math.round(
+    usageSettings.monthlyBudget * (usageSettings.alertThreshold / 100),
+  );
+  const creditsUntilAlert = Math.max(0, alertCreditLevel - usedCredits);
+  const forecastVariance = usageSettings.monthlyBudget - forecastCredits;
   const usageBudgetDraftValue = Number(usageBudgetDraft);
   const usageBudgetDraftInvalid =
     !Number.isFinite(usageBudgetDraftValue) ||
+    !Number.isInteger(usageBudgetDraftValue) ||
     usageBudgetDraftValue < 100 ||
     usageBudgetDraftValue > 50000;
   const usageBudgetDirty =
@@ -2823,6 +2839,83 @@ export default function HomePage() {
     (usageBudgetDraft !== String(usageSettings.monthlyBudget) ||
       usageAlertDraft !== usageSettings.alertThreshold ||
       usagePauseDraft !== usageSettings.pauseAtLimit);
+  const usageDraftAlertCreditLevel = usageBudgetDraftInvalid
+    ? 0
+    : Math.round(usageBudgetDraftValue * (usageAlertDraft / 100));
+  const usageDraftRemaining = usageBudgetDraftInvalid
+    ? 0
+    : usageBudgetDraftValue - usedCredits;
+  const usageDraftForecastVariance = usageBudgetDraftInvalid
+    ? 0
+    : usageBudgetDraftValue - forecastCredits;
+  const usageBudgetChange = usageBudgetDraftInvalid
+    ? 0
+    : usageBudgetDraftValue - usageSettings.monthlyBudget;
+  const usageBudgetRequiresConfirmation =
+    usageBudgetDirty &&
+    !usageBudgetDraftInvalid &&
+    usagePauseDraft &&
+    usageBudgetDraftValue <= usedCredits &&
+    usageRunningTaskCount > 0;
+  const usageBudgetCanSaveBase =
+    usageBudgetDirty &&
+    !usageBudgetDraftInvalid &&
+    (!usageBudgetRequiresConfirmation || usagePauseConfirmed);
+
+  useEffect(() => {
+    if (
+      !tasksReady ||
+      !usageSettings.pauseAtLimit ||
+      !budgetExceeded
+    ) {
+      return;
+    }
+
+    const runningTaskIds = tasks
+      .filter((task) => task.status === "运行中")
+      .map((task) => task.id);
+    if (runningTaskIds.length === 0) return;
+
+    const runningIds = new Set(runningTaskIds);
+    const protectionTimer = window.setTimeout(() => {
+      setTasks((items) =>
+        items.map((task) =>
+          runningIds.has(task.id)
+            ? {
+                ...task,
+                status: "已暂停",
+                updated: "因用量到限保护暂停",
+                runs: stopActiveTaskRuns(
+                  task.runs,
+                  "达到预算上限，系统已停止本次运行。",
+                ),
+              }
+            : task,
+        ),
+      );
+      if (runningIds.has("competitor")) setIsRunning(false);
+      recordActivity({
+        title: "预算保护已自动生效",
+        detail: `本月已使用 ${usedCredits} 点，达到 ${usageSettings.monthlyBudget} 点额度；已暂停 ${runningTaskIds.length} 个运行中任务。`,
+        icon: "shield",
+        tone: "amber",
+        kind: "系统",
+      });
+      setNotice(
+        `已达到月度额度，预算保护暂停了 ${runningTaskIds.length} 个任务`,
+      );
+    }, 0);
+
+    return () => window.clearTimeout(protectionTimer);
+  }, [
+    budgetExceeded,
+    tasks,
+    tasksReady,
+    usageSettings.monthlyBudget,
+    usageSettings.pauseAtLimit,
+    usedCredits,
+  ]);
+
   const workspaceProfileFormErrors = useMemo<WorkspaceProfileFormErrors>(() => {
     const errors: WorkspaceProfileFormErrors = {};
     const normalizedName = workspaceNameDraft.trim();
@@ -3112,6 +3205,8 @@ export default function HomePage() {
     workspaceSyncNotice?.conflicts.includes("artifact") ?? false;
   const budgetWorkspaceConflict =
     workspaceSyncNotice?.conflicts.includes("budget") ?? false;
+  const usageBudgetCanSave =
+    usageBudgetCanSaveBase && !budgetWorkspaceConflict;
   const memberWorkspaceConflict =
     workspaceSyncNotice?.conflicts.includes("member") ?? false;
   const profileWorkspaceConflict =
@@ -6013,6 +6108,7 @@ export default function HomePage() {
     setUsageBudgetDraft(String(defaultUsageSettings.monthlyBudget));
     setUsageAlertDraft(defaultUsageSettings.alertThreshold);
     setUsagePauseDraft(defaultUsageSettings.pauseAtLimit);
+    setUsagePauseConfirmed(false);
     setSettingsDiscardTarget(null);
     setConnectorStates({ ...defaultConnectorStates });
     setSelectedConnectorId(null);
@@ -6344,6 +6440,17 @@ export default function HomePage() {
       setBulkApprovalDecision(null);
       return;
     }
+    const approvalWouldResumeTasks = bulkApprovableApprovals.some(
+      (approval) =>
+        tasks.find((task) => task.id === approval.taskId)?.status === "待确认",
+    );
+    if (
+      approvalWouldResumeTasks &&
+      !requireBudgetCapacity("批量批准并继续关联任务")
+    ) {
+      setBulkApprovalDecision(null);
+      return;
+    }
     const approvedIds = new Set(
       bulkApprovableApprovals.map((approval) => approval.id),
     );
@@ -6546,6 +6653,12 @@ export default function HomePage() {
     const approved = approval;
     const relatedTask = tasks.find((task) => task.id === approved.taskId);
     const shouldResume = relatedTask?.status === "待确认";
+    if (
+      shouldResume &&
+      !requireBudgetCapacity(`批准并继续任务“${relatedTask?.title}”`)
+    ) {
+      return;
+    }
     const nextApproval = approvals.find(
       (item) => item.id !== approved.id,
     );
@@ -6785,7 +6898,8 @@ export default function HomePage() {
         return;
       }
 
-      const startImmediately = isOnline;
+      const budgetBlocksRun = budgetRunBlocked;
+      const startImmediately = isOnline && !budgetBlocksRun;
       const newTask: TaskItem = {
         id: `task-${Date.now()}`,
         title: taskName.trim(),
@@ -6793,7 +6907,11 @@ export default function HomePage() {
         target: taskTarget.trim(),
         status: startImmediately ? "运行中" : "已暂停",
         progress: startImmediately ? 3 : 0,
-        updated: startImmediately ? "刚刚创建" : "已保存，等待网络",
+        updated: startImmediately
+          ? "刚刚创建"
+          : budgetBlocksRun
+            ? "已保存，等待调整预算"
+            : "已保存，等待网络",
         schedule: taskSchedule,
         scheduleTime: taskSchedule === "仅运行一次" ? undefined : taskScheduleTime,
         scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
@@ -6829,10 +6947,16 @@ export default function HomePage() {
       setTaskApproval(true);
       recordActivity({
         title: `${
-          startImmediately ? "任务已创建" : "离线任务已保存"
+          startImmediately
+            ? "任务已创建"
+            : budgetBlocksRun
+              ? "任务已保存，预算保护阻止运行"
+              : "离线任务已保存"
         }：${newTask.title}`,
         detail: startImmediately
           ? `${formatTaskSchedule(newTask)} · 目标：${newTask.target}`
+          : budgetBlocksRun
+            ? `${formatTaskSchedule(newTask)} · 当前已使用 ${usedCredits} / ${usageSettings.monthlyBudget} 点，调整额度后可手动开始。`
           : `${formatTaskSchedule(newTask)} · 已保存配置，恢复网络后可手动开始运行。`,
         icon: "sparkles",
         tone: startImmediately ? "blue" : "amber",
@@ -6842,6 +6966,8 @@ export default function HomePage() {
       setNotice(
         startImmediately
           ? `任务“${newTask.title}”已开始运行`
+          : budgetBlocksRun
+            ? `任务“${newTask.title}”已保存；月度额度已用完，暂未运行`
           : `任务“${newTask.title}”已保存，联网后可以开始运行`,
       );
     } finally {
@@ -7152,6 +7278,7 @@ export default function HomePage() {
       setUsageBudgetDraft(String(incoming.usage.monthlyBudget));
       setUsageAlertDraft(incoming.usage.alertThreshold);
       setUsagePauseDraft(incoming.usage.pauseAtLimit);
+      setUsagePauseConfirmed(false);
     }
     if (conflicts.includes("member")) {
       if (latestMember) {
@@ -7359,6 +7486,7 @@ export default function HomePage() {
     ) {
       return;
     }
+    if (!requireBudgetCapacity(`继续所选的 ${targetIds.size} 个任务`)) return;
     setTasks((items) =>
       items.map((task) =>
         targetIds.has(task.id)
@@ -7543,6 +7671,7 @@ export default function HomePage() {
     setUsageBudgetDraft(String(usageSettings.monthlyBudget));
     setUsageAlertDraft(usageSettings.alertThreshold);
     setUsagePauseDraft(usageSettings.pauseAtLimit);
+    setUsagePauseConfirmed(false);
     setSettingsDiscardTarget(null);
     setUsageBudgetOpen(true);
   }
@@ -7618,6 +7747,7 @@ export default function HomePage() {
       setSettingsDiscardTarget("budget");
       return;
     }
+    setUsagePauseConfirmed(false);
     setUsageBudgetOpen(false);
   }
 
@@ -7631,6 +7761,7 @@ export default function HomePage() {
       setUsageBudgetDraft(String(usageSettings.monthlyBudget));
       setUsageAlertDraft(usageSettings.alertThreshold);
       setUsagePauseDraft(usageSettings.pauseAtLimit);
+      setUsagePauseConfirmed(false);
       setUsageBudgetOpen(false);
     } else if (settingsDiscardTarget === "invite") {
       setInviteName("");
@@ -7651,7 +7782,12 @@ export default function HomePage() {
       setNotice("预算已在另一窗口更新，请先处理版本冲突");
       return;
     }
-    if (usageBudgetDraftInvalid) return;
+    if (!usageBudgetCanSave) {
+      if (usageBudgetRequiresConfirmation && !usagePauseConfirmed) {
+        setNotice("请先确认会立即暂停运行中任务");
+      }
+      return;
+    }
     const monthlyBudget = Math.round(usageBudgetDraftValue);
     const nextSettings: UsageSettings = {
       monthlyBudget,
@@ -7664,6 +7800,7 @@ export default function HomePage() {
       .map((task) => task.id);
 
     setUsageSettings(nextSettings);
+    setUsagePauseConfirmed(false);
     setUsageBudgetOpen(false);
     if (shouldPause && runningTaskIds.length > 0) {
       const runningIds = new Set(runningTaskIds);
@@ -8841,6 +8978,19 @@ export default function HomePage() {
     return false;
   }
 
+  function requireBudgetCapacity(actionLabel: string) {
+    if (!usageSettings.pauseAtLimit || !budgetExceeded) return true;
+    recordActivity({
+      title: "预算保护已阻止任务运行",
+      detail: `${actionLabel}未执行：本月已使用 ${usedCredits} / ${usageSettings.monthlyBudget} 点。调整额度后即可继续。`,
+      icon: "shield",
+      tone: "amber",
+      kind: "系统",
+    });
+    setNotice(`月度额度已用完，已阻止${actionLabel}；请先调整预算`);
+    return false;
+  }
+
   async function checkNetworkConnection() {
     if (isCheckingNetwork) return;
     setIsCheckingNetwork(true);
@@ -8938,6 +9088,7 @@ export default function HomePage() {
     ) {
       return;
     }
+    if (!requireBudgetCapacity(`重试任务“${task.title}”`)) return;
     const now = new Date();
     const nextRun: TaskRun = {
       id: `run-${task.id}-${now.getTime()}`,
@@ -8997,6 +9148,12 @@ export default function HomePage() {
       !requireOnline(
         `设备离线，任务“${task.title}”仍保持暂停；恢复网络后可以继续`,
       )
+    ) {
+      return;
+    }
+    if (
+      willStart &&
+      !requireBudgetCapacity(`继续任务“${task.title}”`)
     ) {
       return;
     }
@@ -9066,6 +9223,12 @@ export default function HomePage() {
       !requireOnline(
         `设备离线，任务“${primaryTask.title}”仍保持暂停；恢复网络后可以继续`,
       )
+    ) {
+      return;
+    }
+    if (
+      nextRunning &&
+      !requireBudgetCapacity(`继续任务“${primaryTask.title}”`)
     ) {
       return;
     }
@@ -11941,7 +12104,13 @@ export default function HomePage() {
               <header className="settings-usage-heading">
                 <div>
                   <span>用量与预算</span>
-                  <h2>看清 AI 消耗，并在超额前自动保护</h2>
+                  <h2>
+                    {budgetExceeded
+                      ? "月度额度已用完，保护策略已经生效"
+                      : forecastVariance < 0
+                        ? `按当前趋势，月底预计超出 ${Math.abs(forecastVariance)} 点`
+                        : `本月额度充足，月底预计剩余 ${forecastVariance} 点`}
+                  </h2>
                   <p>本月额度根据任务执行、连接器调用和本机成果记录实时估算。</p>
                 </div>
                 <div className="settings-usage-heading-actions">
@@ -11962,18 +12131,43 @@ export default function HomePage() {
 
               <div className="settings-usage-layout">
                 <div className="usage-meter-panel">
+                  <div className="usage-meter-status">
+                    <span
+                      className={
+                        budgetExceeded
+                          ? "is-over"
+                          : budgetAlertReached
+                            ? "is-alert"
+                            : "is-healthy"
+                      }
+                    >
+                      {budgetExceeded || budgetAlertReached ? (
+                        <AlertTriangle size={15} />
+                      ) : (
+                        <ShieldCheck size={15} />
+                      )}
+                      {budgetExceeded
+                        ? "额度已用完"
+                        : budgetAlertReached
+                          ? "接近额度上限"
+                          : "额度状态健康"}
+                    </span>
+                    <small>
+                      {usageSettings.pauseAtLimit ? "到限自动保护" : "到限仅提醒"}
+                    </small>
+                  </div>
                   <div className="usage-meter-heading">
                     <span>
-                      <small>本月已使用</small>
+                      <small>本月额度</small>
                       <strong>
                         {usedCredits}
-                        <em> 点</em>
+                        <em> / {usageSettings.monthlyBudget} 点</em>
                       </strong>
                     </span>
                     <span>
-                      <small>月度预算</small>
+                      <small>还可使用</small>
                       <strong>
-                        {usageSettings.monthlyBudget}
+                        {remainingCredits}
                         <em> 点</em>
                       </strong>
                     </span>
@@ -11989,7 +12183,7 @@ export default function HomePage() {
                       usageSettings.monthlyBudget,
                     )}
                   >
-                    <span style={{ width: `${usagePercent}%` }} />
+                    <span style={{ width: `${usageProgressPercent}%` }} />
                     <i
                       style={{
                         left: `${Math.min(100, usageSettings.alertThreshold)}%`,
@@ -11999,14 +12193,29 @@ export default function HomePage() {
                   </div>
                   <div className="usage-meter-legend">
                     <span>{usagePercent}% 已使用</span>
-                    <span>{usageSettings.alertThreshold}% 提醒</span>
+                    <span>{alertCreditLevel} 点提醒</span>
                   </div>
-                  <div className="usage-forecast">
+                  <div className="usage-budget-insights">
                     <span>
                       <Activity size={16} />
                       <span>
                         <small>月底预计</small>
-                        <strong>{forecastCredits} 点</strong>
+                        <strong>
+                          {forecastVariance >= 0
+                            ? `剩余 ${forecastVariance} 点`
+                            : `超出 ${Math.abs(forecastVariance)} 点`}
+                        </strong>
+                      </span>
+                    </span>
+                    <span>
+                      <Bell size={16} />
+                      <span>
+                        <small>提醒点位</small>
+                        <strong>
+                          {creditsUntilAlert > 0
+                            ? `再用 ${creditsUntilAlert} 点`
+                            : "已经触发"}
+                        </strong>
                       </span>
                     </span>
                     <span>
@@ -12017,17 +12226,23 @@ export default function HomePage() {
                       </span>
                     </span>
                   </div>
-                  {budgetAlertReached && (
+                  {(budgetAlertReached || forecastVariance < 0) && (
                     <div className="usage-budget-alert" role="status">
                       <AlertTriangle size={16} />
                       <span>
                         <strong>
-                          {budgetExceeded ? "已达到月度预算" : "用量已超过提醒线"}
+                          {budgetExceeded
+                            ? "已达到月度预算"
+                            : budgetAlertReached
+                              ? "用量已超过提醒线"
+                              : "按当前趋势可能超出预算"}
                         </strong>
                         <small>
-                          {usageSettings.pauseAtLimit
-                            ? "到达 100% 后会自动暂停运行中的任务。"
-                            : "当前未开启到限自动暂停，请关注后续消耗。"}
+                          {budgetExceeded && usageSettings.pauseAtLimit
+                            ? "运行中任务会自动暂停，新建、继续和重试也会被阻止。"
+                            : usageSettings.pauseAtLimit
+                              ? `到达 ${usageSettings.monthlyBudget} 点后会自动暂停运行中的任务。`
+                              : "当前未开启到限自动暂停，达到额度后任务仍会继续运行。"}
                         </small>
                       </span>
                     </div>
@@ -12053,7 +12268,7 @@ export default function HomePage() {
                           <span className="usage-breakdown-copy">
                             <span>
                               <strong>{item.label}</strong>
-                              <em>{item.credits} 点</em>
+                              <em>{share}% · {item.credits} 点</em>
                             </span>
                             <small>{item.detail}</small>
                             <i>
@@ -12069,14 +12284,22 @@ export default function HomePage() {
                 <aside className="usage-guard-panel">
                   <div className="usage-section-heading">
                     <span>预算保护</span>
-                    <strong>{budgetExceeded ? "已触发" : "运行中"}</strong>
+                    <strong>
+                      {budgetExceeded
+                        ? "已触发"
+                        : usageSettings.pauseAtLimit
+                          ? "保护中"
+                          : "仅提醒"}
+                    </strong>
                   </div>
                   <div className="usage-guard-list">
                     <div>
                       <Bell size={17} />
                       <span>
                         <small>用量提醒</small>
-                        <strong>达到 {usageSettings.alertThreshold}% 时提醒</strong>
+                        <strong>
+                          {alertCreditLevel} 点（{usageSettings.alertThreshold}%）时提醒
+                        </strong>
                       </span>
                     </div>
                     <div>
@@ -12085,8 +12308,8 @@ export default function HomePage() {
                         <small>到限处理</small>
                         <strong>
                           {usageSettings.pauseAtLimit
-                            ? "自动暂停运行中任务"
-                            : "继续运行并仅显示提醒"}
+                            ? `达到 ${usageSettings.monthlyBudget} 点自动暂停`
+                            : "达到额度后继续运行"}
                         </strong>
                       </span>
                     </div>
@@ -13939,6 +14162,18 @@ export default function HomePage() {
               </div>
             )}
 
+            {!editingTaskId && budgetRunBlocked && (
+              <div className="task-budget-note" role="status">
+                <ShieldCheck size={16} />
+                <span>
+                  <strong>月度额度已用完</strong>
+                  <small>
+                    任务可以保存，但会保持暂停；提高额度后再手动开始运行。
+                  </small>
+                </span>
+              </div>
+            )}
+
             <nav className="task-composer-progress" aria-label="任务配置步骤">
               <span className="task-composer-progress-meta">
                 <strong>{taskComposerReadyCount}/3</strong>
@@ -14111,16 +14346,39 @@ export default function HomePage() {
                   </span>
                 </label>
 
-                <div className="task-composer-launch-preview">
+                <div
+                  className={`task-composer-launch-preview${
+                    !editingTaskId && budgetRunBlocked ? " is-budget-blocked" : ""
+                  }`}
+                >
                   <span>
-                    <Sparkles size={17} />
+                    {!editingTaskId && budgetRunBlocked ? (
+                      <ShieldCheck size={17} />
+                    ) : (
+                      <Sparkles size={17} />
+                    )}
                   </span>
                   <div>
-                    <strong>任务启动预览</strong>
+                    <strong>
+                      {!editingTaskId && budgetRunBlocked
+                        ? "任务会先保存，不会运行"
+                        : "任务启动预览"}
+                    </strong>
                     <p>
-                      AI 将从 <b>{taskTarget.trim() || "你指定的数据来源"}</b> 开始，
-                      按 <b>{formatSchedule(taskSchedule, taskScheduleTime, taskScheduleDay)}</b>
-                      {taskApproval ? " 执行；遇到敏感操作会等待你确认。" : " 自动执行已授权的步骤。"}
+                      {!editingTaskId && budgetRunBlocked ? (
+                        <>
+                          当前已使用 <b>{usedCredits} / {usageSettings.monthlyBudget} 点</b>；
+                          预算保护会把任务保存为已暂停，提高额度后可手动继续。
+                        </>
+                      ) : (
+                        <>
+                          AI 将从 <b>{taskTarget.trim() || "你指定的数据来源"}</b> 开始，
+                          按 <b>{formatSchedule(taskSchedule, taskScheduleTime, taskScheduleDay)}</b>
+                          {taskApproval
+                            ? " 执行；遇到敏感操作会等待你确认。"
+                            : " 自动执行已授权的步骤。"}
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -14307,7 +14565,7 @@ export default function HomePage() {
                   <LoaderCircle className="composer-saving-icon" size={16} />
                 ) : editingTaskId ? (
                   <Pencil size={16} />
-                ) : !isOnline ? (
+                ) : !isOnline || budgetRunBlocked ? (
                   <Save size={16} />
                 ) : (
                   <Sparkles size={16} />
@@ -14315,11 +14573,13 @@ export default function HomePage() {
                 {isSavingTask
                   ? editingTaskId
                     ? "正在保存"
-                    : isOnline
+                    : isOnline && !budgetRunBlocked
                       ? "正在创建"
                       : "正在保存"
                   : editingTaskId
                     ? "保存修改"
+                    : budgetRunBlocked
+                      ? "保存为已暂停"
                     : isOnline
                       ? "创建并运行"
                       : "保存，联网后运行"}
@@ -15042,14 +15302,18 @@ export default function HomePage() {
             >
               <X size={17} />
             </button>
-            <span className="usage-budget-icon">
-              <Sparkles size={21} />
-            </span>
-            <span className="usage-budget-eyebrow">用量与预算</span>
-            <h2 id="usage-budget-title">设置当前工作区的月度额度</h2>
-            <p id="usage-budget-description">
-              额度只影响当前工作区。提醒和到限保护会依据本机估算用量执行。
-            </p>
+            <div className="usage-budget-dialog-head">
+              <span className="usage-budget-icon">
+                <Sparkles size={21} />
+              </span>
+              <span>
+                <span className="usage-budget-eyebrow">用量与预算</span>
+                <h2 id="usage-budget-title">设置月度额度和到限保护</h2>
+                <p id="usage-budget-description">
+                  先预览提醒点位和月底影响，再保存到当前工作区。
+                </p>
+              </span>
+            </div>
 
             <div className="usage-budget-facts">
               <span>
@@ -15057,12 +15321,12 @@ export default function HomePage() {
                 <strong>{usedCredits} 点</strong>
               </span>
               <span>
-                <small>月底预计</small>
-                <strong>{forecastCredits} 点</strong>
+                <small>当前预算</small>
+                <strong>{usageSettings.monthlyBudget} 点</strong>
               </span>
               <span>
-                <small>运行中任务</small>
-                <strong>{runningTaskCount} 个</strong>
+                <small>月底预计</small>
+                <strong>{forecastCredits} 点</strong>
               </span>
             </div>
 
@@ -15081,13 +15345,16 @@ export default function HomePage() {
                   aria-label="月度 AI 额度"
                   aria-invalid={usageBudgetDraftInvalid}
                   value={usageBudgetDraft}
-                  onChange={(event) => setUsageBudgetDraft(event.target.value)}
+                  onChange={(event) => {
+                    setUsageBudgetDraft(event.target.value);
+                    setUsagePauseConfirmed(false);
+                  }}
                 />
                 <em>点 / 月</em>
               </span>
               {usageBudgetDraftInvalid && (
                 <small className="usage-budget-error" role="alert">
-                  请输入 100 到 50,000 之间的额度。
+                  请输入 100 到 50,000 之间的整数额度。
                 </small>
               )}
             </label>
@@ -15100,7 +15367,10 @@ export default function HomePage() {
                   }
                   key={value}
                   type="button"
-                  onClick={() => setUsageBudgetDraft(String(value))}
+                  onClick={() => {
+                    setUsageBudgetDraft(String(value));
+                    setUsagePauseConfirmed(false);
+                  }}
                 >
                   {value.toLocaleString()} 点
                 </button>
@@ -15120,9 +15390,19 @@ export default function HomePage() {
                     type="button"
                     role="radio"
                     aria-checked={usageAlertDraft === threshold}
-                    onClick={() => setUsageAlertDraft(threshold)}
-                  >
-                    {threshold}%
+                  onClick={() => {
+                    setUsageAlertDraft(threshold);
+                    setUsagePauseConfirmed(false);
+                  }}
+                >
+                    <strong>{threshold}%</strong>
+                    <small>
+                      {usageBudgetDraftInvalid
+                        ? "—"
+                        : `${Math.round(
+                            usageBudgetDraftValue * (threshold / 100),
+                          ).toLocaleString()} 点`}
+                    </small>
                   </button>
                 ))}
               </div>
@@ -15133,7 +15413,9 @@ export default function HomePage() {
                 <Pause size={17} />
                 <span>
                   <strong>达到预算后暂停运行中任务</strong>
-                  <small>不会删除任务，调整额度或手动继续后可恢复。</small>
+                  <small>
+                    当前有 {usageRunningTaskCount} 个任务运行中；暂停不会删除进度和证据。
+                  </small>
                 </span>
               </span>
               <button
@@ -15142,35 +15424,139 @@ export default function HomePage() {
                 role="switch"
                 aria-checked={usagePauseDraft}
                 aria-label="达到预算后暂停运行中任务"
-                onClick={() => setUsagePauseDraft((current) => !current)}
+                onClick={() => {
+                  setUsagePauseDraft((current) => !current);
+                  setUsagePauseConfirmed(false);
+                }}
               >
                 <i />
               </button>
             </div>
 
+            <div
+              className={`usage-budget-impact ${
+                usageBudgetDraftInvalid
+                  ? "is-neutral"
+                  : usageDraftRemaining < 0
+                    ? "is-danger"
+                    : usageDraftForecastVariance < 0
+                      ? "is-warning"
+                      : "is-safe"
+              }`}
+              aria-live="polite"
+            >
+              <span>
+                {usageBudgetDraftInvalid ? (
+                  <Sparkles size={17} />
+                ) : usageDraftRemaining < 0 ||
+                  usageDraftForecastVariance < 0 ? (
+                  <AlertTriangle size={17} />
+                ) : (
+                  <ShieldCheck size={17} />
+                )}
+              </span>
+              <span>
+                <small>保存后影响</small>
+                <strong>
+                  {usageBudgetDraftInvalid
+                    ? "输入有效额度后显示影响"
+                    : usageDraftRemaining < 0
+                      ? `当前用量将超出新额度 ${Math.abs(usageDraftRemaining)} 点`
+                      : usageDraftForecastVariance < 0
+                        ? `月底预计超出 ${Math.abs(usageDraftForecastVariance)} 点`
+                        : `月底预计仍有 ${usageDraftForecastVariance} 点可用`}
+                </strong>
+                {!usageBudgetDraftInvalid && (
+                  <em>
+                    {usageBudgetChange === 0
+                      ? "额度不变"
+                      : `比当前${usageBudgetChange > 0 ? "增加" : "减少"} ${Math.abs(usageBudgetChange)} 点`}
+                    {" · "}
+                    {usageDraftAlertCreditLevel} 点时提醒
+                  </em>
+                )}
+              </span>
+              {!usageBudgetDraftInvalid && (
+                <b>
+                  {Math.round((usedCredits / usageBudgetDraftValue) * 100)}%
+                  <small>已使用</small>
+                </b>
+              )}
+            </div>
+
+            {budgetWorkspaceConflict && (
+              <div className="usage-budget-warning is-conflict" role="alert">
+                <AlertTriangle size={16} />
+                <span>
+                  另一窗口已经更新预算。请先处理顶部的版本冲突，再保存这次调整。
+                </span>
+              </div>
+            )}
+
+            {!usageBudgetDraftInvalid && !usagePauseDraft && (
+              <div className="usage-budget-warning is-unprotected">
+                <AlertTriangle size={16} />
+                <span>
+                  到达额度后任务仍会继续运行，只显示提醒，可能产生额外消耗。
+                </span>
+              </div>
+            )}
+
+            {usageBudgetRequiresConfirmation && (
+              <label className="usage-budget-confirm">
+                <input
+                  type="checkbox"
+                  aria-label={`确认立即暂停 ${usageRunningTaskCount} 个运行中任务`}
+                  checked={usagePauseConfirmed}
+                  onChange={(event) =>
+                    setUsagePauseConfirmed(event.target.checked)
+                  }
+                />
+                <span aria-hidden="true">
+                  <Check size={14} />
+                </span>
+                <span>
+                  <strong>
+                    我已确认立即暂停 {usageRunningTaskCount} 个运行中任务
+                  </strong>
+                  <small>
+                    任务进度和证据会保留，提高额度后可以手动继续。
+                  </small>
+                </span>
+              </label>
+            )}
+
             {!usageBudgetDraftInvalid &&
               usagePauseDraft &&
-              usageBudgetDraftValue <= usedCredits && (
+              usageBudgetDraftValue <= usedCredits &&
+              !usageBudgetRequiresConfirmation && (
                 <div className="usage-budget-warning">
                   <AlertTriangle size={16} />
                   <span>
-                    保存后会立即暂停 {runningTaskCount} 个运行中任务，因为当前用量已经达到新预算。
+                    当前用量已经达到新额度；保存后，新建、继续和重试任务都会被预算保护阻止。
                   </span>
                 </div>
               )}
 
             <div className="usage-budget-actions">
+              <span>
+                {usageBudgetDirty
+                  ? "更改会写入运行记录"
+                  : "修改任一设置后即可保存"}
+              </span>
               <button type="button" onClick={requestCloseUsageBudget}>
                 取消
               </button>
               <button
                 className="confirm"
                 type="button"
-                disabled={usageBudgetDraftInvalid}
+                disabled={!usageBudgetCanSave}
                 onClick={saveUsageBudget}
               >
                 <Check size={15} />
-                保存预算
+                {usageBudgetRequiresConfirmation
+                  ? `确认并暂停 ${usageRunningTaskCount} 个任务`
+                  : "保存预算"}
               </button>
             </div>
           </section>
