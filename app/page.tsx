@@ -78,6 +78,7 @@ type WorkspaceBackup = {
 type ApprovalRisk = "低风险" | "中风险" | "高风险";
 type ActivityKind = "任务" | "审批" | "系统";
 type ActivityFilter = "全部" | ActivityKind;
+type ActivitySort = "最新优先" | "最早优先";
 type ActivityTone = "blue" | "violet" | "green" | "amber" | "red" | "neutral";
 type ActivityIconKey =
   | "activity"
@@ -308,6 +309,20 @@ function formatTaskSchedule(task: TaskItem) {
     task.scheduleTime ?? "09:00",
     task.scheduleDay ?? "周一",
   );
+}
+
+function formatAuditTimestamp(createdAt: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  })
+    .format(new Date(createdAt))
+    .replace(/\//g, "-");
 }
 
 function getNextRunLabel(task: TaskItem) {
@@ -779,6 +794,11 @@ export default function HomePage() {
   const [activityLog, setActivityLog] = useState<ActivityItem[]>(initialActivityItems);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("全部");
   const [activityTaskId, setActivityTaskId] = useState<string | null>(null);
+  const [activityListQuery, setActivityListQuery] = useState("");
+  const [activitySort, setActivitySort] = useState<ActivitySort>("最新优先");
+  const [selectedActivityId, setSelectedActivityId] = useState(
+    initialActivityItems[0].id,
+  );
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -818,6 +838,7 @@ export default function HomePage() {
   const overlayTriggerRef = useRef<HTMLElement | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const approvalDetailRef = useRef<HTMLDivElement>(null);
+  const activityInspectorRef = useRef<HTMLElement>(null);
 
   const pageTitle = viewTitles[activeView];
   const selectedApproval =
@@ -842,7 +863,6 @@ export default function HomePage() {
   const overlayOpen = activeOverlayKind !== null;
   const primaryTask = tasks.find((task) => task.id === "competitor") ?? initialTasks[0];
   const activityTask = tasks.find((task) => task.id === activityTaskId) ?? null;
-  const activitySummaryTask = activityTask ?? primaryTask;
   const selectedTaskActivity = selectedTask
     ? activityLog.filter((item) => item.taskId === selectedTask.id).slice(0, 3)
     : [];
@@ -1371,9 +1391,40 @@ export default function HomePage() {
   );
 
   const filteredActivityLog = useMemo(() => {
-    if (activityFilter === "全部") return scopedActivityLog;
-    return scopedActivityLog.filter((item) => item.kind === activityFilter);
-  }, [activityFilter, scopedActivityLog]);
+    const keyword = activityListQuery.trim().toLowerCase();
+    const matchingItems = scopedActivityLog.filter((item) => {
+      if (activityFilter !== "全部" && item.kind !== activityFilter) return false;
+      if (!keyword) return true;
+      const taskTitle =
+        tasks.find((task) => task.id === item.taskId)?.title ?? "";
+      return `${item.title} ${item.detail} ${item.kind} ${item.id} ${taskTitle}`
+        .toLowerCase()
+        .includes(keyword);
+    });
+
+    return [...matchingItems].sort((first, second) => {
+      const delta =
+        new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime();
+      return activitySort === "最新优先" ? delta : -delta;
+    });
+  }, [
+    activityFilter,
+    activityListQuery,
+    activitySort,
+    scopedActivityLog,
+    tasks,
+  ]);
+
+  const selectedActivity =
+    filteredActivityLog.find((item) => item.id === selectedActivityId) ??
+    filteredActivityLog[0] ??
+    null;
+  const SelectedActivityIcon = selectedActivity
+    ? activityIconMap[selectedActivity.icon] ?? Activity
+    : Activity;
+  const selectedActivityTask = selectedActivity?.taskId
+    ? tasks.find((task) => task.id === selectedActivity.taskId) ?? null
+    : null;
 
   const activityCounts = useMemo(
     () => ({
@@ -1454,6 +1505,42 @@ export default function HomePage() {
       kind: "系统",
     });
     setNotice(`已导出 ${activityLog.length} 条审计记录`);
+  }
+
+  function exportActivityItem(item: ActivityItem) {
+    const payload = {
+      product: "Unzoo One",
+      exportedAt: new Date().toISOString(),
+      record: item,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `unzoo-event-${item.id}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+    setNotice(`已导出事件“${item.title}”`);
+  }
+
+  async function copyActivityId(item: ActivityItem) {
+    try {
+      await window.navigator.clipboard.writeText(item.id);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = item.id;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    setNotice(`已复制事件 ID：${item.id}`);
   }
 
   function exportWorkspace() {
@@ -1586,6 +1673,9 @@ export default function HomePage() {
       setTaskFilter("全部");
       setActivityFilter("全部");
       setActivityTaskId(null);
+      setActivityListQuery("");
+      setActivitySort("最新优先");
+      setSelectedActivityId(backup.activity[0]?.id ?? "");
       setSelectedTaskId(null);
       setRejectApprovalId(null);
       setTemporaryModeOpen(false);
@@ -1622,6 +1712,9 @@ export default function HomePage() {
     setTaskFilter("全部");
     setActivityFilter("全部");
     setActivityTaskId(null);
+    setActivityListQuery("");
+    setActivitySort("最新优先");
+    setSelectedActivityId(initialActivityItems[0].id);
     setSelectedTaskId(null);
     setDeleteTaskId(null);
     setRejectApprovalId(null);
@@ -1647,7 +1740,25 @@ export default function HomePage() {
       openView("approvals");
       return;
     }
+    if (item.kind === "系统") {
+      openView("settings");
+      return;
+    }
     setNotice(item.detail);
+  }
+
+  function selectActivityItem(item: ActivityItem) {
+    setSelectedActivityId(item.id);
+    window.requestAnimationFrame(() => {
+      if (!window.matchMedia("(max-width: 980px)").matches) return;
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      activityInspectorRef.current?.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    });
   }
 
   function scrollApprovalIntoView() {
@@ -2036,6 +2147,10 @@ export default function HomePage() {
     setActiveView(view);
     if (view === "activity") {
       setActivityTaskId(null);
+      setActivityFilter("全部");
+      setActivityListQuery("");
+      setActivitySort("最新优先");
+      setSelectedActivityId(activityLog[0]?.id ?? "");
     }
     if (view === "artifacts") {
       setArtifactTaskId(null);
@@ -2053,8 +2168,12 @@ export default function HomePage() {
   }
 
   function openTaskActivity(taskId: string) {
+    const taskActivities = activityLog.filter((item) => item.taskId === taskId);
     setActivityTaskId(taskId);
     setActivityFilter("全部");
+    setActivityListQuery("");
+    setActivitySort("最新优先");
+    setSelectedActivityId(taskActivities[0]?.id ?? "");
     setActiveView("activity");
     setSelectedTaskId(null);
     setNotificationsOpen(false);
@@ -3440,48 +3559,93 @@ export default function HomePage() {
         {activeView === "activity" && (
           <section className="activity-view">
             <div className="activity-toolbar">
-              <div>
-                <span>{activityTask ? "任务审计" : "可信审计"}</span>
-                <strong>{scopedActivityLog.length} 条记录</strong>
+              <div className="activity-toolbar-primary">
+                <div className="activity-toolbar-title">
+                  <span>{activityTask ? "任务审计" : "可信审计"}</span>
+                  <strong>{scopedActivityLog.length} 条记录</strong>
+                </div>
+                <div
+                  className="activity-filter-tabs"
+                  role="tablist"
+                  aria-label="运行记录筛选"
+                >
+                  {activityFilters.map((filter) => (
+                    <button
+                      className={activityFilter === filter ? "active" : ""}
+                      key={filter}
+                      type="button"
+                      role="tab"
+                      aria-selected={activityFilter === filter}
+                      onClick={() => setActivityFilter(filter)}
+                    >
+                      {filter}
+                      <span>{activityCounts[filter]}</span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="activity-export"
+                  type="button"
+                  onClick={exportActivity}
+                >
+                  <Download size={15} />
+                  导出全部
+                </button>
               </div>
-              <div
-                className="activity-filter-tabs"
-                role="tablist"
-                aria-label="运行记录筛选"
-              >
-                {activityFilters.map((filter) => (
-                  <button
-                    className={activityFilter === filter ? "active" : ""}
-                    key={filter}
-                    type="button"
-                    role="tab"
-                    aria-selected={activityFilter === filter}
-                    onClick={() => setActivityFilter(filter)}
+
+              <div className="activity-list-controls">
+                <label className="activity-list-search">
+                  <Search size={16} />
+                  <input
+                    type="search"
+                    aria-label="搜索运行记录"
+                    autoComplete="off"
+                    placeholder="搜索事件、任务或事件 ID"
+                    value={activityListQuery}
+                    onChange={(event) => setActivityListQuery(event.target.value)}
+                  />
+                  {activityListQuery && (
+                    <button
+                      type="button"
+                      aria-label="清除运行记录搜索"
+                      onClick={() => setActivityListQuery("")}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </label>
+
+                <label className="activity-sort-control">
+                  <ArrowUpDown size={15} />
+                  <span>时间</span>
+                  <select
+                    aria-label="运行记录排序"
+                    value={activitySort}
+                    onChange={(event) =>
+                      setActivitySort(event.target.value as ActivitySort)
+                    }
                   >
-                    {filter}
-                    <span>{activityCounts[filter]}</span>
-                  </button>
-                ))}
+                    <option value="最新优先">最新优先</option>
+                    <option value="最早优先">最早优先</option>
+                  </select>
+                </label>
+
+                <span className="activity-result-count" aria-live="polite">
+                  显示 {filteredActivityLog.length} / {scopedActivityLog.length} 条
+                </span>
               </div>
-              <button
-                className="activity-export"
-                type="button"
-                onClick={exportActivity}
-              >
-                <Download size={15} />
-                导出记录
-              </button>
             </div>
 
             <div className="activity-summary">
               <Activity size={18} />
               <div>
-                <strong>{activitySummaryTask.title}</strong>
+                <strong>
+                  {activityTask?.title ?? "所有任务与系统事件"}
+                </strong>
                 <small>
-                  {formatTaskSchedule(activitySummaryTask)} ·{" "}
                   {activityTask
-                    ? "仅显示此任务的记录"
-                    : `已记录 ${scopedActivityLog.length} 个事件`}
+                    ? `${formatTaskSchedule(activityTask)} · 仅显示此任务的记录`
+                    : "任务执行、审批决定和系统变更都保存在这条时间线上"}
                 </small>
               </div>
               <div className="activity-summary-actions">
@@ -3498,60 +3662,202 @@ export default function HomePage() {
                 )}
                 <span
                   className={`live-state ${
-                    activitySummaryTask.status === "运行中" ? "" : "paused"
+                    activityTask && activityTask.status !== "运行中" ? "paused" : ""
                   }`}
                 >
                   <i />
-                  {activitySummaryTask.status}
+                  {activityTask?.status ?? "持续记录"}
                 </span>
               </div>
             </div>
 
-            <div className="activity-timeline" aria-live="polite">
-              {filteredActivityLog.map((item) => {
-                const ItemIcon = activityIconMap[item.icon] ?? Activity;
-                const hasTask = Boolean(
-                  item.taskId && tasks.some((task) => task.id === item.taskId),
-                );
-                return (
-                  <div className="timeline-row" key={item.id}>
-                    <time dateTime={item.createdAt}>{item.time}</time>
-                    <span className={`timeline-icon ${item.tone}`}>
-                      <ItemIcon size={17} />
-                    </span>
-                    <div className="timeline-content">
-                      <span className={`timeline-kind kind-${item.kind}`}>{item.kind}</span>
-                      <strong>{item.title}</strong>
-                      <p>{item.detail}</p>
+            <div className="activity-workspace">
+              <div className="activity-timeline" aria-live="polite">
+                {filteredActivityLog.map((item) => {
+                  const ItemIcon = activityIconMap[item.icon] ?? Activity;
+                  const itemTask = item.taskId
+                    ? tasks.find((task) => task.id === item.taskId) ?? null
+                    : null;
+                  return (
+                    <div
+                      className={`timeline-row ${
+                        selectedActivity?.id === item.id ? "selected" : ""
+                      }`}
+                      key={item.id}
+                    >
+                      <time dateTime={item.createdAt}>{item.time}</time>
+                      <button
+                        className="timeline-row-main"
+                        type="button"
+                        aria-pressed={selectedActivity?.id === item.id}
+                        onClick={() => selectActivityItem(item)}
+                      >
+                        <span className={`timeline-icon ${item.tone}`}>
+                          <ItemIcon size={17} />
+                        </span>
+                        <span className="timeline-content">
+                          <span className={`timeline-kind kind-${item.kind}`}>
+                            {item.kind}
+                          </span>
+                          <strong>{item.title}</strong>
+                          <p>{item.detail}</p>
+                          <small>
+                            {itemTask?.title ??
+                              (item.kind === "系统" ? "工作区系统" : "无关联任务")}
+                          </small>
+                        </span>
+                      </button>
+                      <button
+                        className="timeline-detail-button"
+                        type="button"
+                        onClick={() => selectActivityItem(item)}
+                      >
+                        查看详情
+                        <ChevronRight size={14} />
+                      </button>
                     </div>
-                    <button type="button" onClick={() => openActivityItem(item)}>
-                      {hasTask ? "打开任务" : item.kind === "审批" ? "查看审批" : "详情"}
+                  );
+                })}
+                {filteredActivityLog.length === 0 && (
+                  <div className="activity-empty">
+                    <Search size={22} />
+                    <strong>
+                      {activityListQuery.trim()
+                        ? `没有找到“${activityListQuery.trim()}”`
+                        : activityTask
+                          ? activityFilter === "全部"
+                            ? "这个任务还没有运行记录"
+                            : "这个任务还没有此类记录"
+                          : "这个分类还没有记录"}
+                    </strong>
+                    <small>
+                      {activityListQuery.trim()
+                        ? "可以尝试事件标题、任务名称或事件 ID。"
+                        : "切换分类或查看全部任务的审计记录。"}
+                    </small>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activityListQuery.trim()) {
+                          setActivityListQuery("");
+                        } else if (activityFilter !== "全部") {
+                          setActivityFilter("全部");
+                        } else {
+                          setActivityTaskId(null);
+                        }
+                      }}
+                    >
+                      {activityListQuery.trim()
+                        ? "清除搜索"
+                        : activityFilter !== "全部"
+                          ? "查看此任务全部记录"
+                          : "查看全部任务"}
                     </button>
                   </div>
-                );
-              })}
-              {filteredActivityLog.length === 0 && (
-                <div className="activity-empty">
-                  <Search size={22} />
-                  <strong>
-                    {activityTask
-                      ? activityFilter === "全部"
-                        ? "这个任务还没有运行记录"
-                        : "这个任务还没有此类记录"
-                      : "这个分类还没有记录"}
-                  </strong>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (activityFilter !== "全部") {
-                        setActivityFilter("全部");
-                      } else {
-                        setActivityTaskId(null);
-                      }
-                    }}
-                  >
-                    {activityFilter !== "全部" ? "查看此任务全部记录" : "查看全部任务"}
-                  </button>
+                )}
+              </div>
+
+              {selectedActivity ? (
+                <aside
+                  className="activity-inspector"
+                  ref={activityInspectorRef}
+                  tabIndex={-1}
+                  aria-label="审计事件详情"
+                >
+                  <header className="activity-inspector-heading">
+                    <span className={`timeline-icon ${selectedActivity.tone}`}>
+                      <SelectedActivityIcon size={19} />
+                    </span>
+                    <div>
+                      <small>
+                        {selectedActivity.kind}事件 · 已记录
+                      </small>
+                      <h2>{selectedActivity.title}</h2>
+                    </div>
+                  </header>
+
+                  <p className="activity-inspector-detail">
+                    {selectedActivity.detail}
+                  </p>
+
+                  <div className="activity-inspector-facts">
+                    <span>
+                      <small>发生时间</small>
+                      <strong>
+                        {formatAuditTimestamp(selectedActivity.createdAt)}
+                      </strong>
+                    </span>
+                    <span>
+                      <small>事件类型</small>
+                      <strong>{selectedActivity.kind}</strong>
+                    </span>
+                    <span>
+                      <small>关联对象</small>
+                      <strong>
+                        {selectedActivityTask?.title ?? "全局工作区"}
+                      </strong>
+                    </span>
+                    <span>
+                      <small>触发来源</small>
+                      <strong>
+                        {selectedActivity.kind === "任务"
+                          ? "任务执行引擎"
+                          : selectedActivity.kind === "审批"
+                            ? "审批策略引擎"
+                            : "工作区系统"}
+                      </strong>
+                    </span>
+                  </div>
+
+                  <div className="activity-event-id">
+                    <span>
+                      <small>事件 ID</small>
+                      <code>{selectedActivity.id}</code>
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="复制事件 ID"
+                      title="复制事件 ID"
+                      onClick={() => copyActivityId(selectedActivity)}
+                    >
+                      <Copy size={15} />
+                    </button>
+                  </div>
+
+                  <div className="activity-integrity">
+                    <ShieldCheck size={18} />
+                    <span>
+                      <strong>审计记录已写入本机</strong>
+                      <small>事件时间、来源和关联对象可随工作区一起导出。</small>
+                    </span>
+                  </div>
+
+                  <footer className="activity-inspector-actions">
+                    <button
+                      type="button"
+                      onClick={() => exportActivityItem(selectedActivity)}
+                    >
+                      <Download size={15} />
+                      导出此事件
+                    </button>
+                    <button
+                      className="primary"
+                      type="button"
+                      onClick={() => openActivityItem(selectedActivity)}
+                    >
+                      {selectedActivityTask
+                        ? "打开关联任务"
+                        : selectedActivity.kind === "审批"
+                          ? "查看审批队列"
+                          : "打开系统设置"}
+                      <ChevronRight size={14} />
+                    </button>
+                  </footer>
+                </aside>
+              ) : (
+                <div className="activity-inspector-empty">
+                  <History size={24} />
+                  <strong>选择一条记录查看审计详情</strong>
                 </div>
               )}
             </div>

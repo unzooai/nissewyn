@@ -86,6 +86,10 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /rejectedApproval/);
   assert.match(page, /拒绝后自动暂停任务/);
   assert.match(page, /function exportActivity/);
+  assert.match(page, /function exportActivityItem/);
+  assert.match(page, /aria-label="搜索运行记录"/);
+  assert.match(page, /aria-label="运行记录排序"/);
+  assert.match(page, /aria-label="复制事件 ID"/);
   assert.match(page, /function exportWorkspace/);
   assert.match(page, /async function importWorkspace/);
   assert.match(page, /function resetWorkspace/);
@@ -148,6 +152,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.artifact-overview/);
   assert.match(css, /\.artifact-workspace/);
   assert.match(css, /\.artifact-content-preview/);
+  assert.match(css, /\.activity-workspace/);
+  assert.match(css, /\.activity-inspector/);
   assert.match(css, /\.task-detail-artifacts/);
   assert.match(css, /\.temporary-session-dialog/);
   assert.match(css, /\.workspace-data-summary\.is-temporary/);
