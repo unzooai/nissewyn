@@ -5,6 +5,7 @@ import {
   Activity,
   Bell,
   Brain,
+  CalendarDays,
   Check,
   CheckCircle2,
   ChevronRight,
@@ -29,6 +30,7 @@ import {
 type ViewId = "home" | "tasks" | "approvals" | "activity" | "settings";
 type TaskStatus = "运行中" | "待确认" | "已完成" | "已暂停";
 type TaskFilter = "全部" | TaskStatus;
+type TaskSchedule = "仅运行一次" | "每天" | "每周";
 
 type TaskItem = {
   id: string;
@@ -38,6 +40,8 @@ type TaskItem = {
   status: TaskStatus;
   progress: number;
   updated: string;
+  schedule?: TaskSchedule;
+  requiresApproval?: boolean;
 };
 
 const navItems: Array<{ id: ViewId; label: string; icon: typeof Home }> = [
@@ -87,6 +91,8 @@ const initialTasks: TaskItem[] = [
     status: "运行中",
     progress: 68,
     updated: "刚刚更新",
+    schedule: "每天",
+    requiresApproval: true,
   },
   {
     id: "weekly-report",
@@ -96,6 +102,8 @@ const initialTasks: TaskItem[] = [
     status: "待确认",
     progress: 92,
     updated: "8 分钟前",
+    schedule: "每周",
+    requiresApproval: true,
   },
   {
     id: "meeting",
@@ -105,6 +113,8 @@ const initialTasks: TaskItem[] = [
     status: "已完成",
     progress: 100,
     updated: "今天 10:32",
+    schedule: "仅运行一次",
+    requiresApproval: true,
   },
   {
     id: "research",
@@ -114,6 +124,8 @@ const initialTasks: TaskItem[] = [
     status: "已完成",
     progress: 100,
     updated: "昨天 18:06",
+    schedule: "仅运行一次",
+    requiresApproval: false,
   },
 ];
 
@@ -208,6 +220,44 @@ const signalPoints = signalBars
   })
   .join(" ");
 
+const taskTemplates: Array<{
+  id: string;
+  label: string;
+  title: string;
+  description: string;
+  target: string;
+  schedule: TaskSchedule;
+  icon: typeof Globe2;
+}> = [
+  {
+    id: "monitor",
+    label: "网页监控",
+    title: "跟踪产品页面变化",
+    description: "检查页面内容变化，只保留有意义的更新并生成摘要。",
+    target: "https://example.com/product",
+    schedule: "每天",
+    icon: Globe2,
+  },
+  {
+    id: "research",
+    label: "深度研究",
+    title: "研究一个新主题",
+    description: "从可信来源收集信息，交叉验证后整理成结构化结论。",
+    target: "输入主题或资料来源",
+    schedule: "仅运行一次",
+    icon: Brain,
+  },
+  {
+    id: "report",
+    label: "自动周报",
+    title: "生成团队每周进展",
+    description: "汇总本周项目文件和工作记录，生成可直接发送的周报草稿。",
+    target: "本地项目工作区",
+    schedule: "每周",
+    icon: FileText,
+  },
+];
+
 export default function HomePage() {
   const [activeView, setActiveView] = useState<ViewId>("home");
   const [query, setQuery] = useState("");
@@ -224,6 +274,11 @@ export default function HomePage() {
   const [notice, setNotice] = useState("");
   const [taskName, setTaskName] = useState("跟踪一个新网页");
   const [taskTarget, setTaskTarget] = useState("https://example.com");
+  const [taskDescription, setTaskDescription] = useState(
+    "检查页面内容变化，只保留有意义的更新并生成摘要。",
+  );
+  const [taskSchedule, setTaskSchedule] = useState<TaskSchedule>("每天");
+  const [taskApproval, setTaskApproval] = useState(true);
   const [settings, setSettings] = useState({
     approval: true,
     local: true,
@@ -242,8 +297,13 @@ export default function HomePage() {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setTasks(parsed as TaskItem[]);
-            const primaryTask = (parsed as TaskItem[]).find(
+            const normalizedTasks = (parsed as TaskItem[]).map((task) => ({
+              ...task,
+              schedule: task.schedule ?? "仅运行一次",
+              requiresApproval: task.requiresApproval ?? true,
+            }));
+            setTasks(normalizedTasks);
+            const primaryTask = normalizedTasks.find(
               (task) => task.id === "competitor",
             );
             setIsRunning(primaryTask?.status !== "已暂停");
@@ -326,15 +386,17 @@ export default function HomePage() {
 
   function createTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!taskName.trim() || !taskTarget.trim()) return;
+    if (!taskName.trim() || !taskDescription.trim() || !taskTarget.trim()) return;
     const newTask: TaskItem = {
       id: `task-${Date.now()}`,
       title: taskName.trim(),
-      description: `检查 ${taskTarget.trim()}，识别变化并整理成可阅读的结果。`,
+      description: taskDescription.trim(),
       target: taskTarget.trim(),
       status: "运行中",
       progress: 3,
       updated: "刚刚创建",
+      schedule: taskSchedule,
+      requiresApproval: taskApproval,
     };
     setTasks((items) => [newTask, ...items]);
     setTaskFilter("全部");
@@ -343,7 +405,17 @@ export default function HomePage() {
     setComposerOpen(false);
     setTaskName("");
     setTaskTarget("");
+    setTaskDescription("");
+    setTaskSchedule("仅运行一次");
+    setTaskApproval(true);
     setNotice(`任务“${newTask.title}”已开始运行`);
+  }
+
+  function applyTaskTemplate(template: (typeof taskTemplates)[number]) {
+    setTaskName(template.title);
+    setTaskDescription(template.description);
+    setTaskTarget(template.target);
+    setTaskSchedule(template.schedule);
   }
 
   function openView(view: ViewId) {
@@ -1119,10 +1191,21 @@ export default function HomePage() {
                 </span>
               </div>
               <div>
+                <CalendarDays size={17} />
+                <span>
+                  <small>运行频率</small>
+                  <strong>{selectedTask.schedule ?? "仅运行一次"}</strong>
+                </span>
+              </div>
+              <div>
                 <ShieldCheck size={17} />
                 <span>
                   <small>执行策略</small>
-                  <strong>对外操作前必须确认</strong>
+                  <strong>
+                    {selectedTask.requiresApproval ?? true
+                      ? "对外操作前必须确认"
+                      : "按任务范围自动执行"}
+                  </strong>
                 </span>
               </div>
             </section>
@@ -1200,49 +1283,126 @@ export default function HomePage() {
         <div className="clarity-dialog-backdrop" onMouseDown={() => setComposerOpen(false)}>
           <form
             className="clarity-dialog"
+            role="dialog"
+            aria-modal="true"
             aria-label="新建任务"
+            aria-labelledby="task-composer-title"
             onSubmit={createTask}
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="clarity-dialog-heading">
               <div>
-                <span>新建任务</span>
-                <h2>你希望 Unzoo One 做什么？</h2>
+                <span>任务配置</span>
+                <h2 id="task-composer-title">交给 Unzoo One 一项工作</h2>
+                <p>描述结果，选择节奏，然后让 AI 持续执行。</p>
               </div>
               <button type="button" aria-label="关闭" onClick={() => setComposerOpen(false)}>
                 <X size={17} />
               </button>
             </div>
 
-            <label>
-              <span>任务名称</span>
-              <input
+            <section className="task-template-picker" aria-label="快速模板">
+              <span>快速开始</span>
+              <div>
+                {taskTemplates.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => applyTaskTemplate(template)}
+                  >
+                    <template.icon size={16} />
+                    {template.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <div className="composer-field-grid">
+              <label>
+                <span>任务名称</span>
+                <input
+                  autoFocus
+                  required
+                  value={taskName}
+                  placeholder="例如：每天跟踪竞品更新"
+                  onChange={(event) => setTaskName(event.target.value)}
+                />
+              </label>
+
+              <label>
+                <span>数据来源或网址</span>
+                <input
+                  required
+                  value={taskTarget}
+                  placeholder="网页、文件夹或资料库"
+                  onChange={(event) => setTaskTarget(event.target.value)}
+                />
+              </label>
+            </div>
+
+            <label className="composer-instruction">
+              <span>希望得到什么结果</span>
+              <textarea
                 required
-                value={taskName}
-                onChange={(event) => setTaskName(event.target.value)}
+                value={taskDescription}
+                placeholder="说清楚要做什么、保留哪些证据，以及最终交付什么结果。"
+                onChange={(event) => setTaskDescription(event.target.value)}
               />
             </label>
 
-            <label>
-              <span>要处理的网页</span>
-              <input
-                required
-                type="url"
-                value={taskTarget}
-                onChange={(event) => setTaskTarget(event.target.value)}
-              />
-            </label>
+            <section className="composer-schedule" aria-label="运行频率">
+              <span>运行频率</span>
+              <div role="radiogroup" aria-label="选择运行频率">
+                {(["仅运行一次", "每天", "每周"] as TaskSchedule[]).map((schedule) => (
+                  <button
+                    className={taskSchedule === schedule ? "active" : ""}
+                    key={schedule}
+                    type="button"
+                    role="radio"
+                    aria-checked={taskSchedule === schedule}
+                    onClick={() => setTaskSchedule(schedule)}
+                  >
+                    {schedule}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <div className="composer-policy">
+              <span className="composer-policy-icon">
+                <ShieldCheck size={18} />
+              </span>
+              <span>
+                <strong>敏感操作需要确认</strong>
+                <small>对外发送、登录访问和写入文件前先询问你。</small>
+              </span>
+              <button
+                className={`switch-control ${taskApproval ? "on" : ""}`}
+                type="button"
+                role="switch"
+                aria-checked={taskApproval}
+                aria-label="敏感操作需要确认"
+                onClick={() => setTaskApproval((value) => !value)}
+              >
+                <i />
+              </button>
+            </div>
 
             <div className="clarity-dialog-note">
-              <ShieldCheck size={17} />
-              <p>任何对外发送或敏感访问，都会先停下来等你确认。</p>
+              <CalendarDays size={17} />
+              <p>
+                <strong>{taskSchedule}</strong>
+                {taskSchedule === "仅运行一次"
+                  ? "运行，完成后保留结果和执行记录。"
+                  : "自动启动，你可以随时暂停或修改任务。"}
+              </p>
             </div>
 
             <div className="clarity-dialog-actions">
               <button type="button" onClick={() => setComposerOpen(false)}>取消</button>
               <button className="confirm" type="submit">
-                <Plus size={16} />
-                创建任务
+                <Sparkles size={16} />
+                创建并运行
               </button>
             </div>
           </form>

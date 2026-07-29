@@ -54,13 +54,24 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /const taskFilters: TaskFilter\[\]/);
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-tasks"/);
   assert.match(page, /function createTask/);
+  assert.match(page, /const taskTemplates:/);
+  assert.match(page, /type TaskSchedule =/);
+  assert.match(page, /role="radiogroup"/);
+  assert.match(page, /role="switch"/);
+  assert.match(page, /<textarea/);
   assert.match(page, /function updateTaskStatus/);
   assert.match(page, /role="dialog"/);
   assert.match(page, /aria-modal="true"/);
   assert.match(page, /role="tab"/);
   assert.match(page, /aria-selected=/);
   assert.match(css, /\.task-detail-drawer/);
+  assert.match(css, /\.task-template-picker/);
+  assert.match(css, /\.composer-policy/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
+  const pixelFontSizes = [...css.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)].map(
+    (match) => Number(match[1]),
+  );
+  assert.ok(Math.min(...pixelFontSizes) >= 11);
   assert.match(layout, /AI 任务操作系统/);
   assert.match(packageJson, /"test": "npm run build && node --test/);
 

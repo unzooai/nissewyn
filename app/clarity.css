@@ -27,7 +27,8 @@ input {
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+textarea:focus-visible {
   outline: 3px solid rgba(53, 105, 212, 0.16);
   outline-offset: 2px;
 }
@@ -85,7 +86,7 @@ input:focus-visible {
 .clarity-brand small {
   margin-top: 3px;
   color: var(--clarity-muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .clarity-nav {
@@ -128,7 +129,7 @@ input:focus-visible {
   border-radius: 999px;
   background: #e2eafb;
   color: #2859ad;
-  font-size: 10px;
+  font-size: 11px;
   font-style: normal;
   font-weight: 800;
 }
@@ -164,13 +165,13 @@ input:focus-visible {
 }
 
 .clarity-sidebar-status strong {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .clarity-sidebar-status small {
   margin-top: 3px;
   color: var(--clarity-muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .clarity-main {
@@ -191,7 +192,7 @@ input:focus-visible {
 
 .clarity-page-title > span {
   color: #858991;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -369,13 +370,13 @@ input:focus-visible {
 
 .clarity-notifications > button strong {
   color: #292b30;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .clarity-notifications > button small {
   margin-top: 3px;
   color: var(--clarity-muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .home-view,
@@ -400,7 +401,7 @@ input:focus-visible {
   align-items: center;
   gap: 7px;
   color: #777b83;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .home-summary > span > i,
@@ -466,7 +467,7 @@ input:focus-visible {
 
 .focus-panel-heading > div > span {
   color: var(--clarity-blue);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -484,7 +485,7 @@ input:focus-visible {
   border-radius: 5px;
   background: var(--clarity-green-soft);
   color: #176f57;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -526,12 +527,12 @@ input:focus-visible {
   justify-content: space-between;
   gap: 12px;
   color: #73777f;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .simple-progress > div strong {
   color: #303238;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .simple-progress > span {
@@ -636,7 +637,7 @@ input:focus-visible {
   margin-top: 4px;
   overflow: hidden;
   color: #858991;
-  font-size: 10px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -646,7 +647,7 @@ input:focus-visible {
   border-radius: 5px;
   background: #f0f1f3;
   color: #73777f;
-  font-size: 10px;
+  font-size: 11px;
   font-style: normal;
   font-weight: 800;
 }
@@ -695,7 +696,7 @@ input:focus-visible {
 
 .current-work span {
   color: #8b8f97;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -708,7 +709,7 @@ input:focus-visible {
 .current-work small {
   margin-top: 4px;
   color: #767a82;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
@@ -723,7 +724,7 @@ input:focus-visible {
   background: #ffffff;
   color: #43464d;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -742,7 +743,7 @@ input:focus-visible {
   align-items: center;
   gap: 5px;
   color: #777b83;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .task-tools > span:first-child {
@@ -762,7 +763,7 @@ input:focus-visible {
   background: transparent;
   color: #3569d4;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 750;
 }
 
@@ -779,7 +780,7 @@ input:focus-visible {
 
 .attention-heading > span {
   color: #a05d1c;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -791,7 +792,7 @@ input:focus-visible {
   border-radius: 999px;
   background: var(--clarity-amber-soft);
   color: #a05d1c;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .attention-icon {
@@ -815,7 +816,7 @@ input:focus-visible {
 .needs-action-panel > p {
   margin: 9px 0 0;
   color: #73777f;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.6;
 }
 
@@ -837,13 +838,13 @@ input:focus-visible {
 
 .plain-impact strong {
   color: #45484e;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .plain-impact small {
   margin-top: 4px;
   color: #7a7e86;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.5;
 }
 
@@ -868,7 +869,7 @@ input:focus-visible {
   background: #ffffff;
   color: #4a4d54;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -904,7 +905,7 @@ input:focus-visible {
 .nothing-pending p {
   margin: 5px 0 0;
   color: var(--clarity-muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .recent-section {
@@ -924,7 +925,7 @@ input:focus-visible {
 
 .section-title-row span {
   color: #8b8f97;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -966,14 +967,14 @@ input:focus-visible {
 
 .recent-task-row strong {
   color: #303238;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .recent-task-row small {
   margin-top: 4px;
   overflow: hidden;
   color: #858991;
-  font-size: 10px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -996,7 +997,7 @@ input:focus-visible {
   border-radius: 5px;
   background: #f0f1f3;
   color: #71757d;
-  font-size: 10px;
+  font-size: 11px;
   font-style: normal;
   font-weight: 800;
 }
@@ -1018,7 +1019,7 @@ input:focus-visible {
 
 .task-updated {
   color: #9699a0;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .recent-task-row > svg {
@@ -1051,7 +1052,7 @@ input:focus-visible {
   background: transparent;
   color: #73777f;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .view-filter-tabs button.active {
@@ -1078,7 +1079,7 @@ input:focus-visible {
   border-bottom: 1px solid var(--clarity-line);
   background: #fafbfc;
   color: #91949b;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -1107,13 +1108,13 @@ input:focus-visible {
 }
 
 .task-table-row > span:first-child strong {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .task-table-row > span:first-child small {
   margin-top: 4px;
   color: #868a92;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .table-progress {
@@ -1140,7 +1141,7 @@ input:focus-visible {
 
 .table-progress > small {
   color: #858991;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .approvals-view {
@@ -1165,11 +1166,11 @@ input:focus-visible {
 
 .approval-queue-heading span {
   color: #7e828a;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .approval-queue-heading strong {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .approval-queue > button {
@@ -1205,7 +1206,7 @@ input:focus-visible {
 
 .approval-queue > button strong {
   color: #34363b;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .approval-queue > button small {
@@ -1213,7 +1214,7 @@ input:focus-visible {
   margin-top: 4px;
   overflow: hidden;
   color: #858991;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -1232,7 +1233,7 @@ input:focus-visible {
   border-radius: 5px;
   background: var(--clarity-amber-soft);
   color: #a45f1d;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -1259,13 +1260,13 @@ input:focus-visible {
 }
 
 .approval-explanation strong {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .approval-explanation p {
   margin: 6px 0 0;
   color: #736c64;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.55;
 }
 
@@ -1280,7 +1281,7 @@ input:focus-visible {
   align-items: center;
   gap: 7px;
   color: #62666e;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .approval-scope svg {
@@ -1318,7 +1319,7 @@ input:focus-visible {
   max-width: 420px;
   margin: 7px 0 0;
   color: #777b83;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.6;
 }
 
@@ -1330,7 +1331,7 @@ input:focus-visible {
   border-radius: 6px;
   background: #ffffff;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -1372,7 +1373,7 @@ input:focus-visible {
 .activity-summary small {
   margin-top: 4px;
   color: #868a92;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .activity-timeline {
@@ -1398,7 +1399,7 @@ input:focus-visible {
   padding-top: 9px;
   color: #92959c;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .timeline-icon {
@@ -1431,13 +1432,13 @@ input:focus-visible {
 .timeline-row strong {
   display: block;
   padding-top: 7px;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .timeline-row p {
   margin: 5px 0 0;
   color: #747880;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.55;
 }
 
@@ -1450,7 +1451,7 @@ input:focus-visible {
   background: #ffffff;
   color: #5c6068;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .settings-view {
@@ -1471,7 +1472,7 @@ input:focus-visible {
 
 .settings-group > div:first-child span {
   color: #8c9098;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -1500,13 +1501,13 @@ input:focus-visible {
 }
 
 .setting-row strong {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .setting-row small {
   margin-top: 5px;
   color: #7d8189;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .switch-control {
@@ -1572,7 +1573,7 @@ input:focus-visible {
 
 .clarity-dialog-heading span {
   color: #3569d4;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -1601,7 +1602,7 @@ input:focus-visible {
   display: block;
   margin-bottom: 7px;
   color: #565a62;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -1629,7 +1630,7 @@ input:focus-visible {
 
 .clarity-dialog-note p {
   margin: 0;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.55;
 }
 
@@ -1662,7 +1663,7 @@ input:focus-visible {
 }
 
 .clarity-toast span {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 750;
 }
 
@@ -1796,7 +1797,7 @@ input:focus-visible {
     right: 4px;
     min-width: 16px;
     height: 16px;
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .clarity-sidebar-status {
@@ -2105,7 +2106,7 @@ input:focus-visible {
 }
 
 .clarity-sidebar-status small {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .clarity-header {
@@ -2143,7 +2144,7 @@ input:focus-visible {
 }
 
 .clarity-notifications > button small {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .home-summary {
@@ -2210,7 +2211,7 @@ input:focus-visible {
 .live-state {
   min-height: 27px;
   padding: 0 9px;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .task-purpose {
@@ -2262,7 +2263,7 @@ input:focus-visible {
 
 .plain-steps em {
   padding: 5px 8px;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .plain-steps > button.selected {
@@ -2289,7 +2290,7 @@ input:focus-visible {
 }
 
 .current-work span {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .current-work strong {
@@ -2316,7 +2317,7 @@ input:focus-visible {
 
 .task-tools > span,
 .task-tools > button {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .needs-action-panel {
@@ -2330,7 +2331,7 @@ input:focus-visible {
 .attention-heading > strong {
   min-width: 24px;
   height: 24px;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .attention-icon {
@@ -2394,7 +2395,7 @@ input:focus-visible {
 }
 
 .section-title-row span {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .section-title-row h2 {
@@ -2423,13 +2424,13 @@ input:focus-visible {
 
 .status-label,
 .task-updated {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .view-filter-tabs button,
 .task-table-head,
 .table-progress > small {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .task-table-row {
@@ -2465,7 +2466,7 @@ input:focus-visible {
 
 .approval-kicker {
   min-height: 27px;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .approval-detail h2 {
@@ -2501,7 +2502,7 @@ input:focus-visible {
 }
 
 .settings-group > div:first-child span {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .settings-group > div:first-child h2 {
@@ -2735,7 +2736,7 @@ input:focus-visible {
 
 .signal-metric > span {
   color: #74809a;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 750;
 }
 
@@ -2749,7 +2750,7 @@ input:focus-visible {
 .signal-metric > small {
   margin-top: 4px;
   color: #77808f;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .signal-metric:last-child > strong {
@@ -2802,7 +2803,7 @@ input:focus-visible {
 }
 
 .signal-chart > span small {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .simple-progress {
@@ -2867,7 +2868,7 @@ input:focus-visible {
   border-radius: 999px;
   background: #dce7fb;
   color: #2b5dbd;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -2898,7 +2899,7 @@ input:focus-visible {
 .recipient-preview small {
   margin-top: 4px;
   color: #84776b;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .plain-impact {
@@ -2971,7 +2972,7 @@ input:focus-visible {
   }
 
   .home-summary > span small {
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .home-summary > span strong {
@@ -3243,7 +3244,7 @@ body {
 
 .focus-panel-heading > div > span {
   color: #2459b9;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -3284,7 +3285,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 680;
 }
 
@@ -3362,7 +3363,7 @@ body {
 
 .task-ai-visual-status small {
   color: #718098;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .task-ai-visual-status strong {
@@ -3564,13 +3565,13 @@ body {
 
 .decision-boundary small {
   color: #8a93a2;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .decision-boundary strong {
   margin-top: 6px;
   color: #2e3746;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .decision-boundary .verified-boundary {
@@ -3722,7 +3723,7 @@ body {
 .recent-task-topline > small {
   margin: 0;
   color: #8a94a4;
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -3774,7 +3775,7 @@ body {
 .recent-task-progress > small {
   color: #647187;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .recent-task-progress > svg {
@@ -3994,7 +3995,7 @@ body {
   display: block;
   margin-top: 8px;
   color: #8993a2;
-  font-size: 10px;
+  font-size: 11px;
   text-align: right;
 }
 
@@ -4025,7 +4026,7 @@ body {
 
 .task-detail-facts small {
   color: #8a94a4;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .task-detail-facts strong {
@@ -4062,7 +4063,7 @@ body {
   background: transparent;
   color: #3162a6;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 750;
 }
 
@@ -4130,7 +4131,7 @@ body {
 .task-detail-trace li small {
   margin-top: 5px;
   color: #7d8898;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.5;
 }
 
@@ -4412,7 +4413,7 @@ body {
 
   .view-filter-tabs button {
     padding: 0 5px;
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .task-table {
@@ -4507,5 +4508,348 @@ body {
 
   .active-task-panel:hover .task-ai-visual img {
     transform: none;
+  }
+}
+
+/* Commercial task composer */
+.clarity-dialog {
+  width: min(100%, 700px);
+  max-height: min(760px, calc(100dvh - 36px));
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-color: rgba(117, 137, 164, 0.22);
+  background: #ffffff;
+  box-shadow:
+    0 32px 90px rgba(27, 39, 58, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.82) inset;
+}
+
+.clarity-dialog-heading {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  margin: 0;
+  padding: 23px 26px 20px;
+  border-bottom: 1px solid rgba(128, 148, 175, 0.17);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(18px);
+}
+
+.clarity-dialog-heading span {
+  color: #2b64c7;
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.clarity-dialog-heading h2 {
+  margin-top: 6px;
+  color: #172131;
+  font-size: 23px;
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.clarity-dialog-heading p {
+  margin: 7px 0 0;
+  color: #778295;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.clarity-dialog-heading button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(126, 144, 169, 0.16);
+  background: #f6f8fb;
+  color: #5f6d80;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.clarity-dialog-heading button:hover {
+  border-color: #c9d5e6;
+  background: #edf3fb;
+  color: #234f94;
+}
+
+.task-template-picker {
+  padding: 20px 26px 0;
+}
+
+.task-template-picker > span,
+.composer-field-grid label > span,
+.composer-instruction > span,
+.composer-schedule > span {
+  display: block;
+  margin-bottom: 8px;
+  color: #536176;
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.task-template-picker > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.task-template-picker button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 13px;
+  border: 1px solid #dbe3ee;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #4a5a70;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 730;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.task-template-picker button:hover {
+  border-color: #adc6ed;
+  background: #eff5ff;
+  color: #2358ad;
+  transform: translateY(-1px);
+}
+
+.composer-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px 26px 0;
+}
+
+.composer-field-grid label {
+  min-width: 0;
+}
+
+.clarity-dialog .composer-field-grid input,
+.clarity-dialog .composer-instruction textarea {
+  width: 100%;
+  border: 1px solid #d9e1ec;
+  border-radius: 7px;
+  outline: 0;
+  background: #f9fbfd;
+  color: #1f2a3b;
+  font-family: inherit;
+  font-size: 12px;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.clarity-dialog .composer-field-grid input {
+  height: 44px;
+  padding: 0 12px;
+}
+
+.clarity-dialog .composer-instruction {
+  display: block;
+  margin: 18px 26px 0;
+}
+
+.clarity-dialog .composer-instruction textarea {
+  min-height: 92px;
+  padding: 11px 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.clarity-dialog .composer-field-grid input:focus,
+.clarity-dialog .composer-instruction textarea:focus {
+  border-color: #6c9be7;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(53, 105, 212, 0.11);
+}
+
+.composer-schedule {
+  display: grid;
+  grid-template-columns: 94px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 18px 26px 0;
+}
+
+.composer-schedule > span {
+  margin: 0;
+}
+
+.composer-schedule > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #dce3ed;
+  border-radius: 7px;
+  background: #f3f6f9;
+}
+
+.composer-schedule button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #69778a;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 720;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.composer-schedule button.active {
+  background: #ffffff;
+  color: #1f58b5;
+  box-shadow: 0 2px 7px rgba(46, 67, 97, 0.1);
+}
+
+.composer-policy {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  margin: 14px 26px 0;
+  padding: 10px 12px;
+  border: 1px solid #dce4ee;
+  border-radius: 7px;
+  background: #fafbfd;
+}
+
+.composer-policy-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  background: #eaf6f1;
+  color: #168464;
+}
+
+.composer-policy strong,
+.composer-policy small {
+  display: block;
+}
+
+.composer-policy strong {
+  color: #2b3544;
+  font-size: 11px;
+}
+
+.composer-policy small {
+  margin-top: 4px;
+  color: #7b8797;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.clarity-dialog .clarity-dialog-note {
+  margin: 14px 26px 0;
+  padding: 11px 12px;
+  border: 1px solid #dce7f7;
+  background: #f2f7ff;
+}
+
+.clarity-dialog .clarity-dialog-note p {
+  color: #526985;
+  font-size: 11px;
+}
+
+.clarity-dialog .clarity-dialog-note p strong {
+  margin-right: 3px;
+  color: #285aa5;
+}
+
+.clarity-dialog-actions {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+  margin: 18px 0 0;
+  padding: 16px 26px 22px;
+  border-top: 1px solid rgba(128, 148, 175, 0.16);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(18px);
+}
+
+.clarity-dialog-actions button {
+  min-height: 42px;
+  padding: 0 17px;
+  font-size: 11px;
+}
+
+.clarity-dialog-actions .confirm {
+  min-width: 138px;
+}
+
+@media (max-width: 680px) {
+  .clarity-dialog-backdrop {
+    align-items: end;
+    padding: 10px 10px 0;
+  }
+
+  .clarity-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 10px);
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .clarity-dialog-heading {
+    padding: 20px 18px 17px;
+  }
+
+  .clarity-dialog-heading h2 {
+    font-size: 21px;
+  }
+
+  .task-template-picker {
+    padding: 17px 18px 0;
+  }
+
+  .task-template-picker button {
+    gap: 5px;
+    padding: 0 7px;
+  }
+
+  .composer-field-grid {
+    grid-template-columns: 1fr;
+    padding: 16px 18px 0;
+  }
+
+  .clarity-dialog .composer-instruction,
+  .composer-schedule,
+  .composer-policy,
+  .clarity-dialog .clarity-dialog-note {
+    margin-right: 18px;
+    margin-left: 18px;
+  }
+
+  .composer-schedule {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .clarity-dialog-actions {
+    padding: 14px 18px max(18px, env(safe-area-inset-bottom));
+  }
+
+  .clarity-dialog-actions button {
+    flex: 1;
   }
 }
