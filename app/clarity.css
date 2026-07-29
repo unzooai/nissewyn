@@ -174,7 +174,7 @@
 
 .approval-risk-filters {
   display: inline-grid;
-  grid-template-columns: repeat(4, auto);
+  grid-template-columns: repeat(5, auto);
   gap: 3px;
   padding: 3px;
   border: 1px solid #dce3ea;
@@ -11921,42 +11921,30 @@ body {
 
 .clarity-brand > span {
   position: relative;
-  width: 46px;
-  height: 46px;
+  width: 42px;
+  height: 42px;
   overflow: hidden;
-  border: 1px solid rgba(17, 51, 59, 0.08);
-  border-radius: 11px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(238, 249, 247, 0.92));
-  box-shadow:
-    0 10px 24px rgba(18, 58, 61, 0.1),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   isolation: isolate;
 }
 
 .clarity-brand > span::before {
-  position: absolute;
-  inset: -45% 48% -45% -35%;
-  z-index: -1;
-  border-radius: 50%;
-  background: rgba(22, 201, 149, 0.1);
-  content: "";
-  filter: blur(8px);
-  transform: rotate(18deg);
+  display: none;
 }
 
 .clarity-brand-mark img {
-  width: 38px;
-  height: 38px;
-  filter: drop-shadow(0 5px 5px rgba(19, 50, 43, 0.13));
+  width: 42px;
+  height: 42px;
+  filter: none;
   transform-origin: 50% 52%;
 }
 
 .clarity-brand:hover > span {
-  border-color: rgba(22, 201, 149, 0.24);
-  box-shadow:
-    0 13px 28px rgba(18, 58, 61, 0.14),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .clarity-brand:hover .clarity-brand-mark img {
@@ -12142,11 +12130,11 @@ body {
     display: block;
     width: 36px;
     height: 36px;
-    padding: 4px;
-    border: 1px solid rgba(17, 51, 59, 0.08);
-    border-radius: 9px;
-    background: linear-gradient(145deg, #ffffff, #edf9f6);
-    box-shadow: 0 6px 16px rgba(18, 58, 61, 0.1);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .clarity-mobile-brand > span,
@@ -19238,5 +19226,408 @@ body {
   .workspace-sync-dismiss {
     grid-column: 3;
     grid-row: 1;
+  }
+}
+
+/* Approval reminder scheduling */
+.approval-risk-summary > span.is-deferred {
+  gap: 5px;
+  color: #6d5b85;
+}
+
+.approval-risk-summary > span.is-deferred svg {
+  color: #7b61a7;
+}
+
+.approval-risk-filters > button {
+  gap: 5px;
+}
+
+.approval-risk-filters > button > svg {
+  flex: 0 0 auto;
+  color: #7c69a0;
+}
+
+.approval-snooze-heading-icon,
+.approval-snooze-row-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #dfd5ed;
+  border-radius: 6px;
+  background: #f7f4fb;
+  color: #745b9d;
+}
+
+.approval-snooze-heading-icon {
+  margin-left: 1px;
+}
+
+.approval-snooze-row-icon {
+  justify-self: center;
+}
+
+.approval-queue-row-shell.is-snoozed {
+  border-left-color: #8b72b3;
+  background: #fdfbff;
+}
+
+.approval-queue-row-shell.is-snoozed:hover {
+  background: #f8f4fc;
+}
+
+.approval-queue-row-shell.is-snoozed.selected {
+  background: #f3eef9;
+  box-shadow: inset 3px 0 0 #8063a9;
+}
+
+.approval-queue-row-shell.is-snoozed .approval-queue-main > svg:first-child {
+  color: #755b9d;
+}
+
+.approval-snoozed-banner {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 56px;
+  margin: 0 28px 18px;
+  padding: 10px 12px;
+  border: 1px solid #ddd3ea;
+  border-radius: 7px;
+  background: #faf7fd;
+  color: #6e568f;
+}
+
+.approval-snoozed-banner > svg {
+  flex: 0 0 auto;
+}
+
+.approval-snoozed-banner span,
+.approval-snoozed-banner strong,
+.approval-snoozed-banner small {
+  display: block;
+  min-width: 0;
+}
+
+.approval-snoozed-banner strong {
+  color: #55406f;
+  font-size: 12px;
+  font-weight: 820;
+}
+
+.approval-snoozed-banner small {
+  margin-top: 3px;
+  color: #776b85;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.approval-detail-actions.is-deferred {
+  grid-template-columns: minmax(180px, 1fr) auto;
+}
+
+.approval-detail-actions .confirm.restore {
+  background: #2c4260;
+  box-shadow: 0 8px 20px rgba(44, 66, 96, 0.15);
+}
+
+.nothing-pending > button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 0 12px;
+  border: 1px solid #cfd9e6;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #3c6698;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.approval-snooze-dialog {
+  position: relative;
+  width: min(100%, 560px);
+  padding: 28px;
+  overflow: hidden;
+  border: 1px solid #d8cfE5;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow:
+    0 32px 90px rgba(46, 38, 59, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  animation: clarity-dialog-in 220ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+.approval-snooze-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #e1e3e8;
+  border-radius: 6px;
+  background: #f8f9fa;
+  color: #6f7580;
+  cursor: pointer;
+}
+
+.approval-snooze-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 17px;
+  border: 1px solid #ddd0eb;
+  border-radius: 8px;
+  background: #f5effb;
+  color: #73569b;
+}
+
+.approval-snooze-eyebrow {
+  display: block;
+  color: #755b9b;
+  font-size: 11px;
+  font-weight: 820;
+}
+
+.approval-snooze-dialog h2 {
+  max-width: calc(100% - 42px);
+  margin: 6px 0 0;
+  color: #263342;
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.approval-snooze-dialog > p {
+  margin: 10px 0 0;
+  color: #6d7785;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.approval-snooze-target {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  margin-top: 18px;
+  padding: 10px 12px;
+  border-top: 1px solid #e4e6ea;
+  border-bottom: 1px solid #e4e6ea;
+  color: #617087;
+}
+
+.approval-snooze-target > svg {
+  justify-self: center;
+  color: #4d6f9b;
+}
+
+.approval-snooze-target span,
+.approval-snooze-target strong,
+.approval-snooze-target small {
+  display: block;
+  min-width: 0;
+}
+
+.approval-snooze-target strong {
+  overflow: hidden;
+  color: #344356;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.approval-snooze-target small {
+  margin-top: 4px;
+  color: #7c8694;
+  font-size: 11px;
+}
+
+.approval-snooze-options {
+  display: grid;
+  gap: 7px;
+  margin-top: 17px;
+}
+
+.approval-snooze-options > button {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto 16px;
+  align-items: center;
+  gap: 10px;
+  min-height: 66px;
+  padding: 9px 12px;
+  border: 1px solid #dfe3e8;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #5f6977;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.approval-snooze-options > button:hover {
+  border-color: #bca9d3;
+  background: #faf7fd;
+  color: #654b88;
+  transform: translateY(-1px);
+}
+
+.approval-snooze-options > button > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 7px;
+  background: #f3f6f9;
+  color: #54759e;
+}
+
+.approval-snooze-options > button:hover > span:first-child {
+  background: #efe7f7;
+  color: #6d4e94;
+}
+
+.approval-snooze-options > button span,
+.approval-snooze-options > button strong,
+.approval-snooze-options > button small {
+  display: block;
+  min-width: 0;
+}
+
+.approval-snooze-options > button strong {
+  color: #344050;
+  font-size: 12px;
+  font-weight: 820;
+}
+
+.approval-snooze-options > button small {
+  margin-top: 3px;
+  color: #858d98;
+  font-size: 11px;
+}
+
+.approval-snooze-options > button em {
+  color: #6f5a8c;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.approval-snooze-cancel {
+  display: inline-flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #687280;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.approval-snooze-cancel:hover {
+  background: #f5f6f8;
+  color: #384454;
+}
+
+@media (max-width: 680px) {
+  .approval-risk-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .approval-risk-summary > span.is-deferred {
+    grid-column: auto;
+  }
+
+  .approval-snoozed-banner {
+    margin-right: 17px;
+    margin-left: 17px;
+  }
+
+  .approval-detail-actions.is-deferred {
+    grid-template-columns: 1fr;
+  }
+
+  .approval-detail-actions.is-deferred .confirm {
+    grid-column: auto;
+  }
+
+  .approval-snooze-backdrop {
+    align-items: flex-end;
+    padding: 10px;
+  }
+
+  .approval-snooze-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    padding: 23px 17px calc(17px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    border-radius: 8px;
+  }
+
+  .approval-snooze-close {
+    top: 14px;
+    right: 14px;
+  }
+
+  .approval-snooze-dialog h2 {
+    font-size: 20px;
+  }
+
+  .approval-snooze-target {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .approval-snooze-target > em {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .approval-snooze-options > button {
+    grid-template-columns: 34px minmax(0, 1fr) 16px;
+    min-height: 62px;
+    padding: 8px 10px;
+  }
+
+  .approval-snooze-options > button em {
+    grid-column: 2;
+    margin-top: -7px;
+  }
+
+  .approval-snooze-options > button > svg {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .approval-snooze-dialog {
+    animation: none;
+  }
+
+  .approval-snooze-options > button {
+    transition: none;
+  }
+
+  .approval-snooze-options > button:hover {
+    transform: none;
   }
 }

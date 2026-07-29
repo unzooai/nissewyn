@@ -154,6 +154,7 @@ type TaskDeleteSnapshot = {
   artifacts: ArtifactItem[];
   activity: ActivityItem[];
   approvals: ApprovalItem[];
+  approvalDeferrals: ApprovalDeferrals;
   selectedTaskIds: string[];
   selectedApprovalId: string;
   selectedApprovalIds: string[];
@@ -185,6 +186,7 @@ type WorkspaceBackup = {
   connectors?: ConnectorState;
   members?: TeamMember[];
   approvalIds: string[];
+  approvalDeferrals?: ApprovalDeferrals;
   activity: ActivityItem[];
   artifacts?: ArtifactItem[];
 };
@@ -205,6 +207,7 @@ type WorkspaceSyncData = {
   connectors: ConnectorState;
   members: TeamMember[];
   approvalIds: string[];
+  approvalDeferrals: ApprovalDeferrals;
   activity: ActivityItem[];
   artifacts: ArtifactItem[];
 };
@@ -229,7 +232,9 @@ type PendingWorkspaceImport = {
   fileSize: number;
 };
 type ApprovalRisk = "低风险" | "中风险" | "高风险";
-type ApprovalRiskFilter = "全部" | ApprovalRisk;
+type ApprovalRiskFilter = "全部" | ApprovalRisk | "稍后";
+type ApprovalSnoozePreset = "15m" | "1h" | "tomorrow";
+type ApprovalDeferrals = Record<string, string>;
 type BulkApprovalDecision = "approve" | "reject";
 type ActivityKind = "任务" | "审批" | "系统";
 type ActivityFilter = "全部" | ActivityKind;
@@ -939,6 +944,16 @@ function isSettingsState(value: unknown): value is SettingsState {
   );
 }
 
+function isApprovalDeferrals(value: unknown): value is ApprovalDeferrals {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.entries(value).every(
+    ([approvalId, deferredUntil]) =>
+      approvalId.length > 0 &&
+      typeof deferredUntil === "string" &&
+      !Number.isNaN(Date.parse(deferredUntil)),
+  );
+}
+
 function parseWorkspaceSyncSnapshot(value: string | null) {
   if (!value) return null;
   try {
@@ -959,6 +974,8 @@ function parseWorkspaceSyncSnapshot(value: string | null) {
       !parsed.members.every(isTeamMember) ||
       !Array.isArray(parsed.approvalIds) ||
       !parsed.approvalIds.every((id) => typeof id === "string") ||
+      (parsed.approvalDeferrals !== undefined &&
+        !isApprovalDeferrals(parsed.approvalDeferrals)) ||
       !Array.isArray(parsed.activity) ||
       !parsed.activity.every(isActivityItem) ||
       !Array.isArray(parsed.artifacts) ||
@@ -966,7 +983,10 @@ function parseWorkspaceSyncSnapshot(value: string | null) {
     ) {
       return null;
     }
-    return parsed as WorkspaceSyncSnapshot;
+    return {
+      ...parsed,
+      approvalDeferrals: parsed.approvalDeferrals ?? {},
+    } as WorkspaceSyncSnapshot;
   } catch {
     return null;
   }
@@ -980,6 +1000,7 @@ function workspaceSyncSignature(data: WorkspaceSyncData) {
     connectors: data.connectors,
     members: data.members,
     approvalIds: data.approvalIds,
+    approvalDeferrals: data.approvalDeferrals,
     activity: data.activity,
     artifacts: data.artifacts,
   });
@@ -994,8 +1015,14 @@ function getWorkspaceSyncSections(
     sections.push("tasks");
   }
   if (
-    JSON.stringify(current.approvalIds) !==
-    JSON.stringify(incoming.approvalIds)
+    JSON.stringify({
+      ids: current.approvalIds,
+      deferrals: current.approvalDeferrals,
+    }) !==
+    JSON.stringify({
+      ids: incoming.approvalIds,
+      deferrals: incoming.approvalDeferrals,
+    })
   ) {
     sections.push("approvals");
   }
@@ -1048,6 +1075,8 @@ function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
         !backup.members.every(isTeamMember))) ||
     !Array.isArray(backup.approvalIds) ||
     !backup.approvalIds.every((id) => typeof id === "string") ||
+    (backup.approvalDeferrals !== undefined &&
+      !isApprovalDeferrals(backup.approvalDeferrals)) ||
     !Array.isArray(backup.activity) ||
     !backup.activity.every(isActivityItem) ||
     (backup.artifacts !== undefined &&
@@ -1056,7 +1085,58 @@ function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
   ) {
     throw new Error("Invalid workspace backup");
   }
-  return backup as WorkspaceBackup;
+  return {
+    ...backup,
+    approvalDeferrals: backup.approvalDeferrals ?? {},
+  } as WorkspaceBackup;
+}
+
+function getApprovalSnoozeUntil(
+  preset: ApprovalSnoozePreset,
+  now = new Date(),
+) {
+  const deferredUntil = new Date(now);
+  if (preset === "15m") {
+    deferredUntil.setMinutes(deferredUntil.getMinutes() + 15);
+  } else if (preset === "1h") {
+    deferredUntil.setHours(deferredUntil.getHours() + 1);
+  } else {
+    deferredUntil.setDate(deferredUntil.getDate() + 1);
+    deferredUntil.setHours(9, 0, 0, 0);
+  }
+  return deferredUntil;
+}
+
+function formatApprovalDeferredUntil(value: string, nowMs = Date.now()) {
+  const deferredUntil = new Date(value);
+  const remainingMs = deferredUntil.getTime() - nowMs;
+  if (Number.isNaN(deferredUntil.getTime()) || remainingMs <= 0) {
+    return "现在重新提醒";
+  }
+  const timeLabel = deferredUntil.toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  if (remainingMs < 60 * 60 * 1000) {
+    return `${Math.max(1, Math.ceil(remainingMs / 60000))} 分钟后 · ${timeLabel}`;
+  }
+  const now = new Date(nowMs);
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow =
+    deferredUntil.getFullYear() === tomorrow.getFullYear() &&
+    deferredUntil.getMonth() === tomorrow.getMonth() &&
+    deferredUntil.getDate() === tomorrow.getDate();
+  if (isTomorrow) return `明天 ${timeLabel}`;
+  if (remainingMs < 24 * 60 * 60 * 1000) return `今天 ${timeLabel}`;
+  return deferredUntil.toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 function formatSchedule(
@@ -1295,6 +1375,7 @@ const approvalRiskFilters: ApprovalRiskFilter[] = [
   "高风险",
   "中风险",
   "低风险",
+  "稍后",
 ];
 const artifactFilters: ArtifactFilter[] = [
   "全部",
@@ -1861,6 +1942,10 @@ export default function HomePage() {
   const [isCheckingNetwork, setIsCheckingNetwork] = useState(false);
   const [selectedStep, setSelectedStep] = useState("analyze");
   const [approvals, setApprovals] = useState(initialApprovals);
+  const [approvalDeferrals, setApprovalDeferrals] =
+    useState<ApprovalDeferrals>({});
+  const [approvalClock, setApprovalClock] = useState(() => Date.now());
+  const [approvalSnoozeId, setApprovalSnoozeId] = useState<string | null>(null);
   const [selectedApprovalId, setSelectedApprovalId] = useState(initialApprovals[0].id);
   const [approvalListQuery, setApprovalListQuery] = useState("");
   const [approvalRiskFilter, setApprovalRiskFilter] =
@@ -2046,8 +2131,30 @@ export default function HomePage() {
   const taskDraftRecoveryOwnedRef = useRef(false);
   const inviteSavingRef = useRef(false);
 
+  const deferredApprovals = useMemo(
+    () =>
+      approvals.filter((approval) => {
+        const deferredUntil = approvalDeferrals[approval.id];
+        return (
+          deferredUntil !== undefined &&
+          Date.parse(deferredUntil) > approvalClock
+        );
+      }),
+    [approvalClock, approvalDeferrals, approvals],
+  );
+  const deferredApprovalIds = useMemo(
+    () => new Set(deferredApprovals.map((approval) => approval.id)),
+    [deferredApprovals],
+  );
+  const activeApprovals = useMemo(
+    () =>
+      approvals.filter((approval) => !deferredApprovalIds.has(approval.id)),
+    [approvals, deferredApprovalIds],
+  );
+  const activeApprovalCount = activeApprovals.length;
+  const deferredApprovalCount = deferredApprovals.length;
   const failedTaskCount = tasks.filter((task) => task.status === "失败").length;
-  const attentionCount = approvals.length + failedTaskCount;
+  const attentionCount = activeApprovalCount + failedTaskCount;
   const workspaceToday = getWorkspaceToday();
   const workspaceLastSavedLabel = workspaceLastSavedAt
     ? new Intl.DateTimeFormat("zh-CN", {
@@ -2096,20 +2203,21 @@ export default function HomePage() {
           title: `${workspaceToday.greeting}，今天有 ${attentionCount} 件事需要你处理`,
           description:
             failedTaskCount > 0
-              ? `${failedTaskCount} 个任务需要恢复，${approvals.length} 项操作等待确认。`
+              ? `${failedTaskCount} 个任务需要恢复，${activeApprovalCount} 项操作等待确认。`
               : viewTitles.home.description,
         }
       : viewTitles[activeView];
-  const selectedApproval =
-    approvals.find((item) => item.id === selectedApprovalId) ?? approvals[0];
   const normalizedApprovalQuery = approvalListQuery.trim().toLowerCase();
   const filteredApprovals = useMemo(
-    () =>
-      approvals.filter((approval) => {
+    () => {
+      const approvalPool =
+        approvalRiskFilter === "稍后" ? deferredApprovals : activeApprovals;
+      return approvalPool.filter((approval) => {
         const relatedTaskTitle =
           tasks.find((task) => task.id === approval.taskId)?.title ?? "";
         const matchesRisk =
           approvalRiskFilter === "全部" ||
+          approvalRiskFilter === "稍后" ||
           approval.risk === approvalRiskFilter;
         const matchesQuery =
           !normalizedApprovalQuery ||
@@ -2124,16 +2232,37 @@ export default function HomePage() {
             value.toLowerCase().includes(normalizedApprovalQuery),
           );
         return matchesRisk && matchesQuery;
-      }),
-    [approvalRiskFilter, approvals, normalizedApprovalQuery, tasks],
+      });
+    },
+    [
+      activeApprovals,
+      approvalRiskFilter,
+      deferredApprovals,
+      normalizedApprovalQuery,
+      tasks,
+    ],
   );
-  const selectedApprovals = approvals.filter((approval) =>
+  const selectedApproval =
+    filteredApprovals.find((item) => item.id === selectedApprovalId) ??
+    filteredApprovals[0] ??
+    null;
+  const selectedApprovalDeferredUntil = selectedApproval
+    ? approvalDeferrals[selectedApproval.id]
+    : undefined;
+  const selectedApprovalIsDeferred = Boolean(
+    selectedApprovalDeferredUntil &&
+      Date.parse(selectedApprovalDeferredUntil) > approvalClock,
+  );
+  const approvalSnoozeTarget =
+    approvals.find((approval) => approval.id === approvalSnoozeId) ?? null;
+  const selectedApprovals = activeApprovals.filter((approval) =>
     selectedApprovalIds.includes(approval.id),
   );
   const selectedVisibleApprovalCount = filteredApprovals.filter((approval) =>
     selectedApprovalIds.includes(approval.id),
   ).length;
   const allVisibleApprovalsSelected =
+    approvalRiskFilter !== "稍后" &&
     filteredApprovals.length > 0 &&
     selectedVisibleApprovalCount === filteredApprovals.length;
   const bulkApprovableApprovals = selectedApprovals.filter(
@@ -2145,10 +2274,14 @@ export default function HomePage() {
     selectedApprovals.map((approval) => approval.taskId),
   ).size;
   const approvalRiskCounts: Record<ApprovalRiskFilter, number> = {
-    全部: approvals.length,
-    高风险: approvals.filter((approval) => approval.risk === "高风险").length,
-    中风险: approvals.filter((approval) => approval.risk === "中风险").length,
-    低风险: approvals.filter((approval) => approval.risk === "低风险").length,
+    全部: activeApprovalCount,
+    高风险: activeApprovals.filter((approval) => approval.risk === "高风险")
+      .length,
+    中风险: activeApprovals.filter((approval) => approval.risk === "中风险")
+      .length,
+    低风险: activeApprovals.filter((approval) => approval.risk === "低风险")
+      .length,
+    稍后: deferredApprovalCount,
   };
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
   const selectedTaskRuns = selectedTask?.runs ?? [];
@@ -2433,6 +2566,8 @@ export default function HomePage() {
         ? "bulk-delete"
     : deletingTask
     ? "delete"
+    : approvalSnoozeTarget
+      ? "approval-snooze"
     : rejectedApproval
       ? "reject"
       : temporaryModeOpen
@@ -2596,6 +2731,11 @@ export default function HomePage() {
       snapshot.activity.map((activity) => activity.id),
     );
     const nextApprovalIds = new Set(nextApprovals.map((approval) => approval.id));
+    const nextApprovalDeferrals = Object.fromEntries(
+      Object.entries(snapshot.approvalDeferrals).filter(([approvalId]) =>
+        nextApprovalIds.has(approvalId),
+      ),
+    );
     const nextMemberIds = new Set(snapshot.members.map((member) => member.id));
     const nextRunIds = new Set(
       snapshot.tasks.flatMap((task) => (task.runs ?? []).map((run) => run.id)),
@@ -2612,6 +2752,7 @@ export default function HomePage() {
     setConnectorStates(snapshot.connectors);
     setTeamMembers(snapshot.members);
     setApprovals(nextApprovals);
+    setApprovalDeferrals(nextApprovalDeferrals);
     setActivityLog(snapshot.activity.slice(0, 100));
     setArtifacts(snapshot.artifacts.slice(0, 100));
     setIsRunning(
@@ -2631,6 +2772,9 @@ export default function HomePage() {
     setSelectedApprovalId((id) =>
       id && nextApprovalIds.has(id) ? id : (nextApprovals[0]?.id ?? ""),
     );
+    setApprovalSnoozeId((id) =>
+      id && nextApprovalIds.has(id) ? id : null,
+    );
     setSelectedArtifactId((id) =>
       id && nextArtifactIds.has(id)
         ? id
@@ -2648,6 +2792,21 @@ export default function HomePage() {
       id && nextMemberIds.has(id) ? id : null,
     );
   }
+
+  useEffect(() => {
+    const now = Date.now();
+    const nextDueAt = Math.min(
+      ...Object.values(approvalDeferrals)
+        .map((deferredUntil) => Date.parse(deferredUntil))
+        .filter((deferredUntil) => deferredUntil > now),
+    );
+    if (!Number.isFinite(nextDueAt)) return;
+    const delay = Math.max(250, Math.min(30000, nextDueAt - now + 50));
+    const timer = window.setTimeout(() => {
+      setApprovalClock(Date.now());
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [approvalClock, approvalDeferrals]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -2995,6 +3154,16 @@ export default function HomePage() {
             setSelectedApprovalId(pendingApprovals[0]?.id ?? "");
           }
         }
+        setApprovalDeferrals(
+          syncedWorkspace
+            ? Object.fromEntries(
+                Object.entries(syncedWorkspace.approvalDeferrals).filter(
+                  ([approvalId]) =>
+                    syncedWorkspace.approvalIds.includes(approvalId),
+                ),
+              )
+            : {},
+        );
         if (savedActivity) {
           const parsedActivity = JSON.parse(savedActivity);
           if (Array.isArray(parsedActivity)) {
@@ -3039,7 +3208,7 @@ export default function HomePage() {
             setReadNotificationIds(parsedReadNotifications.slice(0, 30));
           }
         }
-        window.localStorage.setItem("unzoo-one-schema-version", "9");
+        window.localStorage.setItem("unzoo-one-schema-version", "10");
       } catch (error) {
         lastWorkspaceSyncSignatureRef.current = "";
         if (error instanceof SyntaxError) {
@@ -3145,6 +3314,7 @@ export default function HomePage() {
       connectors: connectorStates,
       members: teamMembers,
       approvalIds: approvals.map((item) => item.id),
+      approvalDeferrals,
       activity: activityLog.slice(0, 100),
       artifacts: artifacts.slice(0, 100),
     };
@@ -3250,6 +3420,7 @@ export default function HomePage() {
     };
   }, [
     activityLog,
+    approvalDeferrals,
     approvals,
     artifacts,
     connectorStates,
@@ -3280,6 +3451,7 @@ export default function HomePage() {
         connectors: connectorStates,
         members: teamMembers,
         approvalIds: approvals.map((approval) => approval.id),
+        approvalDeferrals,
         activity: activityLog.slice(0, 100),
         artifacts: artifacts.slice(0, 100),
       };
@@ -3349,6 +3521,7 @@ export default function HomePage() {
     return () => window.removeEventListener("storage", receiveWorkspaceSync);
   }, [
     activityLog,
+    approvalDeferrals,
     approvals,
     artifactEditorDirty,
     artifacts,
@@ -3599,6 +3772,7 @@ export default function HomePage() {
       "bulk-approval": ".bulk-approval-dialog",
       "bulk-delete": ".bulk-delete-dialog",
       delete: ".confirm-delete-dialog",
+      "approval-snooze": ".approval-snooze-dialog",
       reject: ".approval-reject-dialog",
       temporary: ".temporary-session-dialog",
       reset: ".workspace-reset-dialog",
@@ -3668,6 +3842,8 @@ export default function HomePage() {
         setBulkDeleteOpen(false);
       } else if (activeOverlayKind === "delete") {
         setDeleteTaskId(null);
+      } else if (activeOverlayKind === "approval-snooze") {
+        setApprovalSnoozeId(null);
       } else if (activeOverlayKind === "reject") {
         setRejectApprovalId(null);
         setApprovalRejectReason("");
@@ -3933,10 +4109,12 @@ export default function HomePage() {
         kind: "action",
         id: "approvals",
         title: "处理待确认操作",
-        description: approvals.length
-          ? `${approvals.length} 项敏感操作正在等待你的决定。`
-          : "当前没有等待确认的敏感操作。",
-        meta: approvals.length ? `${approvals.length} 项` : "已清空",
+        description: activeApprovalCount
+          ? `${activeApprovalCount} 项敏感操作正在等待你的决定。`
+          : deferredApprovalCount
+            ? `${deferredApprovalCount} 项操作已安排稍后提醒。`
+            : "当前没有等待确认的敏感操作。",
+        meta: activeApprovalCount ? `${activeApprovalCount} 项` : "已清空",
         icon: ShieldCheck,
       },
       {
@@ -3982,7 +4160,14 @@ export default function HomePage() {
           .includes(keyword),
       )
       .slice(0, 8);
-  }, [approvals.length, artifacts, query, recentSearchKeys, tasks]);
+  }, [
+    activeApprovalCount,
+    artifacts,
+    deferredApprovalCount,
+    query,
+    recentSearchKeys,
+    tasks,
+  ]);
 
   const searchResultSections = useMemo<SearchResultSection[]>(() => {
     if (!query.trim()) {
@@ -4158,11 +4343,20 @@ export default function HomePage() {
       settings,
       usage: usageSettings,
       approvalIds: approvals.map((item) => item.id),
+      approvalDeferrals,
       activity: activityLog,
       artifacts,
     });
     return Math.max(1, Math.ceil(serialized.length / 1024));
-  }, [activityLog, approvals, artifacts, settings, tasks, usageSettings]);
+  }, [
+    activityLog,
+    approvalDeferrals,
+    approvals,
+    artifacts,
+    settings,
+    tasks,
+    usageSettings,
+  ]);
   const latestActivity = activityLog[0] ?? initialActivityItems[0];
   const latestArtifact = artifacts[0] ?? null;
   const notificationItems = useMemo<NotificationItem[]>(() => {
@@ -4180,10 +4374,10 @@ export default function HomePage() {
         tone: "red",
       });
     });
-    if (approvals.length > 0) {
+    if (activeApprovals.length > 0) {
       items.push({
-        id: `approvals-${approvals.map((item) => item.id).join("-")}`,
-        title: `${approvals.length} 项操作等你确认`,
+        id: `approvals-${activeApprovals.map((item) => item.id).join("-")}`,
+        title: `${activeApprovals.length} 项操作等你确认`,
         detail: "涉及外部访问或发送，任务已在执行前暂停。",
         meta: "需要处理",
         target: "approvals",
@@ -4214,7 +4408,7 @@ export default function HomePage() {
       });
     }
     return items;
-  }, [approvals, latestActivity, latestArtifact, tasks]);
+  }, [activeApprovals, latestActivity, latestArtifact, tasks]);
   const unreadNotificationCount = notificationItems.filter(
     (item) => !readNotificationIds.includes(item.id),
   ).length;
@@ -4298,7 +4492,7 @@ export default function HomePage() {
     try {
       const desktopNotification = new window.Notification(newItem.title, {
         body: newItem.detail,
-        icon: "/unzoo-one-mark.svg",
+        icon: "/unzoo-one-mark.png",
         tag: `unzoo-one-${newItem.id}`,
       });
       desktopNotification.onclick = () => {
@@ -4416,6 +4610,7 @@ export default function HomePage() {
       connectors: connectorStates,
       members: teamMembers,
       approvalIds: approvals.map((item) => item.id),
+      approvalDeferrals,
       activity: activityLog,
       artifacts,
     };
@@ -4825,6 +5020,9 @@ export default function HomePage() {
     setSelectedTeamMemberId(null);
     setMemberRemoveConfirm(false);
     setApprovals(restoredApprovals);
+    setApprovalDeferrals(backup.approvalDeferrals ?? {});
+    setApprovalClock(Date.now());
+    setApprovalSnoozeId(null);
     setSelectedApprovalId(restoredApprovals[0]?.id ?? "");
     setApprovalListQuery("");
     setApprovalRiskFilter("全部");
@@ -4897,6 +5095,9 @@ export default function HomePage() {
     setMemberRemoveConfirm(false);
     setInviteFormSubmitted(false);
     setApprovals(initialApprovals.map((item) => ({ ...item })));
+    setApprovalDeferrals({});
+    setApprovalClock(Date.now());
+    setApprovalSnoozeId(null);
     setSelectedApprovalId(initialApprovals[0].id);
     setApprovalListQuery("");
     setApprovalRiskFilter("全部");
@@ -4989,8 +5190,11 @@ export default function HomePage() {
   function approvalMatchesFilters(approval: ApprovalItem) {
     const relatedTaskTitle =
       tasks.find((task) => task.id === approval.taskId)?.title ?? "";
+    const isDeferred = deferredApprovalIds.has(approval.id);
     return (
+      (approvalRiskFilter === "稍后" ? isDeferred : !isDeferred) &&
       (approvalRiskFilter === "全部" ||
+        approvalRiskFilter === "稍后" ||
         approval.risk === approvalRiskFilter) &&
       (!normalizedApprovalQuery ||
         [
@@ -5012,6 +5216,7 @@ export default function HomePage() {
     );
     return (
       remaining.find((approval) => approvalMatchesFilters(approval)) ??
+      remaining.find((approval) => !deferredApprovalIds.has(approval.id)) ??
       remaining[0]
     );
   }
@@ -5044,6 +5249,14 @@ export default function HomePage() {
     setBulkApprovalDecision(decision);
   }
 
+  function removeApprovalDeferrals(approvalIds: Set<string>) {
+    setApprovalDeferrals((deferrals) => {
+      const next = { ...deferrals };
+      approvalIds.forEach((approvalId) => delete next[approvalId]);
+      return next;
+    });
+  }
+
   function confirmBulkApprove() {
     if (bulkApprovableApprovals.length === 0) return;
     if (
@@ -5071,6 +5284,7 @@ export default function HomePage() {
     setApprovals((items) =>
       items.filter((approval) => !approvedIds.has(approval.id)),
     );
+    removeApprovalDeferrals(approvedIds);
     setSelectedApprovalId(nextApproval?.id ?? "");
     setSelectedApprovalIds(highRiskIds);
     setTasks((items) =>
@@ -5168,6 +5382,7 @@ export default function HomePage() {
     setApprovals((items) =>
       items.filter((approval) => !rejectedIds.has(approval.id)),
     );
+    removeApprovalDeferrals(rejectedIds);
     setSelectedApprovalId(nextApproval?.id ?? "");
     setSelectedApprovalIds([]);
     setTasks((items) =>
@@ -5227,6 +5442,7 @@ export default function HomePage() {
       (item) => item.id !== selectedApproval.id,
     );
     setApprovals((items) => items.filter((item) => item.id !== selectedApproval.id));
+    removeApprovalDeferrals(new Set([selectedApproval.id]));
     setSelectedApprovalId(nextApproval?.id ?? "");
     setSelectedApprovalIds((selectedIds) =>
       selectedIds.filter((id) => id !== approved.id),
@@ -5268,33 +5484,69 @@ export default function HomePage() {
 
   function holdCurrent() {
     if (!selectedApproval) return;
-    const held = selectedApproval;
-    const currentIndex = approvals.findIndex((item) => item.id === held.id);
-    const nextApproval =
-      approvals.length > 1
-        ? approvals[(currentIndex + 1) % approvals.length]
-        : undefined;
-    setApprovals((items) => [
-      ...items.filter((item) => item.id !== held.id),
-      held,
-    ]);
-    setSelectedApprovalId(nextApproval?.id ?? held.id);
+    setApprovalSnoozeId(selectedApproval.id);
+  }
+
+  function confirmApprovalSnooze(preset: ApprovalSnoozePreset) {
+    if (!approvalSnoozeTarget) return;
+    const held = approvalSnoozeTarget;
+    const deferredUntil = getApprovalSnoozeUntil(
+      preset,
+      new Date(approvalClock),
+    );
+    const nextApproval = activeApprovals.find(
+      (approval) => approval.id !== held.id,
+    );
+    setApprovalDeferrals((deferrals) => ({
+      ...deferrals,
+      [held.id]: deferredUntil.toISOString(),
+    }));
+    setApprovalClock(Date.now());
+    setApprovalRiskFilter("全部");
+    setSelectedApprovalId(nextApproval?.id ?? "");
+    setSelectedApprovalIds((ids) => ids.filter((id) => id !== held.id));
+    setApprovalSnoozeId(null);
     recordActivity({
       title: `稍后处理：${held.title}`,
-      detail: "操作仍保留在待确认列表中，没有执行任何外部动作。",
+      detail: `操作会在 ${formatApprovalDeferredUntil(
+        deferredUntil.toISOString(),
+        approvalClock,
+      )} 重新进入待确认列表，期间没有执行任何外部动作。`,
       icon: "clock",
       tone: "amber",
       kind: "审批",
       taskId: held.taskId,
     });
-    setNotice(
-      nextApproval
-        ? "已移到队尾，正在查看下一项待确认操作"
-        : "这项操作会继续留在待确认列表中",
-    );
+    setNotice(`已安排 ${formatApprovalDeferredUntil(
+      deferredUntil.toISOString(),
+      approvalClock,
+    )} 重新提醒`);
     if (nextApproval) {
       scrollApprovalIntoView();
     }
+  }
+
+  function restoreDeferredApproval(approvalId: string) {
+    const approval = approvals.find((item) => item.id === approvalId);
+    if (!approval) return;
+    setApprovalDeferrals((deferrals) => {
+      const next = { ...deferrals };
+      delete next[approvalId];
+      return next;
+    });
+    setApprovalClock(Date.now());
+    setApprovalRiskFilter("全部");
+    setSelectedApprovalId(approvalId);
+    recordActivity({
+      title: `已恢复待确认：${approval.title}`,
+      detail: "操作已提前回到待确认列表，仍未执行任何外部动作。",
+      icon: "clock",
+      tone: "blue",
+      kind: "审批",
+      taskId: approval.taskId,
+    });
+    setNotice(`“${approval.title}”已回到待确认列表`);
+    scrollApprovalIntoView();
   }
 
   function requestRejectApproval() {
@@ -5311,6 +5563,7 @@ export default function HomePage() {
     const nextApproval = approvals.find((item) => item.id !== rejected.id);
     stageApprovalRejectUndo(1);
     setApprovals((items) => items.filter((item) => item.id !== rejected.id));
+    removeApprovalDeferrals(new Set([rejected.id]));
     setSelectedApprovalId(nextApproval?.id ?? "");
     setSelectedApprovalIds((selectedIds) =>
       selectedIds.filter((id) => id !== rejected.id),
@@ -5823,6 +6076,7 @@ export default function HomePage() {
       artifacts,
       activity: activityLog,
       approvals,
+      approvalDeferrals,
       selectedTaskIds,
       selectedApprovalId,
       selectedApprovalIds,
@@ -5854,6 +6108,7 @@ export default function HomePage() {
       items.filter((activity) => activity.taskId !== deletingTask.id),
     );
     setApprovals(remainingApprovals);
+    removeApprovalDeferrals(deletedApprovalIds);
     setSelectedApprovalId((approvalId) =>
       deletedApprovalIds.has(approvalId)
         ? (remainingApprovals[0]?.id ?? "")
@@ -6067,6 +6322,7 @@ export default function HomePage() {
       items.filter((activity) => !activity.taskId || !deletedIds.has(activity.taskId)),
     );
     setApprovals(remainingApprovals);
+    removeApprovalDeferrals(deletedApprovalIds);
     setSelectedApprovalId((approvalId) =>
       deletedApprovalIds.has(approvalId)
         ? (remainingApprovals[0]?.id ?? "")
@@ -6107,6 +6363,7 @@ export default function HomePage() {
       ...snapshot.activity,
     ].slice(0, 100));
     setApprovals(snapshot.approvals);
+    setApprovalDeferrals(snapshot.approvalDeferrals);
     setSelectedTaskIds(snapshot.selectedTaskIds);
     setSelectedApprovalId(snapshot.selectedApprovalId);
     setSelectedApprovalIds(snapshot.selectedApprovalIds);
@@ -6364,7 +6621,7 @@ export default function HomePage() {
       try {
         const confirmation = new window.Notification("Unzoo One 提醒已开启", {
           body: "后续需要你决定的任务会在这里提醒。",
-          icon: "/unzoo-one-mark.svg",
+          icon: "/unzoo-one-mark.png",
           tag: "unzoo-one-notifications-enabled",
         });
         window.setTimeout(() => confirmation.close(), 5000);
@@ -6717,6 +6974,7 @@ export default function HomePage() {
       setSelectedApprovalIds([]);
       setBulkApprovalDecision(null);
       setApprovalRejectReason("");
+      setApprovalRiskFilter("全部");
     }
     if (view === "activity") {
       setActivityTaskId(null);
@@ -7057,7 +7315,7 @@ export default function HomePage() {
       }
 
       const response = await window.fetch(
-        `/unzoo-one-mark.svg?network-check=${Date.now()}`,
+        `/unzoo-one-mark.png?network-check=${Date.now()}`,
         { cache: "no-store" },
       );
       if (!response.ok) {
@@ -7313,7 +7571,7 @@ export default function HomePage() {
         <div className="clarity-brand">
           <span className="clarity-brand-mark">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/unzoo-one-mark.svg" alt="Unzoo One" />
+            <img src="/unzoo-one-mark.png" alt="Unzoo One" />
           </span>
           <div>
             <strong>
@@ -7337,8 +7595,8 @@ export default function HomePage() {
               <item.icon size={18} />
               <span>{item.label}</span>
               <small>{item.mobileLabel}</small>
-              {item.id === "approvals" && approvals.length > 0 && (
-                <em>{approvals.length}</em>
+              {item.id === "approvals" && activeApprovalCount > 0 && (
+                <em>{activeApprovalCount}</em>
               )}
             </button>
           ))}
@@ -7362,7 +7620,7 @@ export default function HomePage() {
             onClick={() => openView("home")}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/unzoo-one-mark.svg" alt="" />
+            <img src="/unzoo-one-mark.png" alt="" />
             <span>
               <strong>
                 unzoo <span>one</span>
@@ -8155,7 +8413,7 @@ export default function HomePage() {
                 <i><ShieldCheck size={14} /></i>
                 <span>
                   <small>等待确认</small>
-                  <strong>{approvals.length}</strong>
+                  <strong>{activeApprovalCount}</strong>
                 </span>
               </span>
               <span className="summary-failed">
@@ -8325,7 +8583,7 @@ export default function HomePage() {
               <aside className="needs-action-panel" aria-label="需要你确认">
                 <div className="attention-heading">
                   <span>需要你处理</span>
-                  <strong>{approvals.length}</strong>
+                  <strong>{activeApprovalCount}</strong>
                 </div>
 
                 {selectedApproval ? (
@@ -8398,9 +8656,33 @@ export default function HomePage() {
                   </>
                 ) : (
                   <div className="nothing-pending">
-                    <CheckCircle2 size={28} />
-                    <strong>暂时没有需要处理的事</strong>
-                    <p>任务会继续在后台运行。</p>
+                    {deferredApprovalCount > 0 ? (
+                      <Clock3 size={28} />
+                    ) : (
+                      <CheckCircle2 size={28} />
+                    )}
+                    <strong>
+                      {deferredApprovalCount > 0
+                        ? "当前待办已经清空"
+                        : "暂时没有需要处理的事"}
+                    </strong>
+                    <p>
+                      {deferredApprovalCount > 0
+                        ? `${deferredApprovalCount} 项操作会在安排的时间重新提醒。`
+                        : "任务会继续在后台运行。"}
+                    </p>
+                    {deferredApprovalCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setApprovalRiskFilter("稍后");
+                          openView("approvals");
+                        }}
+                      >
+                        查看稍后提醒
+                        <ChevronRight size={14} />
+                      </button>
+                    )}
                   </div>
                 )}
               </aside>
@@ -8733,7 +9015,7 @@ export default function HomePage() {
                     </span>
                     <div>
                       <small>审批收件箱</small>
-                      <strong>{approvals.length} 项操作等待决定</strong>
+                      <strong>{activeApprovalCount} 项操作等待决定</strong>
                     </div>
                     <div className="approval-risk-summary" aria-label="待确认风险分布">
                       <span>
@@ -8748,6 +9030,12 @@ export default function HomePage() {
                         <i className="risk-dot low" />
                         低风险 {approvalRiskCounts["低风险"]}
                       </span>
+                      {deferredApprovalCount > 0 && (
+                        <span className="is-deferred">
+                          <Clock3 size={12} />
+                          稍后 {deferredApprovalCount}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="approval-inbox-controls">
@@ -8785,15 +9073,23 @@ export default function HomePage() {
                           type="button"
                           role="tab"
                           aria-selected={approvalRiskFilter === filter}
-                          onClick={() => setApprovalRiskFilter(filter)}
+                          onClick={() => {
+                            setApprovalRiskFilter(filter);
+                            setSelectedApprovalIds([]);
+                          }}
                         >
+                          {filter === "稍后" && <Clock3 size={13} />}
                           {filter}
                           <span>{approvalRiskCounts[filter]}</span>
                         </button>
                       ))}
                     </div>
                     <span className="approval-result-count" aria-live="polite">
-                      显示 {filteredApprovals.length} / {approvals.length} 项
+                      显示 {filteredApprovals.length} /{" "}
+                      {approvalRiskFilter === "稍后"
+                        ? deferredApprovalCount
+                        : activeApprovalCount}{" "}
+                      项
                     </span>
                   </div>
                 </div>
@@ -8860,45 +9156,67 @@ export default function HomePage() {
 
                 <div className="approval-queue">
                   <div className="approval-queue-heading">
-                    <label className="approval-selection-control approval-select-all">
-                      <input
-                        type="checkbox"
-                        aria-label="选择当前筛选中的全部审批"
-                        checked={allVisibleApprovalsSelected}
-                        ref={(input) => {
-                          if (input) {
-                            input.indeterminate =
-                              selectedVisibleApprovalCount > 0 &&
-                              !allVisibleApprovalsSelected;
-                          }
-                        }}
-                        onChange={toggleAllVisibleApprovals}
-                      />
-                      <span aria-hidden="true">
-                        <Check size={13} />
+                    {approvalRiskFilter === "稍后" ? (
+                      <span
+                        className="approval-snooze-heading-icon"
+                        aria-hidden="true"
+                      >
+                        <Clock3 size={14} />
                       </span>
-                    </label>
-                    <span>审批队列</span>
+                    ) : (
+                      <label className="approval-selection-control approval-select-all">
+                        <input
+                          type="checkbox"
+                          aria-label="选择当前筛选中的全部审批"
+                          checked={allVisibleApprovalsSelected}
+                          ref={(input) => {
+                            if (input) {
+                              input.indeterminate =
+                                selectedVisibleApprovalCount > 0 &&
+                                !allVisibleApprovalsSelected;
+                            }
+                          }}
+                          onChange={toggleAllVisibleApprovals}
+                        />
+                        <span aria-hidden="true">
+                          <Check size={13} />
+                        </span>
+                      </label>
+                    )}
+                    <span>
+                      {approvalRiskFilter === "稍后" ? "稍后提醒" : "审批队列"}
+                    </span>
                     <strong>{filteredApprovals.length} 项</strong>
                   </div>
                   {filteredApprovals.map((item) => (
                     <div
                       className={`approval-queue-row-shell ${
                         selectedApproval?.id === item.id ? "selected" : ""
-                      } ${selectedApprovalIds.includes(item.id) ? "is-checked" : ""}`}
+                      } ${selectedApprovalIds.includes(item.id) ? "is-checked" : ""} ${
+                        deferredApprovalIds.has(item.id) ? "is-snoozed" : ""
+                      }`}
                       key={item.id}
                     >
-                      <label className="approval-selection-control">
-                        <input
-                          type="checkbox"
-                          aria-label={`选择审批：${item.title}`}
-                          checked={selectedApprovalIds.includes(item.id)}
-                          onChange={() => toggleApprovalSelection(item.id)}
-                        />
-                        <span aria-hidden="true">
-                          <Check size={13} />
+                      {deferredApprovalIds.has(item.id) ? (
+                        <span
+                          className="approval-snooze-row-icon"
+                          aria-hidden="true"
+                        >
+                          <Clock3 size={14} />
                         </span>
-                      </label>
+                      ) : (
+                        <label className="approval-selection-control">
+                          <input
+                            type="checkbox"
+                            aria-label={`选择审批：${item.title}`}
+                            checked={selectedApprovalIds.includes(item.id)}
+                            onChange={() => toggleApprovalSelection(item.id)}
+                          />
+                          <span aria-hidden="true">
+                            <Check size={13} />
+                          </span>
+                        </label>
+                      )}
                       <button
                         className="approval-queue-main"
                         type="button"
@@ -8914,7 +9232,14 @@ export default function HomePage() {
                               {item.risk}
                             </em>
                           </span>
-                          <small>{item.target} · {item.requestedAt}</small>
+                          <small>
+                            {deferredApprovalIds.has(item.id)
+                              ? `${formatApprovalDeferredUntil(
+                                  approvalDeferrals[item.id],
+                                  approvalClock,
+                                )} 重新提醒`
+                              : `${item.target} · ${item.requestedAt}`}
+                          </small>
                         </span>
                         <ChevronRight size={16} />
                       </button>
@@ -8922,17 +9247,42 @@ export default function HomePage() {
                   ))}
                   {filteredApprovals.length === 0 && (
                     <div className="approval-queue-empty">
-                      <Search size={22} />
-                      <strong>没有匹配的待确认操作</strong>
-                      <small>换一个关键词或风险等级，待确认操作不会被移除。</small>
+                      {approvalRiskFilter === "稍后" ? (
+                        <Clock3 size={22} />
+                      ) : activeApprovalCount === 0 ? (
+                        <CheckCircle2 size={22} />
+                      ) : (
+                        <Search size={22} />
+                      )}
+                      <strong>
+                        {approvalRiskFilter === "稍后"
+                          ? "没有安排稍后提醒的操作"
+                          : activeApprovalCount === 0
+                            ? "当前没有需要立即处理的操作"
+                            : "没有匹配的待确认操作"}
+                      </strong>
+                      <small>
+                        {approvalRiskFilter === "稍后"
+                          ? "使用“稍后处理”后，操作会在这里显示并按时重新提醒。"
+                          : activeApprovalCount === 0 && deferredApprovalCount > 0
+                            ? `${deferredApprovalCount} 项操作已安排稍后提醒，期间不会执行外部动作。`
+                            : "换一个关键词或风险等级，待确认操作不会被移除。"}
+                      </small>
                       <button
                         type="button"
                         onClick={() => {
                           setApprovalListQuery("");
-                          setApprovalRiskFilter("全部");
+                          setApprovalRiskFilter(
+                            activeApprovalCount === 0 &&
+                              deferredApprovalCount > 0
+                              ? "稍后"
+                              : "全部",
+                          );
                         }}
                       >
-                        清除筛选
+                        {activeApprovalCount === 0 && deferredApprovalCount > 0
+                          ? "查看稍后提醒"
+                          : "清除筛选"}
                       </button>
                     </div>
                   )}
@@ -8943,8 +9293,14 @@ export default function HomePage() {
                     <div className="approval-review-heading">
                       <div>
                         <span className="approval-kicker">
-                          <ShieldCheck size={15} />
-                          等待你的确认
+                          {selectedApprovalIsDeferred ? (
+                            <Clock3 size={15} />
+                          ) : (
+                            <ShieldCheck size={15} />
+                          )}
+                          {selectedApprovalIsDeferred
+                            ? "已安排稍后处理"
+                            : "等待你的确认"}
                         </span>
                         <em
                           className={`approval-risk risk-${selectedApproval.risk}`}
@@ -8955,6 +9311,28 @@ export default function HomePage() {
                       <h2>{selectedApproval.title}</h2>
                       <p>{selectedApproval.reason}</p>
                     </div>
+
+                    {selectedApprovalIsDeferred &&
+                      selectedApprovalDeferredUntil && (
+                        <div
+                          className="approval-snoozed-banner"
+                          role="status"
+                        >
+                          <Clock3 size={18} />
+                          <span>
+                            <strong>
+                              {formatApprovalDeferredUntil(
+                                selectedApprovalDeferredUntil,
+                                approvalClock,
+                              )}{" "}
+                              重新提醒
+                            </strong>
+                            <small>
+                              到期前不会执行这项操作，也不会计入当前待办。
+                            </small>
+                          </span>
+                        </div>
+                      )}
 
                     <div className="approval-context-grid">
                       <div>
@@ -8998,11 +9376,23 @@ export default function HomePage() {
 
                     <div className="approval-explanation">
                       <span>
-                        <AlertTriangle size={17} />
+                        {selectedApprovalIsDeferred ? (
+                          <Clock3 size={17} />
+                        ) : (
+                          <AlertTriangle size={17} />
+                        )}
                       </span>
                       <div>
-                        <strong>批准后会发生什么</strong>
-                        <p>{selectedApproval.impact}</p>
+                        <strong>
+                          {selectedApprovalIsDeferred
+                            ? "当前保持什么状态"
+                            : "批准后会发生什么"}
+                        </strong>
+                        <p>
+                          {selectedApprovalIsDeferred
+                            ? "操作保持未执行，关联任务继续停在安全检查点。"
+                            : selectedApproval.impact}
+                        </p>
                       </div>
                     </div>
 
@@ -9023,23 +9413,55 @@ export default function HomePage() {
                       </div>
                     </div>
 
-                    <div className="approval-detail-actions">
-                      <button className="confirm" type="button" onClick={approveCurrent}>
-                        <Check size={16} />
-                        {selectedApproval.action}
-                      </button>
-                      <button type="button" onClick={holdCurrent}>
-                        <Timer size={16} />
-                        稍后处理
-                      </button>
-                      <button
-                        className="danger"
-                        type="button"
-                        onClick={requestRejectApproval}
-                      >
-                        <Ban size={16} />
-                        拒绝操作
-                      </button>
+                    <div
+                      className={`approval-detail-actions ${
+                        selectedApprovalIsDeferred ? "is-deferred" : ""
+                      }`}
+                    >
+                      {selectedApprovalIsDeferred ? (
+                        <>
+                          <button
+                            className="confirm restore"
+                            type="button"
+                            onClick={() =>
+                              restoreDeferredApproval(selectedApproval.id)
+                            }
+                          >
+                            <RotateCcw size={16} />
+                            提前恢复到待确认
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openTask(selectedApproval.taskId)}
+                          >
+                            <Link2 size={16} />
+                            查看关联任务
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="confirm"
+                            type="button"
+                            onClick={approveCurrent}
+                          >
+                            <Check size={16} />
+                            {selectedApproval.action}
+                          </button>
+                          <button type="button" onClick={holdCurrent}>
+                            <Timer size={16} />
+                            稍后处理
+                          </button>
+                          <button
+                            className="danger"
+                            type="button"
+                            onClick={requestRejectApproval}
+                          >
+                            <Ban size={16} />
+                            拒绝操作
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
@@ -9789,7 +10211,7 @@ export default function HomePage() {
                 </span>
                 <span>
                   <small>待确认</small>
-                  <strong>{approvals.length}</strong>
+                  <strong>{activeApprovalCount}</strong>
                 </span>
                 <span>
                   <small>数据量</small>
@@ -10357,7 +10779,9 @@ export default function HomePage() {
                       }
                     >
                       {approvals.length > 0
-                        ? `查看 ${approvals.length} 项待确认`
+                        ? activeApprovalCount > 0
+                          ? `查看 ${activeApprovalCount} 项待确认`
+                          : `查看 ${deferredApprovalCount} 项稍后提醒`
                         : "查看任务规则"}
                       <ChevronRight size={15} />
                     </button>
@@ -13118,6 +13542,113 @@ export default function HomePage() {
                 确认删除
               </button>
             </div>
+          </section>
+        </div>
+      )}
+
+      {approvalSnoozeTarget && (
+        <div
+          className="clarity-dialog-backdrop approval-snooze-backdrop"
+          onMouseDown={() => setApprovalSnoozeId(null)}
+        >
+          <section
+            className="approval-snooze-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="approval-snooze-title"
+            aria-describedby="approval-snooze-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="approval-snooze-close"
+              type="button"
+              aria-label="关闭稍后处理"
+              onClick={() => setApprovalSnoozeId(null)}
+            >
+              <X size={17} />
+            </button>
+            <span className="approval-snooze-icon">
+              <Clock3 size={21} />
+            </span>
+            <span className="approval-snooze-eyebrow">稍后处理</span>
+            <h2 id="approval-snooze-title">什么时候重新提醒你？</h2>
+            <p id="approval-snooze-description">
+              “{approvalSnoozeTarget.title}”会暂时移出当前待办，到期后自动回来；期间不会执行任何外部操作。
+            </p>
+
+            <div className="approval-snooze-target">
+              <approvalSnoozeTarget.icon size={17} />
+              <span>
+                <strong>{approvalSnoozeTarget.target}</strong>
+                <small>{approvalSnoozeTarget.scope}</small>
+              </span>
+              <em className={`approval-risk risk-${approvalSnoozeTarget.risk}`}>
+                {approvalSnoozeTarget.risk}
+              </em>
+            </div>
+
+            <div
+              className="approval-snooze-options"
+              role="group"
+              aria-label="重新提醒时间"
+            >
+              {[
+                {
+                  id: "15m" as const,
+                  label: "15 分钟后",
+                  detail: "短暂离开当前队列",
+                  icon: Timer,
+                },
+                {
+                  id: "1h" as const,
+                  label: "1 小时后",
+                  detail: "留到稍后的工作时段",
+                  icon: Clock3,
+                },
+                {
+                  id: "tomorrow" as const,
+                  label: "明天 09:00",
+                  detail: "下一个工作日再决定",
+                  icon: CalendarDays,
+                },
+              ].map((option, index) => {
+                const deferredUntil = getApprovalSnoozeUntil(
+                  option.id,
+                  new Date(approvalClock),
+                );
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    data-overlay-initial-focus={index === 0 ? true : undefined}
+                    onClick={() => confirmApprovalSnooze(option.id)}
+                  >
+                    <span>
+                      <option.icon size={17} />
+                    </span>
+                    <span>
+                      <strong>{option.label}</strong>
+                      <small>{option.detail}</small>
+                    </span>
+                    <em>
+                      {formatApprovalDeferredUntil(
+                        deferredUntil.toISOString(),
+                        approvalClock,
+                      )}
+                    </em>
+                    <ChevronRight size={16} />
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              className="approval-snooze-cancel"
+              type="button"
+              onClick={() => setApprovalSnoozeId(null)}
+            >
+              保持当前待办
+            </button>
           </section>
         </div>
       )}

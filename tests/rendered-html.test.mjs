@@ -38,7 +38,7 @@ test("server-renders the Unzoo One task console", async () => {
   assert.match(html, /需要你处理/);
   assert.match(html, /你交给 Unzoo One 的工作/);
   assert.match(html, /ai-core-premium\.webp/);
-  assert.match(html, /unzoo-one-mark\.svg/);
+  assert.match(html, /unzoo-one-mark\.png/);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/);
 });
 
@@ -48,13 +48,12 @@ test("keeps commercial task interactions and accessibility in source", async () 
     readFile(new URL("../app/clarity.css", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readFile(new URL("../public/unzoo-one-mark.svg", import.meta.url), "utf8"),
+    readFile(new URL("../public/unzoo-one-mark.png", import.meta.url)),
   ]);
 
   assert.match(page, /unzoo <span>one<\/span>/);
-  assert.match(brandMark, /viewBox="0 0 64 64"/);
-  assert.match(brandMark, /id="unzoo-accent"/);
-  assert.match(brandMark, /stroke-width="10"/);
+  assert.equal(brandMark.subarray(1, 4).toString("ascii"), "PNG");
+  assert.ok(brandMark.length > 10_000);
   assert.match(page, /const taskFilters: TaskFilter\[\]/);
   assert.match(page, /type WorkspacePersistenceStatus =/);
   assert.match(page, /const legacyWorkspaceStorageKeys =/);
@@ -107,7 +106,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /"unzoo-one-connectors"/);
   assert.match(page, /"unzoo-one-team"/);
   assert.match(page, /"unzoo-one-usage"/);
-  assert.match(page, /"unzoo-one-schema-version", "9"/);
+  assert.match(page, /"unzoo-one-schema-version", "10"/);
   assert.match(
     page,
     /window\.localStorage\.setItem\(\s*workspaceSyncKey,\s*JSON\.stringify\(snapshot\)/,
@@ -126,6 +125,14 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /taskId: deletingTaskId/);
   assert.match(page, /function recordActivity/);
   assert.match(page, /type ApprovalRisk =/);
+  assert.match(page, /type ApprovalDeferrals = Record<string, string>/);
+  assert.match(page, /function isApprovalDeferrals/);
+  assert.match(page, /function getApprovalSnoozeUntil/);
+  assert.match(page, /function formatApprovalDeferredUntil/);
+  assert.match(page, /function confirmApprovalSnooze/);
+  assert.match(page, /function restoreDeferredApproval/);
+  assert.match(page, /className="approval-snooze-dialog"/);
+  assert.match(page, /aria-label="重新提醒时间"/);
   assert.match(page, /type ArtifactItem =/);
   assert.match(page, /const initialArtifacts: ArtifactItem\[\]/);
   assert.match(page, /function isArtifactItem/);
@@ -328,6 +335,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.workspace-storage-banner/);
   assert.match(css, /\.workspace-storage-actions/);
   assert.match(css, /\.clarity-sidebar-status > i\.storage-failed/);
+  assert.match(css, /\.approval-snooze-dialog/);
+  assert.match(css, /\.approval-snoozed-banner/);
+  assert.match(css, /\.approval-queue-row-shell\.is-snoozed/);
   assert.match(css, /\.network-status-banner/);
   assert.match(css, /\.workspace-sync-banner/);
   assert.match(css, /\.workspace-sync-banner\.has-conflict/);
