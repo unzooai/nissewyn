@@ -206,6 +206,13 @@ type TaskDraftSnapshot = {
   scheduleDay: Weekday;
   approval: boolean;
 };
+type TaskDraftRecovery = {
+  version: 1;
+  savedAt: string;
+  editingTaskId: string | null;
+  draft: TaskDraftSnapshot;
+  baseline: TaskDraftSnapshot;
+};
 type ArtifactFormErrors = Partial<
   Record<"title" | "filename" | "content", string>
 >;
@@ -323,6 +330,9 @@ type SearchResult = {
 };
 
 const weekdays: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+const taskSchedules: TaskSchedule[] = ["仅运行一次", "每天", "每周"];
+const taskDraftRecoveryKey = "unzoo-one-task-draft-recovery";
+const taskDraftRecoveryMaxAge = 7 * 24 * 60 * 60 * 1000;
 const defaultSettings: SettingsState = {
   approval: true,
   local: true,
@@ -450,6 +460,89 @@ function isConnectorState(value: unknown): value is ConnectorState {
     typeof state.mail === "boolean" &&
     typeof state.calendar === "boolean"
   );
+}
+
+function isTaskDraftSnapshot(value: unknown): value is TaskDraftSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const draft = value as Partial<TaskDraftSnapshot>;
+  return (
+    typeof draft.name === "string" &&
+    draft.name.length <= 80 &&
+    typeof draft.target === "string" &&
+    draft.target.length <= 240 &&
+    typeof draft.description === "string" &&
+    draft.description.length <= 500 &&
+    typeof draft.schedule === "string" &&
+    taskSchedules.includes(draft.schedule as TaskSchedule) &&
+    typeof draft.scheduleTime === "string" &&
+    (draft.scheduleTime === "" ||
+      /^([01]\d|2[0-3]):[0-5]\d$/.test(draft.scheduleTime)) &&
+    typeof draft.scheduleDay === "string" &&
+    weekdays.includes(draft.scheduleDay as Weekday) &&
+    typeof draft.approval === "boolean"
+  );
+}
+
+function parseTaskDraftRecovery(value: unknown): TaskDraftRecovery | null {
+  if (!value || typeof value !== "object") return null;
+  const recovery = value as Partial<TaskDraftRecovery>;
+  const savedAt = recovery.savedAt ? Date.parse(recovery.savedAt) : Number.NaN;
+  const age = Date.now() - savedAt;
+  if (
+    recovery.version !== 1 ||
+    Number.isNaN(savedAt) ||
+    age < -5 * 60 * 1000 ||
+    age > taskDraftRecoveryMaxAge ||
+    (recovery.editingTaskId !== null &&
+      (typeof recovery.editingTaskId !== "string" ||
+        recovery.editingTaskId.length > 160)) ||
+    !isTaskDraftSnapshot(recovery.draft) ||
+    !isTaskDraftSnapshot(recovery.baseline)
+  ) {
+    return null;
+  }
+  return recovery as TaskDraftRecovery;
+}
+
+function formatTaskDraftSavedAt(savedAt: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(savedAt));
+}
+
+function getWorkspaceToday() {
+  const now = new Date();
+  const dateParts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(now);
+  const month = dateParts.find((part) => part.type === "month")?.value ?? "";
+  const day = dateParts.find((part) => part.type === "day")?.value ?? "";
+  const hour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Shanghai",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(now),
+  );
+  const greeting =
+    hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
+  return {
+    eyebrow: `今天 · ${month} 月 ${day} 日`,
+    greeting,
+  };
+}
+
+function clearTaskDraftRecoveryStorage() {
+  try {
+    window.sessionStorage.removeItem(taskDraftRecoveryKey);
+  } catch {
+    // Browsers may disable session storage; the active form remains usable.
+  }
 }
 
 function isUsageSettings(value: unknown): value is UsageSettings {
@@ -902,8 +995,8 @@ const activityFilters: ActivityFilter[] = ["全部", "任务", "审批", "系统
 
 const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: string }> = {
   home: {
-    eyebrow: "今天 · 7 月 29 日",
-    title: "下午好，今天有需要你处理的事项",
+    eyebrow: "今天",
+    title: "你好，今天有需要你处理的事项",
     description: "任务正在后台运行，只有需要你决定时才会停下来。",
   },
   tasks: {
@@ -1459,6 +1552,15 @@ export default function HomePage() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [taskDraftBaseline, setTaskDraftBaseline] =
     useState<TaskDraftSnapshot | null>(null);
+  const [pendingTaskDraftRecovery, setPendingTaskDraftRecovery] =
+    useState<TaskDraftRecovery | null>(null);
+  const [taskDraftAutoSavedAt, setTaskDraftAutoSavedAt] = useState<
+    string | null
+  >(null);
+  const [taskDraftAutoSavedSignature, setTaskDraftAutoSavedSignature] =
+    useState("");
+  const [taskDraftSaveFailedSignature, setTaskDraftSaveFailedSignature] =
+    useState("");
   const [taskDiscardOpen, setTaskDiscardOpen] = useState(false);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [rejectApprovalId, setRejectApprovalId] = useState<string | null>(null);
@@ -1567,15 +1669,18 @@ export default function HomePage() {
   const taskDescriptionRef = useRef<HTMLTextAreaElement>(null);
   const taskScheduleTimeRef = useRef<HTMLInputElement>(null);
   const taskSavingRef = useRef(false);
+  const taskDraftRecoveryOwnedRef = useRef(false);
   const inviteSavingRef = useRef(false);
 
   const failedTaskCount = tasks.filter((task) => task.status === "失败").length;
   const attentionCount = approvals.length + failedTaskCount;
+  const workspaceToday = getWorkspaceToday();
   const pageTitle =
     activeView === "home"
       ? {
           ...viewTitles.home,
-          title: `下午好，今天有 ${attentionCount} 件事需要你处理`,
+          eyebrow: workspaceToday.eyebrow,
+          title: `${workspaceToday.greeting}，今天有 ${attentionCount} 件事需要你处理`,
           description:
             failedTaskCount > 0
               ? `${failedTaskCount} 个任务需要恢复，${approvals.length} 项操作等待确认。`
@@ -1968,6 +2073,22 @@ export default function HomePage() {
         taskScheduleDay !== taskDraftBaseline.scheduleDay ||
         taskApproval !== taskDraftBaseline.approval),
   );
+  const taskDraftSignature = JSON.stringify([
+    editingTaskId,
+    taskName,
+    taskTarget,
+    taskDescription,
+    taskSchedule,
+    taskScheduleTime,
+    taskScheduleDay,
+    taskApproval,
+  ]);
+  const taskDraftIsAutoSaved = Boolean(
+    taskDraftAutoSavedAt &&
+      taskDraftAutoSavedSignature === taskDraftSignature,
+  );
+  const taskDraftSaveFailed =
+    taskDraftSaveFailedSignature === taskDraftSignature;
   const teamInviteFormErrors = useMemo<TeamInviteFormErrors>(() => {
     const errors: TeamInviteFormErrors = {};
     const normalizedName = inviteName.trim();
@@ -2001,6 +2122,104 @@ export default function HomePage() {
   const approvalRejectUndoAvailable = Boolean(
     approvalRejectSnapshot && notice.startsWith("已拒绝"),
   );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const savedDraft = window.sessionStorage.getItem(taskDraftRecoveryKey);
+        if (!savedDraft) return;
+        const recovery = parseTaskDraftRecovery(JSON.parse(savedDraft));
+        if (!recovery) {
+          clearTaskDraftRecoveryStorage();
+          return;
+        }
+        setPendingTaskDraftRecovery(recovery);
+      } catch {
+        clearTaskDraftRecoveryStorage();
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!taskComposerDirty && !artifactEditorDirty) return;
+
+    function protectUnsavedWork(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", protectUnsavedWork);
+    return () => window.removeEventListener("beforeunload", protectUnsavedWork);
+  }, [artifactEditorDirty, taskComposerDirty]);
+
+  useEffect(() => {
+    if (!composerOpen || !taskDraftBaseline) return;
+
+    if (!taskComposerDirty) {
+      if (taskDraftRecoveryOwnedRef.current) {
+        clearTaskDraftRecoveryStorage();
+        taskDraftRecoveryOwnedRef.current = false;
+        const resetTimer = window.setTimeout(() => {
+          setPendingTaskDraftRecovery(null);
+          setTaskDraftAutoSavedAt(null);
+          setTaskDraftAutoSavedSignature("");
+          setTaskDraftSaveFailedSignature("");
+        }, 0);
+        return () => window.clearTimeout(resetTimer);
+      }
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const savedAt = new Date().toISOString();
+      const recovery: TaskDraftRecovery = {
+        version: 1,
+        savedAt,
+        editingTaskId,
+        draft: {
+          name: taskName,
+          target: taskTarget,
+          description: taskDescription,
+          schedule: taskSchedule,
+          scheduleTime: taskScheduleTime,
+          scheduleDay: taskScheduleDay,
+          approval: taskApproval,
+        },
+        baseline: taskDraftBaseline,
+      };
+
+      try {
+        window.sessionStorage.setItem(
+          taskDraftRecoveryKey,
+          JSON.stringify(recovery),
+        );
+        taskDraftRecoveryOwnedRef.current = true;
+        setPendingTaskDraftRecovery(null);
+        setTaskDraftAutoSavedAt(savedAt);
+        setTaskDraftAutoSavedSignature(taskDraftSignature);
+        setTaskDraftSaveFailedSignature("");
+      } catch {
+        setTaskDraftSaveFailedSignature(taskDraftSignature);
+      }
+    }, 450);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    composerOpen,
+    editingTaskId,
+    taskApproval,
+    taskComposerDirty,
+    taskDescription,
+    taskDraftBaseline,
+    taskName,
+    taskSchedule,
+    taskScheduleDay,
+    taskScheduleTime,
+    taskTarget,
+    taskDraftSignature,
+  ]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -4011,7 +4230,7 @@ export default function HomePage() {
               : item,
           ),
         );
-        closeComposer();
+        closeComposer({ clearRecovery: true });
         setSelectedTaskId(task.id);
         recordActivity({
           title: `任务配置已更新：${taskName.trim()}`,
@@ -4062,7 +4281,7 @@ export default function HomePage() {
         { view: "tasks", taskId: newTask.id, runId: null },
         "push",
       );
-      closeComposer();
+      closeComposer({ clearRecovery: true });
       setTaskName("");
       setTaskTarget("");
       setTaskDescription("");
@@ -4110,6 +4329,10 @@ export default function HomePage() {
     setTaskScheduleDay(draft.scheduleDay);
     setTaskApproval(draft.approval);
     setTaskDraftBaseline(draft);
+    taskDraftRecoveryOwnedRef.current = false;
+    setTaskDraftAutoSavedAt(null);
+    setTaskDraftAutoSavedSignature("");
+    setTaskDraftSaveFailedSignature("");
     setTaskDiscardOpen(false);
     setTaskFormSubmitted(false);
     setComposerOpen(true);
@@ -4139,13 +4362,29 @@ export default function HomePage() {
     setTaskScheduleDay(draft.scheduleDay);
     setTaskApproval(draft.approval);
     setTaskDraftBaseline(draft);
+    taskDraftRecoveryOwnedRef.current = false;
+    setTaskDraftAutoSavedAt(null);
+    setTaskDraftAutoSavedSignature("");
+    setTaskDraftSaveFailedSignature("");
     setTaskDiscardOpen(false);
     setTaskFormSubmitted(false);
     setEditingTaskId(task.id);
     setComposerOpen(true);
   }
 
-  function closeComposer() {
+  function clearTaskDraftRecovery() {
+    clearTaskDraftRecoveryStorage();
+    taskDraftRecoveryOwnedRef.current = false;
+    setPendingTaskDraftRecovery(null);
+    setTaskDraftAutoSavedAt(null);
+    setTaskDraftAutoSavedSignature("");
+    setTaskDraftSaveFailedSignature("");
+  }
+
+  function closeComposer(options: { clearRecovery?: boolean } = {}) {
+    if (options.clearRecovery || taskDraftRecoveryOwnedRef.current) {
+      clearTaskDraftRecovery();
+    }
     setTaskDiscardOpen(false);
     setComposerOpen(false);
     setEditingTaskId(null);
@@ -4170,6 +4409,57 @@ export default function HomePage() {
         ? "未保存的任务修改已放弃"
         : "未保存的新任务草稿已放弃",
     );
+  }
+
+  function restoreRecoveredTaskDraft() {
+    if (!pendingTaskDraftRecovery || !tasksReady) return;
+    const recovery = pendingTaskDraftRecovery;
+    const originalTask = recovery.editingTaskId
+      ? tasks.find((task) => task.id === recovery.editingTaskId) ?? null
+      : null;
+    const recoveredSignature = JSON.stringify([
+      originalTask?.id ?? null,
+      recovery.draft.name,
+      recovery.draft.target,
+      recovery.draft.description,
+      recovery.draft.schedule,
+      recovery.draft.scheduleTime,
+      recovery.draft.scheduleDay,
+      recovery.draft.approval,
+    ]);
+
+    if (
+      !overlayTriggerRef.current &&
+      document.activeElement instanceof HTMLElement
+    ) {
+      overlayTriggerRef.current = document.activeElement;
+    }
+    setTaskName(recovery.draft.name);
+    setTaskTarget(recovery.draft.target);
+    setTaskDescription(recovery.draft.description);
+    setTaskSchedule(recovery.draft.schedule);
+    setTaskScheduleTime(recovery.draft.scheduleTime);
+    setTaskScheduleDay(recovery.draft.scheduleDay);
+    setTaskApproval(recovery.draft.approval);
+    setTaskDraftBaseline(recovery.baseline);
+    setEditingTaskId(originalTask?.id ?? null);
+    setTaskDiscardOpen(false);
+    setTaskFormSubmitted(false);
+    taskDraftRecoveryOwnedRef.current = true;
+    setPendingTaskDraftRecovery(null);
+    setTaskDraftAutoSavedAt(recovery.savedAt);
+    setTaskDraftAutoSavedSignature(recoveredSignature);
+    setTaskDraftSaveFailedSignature("");
+    setComposerOpen(true);
+
+    if (recovery.editingTaskId && !originalTask) {
+      setNotice("原任务已不存在，草稿将作为新任务继续编辑");
+    }
+  }
+
+  function discardRecoveredTaskDraft() {
+    clearTaskDraftRecovery();
+    setNotice("未完成的任务草稿已放弃");
   }
 
   function applyTaskTemplate(template: (typeof taskTemplates)[number]) {
@@ -6100,6 +6390,45 @@ export default function HomePage() {
             >
               <X size={15} />
             </button>
+          </section>
+        )}
+
+        {tasksReady && pendingTaskDraftRecovery && !composerOpen && (
+          <section
+            className="task-draft-recovery"
+            role="status"
+            aria-labelledby="task-draft-recovery-title"
+          >
+            <span className="task-draft-recovery-icon">
+              <Save size={19} />
+            </span>
+            <span className="task-draft-recovery-copy">
+              <strong id="task-draft-recovery-title">
+                发现未完成的任务草稿
+              </strong>
+              <small>
+                {pendingTaskDraftRecovery.editingTaskId
+                  ? "任务修改"
+                  : "新任务"}
+                ：
+                {pendingTaskDraftRecovery.draft.name.trim() || "未命名任务"}
+                <i aria-hidden="true">·</i>
+                保存于 {formatTaskDraftSavedAt(pendingTaskDraftRecovery.savedAt)}
+              </small>
+            </span>
+            <span className="task-draft-recovery-actions">
+              <button
+                className="continue"
+                type="button"
+                onClick={restoreRecoveredTaskDraft}
+              >
+                <RotateCcw size={15} />
+                继续编辑
+              </button>
+              <button type="button" onClick={discardRecoveredTaskDraft}>
+                放弃草稿
+              </button>
+            </span>
           </section>
         )}
 
@@ -9950,9 +10279,28 @@ export default function HomePage() {
                 </span>
               )}
               {!(taskFormSubmitted && taskFormHasErrors) && taskComposerDirty && (
-                <span className="composer-dirty-summary" aria-live="polite">
-                  <Pencil size={14} />
-                  有未保存修改
+                <span
+                  className={`composer-dirty-summary ${
+                    taskDraftSaveFailed
+                      ? "failed"
+                      : taskDraftIsAutoSaved
+                        ? "saved"
+                        : "saving"
+                  }`}
+                  aria-live="polite"
+                >
+                  {taskDraftSaveFailed ? (
+                    <AlertTriangle size={14} />
+                  ) : taskDraftIsAutoSaved ? (
+                    <CheckCircle2 size={14} />
+                  ) : (
+                    <Save size={14} />
+                  )}
+                  {taskDraftSaveFailed
+                    ? "草稿保存失败，请立即提交"
+                    : taskDraftIsAutoSaved
+                      ? "草稿已自动保存，仍需提交"
+                      : "正在保护你的修改"}
                 </span>
               )}
               <button

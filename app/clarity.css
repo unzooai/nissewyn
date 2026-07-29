@@ -18175,3 +18175,170 @@ body {
     transition: none;
   }
 }
+
+/* Recoverable task drafts */
+.task-draft-recovery {
+  position: relative;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  min-height: 72px;
+  margin-bottom: 16px;
+  padding: 13px 14px;
+  overflow: hidden;
+  border: 1px solid #c9ddd9;
+  border-left: 3px solid #159a78;
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(232, 248, 242, 0.94), rgba(247, 251, 255, 0.96)),
+    #ffffff;
+  box-shadow: 0 12px 32px rgba(32, 76, 90, 0.08);
+  animation: workspace-warning-in 240ms ease-out both;
+}
+
+.task-draft-recovery::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #18a77f 0 72%, #78a7e9 72% 100%);
+  content: "";
+  opacity: 0.72;
+}
+
+.task-draft-recovery-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #b9ddd2;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #108468;
+  box-shadow: 0 5px 14px rgba(31, 105, 87, 0.09);
+}
+
+.task-draft-recovery-copy,
+.task-draft-recovery-copy strong,
+.task-draft-recovery-copy small {
+  display: block;
+  min-width: 0;
+}
+
+.task-draft-recovery-copy strong {
+  color: #18324a;
+  font-size: 13px;
+  font-weight: 820;
+  line-height: 1.35;
+}
+
+.task-draft-recovery-copy small {
+  margin-top: 5px;
+  overflow: hidden;
+  color: #617385;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-draft-recovery-copy i {
+  margin: 0 7px;
+  color: #91a2af;
+  font-style: normal;
+}
+
+.task-draft-recovery-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-draft-recovery-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid #c9d6df;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #536576;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 780;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.task-draft-recovery-actions button:hover {
+  border-color: #9fb2c0;
+  box-shadow: 0 6px 16px rgba(37, 68, 90, 0.09);
+  transform: translateY(-1px);
+}
+
+.task-draft-recovery-actions .continue {
+  border-color: #173c57;
+  background: #173c57;
+  color: #ffffff;
+}
+
+.task-draft-recovery-actions .continue:hover {
+  border-color: #0e715d;
+  background: #0e715d;
+}
+
+.composer-dirty-summary.saving {
+  color: #446a99;
+}
+
+.composer-dirty-summary.saved {
+  color: #147559;
+}
+
+.composer-dirty-summary.failed {
+  color: #aa413e;
+}
+
+@media (max-width: 680px) {
+  .task-draft-recovery {
+    grid-template-columns: 42px minmax(0, 1fr);
+    align-items: start;
+    gap: 11px;
+    padding: 12px;
+  }
+
+  .task-draft-recovery-copy small {
+    white-space: normal;
+  }
+
+  .task-draft-recovery-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .task-draft-recovery-actions button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-draft-recovery {
+    animation: none;
+  }
+
+  .task-draft-recovery-actions button {
+    transition: none;
+  }
+
+  .task-draft-recovery-actions button:hover {
+    transform: none;
+  }
+}
