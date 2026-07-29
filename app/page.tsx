@@ -1216,6 +1216,12 @@ export default function HomePage() {
 
   const runningTaskCount = tasks.filter((task) => task.status === "运行中").length;
   const completedTaskCount = tasks.filter((task) => task.status === "已完成").length;
+  const protectedTaskCount = tasks.filter(
+    (task) => task.requiresApproval !== false,
+  ).length;
+  const settingsAuditItems = activityLog
+    .filter((item) => item.kind === "审批" || item.kind === "系统")
+    .slice(0, 3);
   const workspaceDataSize = useMemo(() => {
     const serialized = JSON.stringify({
       tasks,
@@ -3382,6 +3388,160 @@ export default function HomePage() {
                 onChange={importWorkspace}
               />
             </div>
+
+            <section className="settings-trust-center">
+              <header className="settings-trust-heading">
+                <div>
+                  <span>执行边界与审计</span>
+                  <h2>确认 AI 能做什么，以及刚刚做了什么</h2>
+                  <p>这里汇总当前工作区真正生效的规则，不展示未连接的能力。</p>
+                </div>
+                <span className="settings-trust-state">
+                  <CheckCircle2 size={16} />
+                  规则已生效
+                </span>
+              </header>
+
+              <div className="settings-trust-layout">
+                <div className="settings-policy-list" aria-label="当前执行规则">
+                  <div className="settings-policy-row">
+                    <span className="settings-policy-icon approval">
+                      <ShieldCheck size={19} />
+                    </span>
+                    <div>
+                      <span>审批保护</span>
+                      <strong>
+                        {settings.approval ? "新任务默认需要确认" : "新任务默认自动执行"}
+                      </strong>
+                      <small>
+                        {protectedTaskCount} / {tasks.length} 个现有任务保留审批边界
+                      </small>
+                    </div>
+                    <em className={settings.approval ? "is-safe" : "is-caution"}>
+                      {settings.approval ? "默认开启" : "默认关闭"}
+                    </em>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openView(approvals.length > 0 ? "approvals" : "tasks")
+                      }
+                    >
+                      {approvals.length > 0
+                        ? `查看 ${approvals.length} 项待确认`
+                        : "查看任务规则"}
+                      <ChevronRight size={15} />
+                    </button>
+                  </div>
+
+                  <div className="settings-policy-row">
+                    <span className="settings-policy-icon storage">
+                      <HardDrive size={19} />
+                    </span>
+                    <div>
+                      <span>工作区保存</span>
+                      <strong>
+                        {settings.local ? "数据保存在这台设备" : "当前是临时会话"}
+                      </strong>
+                      <small>
+                        {settings.local
+                          ? `约 ${workspaceDataSize} KB，可随时导出迁移`
+                          : "关闭页面前请先导出需要保留的数据"}
+                      </small>
+                    </div>
+                    <em className={settings.local ? "is-safe" : "is-caution"}>
+                      {settings.local ? "本机保存" : "临时模式"}
+                    </em>
+                    <button
+                      type="button"
+                      onClick={
+                        settings.local ? exportWorkspace : requestToggleLocalPersistence
+                      }
+                    >
+                      {settings.local ? "立即备份" : "开启保存"}
+                      <ChevronRight size={15} />
+                    </button>
+                  </div>
+
+                  <div className="settings-policy-row">
+                    <span className="settings-policy-icon notification">
+                      <Bell size={19} />
+                    </span>
+                    <div>
+                      <span>确认提醒</span>
+                      <strong>
+                        {settings.notifications
+                          ? "任务暂停时显示提醒"
+                          : "当前不会主动提醒"}
+                      </strong>
+                      <small>只影响后续需要你决定的任务，不改变执行规则</small>
+                    </div>
+                    <em
+                      className={settings.notifications ? "is-safe" : "is-neutral"}
+                    >
+                      {settings.notifications ? "已开启" : "已关闭"}
+                    </em>
+                    <button
+                      type="button"
+                      onClick={() => toggleSetting("notifications", "确认通知")}
+                    >
+                      {settings.notifications ? "关闭提醒" : "开启提醒"}
+                      <ChevronRight size={15} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-audit-preview">
+                  <div className="settings-audit-heading">
+                    <div>
+                      <span>最近安全事件</span>
+                      <strong>{settingsAuditItems.length} 条可追溯记录</strong>
+                    </div>
+                    <History size={18} />
+                  </div>
+                  <div className="settings-audit-list">
+                    {settingsAuditItems.map((item) => {
+                      const ItemIcon = activityIconMap[item.icon] ?? Activity;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => openActivityItem(item)}
+                        >
+                          <span className={`tone-${item.tone}`}>
+                            <ItemIcon size={16} />
+                          </span>
+                          <span>
+                            <small>
+                              {item.kind} · {item.time}
+                            </small>
+                            <strong>{item.title}</strong>
+                          </span>
+                          <ChevronRight size={15} />
+                        </button>
+                      );
+                    })}
+                    {settingsAuditItems.length === 0 && (
+                      <div className="settings-audit-empty">
+                        <CheckCircle2 size={19} />
+                        <strong>还没有安全事件</strong>
+                        <small>审批、设置和系统变更会自动记录在这里。</small>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className="settings-audit-open"
+                    type="button"
+                    onClick={() => {
+                      setActivityFilter("全部");
+                      openView("activity");
+                    }}
+                  >
+                    <History size={16} />
+                    打开完整运行记录
+                  </button>
+                </div>
+              </div>
+            </section>
           </section>
         )}
       </section>
