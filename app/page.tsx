@@ -66,12 +66,25 @@ type SettingsState = {
   local: boolean;
   notifications: boolean;
 };
+type ConnectorId = "browser" | "workspace" | "mail" | "calendar";
+type ConnectorState = Record<ConnectorId, boolean>;
+type ConnectorDefinition = {
+  id: ConnectorId;
+  name: string;
+  description: string;
+  scope: string;
+  lastUsed: string;
+  permissions: string[];
+  icon: typeof Globe2;
+  tone: "blue" | "green" | "amber" | "violet";
+};
 type WorkspaceBackup = {
   version: 1;
   product: "Unzoo One";
   exportedAt: string;
   tasks: TaskItem[];
   settings: SettingsState;
+  connectors?: ConnectorState;
   approvalIds: string[];
   activity: ActivityItem[];
   artifacts?: ArtifactItem[];
@@ -203,6 +216,65 @@ const defaultSettings: SettingsState = {
   local: true,
   notifications: true,
 };
+const defaultConnectorStates: ConnectorState = {
+  browser: true,
+  workspace: true,
+  mail: true,
+  calendar: false,
+};
+const connectorCatalog: ConnectorDefinition[] = [
+  {
+    id: "browser",
+    name: "Unzoo Browser",
+    description: "读取网页、保存截图与提取页面结构",
+    scope: "仅限任务指定页面",
+    lastUsed: "刚刚 · 跟踪竞品发布动态",
+    permissions: ["读取指定网页", "保存页面截图", "使用已授权会话"],
+    icon: Globe2,
+    tone: "blue",
+  },
+  {
+    id: "workspace",
+    name: "本机工作区",
+    description: "读取项目文件并写入已批准的成果",
+    scope: "仅限当前项目目录",
+    lastUsed: "8 分钟前 · 整理本周项目进展",
+    permissions: ["读取项目文件", "创建任务成果", "保留版本记录"],
+    icon: HardDrive,
+    tone: "green",
+  },
+  {
+    id: "mail",
+    name: "邮件连接器",
+    description: "发送已批准的摘要、提醒与报告",
+    scope: "发送前必须确认",
+    lastUsed: "等待确认 · 竞品摘要",
+    permissions: ["创建邮件草稿", "读取发送状态", "批准后发送邮件"],
+    icon: Mail,
+    tone: "amber",
+  },
+  {
+    id: "calendar",
+    name: "日历连接器",
+    description: "读取空闲时间并安排自动任务",
+    scope: "仅限空闲与任务日程",
+    lastUsed: "尚未使用",
+    permissions: ["读取空闲时间", "创建日程提醒", "更新任务时间"],
+    icon: CalendarDays,
+    tone: "violet",
+  },
+];
+
+function isConnectorState(value: unknown): value is ConnectorState {
+  if (!value || typeof value !== "object") return false;
+  const state = value as Partial<ConnectorState>;
+  return (
+    typeof state.browser === "boolean" &&
+    typeof state.workspace === "boolean" &&
+    typeof state.mail === "boolean" &&
+    typeof state.calendar === "boolean"
+  );
+}
 
 function isTaskItem(value: unknown): value is TaskItem {
   if (!value || typeof value !== "object") return false;
@@ -308,6 +380,7 @@ function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
     typeof backup.settings.approval !== "boolean" ||
     typeof backup.settings.local !== "boolean" ||
     typeof backup.settings.notifications !== "boolean" ||
+    (backup.connectors !== undefined && !isConnectorState(backup.connectors)) ||
     !Array.isArray(backup.approvalIds) ||
     !backup.approvalIds.every((id) => typeof id === "string") ||
     !Array.isArray(backup.activity) ||
@@ -868,6 +941,15 @@ export default function HomePage() {
   const [taskFormSubmitted, setTaskFormSubmitted] = useState(false);
   const [isSavingTask, setIsSavingTask] = useState(false);
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
+  const [connectorStates, setConnectorStates] = useState<ConnectorState>(
+    defaultConnectorStates,
+  );
+  const [selectedConnectorId, setSelectedConnectorId] =
+    useState<ConnectorId | null>(null);
+  const [connectorTestingId, setConnectorTestingId] =
+    useState<ConnectorId | null>(null);
+  const [connectorDisconnectConfirm, setConnectorDisconnectConfirm] =
+    useState(false);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const notificationWrapRef = useRef<HTMLDivElement>(null);
@@ -887,6 +969,21 @@ export default function HomePage() {
   const selectedApproval =
     approvals.find((item) => item.id === selectedApprovalId) ?? approvals[0];
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
+  const selectedConnector =
+    connectorCatalog.find((connector) => connector.id === selectedConnectorId) ??
+    null;
+  const SelectedConnectorIcon = selectedConnector?.icon ?? Link2;
+  const connectedConnectorCount = connectorCatalog.filter(
+    (connector) => connectorStates[connector.id],
+  ).length;
+  const connectorUsageCounts: Record<ConnectorId, number> = {
+    browser: tasks.filter((task) => /^https?:\/\//i.test(task.target)).length,
+    workspace: tasks.filter((task) => !/^https?:\/\//i.test(task.target)).length,
+    mail: approvals.filter((item) =>
+      `${item.title} ${item.reason} ${item.action}`.includes("发送"),
+    ).length,
+    calendar: tasks.filter((task) => task.schedule !== "仅运行一次").length,
+  };
   const deletingTask = tasks.find((task) => task.id === deleteTaskId) ?? null;
   const rejectedApproval =
     approvals.find((item) => item.id === rejectApprovalId) ?? null;
@@ -902,6 +999,8 @@ export default function HomePage() {
           ? "reset"
           : composerOpen
             ? "composer"
+            : selectedConnector
+              ? "connector"
             : selectedTask
               ? "task"
               : null;
@@ -965,6 +1064,9 @@ export default function HomePage() {
       try {
         const saved = window.localStorage.getItem("unzoo-one-tasks");
         const savedSettings = window.localStorage.getItem("unzoo-one-settings");
+        const savedConnectors = window.localStorage.getItem(
+          "unzoo-one-connectors",
+        );
         const savedApprovalIds = window.localStorage.getItem(
           "unzoo-one-pending-approvals",
         );
@@ -1029,6 +1131,14 @@ export default function HomePage() {
                 : current.notifications,
           }));
         }
+        if (savedConnectors) {
+          const parsedConnectors = JSON.parse(savedConnectors);
+          if (isConnectorState(parsedConnectors)) {
+            setConnectorStates(parsedConnectors);
+          } else {
+            window.localStorage.removeItem("unzoo-one-connectors");
+          }
+        }
         if (savedApprovalIds) {
           const approvalIds = JSON.parse(savedApprovalIds);
           if (Array.isArray(approvalIds)) {
@@ -1083,10 +1193,11 @@ export default function HomePage() {
             setReadNotificationIds(parsedReadNotifications.slice(0, 30));
           }
         }
-        window.localStorage.setItem("unzoo-one-schema-version", "4");
+        window.localStorage.setItem("unzoo-one-schema-version", "5");
       } catch {
         window.localStorage.removeItem("unzoo-one-tasks");
         window.localStorage.removeItem("unzoo-one-settings");
+        window.localStorage.removeItem("unzoo-one-connectors");
         window.localStorage.removeItem("unzoo-one-pending-approvals");
         window.localStorage.removeItem("unzoo-one-activity");
         window.localStorage.removeItem("unzoo-one-artifacts");
@@ -1108,6 +1219,10 @@ export default function HomePage() {
     if (settings.local) {
       window.localStorage.setItem("unzoo-one-tasks", JSON.stringify(tasks));
       window.localStorage.setItem("unzoo-one-settings", JSON.stringify(settings));
+      window.localStorage.setItem(
+        "unzoo-one-connectors",
+        JSON.stringify(connectorStates),
+      );
       window.localStorage.setItem(
         "unzoo-one-pending-approvals",
         JSON.stringify(approvals.map((item) => item.id)),
@@ -1131,6 +1246,7 @@ export default function HomePage() {
     } else {
       window.localStorage.removeItem("unzoo-one-tasks");
       window.localStorage.removeItem("unzoo-one-settings");
+      window.localStorage.removeItem("unzoo-one-connectors");
       window.localStorage.removeItem("unzoo-one-pending-approvals");
       window.localStorage.removeItem("unzoo-one-activity");
       window.localStorage.removeItem("unzoo-one-artifacts");
@@ -1141,6 +1257,7 @@ export default function HomePage() {
     activityLog,
     approvals,
     artifacts,
+    connectorStates,
     readNotificationIds,
     recentSearchKeys,
     settings,
@@ -1175,6 +1292,7 @@ export default function HomePage() {
         (event.metaKey || event.ctrlKey) &&
         event.key.toLowerCase() === "k" &&
         !composerOpen &&
+        !selectedConnector &&
         !selectedTask &&
         !deletingTask &&
         !rejectedApproval &&
@@ -1214,6 +1332,7 @@ export default function HomePage() {
     notificationsOpen,
     pendingWorkspaceImport,
     searchOpen,
+    selectedConnector,
     selectedTask,
     temporaryModeOpen,
     workspaceResetOpen,
@@ -1252,6 +1371,7 @@ export default function HomePage() {
       temporary: ".temporary-session-dialog",
       reset: ".workspace-reset-dialog",
       composer: ".clarity-dialog",
+      connector: ".connector-detail-dialog",
       task: ".task-detail-drawer",
     } as const;
     const overlay = document.querySelector<HTMLElement>(
@@ -1283,6 +1403,9 @@ export default function HomePage() {
         setWorkspaceResetOpen(false);
       } else if (activeOverlayKind === "composer") {
         closeComposer();
+      } else if (activeOverlayKind === "connector") {
+        setSelectedConnectorId(null);
+        setConnectorDisconnectConfirm(false);
       } else {
         setSelectedTaskId(null);
       }
@@ -1800,6 +1923,7 @@ export default function HomePage() {
       exportedAt: new Date().toISOString(),
       tasks,
       settings,
+      connectors: connectorStates,
       approvalIds: approvals.map((item) => item.id),
       activity: activityLog,
       artifacts,
@@ -1930,6 +2054,9 @@ export default function HomePage() {
     setArtifactSort("最近更新");
     setSelectedArtifactId(restoredArtifacts[0]?.id ?? "");
     setSettings(backup.settings);
+    setConnectorStates(backup.connectors ?? { ...defaultConnectorStates });
+    setSelectedConnectorId(null);
+    setConnectorDisconnectConfirm(false);
     setApprovals(restoredApprovals);
     setSelectedApprovalId(restoredApprovals[0]?.id ?? "");
     setActivityLog(backup.activity.slice(0, 100));
@@ -1968,6 +2095,10 @@ export default function HomePage() {
     setArtifactSort("最近更新");
     setSelectedArtifactId(initialArtifacts[0].id);
     setSettings({ ...defaultSettings });
+    setConnectorStates({ ...defaultConnectorStates });
+    setSelectedConnectorId(null);
+    setConnectorDisconnectConfirm(false);
+    setConnectorTestingId(null);
     setApprovals(initialApprovals.map((item) => ({ ...item })));
     setSelectedApprovalId(initialApprovals[0].id);
     setActivityLog(initialActivityItems.map((item) => ({ ...item })));
@@ -2427,6 +2558,60 @@ export default function HomePage() {
       kind: "系统",
     });
     setNotice("已进入临时会话，关闭页面前可以随时重新开启保存");
+  }
+
+  function openConnector(connectorId: ConnectorId) {
+    setConnectorDisconnectConfirm(false);
+    setSelectedConnectorId(connectorId);
+  }
+
+  function connectConnector(connectorId: ConnectorId) {
+    const connector = connectorCatalog.find((item) => item.id === connectorId);
+    if (!connector) return;
+    setConnectorStates((current) => ({ ...current, [connectorId]: true }));
+    setConnectorDisconnectConfirm(false);
+    recordActivity({
+      title: `连接器已授权：${connector.name}`,
+      detail: `已启用 ${connector.permissions.join("、")}；授权范围为${connector.scope}。`,
+      icon: "settings",
+      tone: "green",
+      kind: "系统",
+    });
+    setNotice(`${connector.name}已连接，可以用于后续任务`);
+  }
+
+  function testConnector(connectorId: ConnectorId) {
+    const connector = connectorCatalog.find((item) => item.id === connectorId);
+    if (!connector || !connectorStates[connectorId] || connectorTestingId) return;
+    setConnectorTestingId(connectorId);
+    window.setTimeout(() => {
+      setConnectorTestingId(null);
+      recordActivity({
+        title: `连接测试通过：${connector.name}`,
+        detail: `连接正常，当前授权范围为${connector.scope}。`,
+        icon: "settings",
+        tone: "green",
+        kind: "系统",
+      });
+      setNotice(`${connector.name}连接正常`);
+    }, 850);
+  }
+
+  function confirmDisconnectConnector() {
+    if (!selectedConnector) return;
+    setConnectorStates((current) => ({
+      ...current,
+      [selectedConnector.id]: false,
+    }));
+    setConnectorDisconnectConfirm(false);
+    recordActivity({
+      title: `连接器已断开：${selectedConnector.name}`,
+      detail: "后续任务不会再使用这项能力，历史运行记录仍会保留。",
+      icon: "settings",
+      tone: "amber",
+      kind: "系统",
+    });
+    setNotice(`${selectedConnector.name}已断开`);
   }
 
   function scrollWorkspaceTop() {
@@ -4568,6 +4753,72 @@ export default function HomePage() {
               </div>
             </div>
 
+            <section className="settings-connectors-center">
+              <header className="settings-connectors-heading">
+                <div>
+                  <span>能力连接</span>
+                  <h2>AI 当前可以使用这些工具</h2>
+                  <p>查看每项能力的授权范围、使用状态，并随时测试或断开连接。</p>
+                </div>
+                <span className="settings-connectors-state">
+                  <Link2 size={16} />
+                  {connectedConnectorCount} / {connectorCatalog.length} 项可用
+                </span>
+              </header>
+
+              <div className="settings-connector-grid">
+                {connectorCatalog.map((connector) => {
+                  const ConnectorIcon = connector.icon;
+                  const connected = connectorStates[connector.id];
+                  const usageCount = connectorUsageCounts[connector.id];
+                  return (
+                    <article
+                      className={`settings-connector-card tone-${connector.tone} ${
+                        connected ? "is-connected" : "is-disconnected"
+                      }`}
+                      key={connector.id}
+                    >
+                      <div className="settings-connector-card-top">
+                        <span className="settings-connector-icon">
+                          <ConnectorIcon size={20} />
+                        </span>
+                        <span className="settings-connector-status">
+                          <i />
+                          {connected ? "已连接" : "未连接"}
+                        </span>
+                      </div>
+                      <div className="settings-connector-copy">
+                        <h3>{connector.name}</h3>
+                        <p>{connector.description}</p>
+                      </div>
+                      <div className="settings-connector-facts">
+                        <span>
+                          <small>授权范围</small>
+                          <strong>{connected ? connector.scope : "尚未授权"}</strong>
+                        </span>
+                        <span>
+                          <small>关联任务</small>
+                          <strong>{usageCount} 个</strong>
+                        </span>
+                      </div>
+                      <div className="settings-connector-footer">
+                        <small>
+                          {connected ? connector.lastUsed : "连接后才会用于任务"}
+                        </small>
+                        <button
+                          type="button"
+                          onClick={() => openConnector(connector.id)}
+                        >
+                          {connected ? "管理" : "连接"}
+                          <ChevronRight size={15} />
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+
             <section className="settings-trust-center">
               <header className="settings-trust-heading">
                 <div>
@@ -4724,6 +4975,184 @@ export default function HomePage() {
           </section>
         )}
       </section>
+
+      {selectedConnector && (
+        <div
+          className="clarity-dialog-backdrop connector-detail-backdrop"
+          onMouseDown={() => {
+            setSelectedConnectorId(null);
+            setConnectorDisconnectConfirm(false);
+          }}
+        >
+          <section
+            className={`connector-detail-dialog tone-${selectedConnector.tone}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="connector-detail-title"
+            aria-describedby="connector-detail-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="connector-detail-close"
+              type="button"
+              aria-label="关闭连接器管理"
+              onClick={() => {
+                setSelectedConnectorId(null);
+                setConnectorDisconnectConfirm(false);
+              }}
+            >
+              <X size={17} />
+            </button>
+
+            <header className="connector-detail-heading">
+              <span className="connector-detail-icon">
+                <SelectedConnectorIcon size={23} />
+              </span>
+              <div>
+                <span>连接器管理</span>
+                <h2 id="connector-detail-title">{selectedConnector.name}</h2>
+                <p id="connector-detail-description">
+                  {selectedConnector.description}
+                </p>
+              </div>
+              <span
+                className={`connector-detail-status ${
+                  connectorStates[selectedConnector.id] ? "is-connected" : ""
+                }`}
+              >
+                <i />
+                {connectorStates[selectedConnector.id] ? "连接正常" : "尚未连接"}
+              </span>
+            </header>
+
+            <div className="connector-detail-facts">
+              <span>
+                <small>授权范围</small>
+                <strong>
+                  {connectorStates[selectedConnector.id]
+                    ? selectedConnector.scope
+                    : "未授予任何权限"}
+                </strong>
+              </span>
+              <span>
+                <small>关联任务</small>
+                <strong>{connectorUsageCounts[selectedConnector.id]} 个</strong>
+              </span>
+              <span>
+                <small>最近使用</small>
+                <strong>
+                  {connectorStates[selectedConnector.id]
+                    ? selectedConnector.lastUsed
+                    : "尚未使用"}
+                </strong>
+              </span>
+            </div>
+
+            <div className="connector-permission-section">
+              <div>
+                <span>权限范围</span>
+                <strong>
+                  {connectorStates[selectedConnector.id]
+                    ? "当前已允许以下操作"
+                    : "连接后将请求以下权限"}
+                </strong>
+              </div>
+              <div className="connector-permission-list">
+                {selectedConnector.permissions.map((permission) => (
+                  <span key={permission}>
+                    <Check size={15} />
+                    {permission}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="connector-safety-note">
+              <ShieldCheck size={17} />
+              <span>
+                {selectedConnector.id === "mail"
+                  ? "邮件只会在你确认后发送，连接器不会绕过审批保护。"
+                  : "连接器只在任务需要时调用，每次使用都会写入运行记录。"}
+              </span>
+            </div>
+
+            {connectorDisconnectConfirm ? (
+              <div className="connector-disconnect-confirm" role="alert">
+                <AlertTriangle size={18} />
+                <span>
+                  <strong>确认断开 {selectedConnector.name}？</strong>
+                  <small>后续任务将停止使用这项能力，历史记录不会被删除。</small>
+                </span>
+                <div>
+                  <button
+                    type="button"
+                    data-overlay-initial-focus
+                    onClick={() => setConnectorDisconnectConfirm(false)}
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="danger"
+                    type="button"
+                    onClick={confirmDisconnectConnector}
+                  >
+                    确认断开
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="connector-detail-actions">
+                {connectorStates[selectedConnector.id] ? (
+                  <>
+                    <button
+                      className="disconnect"
+                      type="button"
+                      onClick={() => setConnectorDisconnectConfirm(true)}
+                    >
+                      断开连接
+                    </button>
+                    <button
+                      className="primary"
+                      type="button"
+                      data-overlay-initial-focus
+                      disabled={connectorTestingId !== null}
+                      aria-busy={connectorTestingId === selectedConnector.id}
+                      onClick={() => testConnector(selectedConnector.id)}
+                    >
+                      {connectorTestingId === selectedConnector.id ? (
+                        <LoaderCircle className="is-spinning" size={16} />
+                      ) : (
+                        <CheckCircle2 size={16} />
+                      )}
+                      {connectorTestingId === selectedConnector.id
+                        ? "正在测试"
+                        : "测试连接"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedConnectorId(null)}
+                    >
+                      暂不连接
+                    </button>
+                    <button
+                      className="primary"
+                      type="button"
+                      data-overlay-initial-focus
+                      onClick={() => connectConnector(selectedConnector.id)}
+                    >
+                      <Link2 size={16} />
+                      连接并授权
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
       {selectedTask && (
         <div

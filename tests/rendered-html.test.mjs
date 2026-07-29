@@ -53,6 +53,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /const taskFilters: TaskFilter\[\]/);
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-tasks"/);
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-settings"/);
+  assert.match(page, /"unzoo-one-connectors"/);
   assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-activity"/);
   assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-artifacts"/);
   assert.match(page, /"unzoo-one-pending-approvals"/);
@@ -71,6 +72,15 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function toggleArtifactStar/);
   assert.match(page, /function requestToggleLocalPersistence/);
   assert.match(page, /function confirmTemporaryMode/);
+  assert.match(page, /type ConnectorId =/);
+  assert.match(page, /const defaultConnectorStates/);
+  assert.match(page, /const connectorCatalog/);
+  assert.match(page, /function isConnectorState/);
+  assert.match(page, /function connectConnector/);
+  assert.match(page, /function testConnector/);
+  assert.match(page, /function confirmDisconnectConnector/);
+  assert.match(page, /connectors: connectorStates/);
+  assert.match(page, /selectedConnectorId/);
   assert.match(page, /function scrollWorkspaceTop/);
   assert.match(page, /temporaryModeOpen/);
   assert.match(page, /关闭页面后保留工作区/);
@@ -138,6 +148,10 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /执行边界与审计/);
   assert.match(page, /打开完整运行记录/);
   assert.match(css, /\.settings-trust-center/);
+  assert.match(css, /\.settings-connectors-center/);
+  assert.match(css, /\.settings-connector-grid/);
+  assert.match(css, /\.connector-detail-dialog/);
+  assert.match(css, /\.connector-disconnect-confirm/);
   assert.match(page, /handleOverlayKeyDown/);
   assert.match(page, /data-overlay-initial-focus/);
   assert.match(page, /notificationWrapRef/);
