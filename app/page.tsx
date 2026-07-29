@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock3,
+  Copy,
   FileText,
   Globe2,
   History,
@@ -17,6 +18,7 @@ import {
   ListChecks,
   Mail,
   Pause,
+  Pencil,
   Play,
   Plus,
   Search,
@@ -24,6 +26,7 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -31,6 +34,11 @@ type ViewId = "home" | "tasks" | "approvals" | "activity" | "settings";
 type TaskStatus = "运行中" | "待确认" | "已完成" | "已暂停";
 type TaskFilter = "全部" | TaskStatus;
 type TaskSchedule = "仅运行一次" | "每天" | "每周";
+type SettingsState = {
+  approval: boolean;
+  local: boolean;
+  notifications: boolean;
+};
 
 type TaskItem = {
   id: string;
@@ -42,6 +50,7 @@ type TaskItem = {
   updated: string;
   schedule?: TaskSchedule;
   requiresApproval?: boolean;
+  pinned?: boolean;
 };
 
 const navItems: Array<{ id: ViewId; label: string; icon: typeof Home }> = [
@@ -93,6 +102,7 @@ const initialTasks: TaskItem[] = [
     updated: "刚刚更新",
     schedule: "每天",
     requiresApproval: true,
+    pinned: true,
   },
   {
     id: "weekly-report",
@@ -267,6 +277,8 @@ export default function HomePage() {
   const [selectedApprovalId, setSelectedApprovalId] = useState(initialApprovals[0].id);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
   const [tasksReady, setTasksReady] = useState(false);
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("全部");
@@ -279,7 +291,7 @@ export default function HomePage() {
   );
   const [taskSchedule, setTaskSchedule] = useState<TaskSchedule>("每天");
   const [taskApproval, setTaskApproval] = useState(true);
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<SettingsState>({
     approval: true,
     local: true,
     notifications: true,
@@ -289,18 +301,35 @@ export default function HomePage() {
   const selectedApproval =
     approvals.find((item) => item.id === selectedApprovalId) ?? approvals[0];
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
+  const deletingTask = tasks.find((task) => task.id === deleteTaskId) ?? null;
+  const primaryTask = tasks.find((task) => task.id === "competitor") ?? initialTasks[0];
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
         const saved = window.localStorage.getItem("unzoo-one-tasks");
+        const savedSettings = window.localStorage.getItem("unzoo-one-settings");
+        const schemaVersion = Number(
+          window.localStorage.getItem("unzoo-one-schema-version") ?? "1",
+        );
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
             const normalizedTasks = (parsed as TaskItem[]).map((task) => ({
               ...task,
-              schedule: task.schedule ?? "仅运行一次",
+              schedule:
+                schemaVersion < 2 &&
+                task.id === "competitor" &&
+                task.schedule === "仅运行一次"
+                  ? "每天"
+                  : task.schedule ??
+                    (task.id === "competitor"
+                      ? "每天"
+                      : task.id === "weekly-report"
+                        ? "每周"
+                        : "仅运行一次"),
               requiresApproval: task.requiresApproval ?? true,
+              pinned: task.pinned ?? task.id === "competitor",
             }));
             setTasks(normalizedTasks);
             const primaryTask = normalizedTasks.find(
@@ -309,8 +338,27 @@ export default function HomePage() {
             setIsRunning(primaryTask?.status !== "已暂停");
           }
         }
+        if (savedSettings) {
+          const parsedSettings = JSON.parse(savedSettings) as Partial<SettingsState>;
+          setSettings((current) => ({
+            approval:
+              typeof parsedSettings.approval === "boolean"
+                ? parsedSettings.approval
+                : current.approval,
+            local:
+              typeof parsedSettings.local === "boolean"
+                ? parsedSettings.local
+                : current.local,
+            notifications:
+              typeof parsedSettings.notifications === "boolean"
+                ? parsedSettings.notifications
+                : current.notifications,
+          }));
+        }
+        window.localStorage.setItem("unzoo-one-schema-version", "2");
       } catch {
         window.localStorage.removeItem("unzoo-one-tasks");
+        window.localStorage.removeItem("unzoo-one-settings");
       } finally {
         setTasksReady(true);
       }
@@ -323,10 +371,12 @@ export default function HomePage() {
     if (!tasksReady) return;
     if (settings.local) {
       window.localStorage.setItem("unzoo-one-tasks", JSON.stringify(tasks));
+      window.localStorage.setItem("unzoo-one-settings", JSON.stringify(settings));
     } else {
       window.localStorage.removeItem("unzoo-one-tasks");
+      window.localStorage.removeItem("unzoo-one-settings");
     }
-  }, [settings.local, tasks, tasksReady]);
+  }, [settings, tasks, tasksReady]);
 
   useEffect(() => {
     if (!notice) return;
@@ -335,13 +385,15 @@ export default function HomePage() {
   }, [notice]);
 
   useEffect(() => {
-    if (!composerOpen && !selectedTask) return;
+    if (!composerOpen && !selectedTask && !deletingTask) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
+      setDeleteTaskId(null);
       setComposerOpen(false);
+      setEditingTaskId(null);
       setSelectedTaskId(null);
     }
 
@@ -350,7 +402,7 @@ export default function HomePage() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [composerOpen, selectedTask]);
+  }, [composerOpen, deletingTask, selectedTask]);
 
   const searchedTasks = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -387,6 +439,32 @@ export default function HomePage() {
   function createTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!taskName.trim() || !taskDescription.trim() || !taskTarget.trim()) return;
+
+    if (editingTaskId) {
+      const task = tasks.find((item) => item.id === editingTaskId);
+      if (!task) return;
+      setTasks((items) =>
+        items.map((item) =>
+          item.id === editingTaskId
+            ? {
+                ...item,
+                title: taskName.trim(),
+                description: taskDescription.trim(),
+                target: taskTarget.trim(),
+                schedule: taskSchedule,
+                requiresApproval: taskApproval,
+                updated: "刚刚修改",
+              }
+            : item,
+        ),
+      );
+      setComposerOpen(false);
+      setEditingTaskId(null);
+      setSelectedTaskId(task.id);
+      setNotice(`任务“${taskName.trim()}”已更新`);
+      return;
+    }
+
     const newTask: TaskItem = {
       id: `task-${Date.now()}`,
       title: taskName.trim(),
@@ -411,11 +489,74 @@ export default function HomePage() {
     setNotice(`任务“${newTask.title}”已开始运行`);
   }
 
+  function beginCreateTask() {
+    setEditingTaskId(null);
+    setTaskName("跟踪一个新网页");
+    setTaskTarget("https://example.com");
+    setTaskDescription("检查页面内容变化，只保留有意义的更新并生成摘要。");
+    setTaskSchedule("每天");
+    setTaskApproval(settings.approval);
+    setComposerOpen(true);
+  }
+
+  function beginEditTask(task: TaskItem) {
+    setTaskName(task.title);
+    setTaskTarget(task.target);
+    setTaskDescription(task.description);
+    setTaskSchedule(task.schedule ?? "仅运行一次");
+    setTaskApproval(task.requiresApproval ?? true);
+    setEditingTaskId(task.id);
+    setSelectedTaskId(null);
+    setComposerOpen(true);
+  }
+
+  function closeComposer() {
+    setComposerOpen(false);
+    setEditingTaskId(null);
+  }
+
   function applyTaskTemplate(template: (typeof taskTemplates)[number]) {
     setTaskName(template.title);
     setTaskDescription(template.description);
     setTaskTarget(template.target);
     setTaskSchedule(template.schedule);
+  }
+
+  function duplicateTask(task: TaskItem) {
+    const duplicate: TaskItem = {
+      ...task,
+      id: `task-${Date.now()}`,
+      title: `${task.title}（副本）`,
+      status: "已暂停",
+      progress: 0,
+      updated: "刚刚复制",
+      pinned: false,
+    };
+    setTasks((items) => [duplicate, ...items]);
+    setSelectedTaskId(duplicate.id);
+    setNotice(`已复制“${task.title}”，副本保持暂停`);
+  }
+
+  function requestDeleteTask(task: TaskItem) {
+    if (task.pinned) {
+      setNotice("首页主任务不能删除，你可以暂停或修改它");
+      return;
+    }
+    setSelectedTaskId(null);
+    setDeleteTaskId(task.id);
+  }
+
+  function confirmDeleteTask() {
+    if (!deletingTask) return;
+    setTasks((items) => items.filter((item) => item.id !== deletingTask.id));
+    setDeleteTaskId(null);
+    setNotice(`任务“${deletingTask.title}”已删除`);
+  }
+
+  function toggleSetting(key: keyof SettingsState, label: string) {
+    const nextValue = !settings[key];
+    setSettings((current) => ({ ...current, [key]: nextValue }));
+    setNotice(`${label}已${nextValue ? "开启" : "关闭"}`);
   }
 
   function openView(view: ViewId) {
@@ -501,6 +642,8 @@ export default function HomePage() {
               className={activeView === item.id ? "active" : ""}
               key={item.id}
               type="button"
+              aria-label={item.label}
+              title={item.label}
               onClick={() => openView(item.id)}
             >
               <item.icon size={18} />
@@ -584,7 +727,7 @@ export default function HomePage() {
             <button
               className="clarity-primary-button"
               type="button"
-              onClick={() => setComposerOpen(true)}
+              onClick={beginCreateTask}
             >
               <Plus size={17} />
               新建任务
@@ -624,8 +767,10 @@ export default function HomePage() {
                   <div className="task-ai-copy">
                     <div className="focus-panel-heading">
                       <div>
-                        <span>自主任务 · 正在运行</span>
-                        <strong>跟踪竞品发布动态</strong>
+                        <span>
+                          {primaryTask.schedule ?? "自主任务"} · {isRunning ? "正在运行" : "已暂停"}
+                        </span>
+                        <strong>{primaryTask.title}</strong>
                       </div>
                       <span className={`live-state ${isRunning ? "" : "paused"}`}>
                         <i />
@@ -634,7 +779,7 @@ export default function HomePage() {
                     </div>
 
                     <p className="task-purpose">
-                      每天检查 3 个竞品页面。有变化时，系统会整理成一份可以直接阅读的摘要。
+                      {primaryTask.description}
                     </p>
 
                     <div className="task-ai-context" aria-label="AI 当前状态">
@@ -685,10 +830,13 @@ export default function HomePage() {
                 <div className="simple-progress">
                   <div>
                     <span>已完成 2 / 3 步</span>
-                    <strong>{isRunning ? "68%" : "暂停"}</strong>
+                    <strong>{isRunning ? `${primaryTask.progress}%` : "暂停"}</strong>
                   </div>
                   <span>
-                    <i className={isRunning ? "moving" : ""} />
+                    <i
+                      className={isRunning ? "moving" : ""}
+                      style={{ width: `${primaryTask.progress}%` }}
+                    />
                   </span>
                 </div>
 
@@ -906,7 +1054,7 @@ export default function HomePage() {
               <button
                 className="clarity-secondary-button"
                 type="button"
-                onClick={() => setComposerOpen(true)}
+                onClick={beginCreateTask}
               >
                 <Plus size={16} />
                 新建任务
@@ -1076,9 +1224,7 @@ export default function HomePage() {
                   type="button"
                   role="switch"
                   aria-checked={settings.approval}
-                  onClick={() =>
-                    setSettings((value) => ({ ...value, approval: !value.approval }))
-                  }
+                  onClick={() => toggleSetting("approval", "默认审批保护")}
                 >
                   <i />
                 </button>
@@ -1093,9 +1239,7 @@ export default function HomePage() {
                   type="button"
                   role="switch"
                   aria-checked={settings.local}
-                  onClick={() =>
-                    setSettings((value) => ({ ...value, local: !value.local }))
-                  }
+                  onClick={() => toggleSetting("local", "本机数据保存")}
                 >
                   <i />
                 </button>
@@ -1117,12 +1261,7 @@ export default function HomePage() {
                   type="button"
                   role="switch"
                   aria-checked={settings.notifications}
-                  onClick={() =>
-                    setSettings((value) => ({
-                      ...value,
-                      notifications: !value.notifications,
-                    }))
-                  }
+                  onClick={() => toggleSetting("notifications", "确认通知")}
                 >
                   <i />
                 </button>
@@ -1145,19 +1284,38 @@ export default function HomePage() {
             onMouseDown={(event) => event.stopPropagation()}
           >
             <header className="task-detail-heading">
-              <div>
+              <div className="task-detail-heading-meta">
                 <span>任务详情</span>
                 <em className={`status-label status-${selectedTask.status}`}>
                   {selectedTask.status}
                 </em>
               </div>
-              <button
-                type="button"
-                aria-label="关闭任务详情"
-                onClick={() => setSelectedTaskId(null)}
-              >
-                <X size={18} />
-              </button>
+              <div className="task-detail-heading-actions">
+                <button
+                  type="button"
+                  aria-label="编辑任务"
+                  title="编辑任务"
+                  onClick={() => beginEditTask(selectedTask)}
+                >
+                  <Pencil size={16} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="复制任务"
+                  title="复制任务"
+                  onClick={() => duplicateTask(selectedTask)}
+                >
+                  <Copy size={16} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="关闭任务详情"
+                  title="关闭"
+                  onClick={() => setSelectedTaskId(null)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </header>
 
             <div className="task-detail-intro">
@@ -1271,32 +1429,49 @@ export default function HomePage() {
                 {selectedTask.status === "已暂停" && "继续任务"}
                 {selectedTask.status === "已完成" && "再次运行"}
               </button>
-              <button type="button" onClick={() => setSelectedTaskId(null)}>
-                关闭
-              </button>
+              {selectedTask.pinned ? (
+                <button type="button" onClick={() => setSelectedTaskId(null)}>
+                  关闭
+                </button>
+              ) : (
+                <button
+                  className="danger"
+                  type="button"
+                  onClick={() => requestDeleteTask(selectedTask)}
+                >
+                  <Trash2 size={15} />
+                  删除
+                </button>
+              )}
             </footer>
           </aside>
         </div>
       )}
 
       {composerOpen && (
-        <div className="clarity-dialog-backdrop" onMouseDown={() => setComposerOpen(false)}>
+        <div className="clarity-dialog-backdrop" onMouseDown={closeComposer}>
           <form
             className="clarity-dialog"
             role="dialog"
             aria-modal="true"
-            aria-label="新建任务"
+            aria-label={editingTaskId ? "编辑任务" : "新建任务"}
             aria-labelledby="task-composer-title"
             onSubmit={createTask}
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="clarity-dialog-heading">
               <div>
-                <span>任务配置</span>
-                <h2 id="task-composer-title">交给 Unzoo One 一项工作</h2>
-                <p>描述结果，选择节奏，然后让 AI 持续执行。</p>
+                <span>{editingTaskId ? "编辑配置" : "任务配置"}</span>
+                <h2 id="task-composer-title">
+                  {editingTaskId ? "更新任务设置" : "交给 Unzoo One 一项工作"}
+                </h2>
+                <p>
+                  {editingTaskId
+                    ? "修改会立即保存，正在运行的任务会使用新配置。"
+                    : "描述结果，选择节奏，然后让 AI 持续执行。"}
+                </p>
               </div>
-              <button type="button" aria-label="关闭" onClick={() => setComposerOpen(false)}>
+              <button type="button" aria-label="关闭" onClick={closeComposer}>
                 <X size={17} />
               </button>
             </div>
@@ -1399,13 +1574,65 @@ export default function HomePage() {
             </div>
 
             <div className="clarity-dialog-actions">
-              <button type="button" onClick={() => setComposerOpen(false)}>取消</button>
+              <button type="button" onClick={closeComposer}>取消</button>
               <button className="confirm" type="submit">
-                <Sparkles size={16} />
-                创建并运行
+                {editingTaskId ? <Pencil size={16} /> : <Sparkles size={16} />}
+                {editingTaskId ? "保存修改" : "创建并运行"}
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {deletingTask && (
+        <div
+          className="clarity-dialog-backdrop"
+          onMouseDown={() => setDeleteTaskId(null)}
+        >
+          <section
+            className="confirm-delete-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-task-title"
+            aria-describedby="delete-task-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="confirm-delete-close"
+              type="button"
+              aria-label="关闭删除确认"
+              onClick={() => setDeleteTaskId(null)}
+            >
+              <X size={17} />
+            </button>
+            <span className="confirm-delete-icon">
+              <Trash2 size={21} />
+            </span>
+            <span className="confirm-delete-eyebrow">删除任务</span>
+            <h2 id="delete-task-title">确定删除“{deletingTask.title}”吗？</h2>
+            <p id="delete-task-description">
+              任务配置和本机运行记录将被移除。这项操作无法撤销。
+            </p>
+            <div className="confirm-delete-facts">
+              <span>
+                <small>运行频率</small>
+                <strong>{deletingTask.schedule ?? "仅运行一次"}</strong>
+              </span>
+              <span>
+                <small>数据来源</small>
+                <strong>{deletingTask.target}</strong>
+              </span>
+            </div>
+            <div className="confirm-delete-actions">
+              <button type="button" onClick={() => setDeleteTaskId(null)}>
+                保留任务
+              </button>
+              <button className="danger" type="button" onClick={confirmDeleteTask}>
+                <Trash2 size={15} />
+                确认删除
+              </button>
+            </div>
+          </section>
         </div>
       )}
 

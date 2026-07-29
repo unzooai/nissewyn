@@ -53,7 +53,11 @@ test("keeps commercial task interactions and accessibility in source", async () 
 
   assert.match(page, /const taskFilters: TaskFilter\[\]/);
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-tasks"/);
+  assert.match(page, /window\.localStorage\.setItem\("unzoo-one-settings"/);
   assert.match(page, /function createTask/);
+  assert.match(page, /function beginEditTask/);
+  assert.match(page, /function duplicateTask/);
+  assert.match(page, /function confirmDeleteTask/);
   assert.match(page, /const taskTemplates:/);
   assert.match(page, /type TaskSchedule =/);
   assert.match(page, /role="radiogroup"/);
@@ -61,12 +65,15 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /<textarea/);
   assert.match(page, /function updateTaskStatus/);
   assert.match(page, /role="dialog"/);
+  assert.match(page, /role="alertdialog"/);
   assert.match(page, /aria-modal="true"/);
   assert.match(page, /role="tab"/);
   assert.match(page, /aria-selected=/);
   assert.match(css, /\.task-detail-drawer/);
   assert.match(css, /\.task-template-picker/);
   assert.match(css, /\.composer-policy/);
+  assert.match(css, /\.confirm-delete-dialog/);
+  assert.match(css, /\.task-detail-heading-actions/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   const pixelFontSizes = [...css.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)].map(
     (match) => Number(match[1]),
