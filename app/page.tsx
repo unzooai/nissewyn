@@ -68,6 +68,7 @@ type WorkspaceRoute = {
   taskId: string | null;
   runId: string | null;
   artifactId?: string | null;
+  approvalId?: string | null;
   activityId?: string | null;
   activityTaskId?: string | null;
   taskFilter?: TaskFilter | null;
@@ -190,6 +191,8 @@ type ArtifactDeleteSnapshot = {
 type ApprovalRejectSnapshot = {
   tasks: TaskItem[];
   approvals: ApprovalItem[];
+  approvalDeferrals: ApprovalDeferrals;
+  approvalRiskFilter: ApprovalRiskFilter;
   selectedApprovalId: string;
   selectedApprovalIds: string[];
   rejectedCount: number;
@@ -1376,12 +1379,16 @@ function readWorkspaceRoute(): WorkspaceRoute {
   const artifactId = taskId
     ? null
     : url.searchParams.get("artifact")?.trim() || null;
-  const activityId =
+  const approvalId =
     !taskId && !artifactId
+      ? url.searchParams.get("approval")?.trim() || null
+      : null;
+  const activityId =
+    !taskId && !artifactId && !approvalId
       ? url.searchParams.get("event")?.trim() || null
       : null;
   const activityTaskId =
-    !taskId && !artifactId
+    !taskId && !artifactId && !approvalId
       ? url.searchParams.get("auditTask")?.trim() || null
       : null;
   const requestedTaskFilter = url.searchParams.get("status");
@@ -1394,9 +1401,11 @@ function readWorkspaceRoute(): WorkspaceRoute {
     ? "tasks"
     : artifactId
       ? "artifacts"
-      : activityId || activityTaskId
-        ? "activity"
-        : view;
+      : approvalId
+        ? "approvals"
+        : activityId || activityTaskId
+          ? "activity"
+          : view;
   const requestedApprovalFilter = url.searchParams.get("risk");
   const approvalFilter =
     requestedApprovalFilter &&
@@ -1414,6 +1423,7 @@ function readWorkspaceRoute(): WorkspaceRoute {
     taskId,
     runId,
     artifactId: resolvedView === "artifacts" ? artifactId : null,
+    approvalId: resolvedView === "approvals" ? approvalId : null,
     activityId: resolvedView === "activity" ? activityId : null,
     activityTaskId: resolvedView === "activity" ? activityTaskId : null,
     taskFilter: resolvedView === "tasks" ? taskFilter : null,
@@ -1447,6 +1457,11 @@ function writeWorkspaceRoute(
     url.searchParams.set("artifact", route.artifactId);
   } else {
     url.searchParams.delete("artifact");
+  }
+  if (route.view === "approvals" && route.approvalId) {
+    url.searchParams.set("approval", route.approvalId);
+  } else {
+    url.searchParams.delete("approval");
   }
   if (route.view === "activity" && route.activityId) {
     url.searchParams.set("event", route.activityId);
@@ -2469,6 +2484,28 @@ export default function HomePage() {
     filteredApprovals.find((item) => item.id === selectedApprovalId) ??
     filteredApprovals[0] ??
     null;
+  useEffect(() => {
+    if (!tasksReady || activeView !== "approvals") return;
+    const nextApprovalId = selectedApproval?.id ?? "";
+    if (nextApprovalId === selectedApprovalId) return;
+    writeWorkspaceRoute(
+      {
+        view: "approvals",
+        taskId: null,
+        runId: null,
+        approvalId: nextApprovalId || null,
+        approvalFilter: approvalRiskFilter,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
+  }, [
+    activeView,
+    approvalRiskFilter,
+    selectedApproval?.id,
+    selectedApprovalId,
+    tasksReady,
+  ]);
   const selectedApprovalDeferredUntil = selectedApproval
     ? approvalDeferrals[selectedApproval.id]
     : undefined;
@@ -3539,6 +3576,49 @@ export default function HomePage() {
         !routeTask && requestedRoute.view === "artifacts"
           ? (artifacts[0] ?? null)
           : null;
+      const routeApproval =
+        !routeTask && requestedRoute.approvalId
+          ? approvals.find(
+              (approval) => approval.id === requestedRoute.approvalId,
+            ) ?? null
+          : null;
+      let resolvedApprovalFilter =
+        requestedRoute.approvalFilter ?? "全部";
+      const routeApprovalDeferredUntil = routeApproval
+        ? approvalDeferrals[routeApproval.id]
+        : undefined;
+      const routeApprovalIsDeferred = Boolean(
+        routeApprovalDeferredUntil &&
+          Date.parse(routeApprovalDeferredUntil) > approvalClock,
+      );
+      if (routeApproval) {
+        if (routeApprovalIsDeferred) {
+          resolvedApprovalFilter = "稍后";
+        } else if (
+          resolvedApprovalFilter === "稍后" ||
+          (resolvedApprovalFilter !== "全部" &&
+            routeApproval.risk !== resolvedApprovalFilter)
+        ) {
+          resolvedApprovalFilter = "全部";
+        }
+      }
+      const fallbackApproval =
+        !routeTask && requestedRoute.view === "approvals"
+          ? (approvals.find((approval) => {
+              const deferredUntil = approvalDeferrals[approval.id];
+              const isDeferred = Boolean(
+                deferredUntil && Date.parse(deferredUntil) > approvalClock,
+              );
+              return (
+                (resolvedApprovalFilter === "稍后"
+                  ? isDeferred
+                  : !isDeferred) &&
+                (resolvedApprovalFilter === "全部" ||
+                  resolvedApprovalFilter === "稍后" ||
+                  approval.risk === resolvedApprovalFilter)
+              );
+            }) ?? null)
+          : null;
       const requestedActivityTask =
         !routeTask && requestedRoute.activityTaskId
           ? tasks.find((task) => task.id === requestedRoute.activityTaskId) ??
@@ -3585,6 +3665,10 @@ export default function HomePage() {
           !routeTask && requestedRoute.view === "artifacts"
             ? (routeArtifact?.id ?? fallbackArtifact?.id ?? null)
             : null,
+        approvalId:
+          !routeTask && requestedRoute.view === "approvals"
+            ? (routeApproval?.id ?? fallbackApproval?.id ?? null)
+            : null,
         activityId:
           !routeTask && requestedRoute.view === "activity"
             ? (routeActivity?.id ?? fallbackActivity?.id ?? null)
@@ -3599,7 +3683,7 @@ export default function HomePage() {
             : null,
         approvalFilter:
           requestedRoute.view === "approvals"
-            ? (requestedRoute.approvalFilter ?? null)
+            ? resolvedApprovalFilter
             : null,
         activityFilter:
           requestedRoute.view === "activity"
@@ -3620,6 +3704,12 @@ export default function HomePage() {
         resolvedRoute.view === "approvals"
           ? (resolvedRoute.approvalFilter ?? "全部")
           : "全部",
+      );
+      setApprovalListQuery("");
+      setSelectedApprovalId(
+        resolvedRoute.view === "approvals"
+          ? (resolvedRoute.approvalId ?? "")
+          : (approvals[0]?.id ?? ""),
       );
       setActivityTaskId(
         resolvedRoute.view === "activity"
@@ -3668,6 +3758,17 @@ export default function HomePage() {
         );
       }
       if (
+        requestedRoute.view === "approvals" &&
+        requestedRoute.approvalId &&
+        !routeApproval
+      ) {
+        setNotice(
+          fallbackApproval
+            ? "该审批已处理或不存在，已打开当前队列中的下一项"
+            : "该审批已处理或不存在，当前筛选下没有其他待办",
+        );
+      }
+      if (
         requestedRoute.view === "activity" &&
         requestedRoute.activityId &&
         !routeActivity
@@ -3698,7 +3799,15 @@ export default function HomePage() {
 
     window.addEventListener("popstate", restoreWorkspaceRoute);
     return () => window.removeEventListener("popstate", restoreWorkspaceRoute);
-  }, [activityLog, artifacts, tasks, tasksReady]);
+  }, [
+    activityLog,
+    approvalClock,
+    approvalDeferrals,
+    approvals,
+    artifacts,
+    tasks,
+    tasksReady,
+  ]);
 
   useEffect(() => {
     if (!tasksReady) return;
@@ -5795,30 +5904,84 @@ export default function HomePage() {
   }
 
   function chooseApproval(approvalId: string) {
+    if (!approvals.some((approval) => approval.id === approvalId)) return;
     setSelectedApprovalId(approvalId);
+    writeWorkspaceRoute(
+      {
+        view: "approvals",
+        taskId: null,
+        runId: null,
+        approvalId,
+        approvalFilter: approvalRiskFilter,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
     scrollApprovalIntoView();
   }
 
-  function approvalMatchesFilters(approval: ApprovalItem) {
+  function getApprovalFilterForSelection(
+    approval: ApprovalItem | undefined,
+    preferredFilter: ApprovalRiskFilter,
+  ) {
+    if (!approval) return preferredFilter;
+    if (deferredApprovalIds.has(approval.id)) return "稍后";
+    if (
+      preferredFilter === "稍后" ||
+      (preferredFilter !== "全部" && approval.risk !== preferredFilter)
+    ) {
+      return "全部";
+    }
+    return preferredFilter;
+  }
+
+  function replaceApprovalSelection(
+    approval: ApprovalItem | undefined,
+    preferredFilter = approvalRiskFilter,
+  ) {
+    const nextFilter = getApprovalFilterForSelection(
+      approval,
+      preferredFilter,
+    );
+    setApprovalRiskFilter(nextFilter);
+    setSelectedApprovalId(approval?.id ?? "");
+    writeWorkspaceRoute(
+      {
+        view: "approvals",
+        taskId: null,
+        runId: null,
+        approvalId: approval?.id ?? null,
+        approvalFilter: nextFilter,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
+  }
+
+  function approvalMatchesSearch(approval: ApprovalItem) {
+    if (!normalizedApprovalQuery) return true;
     const relatedTaskTitle =
       tasks.find((task) => task.id === approval.taskId)?.title ?? "";
+    return [
+      approval.title,
+      approval.reason,
+      approval.target,
+      approval.scope,
+      approval.policy,
+      relatedTaskTitle,
+    ].some((value) =>
+      value.toLowerCase().includes(normalizedApprovalQuery),
+    );
+  }
+
+  function approvalMatchesFilters(approval: ApprovalItem) {
     const isDeferred = deferredApprovalIds.has(approval.id);
     return (
       (approvalRiskFilter === "稍后" ? isDeferred : !isDeferred) &&
       (approvalRiskFilter === "全部" ||
         approvalRiskFilter === "稍后" ||
         approval.risk === approvalRiskFilter) &&
-      (!normalizedApprovalQuery ||
-        [
-          approval.title,
-          approval.reason,
-          approval.target,
-          approval.scope,
-          approval.policy,
-          relatedTaskTitle,
-        ].some((value) =>
-          value.toLowerCase().includes(normalizedApprovalQuery),
-        ))
+      approvalMatchesSearch(approval)
     );
   }
 
@@ -5897,7 +6060,7 @@ export default function HomePage() {
       items.filter((approval) => !approvedIds.has(approval.id)),
     );
     removeApprovalDeferrals(approvedIds);
-    setSelectedApprovalId(nextApproval?.id ?? "");
+    replaceApprovalSelection(nextApproval);
     setSelectedApprovalIds(highRiskIds);
     setTasks((items) =>
       items.map((task) => {
@@ -5945,6 +6108,8 @@ export default function HomePage() {
     setApprovalRejectSnapshot({
       tasks,
       approvals,
+      approvalDeferrals,
+      approvalRiskFilter,
       selectedApprovalId,
       selectedApprovalIds,
       rejectedCount,
@@ -5957,6 +6122,8 @@ export default function HomePage() {
     const snapshot = approvalRejectSnapshot;
     setTasks(snapshot.tasks);
     setApprovals(snapshot.approvals);
+    setApprovalDeferrals(snapshot.approvalDeferrals);
+    setApprovalRiskFilter(snapshot.approvalRiskFilter);
     setSelectedApprovalId(snapshot.selectedApprovalId);
     setSelectedApprovalIds(snapshot.selectedApprovalIds);
     setIsRunning(snapshot.isRunning);
@@ -5966,7 +6133,13 @@ export default function HomePage() {
     setApprovalRejectSnapshot(null);
     setActiveView("approvals");
     writeWorkspaceRoute(
-      { view: "approvals", taskId: null, runId: null },
+      {
+        view: "approvals",
+        taskId: null,
+        runId: null,
+        approvalId: snapshot.selectedApprovalId || null,
+        approvalFilter: snapshot.approvalRiskFilter,
+      },
       "push",
     );
     recordActivity({
@@ -5995,7 +6168,7 @@ export default function HomePage() {
       items.filter((approval) => !rejectedIds.has(approval.id)),
     );
     removeApprovalDeferrals(rejectedIds);
-    setSelectedApprovalId(nextApproval?.id ?? "");
+    replaceApprovalSelection(nextApproval);
     setSelectedApprovalIds([]);
     setTasks((items) =>
       items.map((task) =>
@@ -6055,7 +6228,7 @@ export default function HomePage() {
     );
     setApprovals((items) => items.filter((item) => item.id !== selectedApproval.id));
     removeApprovalDeferrals(new Set([selectedApproval.id]));
-    setSelectedApprovalId(nextApproval?.id ?? "");
+    replaceApprovalSelection(nextApproval);
     setSelectedApprovalIds((selectedIds) =>
       selectedIds.filter((id) => id !== approved.id),
     );
@@ -6114,8 +6287,7 @@ export default function HomePage() {
       [held.id]: deferredUntil.toISOString(),
     }));
     setApprovalClock(Date.now());
-    chooseApprovalRiskFilter("全部");
-    setSelectedApprovalId(nextApproval?.id ?? "");
+    replaceApprovalSelection(nextApproval, "全部");
     setSelectedApprovalIds((ids) => ids.filter((id) => id !== held.id));
     setApprovalSnoozeId(null);
     recordActivity({
@@ -6147,8 +6319,19 @@ export default function HomePage() {
       return next;
     });
     setApprovalClock(Date.now());
-    chooseApprovalRiskFilter("全部");
+    setApprovalRiskFilter("全部");
     setSelectedApprovalId(approvalId);
+    writeWorkspaceRoute(
+      {
+        view: "approvals",
+        taskId: null,
+        runId: null,
+        approvalId,
+        approvalFilter: "全部",
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
     recordActivity({
       title: `已恢复待确认：${approval.title}`,
       detail: "操作已提前回到待确认列表，仍未执行任何外部动作。",
@@ -6176,7 +6359,7 @@ export default function HomePage() {
     stageApprovalRejectUndo(1);
     setApprovals((items) => items.filter((item) => item.id !== rejected.id));
     removeApprovalDeferrals(new Set([rejected.id]));
-    setSelectedApprovalId(nextApproval?.id ?? "");
+    replaceApprovalSelection(nextApproval);
     setSelectedApprovalIds((selectedIds) =>
       selectedIds.filter((id) => id !== rejected.id),
     );
@@ -7657,6 +7840,7 @@ export default function HomePage() {
       scrollToTop?: boolean;
       taskFilter?: TaskFilter;
       approvalFilter?: ApprovalRiskFilter;
+      approvalId?: string;
       artifactId?: string;
       activityId?: string;
       activityFilter?: ActivityFilter;
@@ -7666,6 +7850,25 @@ export default function HomePage() {
       view === "tasks" ? (options.taskFilter ?? "全部") : "全部";
     const nextApprovalFilter =
       view === "approvals" ? (options.approvalFilter ?? "全部") : "全部";
+    const nextApprovalPool =
+      nextApprovalFilter === "稍后" ? deferredApprovals : activeApprovals;
+    const nextApproval =
+      view === "approvals"
+        ? (nextApprovalPool.find(
+            (approval) =>
+              approval.id === options.approvalId &&
+              (nextApprovalFilter === "全部" ||
+                nextApprovalFilter === "稍后" ||
+                approval.risk === nextApprovalFilter),
+          ) ??
+          nextApprovalPool.find(
+            (approval) =>
+              nextApprovalFilter === "全部" ||
+              nextApprovalFilter === "稍后" ||
+              approval.risk === nextApprovalFilter,
+          ) ??
+          null)
+        : null;
     const nextActivityFilter =
       view === "activity" ? (options.activityFilter ?? "全部") : "全部";
     const nextActivity =
@@ -7706,6 +7909,7 @@ export default function HomePage() {
     } else {
       setApprovalRiskFilter(nextApprovalFilter);
       setApprovalListQuery("");
+      setSelectedApprovalId(nextApproval?.id ?? "");
     }
     if (view === "activity") {
       setActivityTaskId(null);
@@ -7731,6 +7935,7 @@ export default function HomePage() {
         taskId: null,
         runId: null,
         artifactId: view === "artifacts" ? (nextArtifact?.id ?? null) : null,
+        approvalId: view === "approvals" ? (nextApproval?.id ?? null) : null,
         activityId: view === "activity" ? (nextActivity?.id ?? null) : null,
         activityTaskId: null,
         taskFilter: view === "tasks" ? nextTaskFilter : null,
@@ -7768,13 +7973,24 @@ export default function HomePage() {
   }
 
   function chooseApprovalRiskFilter(filter: ApprovalRiskFilter) {
+    const approvalPool = filter === "稍后" ? deferredApprovals : activeApprovals;
+    const nextApproval =
+      approvalPool.find(
+        (approval) =>
+          (filter === "全部" ||
+            filter === "稍后" ||
+            approval.risk === filter) &&
+          approvalMatchesSearch(approval),
+      ) ?? null;
     setApprovalRiskFilter(filter);
+    setSelectedApprovalId(nextApproval?.id ?? "");
     setSelectedApprovalIds([]);
     writeWorkspaceRoute(
       {
         view: "approvals",
         taskId: null,
         runId: null,
+        approvalId: nextApproval?.id ?? null,
         approvalFilter: filter,
       },
       "replace",
@@ -7804,6 +8020,25 @@ export default function HomePage() {
       }
     }
     setNotice(copied ? `${label}已复制` : "复制失败，请稍后重试");
+  }
+
+  async function copyApprovalLink(approval: ApprovalItem) {
+    const nextFilter = getApprovalFilterForSelection(
+      approval,
+      approvalRiskFilter,
+    );
+    writeWorkspaceRoute(
+      {
+        view: "approvals",
+        taskId: null,
+        runId: null,
+        approvalId: approval.id,
+        approvalFilter: nextFilter,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
+    await copyCurrentViewLink("审批链接");
   }
 
   function openWorkspaceSection(sectionId: string) {
@@ -8231,7 +8466,7 @@ export default function HomePage() {
     setNotificationsOpen(false);
 
     if (item.target === "approvals") {
-      openView("approvals");
+      openView("approvals", { approvalId: item.targetId });
     } else if (item.target === "activity") {
       if (item.targetId) {
         openActivityEvent(item.targetId);
@@ -9576,7 +9811,11 @@ export default function HomePage() {
                       <button
                         className="confirm"
                         type="button"
-                        onClick={() => openView("approvals")}
+                        onClick={() =>
+                          openView("approvals", {
+                            approvalId: selectedApproval.id,
+                          })
+                        }
                       >
                         <ShieldCheck size={16} />
                         查看并确认
@@ -10055,9 +10294,11 @@ export default function HomePage() {
                       <button
                         className="view-link-copy"
                         type="button"
-                        aria-label="复制当前审批视图链接"
-                        title="复制当前审批视图链接"
-                        onClick={() => copyCurrentViewLink("审批视图链接")}
+                        aria-label="复制当前审批链接"
+                        title="复制当前审批链接"
+                        onClick={() =>
+                          selectedApproval && copyApprovalLink(selectedApproval)
+                        }
                       >
                         <Link2 size={14} />
                       </button>

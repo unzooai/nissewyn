@@ -96,6 +96,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /searchParams\.set\("status", route\.taskFilter\)/);
   assert.match(page, /searchParams\.get\("risk"\)/);
   assert.match(page, /searchParams\.set\("risk", route\.approvalFilter\)/);
+  assert.match(page, /searchParams\.get\("approval"\)/);
+  assert.match(page, /searchParams\.set\("approval", route\.approvalId\)/);
   assert.match(page, /searchParams\.get\("artifact"\)/);
   assert.match(page, /searchParams\.set\("artifact", route\.artifactId\)/);
   assert.match(page, /searchParams\.get\("event"\)/);
@@ -109,9 +111,11 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function openActivityEvent/);
   assert.match(page, /function chooseActivityFilter/);
   assert.match(page, /function copyActivityEventLink/);
+  assert.match(page, /function replaceApprovalSelection/);
+  assert.match(page, /function copyApprovalLink/);
   assert.match(page, /复制当前审计事件链接/);
   assert.match(page, /复制当前成果链接/);
-  assert.match(page, /复制当前审批视图链接/);
+  assert.match(page, /复制当前审批链接/);
   assert.match(page, /className="summary-running"/);
   assert.match(page, /className="task-filter-context"/);
   assert.match(page, /type DesktopNotificationPermission =/);
