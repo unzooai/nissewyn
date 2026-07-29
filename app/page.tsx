@@ -377,20 +377,41 @@ export default function HomePage() {
 
             <div className="home-focus-grid">
               <section className="active-task-panel" aria-label="正在运行的任务">
-                <div className="focus-panel-heading">
-                  <div>
-                    <span>正在运行</span>
-                    <strong>跟踪竞品发布动态</strong>
-                  </div>
-                  <span className={`live-state ${isRunning ? "" : "paused"}`}>
-                    <i />
-                    {isRunning ? "运行中" : "已暂停"}
-                  </span>
-                </div>
+                <div className="task-ai-hero">
+                  <div className="task-ai-copy">
+                    <div className="focus-panel-heading">
+                      <div>
+                        <span>自主任务 · 正在运行</span>
+                        <strong>跟踪竞品发布动态</strong>
+                      </div>
+                      <span className={`live-state ${isRunning ? "" : "paused"}`}>
+                        <i />
+                        {isRunning ? "运行中" : "已暂停"}
+                      </span>
+                    </div>
 
-                <p className="task-purpose">
-                  每天检查 3 个竞品页面。有变化时，系统会整理成一份可以直接阅读的摘要。
-                </p>
+                    <p className="task-purpose">
+                      每天检查 3 个竞品页面。有变化时，系统会整理成一份可以直接阅读的摘要。
+                    </p>
+
+                    <div className="task-ai-context" aria-label="AI 当前状态">
+                      <span><Brain size={15} /> Codex 推理</span>
+                      <i />
+                      <span><ShieldCheck size={15} /> 可审计执行</span>
+                    </div>
+                  </div>
+
+                  <div className="task-ai-visual" aria-label="AI 正在整合网页证据">
+                    <img src="/ai-core-premium.webp" alt="" aria-hidden="true" />
+                    <span className="task-ai-visual-status">
+                      <Sparkles size={15} />
+                      <span>
+                        <small>AI 引擎实况</small>
+                        <strong>正在整合 12 份页面证据</strong>
+                      </span>
+                    </span>
+                  </div>
+                </div>
 
                 <div className="task-signal-band" aria-label="今日任务信号">
                   <div className="signal-metric">
