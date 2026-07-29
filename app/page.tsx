@@ -1431,6 +1431,36 @@ const taskFilters: TaskFilter[] = [
   "已暂停",
   "已完成",
 ];
+const taskFilterPageCopy: Record<
+  TaskStatus,
+  { eyebrow: string; title: string; description: string }
+> = {
+  运行中: {
+    eyebrow: "任务 · 正在执行",
+    title: "正在运行的任务",
+    description: "查看实时进度，必要时暂停运行或打开完整记录。",
+  },
+  待确认: {
+    eyebrow: "任务 · 等待决定",
+    title: "等待确认的任务",
+    description: "这些任务已停在安全边界，确认后才会继续执行。",
+  },
+  失败: {
+    eyebrow: "任务 · 需要处理",
+    title: "需要恢复的任务",
+    description: "检查失败原因，从安全检查点重试或修复连接。",
+  },
+  已暂停: {
+    eyebrow: "任务 · 已暂停",
+    title: "暂时停止的任务",
+    description: "进度和证据都已保存，可以随时继续运行。",
+  },
+  已完成: {
+    eyebrow: "任务 · 已交付",
+    title: "已经完成的任务",
+    description: "查看最终进度、运行记录和对应成果。",
+  },
+};
 const approvalRiskFilters: ApprovalRiskFilter[] = [
   "全部",
   "高风险",
@@ -2280,7 +2310,9 @@ export default function HomePage() {
               ? `${failedTaskCount} 个任务需要恢复，${activeApprovalCount} 项操作等待确认。`
               : viewTitles.home.description,
         }
-      : viewTitles[activeView];
+      : activeView === "tasks" && taskFilter !== "全部"
+        ? taskFilterPageCopy[taskFilter]
+        : viewTitles[activeView];
   const normalizedApprovalQuery = approvalListQuery.trim().toLowerCase();
   const filteredApprovals = useMemo(
     () => {
@@ -7228,6 +7260,31 @@ export default function HomePage() {
     }
   }
 
+  function openTaskStatus(filter: TaskStatus) {
+    setTaskFilter(filter);
+    setTaskListQuery("");
+    setTaskSort("状态优先");
+    setSelectedTaskIds([]);
+    openView("tasks");
+    setNotice(
+      taskFilterCounts[filter] > 0
+        ? `正在查看 ${taskFilterCounts[filter]} 个${filter}任务`
+        : `当前没有${filter}任务`,
+    );
+  }
+
+  function openApprovalQueue() {
+    setApprovalRiskFilter("全部");
+    setApprovalListQuery("");
+    setSelectedApprovalIds([]);
+    openView("approvals");
+    setNotice(
+      activeApprovalCount > 0
+        ? `正在查看 ${activeApprovalCount} 项待确认操作`
+        : "当前没有待确认操作",
+    );
+  }
+
   function openWorkspaceSection(sectionId: string) {
     openView("settings", { scrollToTop: false });
     window.requestAnimationFrame(() =>
@@ -8640,34 +8697,58 @@ export default function HomePage() {
         {activeView === "home" && (
           <section className="home-view">
             <div className="home-summary" aria-label="今日概览">
-              <span className="summary-running">
+              <button
+                className="summary-running"
+                type="button"
+                aria-label={`查看 ${runningTaskCount} 个正在运行的任务`}
+                onClick={() => openTaskStatus("运行中")}
+              >
                 <i><Play size={14} /></i>
                 <span>
                   <small>正在运行</small>
                   <strong>{runningTaskCount}</strong>
                 </span>
-              </span>
-              <span className="summary-waiting">
+                <ChevronRight className="summary-open-icon" size={14} />
+              </button>
+              <button
+                className="summary-waiting"
+                type="button"
+                aria-label={`查看 ${activeApprovalCount} 项待确认操作`}
+                onClick={openApprovalQueue}
+              >
                 <i><ShieldCheck size={14} /></i>
                 <span>
                   <small>等待确认</small>
                   <strong>{activeApprovalCount}</strong>
                 </span>
-              </span>
-              <span className="summary-failed">
+                <ChevronRight className="summary-open-icon" size={14} />
+              </button>
+              <button
+                className="summary-failed"
+                type="button"
+                aria-label={`查看 ${failedTaskCount} 个需要恢复的任务`}
+                onClick={() => openTaskStatus("失败")}
+              >
                 <i><AlertTriangle size={14} /></i>
                 <span>
                   <small>需要恢复</small>
                   <strong>{failedTaskCount}</strong>
                 </span>
-              </span>
-              <span className="summary-done">
+                <ChevronRight className="summary-open-icon" size={14} />
+              </button>
+              <button
+                className="summary-done"
+                type="button"
+                aria-label={`查看 ${completedTaskCount} 个已完成任务`}
+                onClick={() => openTaskStatus("已完成")}
+              >
                 <i><CheckCircle2 size={14} /></i>
                 <span>
-                  <small>今天已完成</small>
+                  <small>已完成</small>
                   <strong>{completedTaskCount}</strong>
                 </span>
-              </span>
+                <ChevronRight className="summary-open-icon" size={14} />
+              </button>
             </div>
 
             <div className="home-focus-grid">
@@ -9038,9 +9119,23 @@ export default function HomePage() {
                 </select>
               </label>
 
-              <span className="task-result-count" aria-live="polite">
-                显示 <strong>{filteredTasks.length}</strong> / {tasks.length} 个任务
-              </span>
+              <div className="task-result-meta">
+                {taskFilter !== "全部" && (
+                  <button
+                    className="task-filter-context"
+                    type="button"
+                    aria-label={`清除${taskFilter}筛选`}
+                    onClick={() => setTaskFilter("全部")}
+                  >
+                    <ListChecks size={13} />
+                    <span>{taskFilter}</span>
+                    <X size={12} />
+                  </button>
+                )}
+                <span className="task-result-count" aria-live="polite">
+                  显示 <strong>{filteredTasks.length}</strong> / {tasks.length} 个任务
+                </span>
+              </div>
             </div>
 
             {selectedTasks.length > 0 && (

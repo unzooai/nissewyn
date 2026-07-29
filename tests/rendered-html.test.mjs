@@ -86,6 +86,11 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function saveWorkspaceProfile/);
   assert.match(page, /className="workspace-profile-dialog"/);
   assert.match(page, /profile: workspaceProfile/);
+  assert.match(page, /const taskFilterPageCopy:/);
+  assert.match(page, /function openTaskStatus/);
+  assert.match(page, /function openApprovalQueue/);
+  assert.match(page, /className="summary-running"/);
+  assert.match(page, /className="task-filter-context"/);
   assert.match(page, /type DesktopNotificationPermission =/);
   assert.match(page, /notifications: false/);
   assert.match(page, /useSyncExternalStore/);
