@@ -196,6 +196,20 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function stopActiveTaskRuns/);
   assert.match(page, /function getTaskRunStages/);
   assert.match(page, /inspectedRunTaskId/);
+  assert.match(page, /type WorkspaceRoute =/);
+  assert.match(page, /type WorkspaceHistoryState =/);
+  assert.match(page, /function readWorkspaceRoute/);
+  assert.match(page, /function writeWorkspaceRoute/);
+  assert.match(
+    page,
+    /window\.history\[shouldPush \? "pushState" : "replaceState"\]/,
+  );
+  assert.match(page, /window\.addEventListener\("popstate"/);
+  assert.match(page, /url\.searchParams\.set\("task", route\.taskId\)/);
+  assert.match(page, /url\.searchParams\.set\("run", route\.runId\)/);
+  assert.match(page, /function closeRunDetail/);
+  assert.match(page, /function closeTaskDetail/);
+  assert.match(page, /window\.history\.back\(\)/);
   assert.match(page, /function openTaskRun/);
   assert.match(page, /async function copyTaskRunId/);
   assert.match(page, /function downloadTaskRun/);

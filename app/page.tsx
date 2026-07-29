@@ -55,6 +55,16 @@ type ViewId =
   | "artifacts"
   | "activity"
   | "settings";
+type WorkspaceRoute = {
+  view: ViewId;
+  taskId: string | null;
+  runId: string | null;
+};
+type WorkspaceHistoryState = {
+  unzooOne: true;
+  route: WorkspaceRoute;
+  canPop: boolean;
+};
 type TaskStatus = "运行中" | "待确认" | "失败" | "已完成" | "已暂停";
 type TaskFilter = "全部" | TaskStatus;
 type TaskSort = "状态优先" | "进度最高" | "名称";
@@ -796,6 +806,74 @@ const navItems: Array<{
   { id: "settings", label: "设置", mobileLabel: "设置", icon: Settings2 },
 ];
 
+function readWorkspaceRoute(): WorkspaceRoute {
+  const url = new URL(window.location.href);
+  const requestedView = url.searchParams.get("view");
+  const view =
+    requestedView &&
+    navItems.some((item) => item.id === requestedView)
+      ? (requestedView as ViewId)
+      : "home";
+  const taskId = url.searchParams.get("task")?.trim() || null;
+  const runId = taskId
+    ? url.searchParams.get("run")?.trim() || null
+    : null;
+  return {
+    view: taskId ? "tasks" : view,
+    taskId,
+    runId,
+  };
+}
+
+function writeWorkspaceRoute(
+  route: WorkspaceRoute,
+  mode: "push" | "replace",
+  canPop = false,
+) {
+  const url = new URL(window.location.href);
+  if (route.view === "home") {
+    url.searchParams.delete("view");
+  } else {
+    url.searchParams.set("view", route.view);
+  }
+  if (route.taskId) {
+    url.searchParams.set("task", route.taskId);
+  } else {
+    url.searchParams.delete("task");
+  }
+  if (route.taskId && route.runId) {
+    url.searchParams.set("run", route.runId);
+  } else {
+    url.searchParams.delete("run");
+  }
+
+  const nextLocation = `${url.pathname}${url.search}${url.hash}`;
+  const currentLocation = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  const shouldPush = mode === "push" && nextLocation !== currentLocation;
+  const currentState = window.history.state as
+    | WorkspaceHistoryState
+    | null;
+  const nextState: WorkspaceHistoryState = {
+    unzooOne: true,
+    route,
+    canPop: shouldPush
+      ? true
+      : mode === "replace"
+        ? canPop
+        : (currentState?.canPop ?? false),
+  };
+  window.history[shouldPush ? "pushState" : "replaceState"](
+    nextState,
+    "",
+    nextLocation,
+  );
+}
+
+function canReturnToWorkspaceParent() {
+  const state = window.history.state as WorkspaceHistoryState | null;
+  return Boolean(state?.unzooOne && state.canPop);
+}
+
 const taskFilters: TaskFilter[] = [
   "全部",
   "运行中",
@@ -1470,6 +1548,7 @@ export default function HomePage() {
   const notificationButtonRef = useRef<HTMLButtonElement>(null);
   const notificationPanelRef = useRef<HTMLDivElement>(null);
   const overlayTriggerRef = useRef<HTMLElement | null>(null);
+  const routeReadyRef = useRef(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const approvalDetailRef = useRef<HTMLDivElement>(null);
   const activityInspectorRef = useRef<HTMLElement>(null);
@@ -2103,6 +2182,57 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!tasksReady) return;
+
+    function restoreWorkspaceRoute() {
+      const requestedRoute = readWorkspaceRoute();
+      const routeTask = requestedRoute.taskId
+        ? tasks.find((task) => task.id === requestedRoute.taskId) ?? null
+        : null;
+      const routeRun =
+        routeTask && requestedRoute.runId
+          ? (routeTask.runs ?? []).find(
+              (run) => run.id === requestedRoute.runId,
+            ) ?? null
+          : null;
+      const resolvedRoute: WorkspaceRoute = {
+        view: routeTask ? "tasks" : requestedRoute.view,
+        taskId: routeTask?.id ?? null,
+        runId: routeRun?.id ?? null,
+      };
+      const currentHistoryState = window.history.state as
+        | WorkspaceHistoryState
+        | null;
+
+      setActiveView(resolvedRoute.view);
+      setSelectedTaskId(
+        resolvedRoute.taskId && !resolvedRoute.runId
+          ? resolvedRoute.taskId
+          : null,
+      );
+      setInspectedRunTaskId(
+        resolvedRoute.runId ? resolvedRoute.taskId : null,
+      );
+      setInspectedRunId(resolvedRoute.runId);
+      setNotificationsOpen(false);
+      setSearchOpen(false);
+      writeWorkspaceRoute(
+        resolvedRoute,
+        "replace",
+        Boolean(currentHistoryState?.unzooOne && currentHistoryState.canPop),
+      );
+    }
+
+    if (!routeReadyRef.current) {
+      routeReadyRef.current = true;
+      restoreWorkspaceRoute();
+    }
+
+    window.addEventListener("popstate", restoreWorkspaceRoute);
+    return () => window.removeEventListener("popstate", restoreWorkspaceRoute);
+  }, [tasks, tasksReady]);
+
+  useEffect(() => {
+    if (!tasksReady) return;
     if (settings.local) {
       window.localStorage.setItem("unzoo-one-tasks", JSON.stringify(tasks));
       window.localStorage.setItem("unzoo-one-settings", JSON.stringify(settings));
@@ -2372,11 +2502,34 @@ export default function HomePage() {
         setSelectedConnectorId(null);
         setConnectorDisconnectConfirm(false);
       } else if (activeOverlayKind === "run") {
-        setInspectedRunTaskId(null);
-        setInspectedRunId(null);
-        if (inspectedRunTaskId) setSelectedTaskId(inspectedRunTaskId);
+        if (canReturnToWorkspaceParent()) {
+          window.history.back();
+        } else {
+          setInspectedRunTaskId(null);
+          setInspectedRunId(null);
+          if (inspectedRunTaskId) {
+            setActiveView("tasks");
+            setSelectedTaskId(inspectedRunTaskId);
+            writeWorkspaceRoute(
+              {
+                view: "tasks",
+                taskId: inspectedRunTaskId,
+                runId: null,
+              },
+              "replace",
+            );
+          }
+        }
       } else {
-        setSelectedTaskId(null);
+        if (canReturnToWorkspaceParent()) {
+          window.history.back();
+        } else {
+          setSelectedTaskId(null);
+          writeWorkspaceRoute(
+            { view: activeView, taskId: null, runId: null },
+            "replace",
+          );
+        }
       }
     }
 
@@ -2441,6 +2594,7 @@ export default function HomePage() {
     };
   }, [
     activeOverlayKind,
+    activeView,
     artifactEditorDirty,
     inspectedRunTaskId,
     isSavingArtifact,
@@ -3317,6 +3471,10 @@ export default function HomePage() {
     setWorkspaceLoadWarning("");
     setPendingWorkspaceImport(null);
     setActiveView("settings");
+    writeWorkspaceRoute(
+      { view: "settings", taskId: null, runId: null },
+      "push",
+    );
     recordActivity({
       title: "工作区备份已恢复",
       detail: `已从“${fileName}”恢复 ${backup.tasks.length} 个任务、${restoredArtifacts.length} 个成果、${(backup.members ?? initialTeamMembers).length} 位成员和 ${backup.activity.length} 条运行记录。`,
@@ -3398,7 +3556,7 @@ export default function HomePage() {
 
   function openActivityItem(item: ActivityItem) {
     if (item.taskId && tasks.some((task) => task.id === item.taskId)) {
-      setSelectedTaskId(item.taskId);
+      openTask(item.taskId);
       return;
     }
     if (item.kind === "审批" && approvals.length > 0) {
@@ -3589,6 +3747,10 @@ export default function HomePage() {
     setApprovalRejectReason("");
     setApprovalRejectSnapshot(null);
     setActiveView("approvals");
+    writeWorkspaceRoute(
+      { view: "approvals", taskId: null, runId: null },
+      "push",
+    );
     recordActivity({
       title: `已撤销拒绝 ${snapshot.rejectedCount} 项操作`,
       detail: "待确认操作、关联任务状态和原运行记录已恢复；之前的拒绝与本次恢复仍保留在审计中。",
@@ -3876,6 +4038,10 @@ export default function HomePage() {
       setSelectedTaskIds([]);
       setActiveView("tasks");
       setSelectedTaskId(newTask.id);
+      writeWorkspaceRoute(
+        { view: "tasks", taskId: newTask.id, runId: null },
+        "push",
+      );
       closeComposer();
       setTaskName("");
       setTaskTarget("");
@@ -3956,7 +4122,6 @@ export default function HomePage() {
     setTaskDiscardOpen(false);
     setTaskFormSubmitted(false);
     setEditingTaskId(task.id);
-    setSelectedTaskId(null);
     setComposerOpen(true);
   }
 
@@ -4017,6 +4182,10 @@ export default function HomePage() {
     };
     setTasks((items) => [duplicate, ...items]);
     setSelectedTaskId(duplicate.id);
+    writeWorkspaceRoute(
+      { view: "tasks", taskId: duplicate.id, runId: null },
+      "push",
+    );
     recordActivity({
       title: `任务已复制：${duplicate.title}`,
       detail: "为避免误执行，复制后的任务保持暂停。",
@@ -4033,7 +4202,6 @@ export default function HomePage() {
       setNotice("首页主任务不能删除，你可以暂停或修改它");
       return;
     }
-    setSelectedTaskId(null);
     setDeleteTaskId(task.id);
   }
 
@@ -4097,6 +4265,11 @@ export default function HomePage() {
       setArtifactTaskId(null);
     }
     setDeleteTaskId(null);
+    setSelectedTaskId(null);
+    writeWorkspaceRoute(
+      { view: "tasks", taskId: null, runId: null },
+      "replace",
+    );
     recordActivity({
       title: `任务已删除：${deletingTask.title}`,
       detail: `已移除任务配置、关联成果和本机记录，原数据来源：${deletingTask.target}`,
@@ -4329,6 +4502,14 @@ export default function HomePage() {
     if (snapshot.restoreTaskId) {
       setActiveView("tasks");
       setSelectedTaskId(snapshot.restoreTaskId);
+      writeWorkspaceRoute(
+        {
+          view: "tasks",
+          taskId: snapshot.restoreTaskId,
+          runId: null,
+        },
+        "push",
+      );
     }
     setTaskDeleteSnapshot(null);
     recordActivity({
@@ -4571,8 +4752,7 @@ export default function HomePage() {
   function openConnectorAffectedTask(taskId: string) {
     setSelectedConnectorId(null);
     setConnectorDisconnectConfirm(false);
-    setActiveView("tasks");
-    setSelectedTaskId(taskId);
+    openTask(taskId);
   }
 
   function confirmDisconnectConnector() {
@@ -4757,21 +4937,35 @@ export default function HomePage() {
     setSelectedTaskId(null);
     setInspectedRunTaskId(null);
     setInspectedRunId(null);
+    writeWorkspaceRoute(
+      { view, taskId: null, runId: null },
+      "push",
+    );
     scrollWorkspaceTop();
   }
 
   function openTask(taskId: string) {
+    setActiveView("tasks");
     setInspectedRunTaskId(null);
     setInspectedRunId(null);
     setSelectedTaskId(taskId);
     setNotificationsOpen(false);
+    writeWorkspaceRoute(
+      { view: "tasks", taskId, runId: null },
+      "push",
+    );
   }
 
   function openTaskRun(taskId: string, runId: string) {
+    setActiveView("tasks");
     setSelectedTaskId(null);
     setInspectedRunTaskId(taskId);
     setInspectedRunId(runId);
     setNotificationsOpen(false);
+    writeWorkspaceRoute(
+      { view: "tasks", taskId, runId },
+      "push",
+    );
   }
 
   function dismissRunDetail() {
@@ -4781,16 +4975,38 @@ export default function HomePage() {
 
   function closeRunDetail() {
     const taskId = inspectedRunTaskId;
+    if (canReturnToWorkspaceParent()) {
+      window.history.back();
+      return;
+    }
     dismissRunDetail();
-    if (taskId) setSelectedTaskId(taskId);
+    if (taskId) {
+      setActiveView("tasks");
+      setSelectedTaskId(taskId);
+      writeWorkspaceRoute(
+        { view: "tasks", taskId, runId: null },
+        "replace",
+      );
+    }
+  }
+
+  function closeTaskDetail() {
+    if (canReturnToWorkspaceParent()) {
+      window.history.back();
+      return;
+    }
+    setSelectedTaskId(null);
+    writeWorkspaceRoute(
+      { view: activeView, taskId: null, runId: null },
+      "replace",
+    );
   }
 
   function openInspectedRunTask() {
     if (!inspectedRunTask) return;
     const taskId = inspectedRunTask.id;
     dismissRunDetail();
-    setActiveView("tasks");
-    setSelectedTaskId(taskId);
+    openTask(taskId);
   }
 
   async function copyTaskRunId(run: TaskRun) {
@@ -4866,7 +5082,7 @@ export default function HomePage() {
   function pauseInspectedRun(task: TaskItem) {
     updateTaskStatus(task);
     dismissRunDetail();
-    setSelectedTaskId(task.id);
+    openTask(task.id);
   }
 
   function retryInspectedRun(task: TaskItem) {
@@ -4876,7 +5092,7 @@ export default function HomePage() {
     }
     retryTask(task);
     dismissRunDetail();
-    setSelectedTaskId(task.id);
+    openTask(task.id);
   }
 
   function openTaskActivity(taskId: string) {
@@ -4891,6 +5107,10 @@ export default function HomePage() {
     setInspectedRunTaskId(null);
     setInspectedRunId(null);
     setNotificationsOpen(false);
+    writeWorkspaceRoute(
+      { view: "activity", taskId: null, runId: null },
+      "push",
+    );
     scrollWorkspaceTop();
   }
 
@@ -4906,6 +5126,10 @@ export default function HomePage() {
     setInspectedRunTaskId(null);
     setInspectedRunId(null);
     setNotificationsOpen(false);
+    writeWorkspaceRoute(
+      { view: "artifacts", taskId: null, runId: null },
+      "push",
+    );
     scrollWorkspaceTop();
   }
 
@@ -4930,13 +5154,16 @@ export default function HomePage() {
     ].slice(0, 4));
 
     if (result.kind === "task") {
-      setActiveView("tasks");
       openTask(result.id);
     } else if (result.kind === "artifact") {
       setActiveView("artifacts");
       setArtifactTaskId(null);
       setArtifactFilter("全部");
       setSelectedArtifactId(result.id);
+      writeWorkspaceRoute(
+        { view: "artifacts", taskId: null, runId: null },
+        "push",
+      );
     } else if (result.kind === "view") {
       openView(result.id as ViewId);
     } else if (result.id === "new-task") {
@@ -4986,8 +5213,11 @@ export default function HomePage() {
       openView("artifacts");
       if (item.targetId) setSelectedArtifactId(item.targetId);
     } else {
-      openView("tasks");
-      if (item.targetId) setSelectedTaskId(item.targetId);
+      if (item.targetId) {
+        openTask(item.targetId);
+      } else {
+        openView("tasks");
+      }
     }
   }
 
@@ -5067,8 +5297,7 @@ export default function HomePage() {
   }
 
   function openTaskRecoverySettings() {
-    setSelectedTaskId(null);
-    setActiveView("settings");
+    openView("settings");
     setSelectedConnectorId("mail");
   }
 
@@ -8797,7 +9026,7 @@ export default function HomePage() {
       {selectedTask && (
         <div
           className="task-detail-backdrop"
-          onMouseDown={() => setSelectedTaskId(null)}
+          onMouseDown={closeTaskDetail}
         >
           <aside
             className="task-detail-drawer"
@@ -8835,7 +9064,7 @@ export default function HomePage() {
                   aria-label="关闭任务详情"
                   title="关闭"
                   data-overlay-initial-focus
-                  onClick={() => setSelectedTaskId(null)}
+                  onClick={closeTaskDetail}
                 >
                   <X size={18} />
                 </button>
@@ -9093,6 +9322,14 @@ export default function HomePage() {
                           setSelectedArtifactId(artifact.id);
                           setActiveView("artifacts");
                           setSelectedTaskId(null);
+                          writeWorkspaceRoute(
+                            {
+                              view: "artifacts",
+                              taskId: null,
+                              runId: null,
+                            },
+                            "push",
+                          );
                         }}
                       >
                         <span className={`type-${artifact.type}`}>
@@ -9187,7 +9424,7 @@ export default function HomePage() {
                 {selectedTask.status === "已完成" && "再次运行"}
               </button>
               {selectedTask.pinned ? (
-                <button type="button" onClick={() => setSelectedTaskId(null)}>
+                <button type="button" onClick={closeTaskDetail}>
                   关闭
                 </button>
               ) : (
