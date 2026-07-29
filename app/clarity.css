@@ -528,7 +528,10 @@ textarea:focus-visible {
   top: calc(100% + 10px);
   right: 0;
   width: 320px;
+  max-height: min(520px, calc(100dvh - 108px));
   padding: 9px;
+  overflow: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--clarity-line);
   border-radius: 8px;
   background: #ffffff;
@@ -551,8 +554,8 @@ textarea:focus-visible {
 .clarity-notifications > div > button {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -562,8 +565,10 @@ textarea:focus-visible {
 .clarity-notifications > button {
   display: grid;
   grid-template-columns: 28px 1fr;
+  align-items: center;
   gap: 9px;
   width: 100%;
+  min-height: 64px;
   padding: 11px 7px;
   border: 0;
   border-top: 1px solid #eceef1;
@@ -2195,6 +2200,12 @@ textarea:focus-visible {
     right: 10px;
     left: 10px;
     width: auto;
+    max-height: calc(100dvh - 198px - env(safe-area-inset-bottom));
+  }
+
+  .clarity-notifications > div > button {
+    width: 40px;
+    height: 40px;
   }
 
   .home-summary {

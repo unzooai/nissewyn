@@ -127,6 +127,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /执行边界与审计/);
   assert.match(page, /打开完整运行记录/);
   assert.match(css, /\.settings-trust-center/);
+  assert.match(page, /handleOverlayKeyDown/);
+  assert.match(page, /data-overlay-initial-focus/);
+  assert.match(page, /notificationWrapRef/);
   assert.match(css, /\.task-template-picker/);
   assert.match(css, /\.composer-policy/);
   assert.match(css, /\.composer-schedule-detail/);

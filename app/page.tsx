@@ -805,6 +805,9 @@ export default function HomePage() {
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const notificationWrapRef = useRef<HTMLDivElement>(null);
+  const notificationButtonRef = useRef<HTMLButtonElement>(null);
+  const overlayTriggerRef = useRef<HTMLElement | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const approvalDetailRef = useRef<HTMLDivElement>(null);
 
@@ -815,6 +818,20 @@ export default function HomePage() {
   const deletingTask = tasks.find((task) => task.id === deleteTaskId) ?? null;
   const rejectedApproval =
     approvals.find((item) => item.id === rejectApprovalId) ?? null;
+  const activeOverlayKind = deletingTask
+    ? "delete"
+    : rejectedApproval
+      ? "reject"
+      : temporaryModeOpen
+        ? "temporary"
+        : workspaceResetOpen
+          ? "reset"
+          : composerOpen
+            ? "composer"
+            : selectedTask
+              ? "task"
+              : null;
+  const overlayOpen = activeOverlayKind !== null;
   const primaryTask = tasks.find((task) => task.id === "competitor") ?? initialTasks[0];
   const activityTask = tasks.find((task) => task.id === activityTaskId) ?? null;
   const activitySummaryTask = activityTask ?? primaryTask;
@@ -979,6 +996,12 @@ export default function HomePage() {
       ) {
         setSearchOpen(false);
       }
+      if (
+        notificationWrapRef.current &&
+        !notificationWrapRef.current.contains(event.target as Node)
+      ) {
+        setNotificationsOpen(false);
+      }
     }
 
     function handleSearchShortcut(event: KeyboardEvent) {
@@ -999,8 +1022,15 @@ export default function HomePage() {
       }
 
       if (event.key === "Escape" && searchOpen) {
+        event.preventDefault();
         setSearchOpen(false);
         searchInputRef.current?.blur();
+      } else if (event.key === "Escape" && notificationsOpen) {
+        event.preventDefault();
+        setNotificationsOpen(false);
+        window.requestAnimationFrame(() =>
+          window.requestAnimationFrame(() => notificationButtonRef.current?.focus()),
+        );
       }
     }
 
@@ -1014,6 +1044,7 @@ export default function HomePage() {
     composerOpen,
     deletingTask,
     rejectedApproval,
+    notificationsOpen,
     searchOpen,
     selectedTask,
     temporaryModeOpen,
@@ -1021,43 +1052,119 @@ export default function HomePage() {
   ]);
 
   useEffect(() => {
+    if (!overlayOpen) return;
+
     if (
-      !composerOpen &&
-      !selectedTask &&
-      !deletingTask &&
-      !rejectedApproval &&
-      !temporaryModeOpen &&
-      !workspaceResetOpen
+      !overlayTriggerRef.current &&
+      document.activeElement instanceof HTMLElement
     ) {
-      return;
+      overlayTriggerRef.current = document.activeElement;
     }
+
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      setDeleteTaskId(null);
-      setRejectApprovalId(null);
-      setComposerOpen(false);
-      setEditingTaskId(null);
-      setSelectedTaskId(null);
-      setTemporaryModeOpen(false);
-      setWorkspaceResetOpen(false);
-    }
-
-    window.addEventListener("keydown", handleEscape);
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleEscape);
+      const trigger = overlayTriggerRef.current;
+      overlayTriggerRef.current = null;
+      if (trigger?.isConnected) {
+        window.requestAnimationFrame(() => trigger.focus());
+      }
     };
-  }, [
-    composerOpen,
-    deletingTask,
-    rejectedApproval,
-    selectedTask,
-    temporaryModeOpen,
-    workspaceResetOpen,
-  ]);
+  }, [overlayOpen]);
+
+  useEffect(() => {
+    if (!activeOverlayKind) return;
+
+    const selectorByKind = {
+      delete: ".confirm-delete-dialog",
+      reject: ".approval-reject-dialog",
+      temporary: ".temporary-session-dialog",
+      reset: ".workspace-reset-dialog",
+      composer: ".clarity-dialog",
+      task: ".task-detail-drawer",
+    } as const;
+    const overlay = document.querySelector<HTMLElement>(
+      selectorByKind[activeOverlayKind],
+    );
+    if (!overlay) return;
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      const initialFocus =
+        overlay.querySelector<HTMLElement>("[data-overlay-initial-focus]") ??
+        overlay.querySelector<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled])",
+        );
+      if (!overlay.contains(document.activeElement)) {
+        initialFocus?.focus();
+      }
+    });
+
+    function closeTopOverlay() {
+      if (activeOverlayKind === "delete") {
+        setDeleteTaskId(null);
+      } else if (activeOverlayKind === "reject") {
+        setRejectApprovalId(null);
+      } else if (activeOverlayKind === "temporary") {
+        setTemporaryModeOpen(false);
+      } else if (activeOverlayKind === "reset") {
+        setWorkspaceResetOpen(false);
+      } else if (activeOverlayKind === "composer") {
+        closeComposer();
+      } else {
+        setSelectedTaskId(null);
+      }
+    }
+
+    function handleOverlayKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        closeTopOverlay();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = Array.from(
+        overlay.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter(
+        (element) =>
+          element.offsetWidth > 0 ||
+          element.offsetHeight > 0 ||
+          element === document.activeElement,
+      );
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement;
+      if (
+        event.shiftKey &&
+        (activeElement === first || !overlay.contains(activeElement))
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (activeElement === last || !overlay.contains(activeElement))
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener("keydown", handleOverlayKeyDown, true);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      window.removeEventListener("keydown", handleOverlayKeyDown, true);
+    };
+  }, [activeOverlayKind]);
 
   const searchedTasks = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -1695,6 +1802,12 @@ export default function HomePage() {
   }
 
   function beginCreateTask() {
+    if (
+      !overlayTriggerRef.current &&
+      document.activeElement instanceof HTMLElement
+    ) {
+      overlayTriggerRef.current = document.activeElement;
+    }
     setEditingTaskId(null);
     setTaskName("跟踪一个新网页");
     setTaskTarget("https://example.com");
@@ -1707,6 +1820,12 @@ export default function HomePage() {
   }
 
   function beginEditTask(task: TaskItem) {
+    if (
+      !overlayTriggerRef.current &&
+      document.activeElement instanceof HTMLElement
+    ) {
+      overlayTriggerRef.current = document.activeElement;
+    }
     setTaskName(task.title);
     setTaskTarget(task.target);
     setTaskDescription(task.description);
@@ -2212,25 +2331,43 @@ export default function HomePage() {
               )}
             </div>
 
-            <div className="clarity-notification-wrap">
+            <div className="clarity-notification-wrap" ref={notificationWrapRef}>
               <button
+                ref={notificationButtonRef}
                 className="clarity-icon-button"
                 type="button"
                 aria-label="通知"
+                aria-controls="global-notifications"
                 aria-expanded={notificationsOpen}
-                onClick={() => setNotificationsOpen((open) => !open)}
+                aria-haspopup="dialog"
+                onClick={() => {
+                  setSearchOpen(false);
+                  setNotificationsOpen((open) => !open);
+                }}
               >
                 <Bell size={18} />
                 {approvals.length > 0 && <i />}
               </button>
               {notificationsOpen && (
-                <div className="clarity-notifications" role="dialog" aria-label="通知">
+                <div
+                  className="clarity-notifications"
+                  id="global-notifications"
+                  role="dialog"
+                  aria-label="通知"
+                >
                   <div>
                     <strong>通知</strong>
                     <button
                       type="button"
                       aria-label="关闭通知"
-                      onClick={() => setNotificationsOpen(false)}
+                      onClick={() => {
+                        setNotificationsOpen(false);
+                        window.requestAnimationFrame(() =>
+                          window.requestAnimationFrame(() =>
+                            notificationButtonRef.current?.focus(),
+                          ),
+                        );
+                      }}
                     >
                       <X size={16} />
                     </button>
@@ -3586,6 +3723,7 @@ export default function HomePage() {
                   type="button"
                   aria-label="关闭任务详情"
                   title="关闭"
+                  data-overlay-initial-focus
                   onClick={() => setSelectedTaskId(null)}
                 >
                   <X size={18} />
@@ -3834,6 +3972,7 @@ export default function HomePage() {
                 <span>任务名称</span>
                 <input
                   autoFocus
+                  data-overlay-initial-focus
                   required
                   value={taskName}
                   placeholder="例如：每天跟踪竞品更新"
@@ -4010,7 +4149,11 @@ export default function HomePage() {
               </span>
             </div>
             <div className="confirm-delete-actions">
-              <button type="button" onClick={() => setDeleteTaskId(null)}>
+              <button
+                type="button"
+                data-overlay-initial-focus
+                onClick={() => setDeleteTaskId(null)}
+              >
                 保留任务
               </button>
               <button className="danger" type="button" onClick={confirmDeleteTask}>
@@ -4073,7 +4216,11 @@ export default function HomePage() {
               <span>拒绝决定会写入审计记录，不会发生任何外部操作。</span>
             </div>
             <div className="approval-reject-actions">
-              <button type="button" onClick={() => setRejectApprovalId(null)}>
+              <button
+                type="button"
+                data-overlay-initial-focus
+                onClick={() => setRejectApprovalId(null)}
+              >
                 返回审核
               </button>
               <button
@@ -4147,7 +4294,11 @@ export default function HomePage() {
               先导出工作区备份
             </button>
             <div className="temporary-session-actions">
-              <button type="button" onClick={() => setTemporaryModeOpen(false)}>
+              <button
+                type="button"
+                data-overlay-initial-focus
+                onClick={() => setTemporaryModeOpen(false)}
+              >
                 保持本机保存
               </button>
               <button
@@ -4215,7 +4366,11 @@ export default function HomePage() {
               先导出备份
             </button>
             <div className="workspace-reset-actions">
-              <button type="button" onClick={() => setWorkspaceResetOpen(false)}>
+              <button
+                type="button"
+                data-overlay-initial-focus
+                onClick={() => setWorkspaceResetOpen(false)}
+              >
                 保留当前数据
               </button>
               <button className="danger" type="button" onClick={resetWorkspace}>
