@@ -68,8 +68,11 @@ type WorkspaceRoute = {
   taskId: string | null;
   runId: string | null;
   artifactId?: string | null;
+  activityId?: string | null;
+  activityTaskId?: string | null;
   taskFilter?: TaskFilter | null;
   approvalFilter?: ApprovalRiskFilter | null;
+  activityFilter?: ActivityFilter | null;
 };
 type WorkspaceHistoryState = {
   unzooOne: true;
@@ -1373,26 +1376,49 @@ function readWorkspaceRoute(): WorkspaceRoute {
   const artifactId = taskId
     ? null
     : url.searchParams.get("artifact")?.trim() || null;
+  const activityId =
+    !taskId && !artifactId
+      ? url.searchParams.get("event")?.trim() || null
+      : null;
+  const activityTaskId =
+    !taskId && !artifactId
+      ? url.searchParams.get("auditTask")?.trim() || null
+      : null;
   const requestedTaskFilter = url.searchParams.get("status");
   const taskFilter =
     requestedTaskFilter &&
     taskFilters.includes(requestedTaskFilter as TaskFilter)
       ? (requestedTaskFilter as TaskFilter)
       : null;
-  const resolvedView = taskId ? "tasks" : artifactId ? "artifacts" : view;
+  const resolvedView = taskId
+    ? "tasks"
+    : artifactId
+      ? "artifacts"
+      : activityId || activityTaskId
+        ? "activity"
+        : view;
   const requestedApprovalFilter = url.searchParams.get("risk");
   const approvalFilter =
     requestedApprovalFilter &&
     approvalRiskFilters.includes(requestedApprovalFilter as ApprovalRiskFilter)
       ? (requestedApprovalFilter as ApprovalRiskFilter)
       : null;
+  const requestedActivityFilter = url.searchParams.get("kind");
+  const activityFilter =
+    requestedActivityFilter &&
+    activityFilters.includes(requestedActivityFilter as ActivityFilter)
+      ? (requestedActivityFilter as ActivityFilter)
+      : null;
   return {
     view: resolvedView,
     taskId,
     runId,
     artifactId: resolvedView === "artifacts" ? artifactId : null,
+    activityId: resolvedView === "activity" ? activityId : null,
+    activityTaskId: resolvedView === "activity" ? activityTaskId : null,
     taskFilter: resolvedView === "tasks" ? taskFilter : null,
     approvalFilter: resolvedView === "approvals" ? approvalFilter : null,
+    activityFilter: resolvedView === "activity" ? activityFilter : null,
   };
 }
 
@@ -1422,6 +1448,16 @@ function writeWorkspaceRoute(
   } else {
     url.searchParams.delete("artifact");
   }
+  if (route.view === "activity" && route.activityId) {
+    url.searchParams.set("event", route.activityId);
+  } else {
+    url.searchParams.delete("event");
+  }
+  if (route.view === "activity" && route.activityTaskId) {
+    url.searchParams.set("auditTask", route.activityTaskId);
+  } else {
+    url.searchParams.delete("auditTask");
+  }
   if (
     route.view === "tasks" &&
     route.taskFilter &&
@@ -1439,6 +1475,15 @@ function writeWorkspaceRoute(
     url.searchParams.set("risk", route.approvalFilter);
   } else {
     url.searchParams.delete("risk");
+  }
+  if (
+    route.view === "activity" &&
+    route.activityFilter &&
+    route.activityFilter !== "全部"
+  ) {
+    url.searchParams.set("kind", route.activityFilter);
+  } else {
+    url.searchParams.delete("kind");
   }
 
   const nextLocation = `${url.pathname}${url.search}${url.hash}`;
@@ -3494,6 +3539,44 @@ export default function HomePage() {
         !routeTask && requestedRoute.view === "artifacts"
           ? (artifacts[0] ?? null)
           : null;
+      const requestedActivityTask =
+        !routeTask && requestedRoute.activityTaskId
+          ? tasks.find((task) => task.id === requestedRoute.activityTaskId) ??
+            null
+          : null;
+      const routeActivity =
+        !routeTask && requestedRoute.activityId
+          ? activityLog.find(
+              (activity) => activity.id === requestedRoute.activityId,
+            ) ?? null
+          : null;
+      let resolvedActivityTaskId = requestedActivityTask?.id ?? null;
+      let resolvedActivityFilter =
+        requestedRoute.activityFilter ?? "全部";
+      if (
+        routeActivity &&
+        resolvedActivityTaskId &&
+        routeActivity.taskId !== resolvedActivityTaskId
+      ) {
+        resolvedActivityTaskId = null;
+      }
+      if (
+        routeActivity &&
+        resolvedActivityFilter !== "全部" &&
+        routeActivity.kind !== resolvedActivityFilter
+      ) {
+        resolvedActivityFilter = "全部";
+      }
+      const fallbackActivity =
+        !routeTask && requestedRoute.view === "activity"
+          ? (activityLog.find(
+              (activity) =>
+                (!resolvedActivityTaskId ||
+                  activity.taskId === resolvedActivityTaskId) &&
+                (resolvedActivityFilter === "全部" ||
+                  activity.kind === resolvedActivityFilter),
+            ) ?? null)
+          : null;
       const resolvedRoute: WorkspaceRoute = {
         view: routeTask ? "tasks" : requestedRoute.view,
         taskId: routeTask?.id ?? null,
@@ -3502,6 +3585,14 @@ export default function HomePage() {
           !routeTask && requestedRoute.view === "artifacts"
             ? (routeArtifact?.id ?? fallbackArtifact?.id ?? null)
             : null,
+        activityId:
+          !routeTask && requestedRoute.view === "activity"
+            ? (routeActivity?.id ?? fallbackActivity?.id ?? null)
+            : null,
+        activityTaskId:
+          !routeTask && requestedRoute.view === "activity"
+            ? resolvedActivityTaskId
+            : null,
         taskFilter:
           requestedRoute.view === "tasks"
             ? (requestedRoute.taskFilter ?? null)
@@ -3509,6 +3600,10 @@ export default function HomePage() {
         approvalFilter:
           requestedRoute.view === "approvals"
             ? (requestedRoute.approvalFilter ?? null)
+            : null,
+        activityFilter:
+          requestedRoute.view === "activity"
+            ? resolvedActivityFilter
             : null,
       };
       const currentHistoryState = window.history.state as
@@ -3525,6 +3620,22 @@ export default function HomePage() {
         resolvedRoute.view === "approvals"
           ? (resolvedRoute.approvalFilter ?? "全部")
           : "全部",
+      );
+      setActivityTaskId(
+        resolvedRoute.view === "activity"
+          ? (resolvedRoute.activityTaskId ?? null)
+          : null,
+      );
+      setActivityFilter(
+        resolvedRoute.view === "activity"
+          ? (resolvedRoute.activityFilter ?? "全部")
+          : "全部",
+      );
+      setActivityListQuery("");
+      setSelectedActivityId(
+        resolvedRoute.view === "activity"
+          ? (resolvedRoute.activityId ?? "")
+          : (activityLog[0]?.id ?? ""),
       );
       setSelectedTaskId(
         resolvedRoute.taskId && !resolvedRoute.runId
@@ -3556,6 +3667,23 @@ export default function HomePage() {
             : "该成果已不存在，当前工作区还没有其他成果",
         );
       }
+      if (
+        requestedRoute.view === "activity" &&
+        requestedRoute.activityId &&
+        !routeActivity
+      ) {
+        setNotice(
+          fallbackActivity
+            ? "该审计事件已不存在，已打开范围内最新记录"
+            : "该审计事件已不存在，当前范围还没有其他记录",
+        );
+      } else if (
+        requestedRoute.view === "activity" &&
+        requestedRoute.activityTaskId &&
+        !requestedActivityTask
+      ) {
+        setNotice("关联任务已不存在，已打开全部审计记录");
+      }
       writeWorkspaceRoute(
         resolvedRoute,
         "replace",
@@ -3570,7 +3698,7 @@ export default function HomePage() {
 
     window.addEventListener("popstate", restoreWorkspaceRoute);
     return () => window.removeEventListener("popstate", restoreWorkspaceRoute);
-  }, [artifacts, tasks, tasksReady]);
+  }, [activityLog, artifacts, tasks, tasksReady]);
 
   useEffect(() => {
     if (!tasksReady) return;
@@ -4622,6 +4750,30 @@ export default function HomePage() {
     filteredActivityLog.find((item) => item.id === selectedActivityId) ??
     filteredActivityLog[0] ??
     null;
+  useEffect(() => {
+    if (!tasksReady || activeView !== "activity") return;
+    const nextActivityId = selectedActivity?.id ?? "";
+    if (nextActivityId === selectedActivityId) return;
+    writeWorkspaceRoute(
+      {
+        view: "activity",
+        taskId: null,
+        runId: null,
+        activityId: nextActivityId || null,
+        activityTaskId,
+        activityFilter,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
+  }, [
+    activeView,
+    activityFilter,
+    activityTaskId,
+    selectedActivity?.id,
+    selectedActivityId,
+    tasksReady,
+  ]);
   const SelectedActivityIcon = selectedActivity
     ? activityIconMap[selectedActivity.icon] ?? Activity
     : Activity;
@@ -4913,6 +5065,22 @@ export default function HomePage() {
       textarea.remove();
     }
     setNotice(`已复制事件 ID：${item.id}`);
+  }
+
+  async function copyActivityEventLink(item: ActivityItem) {
+    writeWorkspaceRoute(
+      {
+        view: "activity",
+        taskId: null,
+        runId: null,
+        activityId: item.id,
+        activityTaskId,
+        activityFilter,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
+    await copyCurrentViewLink("审计事件链接");
   }
 
   function exportWorkspace() {
@@ -5505,8 +5673,60 @@ export default function HomePage() {
     setNotice(item.detail);
   }
 
+  function openActivityEvent(
+    activityId: string,
+    options: { activityTaskId?: string; scrollToTop?: boolean } = {},
+  ) {
+    const activity = activityLog.find((item) => item.id === activityId);
+    if (!activity) {
+      openView("activity");
+      setNotice("该审计事件已不存在，已打开运行记录");
+      return;
+    }
+    const nextActivityTaskId =
+      options.activityTaskId && activity.taskId === options.activityTaskId
+        ? options.activityTaskId
+        : null;
+    setActivityTaskId(nextActivityTaskId);
+    setActivityFilter("全部");
+    setActivityListQuery("");
+    setActivitySort("最新优先");
+    setSelectedActivityId(activity.id);
+    setActiveView("activity");
+    setSelectedTaskId(null);
+    setInspectedRunTaskId(null);
+    setInspectedRunId(null);
+    setNotificationsOpen(false);
+    writeWorkspaceRoute(
+      {
+        view: "activity",
+        taskId: null,
+        runId: null,
+        activityId: activity.id,
+        activityTaskId: nextActivityTaskId,
+        activityFilter: "全部",
+      },
+      "push",
+    );
+    if (options.scrollToTop !== false) {
+      scrollWorkspaceTop();
+    }
+  }
+
   function selectActivityItem(item: ActivityItem) {
     setSelectedActivityId(item.id);
+    writeWorkspaceRoute(
+      {
+        view: "activity",
+        taskId: null,
+        runId: null,
+        activityId: item.id,
+        activityTaskId,
+        activityFilter,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
     window.requestAnimationFrame(() => {
       if (!window.matchMedia("(max-width: 980px)").matches) return;
       const reduceMotion = window.matchMedia(
@@ -5517,6 +5737,48 @@ export default function HomePage() {
         block: "start",
       });
     });
+  }
+
+  function chooseActivityFilter(filter: ActivityFilter) {
+    const nextActivity =
+      filter === "全部"
+        ? scopedActivityLog[0]
+        : scopedActivityLog.find((item) => item.kind === filter);
+    setActivityFilter(filter);
+    setSelectedActivityId(nextActivity?.id ?? "");
+    writeWorkspaceRoute(
+      {
+        view: "activity",
+        taskId: null,
+        runId: null,
+        activityId: nextActivity?.id ?? null,
+        activityTaskId,
+        activityFilter: filter,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
+  }
+
+  function clearActivityTaskScope() {
+    const nextActivity =
+      activityFilter === "全部"
+        ? activityLog[0]
+        : activityLog.find((item) => item.kind === activityFilter);
+    setActivityTaskId(null);
+    setSelectedActivityId(nextActivity?.id ?? "");
+    writeWorkspaceRoute(
+      {
+        view: "activity",
+        taskId: null,
+        runId: null,
+        activityId: nextActivity?.id ?? null,
+        activityTaskId: null,
+        activityFilter,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
   }
 
   function scrollApprovalIntoView() {
@@ -7396,12 +7658,31 @@ export default function HomePage() {
       taskFilter?: TaskFilter;
       approvalFilter?: ApprovalRiskFilter;
       artifactId?: string;
+      activityId?: string;
+      activityFilter?: ActivityFilter;
     } = {},
   ) {
     const nextTaskFilter =
       view === "tasks" ? (options.taskFilter ?? "全部") : "全部";
     const nextApprovalFilter =
       view === "approvals" ? (options.approvalFilter ?? "全部") : "全部";
+    const nextActivityFilter =
+      view === "activity" ? (options.activityFilter ?? "全部") : "全部";
+    const nextActivity =
+      view === "activity"
+        ? (activityLog.find(
+            (activity) =>
+              activity.id === options.activityId &&
+              (nextActivityFilter === "全部" ||
+                activity.kind === nextActivityFilter),
+          ) ??
+          activityLog.find(
+            (activity) =>
+              nextActivityFilter === "全部" ||
+              activity.kind === nextActivityFilter,
+          ) ??
+          null)
+        : null;
     const nextArtifact =
       view === "artifacts"
         ? (artifacts.find((artifact) => artifact.id === options.artifactId) ??
@@ -7428,10 +7709,10 @@ export default function HomePage() {
     }
     if (view === "activity") {
       setActivityTaskId(null);
-      setActivityFilter("全部");
+      setActivityFilter(nextActivityFilter);
       setActivityListQuery("");
       setActivitySort("最新优先");
-      setSelectedActivityId(activityLog[0]?.id ?? "");
+      setSelectedActivityId(nextActivity?.id ?? "");
     }
     if (view === "artifacts") {
       setArtifactTaskId(null);
@@ -7450,9 +7731,13 @@ export default function HomePage() {
         taskId: null,
         runId: null,
         artifactId: view === "artifacts" ? (nextArtifact?.id ?? null) : null,
+        activityId: view === "activity" ? (nextActivity?.id ?? null) : null,
+        activityTaskId: null,
         taskFilter: view === "tasks" ? nextTaskFilter : null,
         approvalFilter:
           view === "approvals" ? nextApprovalFilter : null,
+        activityFilter:
+          view === "activity" ? nextActivityFilter : null,
       },
       "push",
     );
@@ -7727,18 +8012,26 @@ export default function HomePage() {
 
   function openTaskActivity(taskId: string) {
     const taskActivities = activityLog.filter((item) => item.taskId === taskId);
+    const nextActivity = taskActivities[0] ?? null;
     setActivityTaskId(taskId);
     setActivityFilter("全部");
     setActivityListQuery("");
     setActivitySort("最新优先");
-    setSelectedActivityId(taskActivities[0]?.id ?? "");
+    setSelectedActivityId(nextActivity?.id ?? "");
     setActiveView("activity");
     setSelectedTaskId(null);
     setInspectedRunTaskId(null);
     setInspectedRunId(null);
     setNotificationsOpen(false);
     writeWorkspaceRoute(
-      { view: "activity", taskId: null, runId: null },
+      {
+        view: "activity",
+        taskId: null,
+        runId: null,
+        activityId: nextActivity?.id ?? null,
+        activityTaskId: taskId,
+        activityFilter: "全部",
+      },
       "push",
     );
     scrollWorkspaceTop();
@@ -7940,8 +8233,11 @@ export default function HomePage() {
     if (item.target === "approvals") {
       openView("approvals");
     } else if (item.target === "activity") {
-      openView("activity");
-      if (item.targetId) setSelectedActivityId(item.targetId);
+      if (item.targetId) {
+        openActivityEvent(item.targetId);
+      } else {
+        openView("activity");
+      }
     } else if (item.target === "artifact") {
       if (item.targetId) {
         openArtifact(item.targetId);
@@ -10587,7 +10883,7 @@ export default function HomePage() {
                       type="button"
                       role="tab"
                       aria-selected={activityFilter === filter}
-                      onClick={() => setActivityFilter(filter)}
+                      onClick={() => chooseActivityFilter(filter)}
                     >
                       {filter}
                       <span>{activityCounts[filter]}</span>
@@ -10665,7 +10961,7 @@ export default function HomePage() {
                     className="activity-scope-clear"
                     type="button"
                     aria-label={`取消“${activityTask.title}”任务筛选`}
-                    onClick={() => setActivityTaskId(null)}
+                    onClick={clearActivityTaskScope}
                   >
                     <X size={14} />
                     查看全部
@@ -10752,9 +11048,9 @@ export default function HomePage() {
                         if (activityListQuery.trim()) {
                           setActivityListQuery("");
                         } else if (activityFilter !== "全部") {
-                          setActivityFilter("全部");
+                          chooseActivityFilter("全部");
                         } else {
-                          setActivityTaskId(null);
+                          clearActivityTaskScope();
                         }
                       }}
                     >
@@ -10825,14 +11121,24 @@ export default function HomePage() {
                       <small>事件 ID</small>
                       <code>{selectedActivity.id}</code>
                     </span>
-                    <button
-                      type="button"
-                      aria-label="复制事件 ID"
-                      title="复制事件 ID"
-                      onClick={() => copyActivityId(selectedActivity)}
-                    >
-                      <Copy size={15} />
-                    </button>
+                    <span className="activity-event-id-actions">
+                      <button
+                        type="button"
+                        aria-label="复制当前审计事件链接"
+                        title="复制当前审计事件链接"
+                        onClick={() => copyActivityEventLink(selectedActivity)}
+                      >
+                        <Link2 size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="复制事件 ID"
+                        title="复制事件 ID"
+                        onClick={() => copyActivityId(selectedActivity)}
+                      >
+                        <Copy size={15} />
+                      </button>
+                    </span>
                   </div>
 
                   <div className="activity-integrity">
@@ -11565,7 +11871,7 @@ export default function HomePage() {
                         <button
                           key={item.id}
                           type="button"
-                          onClick={() => openActivityItem(item)}
+                          onClick={() => openActivityEvent(item.id)}
                         >
                           <span className={`tone-${item.tone}`}>
                             <ItemIcon size={16} />
@@ -11591,10 +11897,7 @@ export default function HomePage() {
                   <button
                     className="settings-audit-open"
                     type="button"
-                    onClick={() => {
-                      setActivityFilter("全部");
-                      openView("activity");
-                    }}
+                    onClick={() => openView("activity")}
                   >
                     <History size={16} />
                     打开完整运行记录

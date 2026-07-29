@@ -98,8 +98,18 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /searchParams\.set\("risk", route\.approvalFilter\)/);
   assert.match(page, /searchParams\.get\("artifact"\)/);
   assert.match(page, /searchParams\.set\("artifact", route\.artifactId\)/);
+  assert.match(page, /searchParams\.get\("event"\)/);
+  assert.match(page, /searchParams\.set\("event", route\.activityId\)/);
+  assert.match(page, /searchParams\.get\("auditTask"\)/);
+  assert.match(page, /searchParams\.set\("auditTask", route\.activityTaskId\)/);
+  assert.match(page, /searchParams\.get\("kind"\)/);
+  assert.match(page, /searchParams\.set\("kind", route\.activityFilter\)/);
   assert.match(page, /function openArtifact/);
   assert.match(page, /function selectArtifact/);
+  assert.match(page, /function openActivityEvent/);
+  assert.match(page, /function chooseActivityFilter/);
+  assert.match(page, /function copyActivityEventLink/);
+  assert.match(page, /复制当前审计事件链接/);
   assert.match(page, /复制当前成果链接/);
   assert.match(page, /复制当前审批视图链接/);
   assert.match(page, /className="summary-running"/);
@@ -505,6 +515,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.artifact-delete-actions/);
   assert.match(css, /\.activity-workspace/);
   assert.match(css, /\.activity-inspector/);
+  assert.match(css, /\.activity-event-id-actions/);
   assert.match(css, /\.task-detail-artifacts/);
   assert.match(css, /\.temporary-session-dialog/);
   assert.match(css, /\.workspace-data-summary\.is-temporary/);
