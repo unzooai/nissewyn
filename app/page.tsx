@@ -950,10 +950,12 @@ export default function HomePage() {
         <div className="clarity-brand">
           <span className="clarity-brand-mark">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/unzoo-mark-ai.webp" alt="Unzoo One" />
+            <img src="/unzoo-one-mark.svg" alt="Unzoo One" />
           </span>
           <div>
-            <strong>Unzoo One</strong>
+            <strong>
+              Unzoo <span>One</span>
+            </strong>
             <small>可信 AI 执行</small>
           </div>
         </div>

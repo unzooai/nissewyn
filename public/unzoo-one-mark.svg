@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Unzoo One</title>
+  <path
+    fill="#101820"
+    fill-rule="evenodd"
+    d="M22 5h20c9.4 0 17 7.6 17 17v20c0 9.4-7.6 17-17 17H23C13.1 59 5 50.9 5 41V23C5 13.1 13.1 5 23 5h-1Zm1 11c-3.9 0-7 3.1-7 7v17c0 4.4 3.6 8 8 8h17c3.9 0 7-3.1 7-7V23c0-3.9-3.1-7-7-7H23Z"
+  />
+  <path
+    fill="#101820"
+    d="m23.5 31.2 8.2-7.1c2.5-2.2 6.4-.4 6.4 2.9v25.6H27.4V35.5l-3.9 3.4v-7.7Z"
+  />
+  <path
+    fill="#16C995"
+    d="M37.9 23.3h3.9c6.4 0 12.2 3 16.2 7.7l-8.2 7.1c-2.1-2.6-4.8-4-8.4-4h-3.5V23.3Z"
+  />
+</svg>

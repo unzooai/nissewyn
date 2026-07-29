@@ -38,8 +38,7 @@ test("server-renders the Unzoo One task console", async () => {
   assert.match(html, /需要你处理/);
   assert.match(html, /你交给 Unzoo One 的工作/);
   assert.match(html, /ai-core-premium\.webp/);
-  assert.match(html, /unzoo-mark-ai\.webp/);
-  assert.match(html, /unzoo-favicon\.png/);
+  assert.match(html, /unzoo-one-mark\.svg/);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/);
 });
 

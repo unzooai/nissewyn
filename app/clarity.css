@@ -3035,33 +3035,56 @@ body {
 .clarity-brand > span {
   position: relative;
   overflow: hidden;
-  background: #111827;
+  border: 1px solid rgba(30, 102, 82, 0.16);
+  background: #f1fbf7;
   box-shadow:
-    0 10px 24px rgba(17, 24, 39, 0.17),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    0 8px 22px rgba(20, 82, 65, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.86);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
 .clarity-brand > span::after {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  background: linear-gradient(135deg, transparent 35%, rgba(77, 177, 255, 0.8), transparent 63%);
-  content: "";
-  transform: translateX(-110%);
-  animation: premium-brand-sweep 7s ease-in-out infinite;
+  display: none;
 }
 
 .clarity-brand-mark img {
   position: relative;
   z-index: 1;
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 31px;
+  height: 31px;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.clarity-brand:hover > span {
+  border-color: rgba(22, 201, 149, 0.34);
+  box-shadow:
+    0 11px 26px rgba(20, 82, 65, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+.clarity-brand:hover .clarity-brand-mark img {
+  transform: scale(1.045);
 }
 
 .clarity-brand strong {
   color: var(--premium-ink);
+  font-size: 14px;
+  font-weight: 760;
   letter-spacing: 0;
+}
+
+.clarity-brand strong span {
+  color: #078361;
+}
+
+.clarity-brand small {
+  color: #748079;
+  font-weight: 560;
 }
 
 .clarity-nav button {
