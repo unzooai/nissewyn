@@ -236,7 +236,7 @@ export default function Home() {
           <section className="palette-panel" aria-label="能力市场">
             <div className="section-heading">
               <div>
-                <span>Capability Marketplace</span>
+                <span>能力工具</span>
                 <h2>能力市场</h2>
               </div>
               <button type="button" aria-label="展开能力市场">
@@ -275,7 +275,7 @@ export default function Home() {
             <div className="brain-route-box">
               <div className="section-heading compact">
                 <div>
-                  <span>Brain Adapter Bus</span>
+                  <span>模型路由</span>
                   <h2>大脑路由</h2>
                 </div>
               </div>
@@ -300,7 +300,7 @@ export default function Home() {
           <section className="canvas-panel" aria-label="任务流画布">
             <div className="canvas-toolbar">
               <div>
-                <span>Task Flow</span>
+                <span>自动化流程</span>
                 <h2>竞品信号自动化任务</h2>
               </div>
               <div className="toolbar-actions">
@@ -446,7 +446,7 @@ export default function Home() {
             <div className="audit-box">
               <div className="section-heading compact">
                 <div>
-                  <span>Audit Stream</span>
+                  <span>操作记录</span>
                   <h2>实时审计</h2>
                 </div>
               </div>
