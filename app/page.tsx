@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   Bell,
@@ -27,6 +27,18 @@ import {
 } from "lucide-react";
 
 type ViewId = "home" | "tasks" | "approvals" | "activity" | "settings";
+type TaskStatus = "运行中" | "待确认" | "已完成" | "已暂停";
+type TaskFilter = "全部" | TaskStatus;
+
+type TaskItem = {
+  id: string;
+  title: string;
+  description: string;
+  target: string;
+  status: TaskStatus;
+  progress: number;
+  updated: string;
+};
 
 const navItems: Array<{ id: ViewId; label: string; icon: typeof Home }> = [
   { id: "home", label: "首页", icon: Home },
@@ -35,6 +47,8 @@ const navItems: Array<{ id: ViewId; label: string; icon: typeof Home }> = [
   { id: "activity", label: "运行记录", icon: History },
   { id: "settings", label: "设置", icon: Settings2 },
 ];
+
+const taskFilters: TaskFilter[] = ["全部", "运行中", "待确认", "已暂停", "已完成"];
 
 const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: string }> = {
   home: {
@@ -64,11 +78,12 @@ const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: 
   },
 };
 
-const initialTasks = [
+const initialTasks: TaskItem[] = [
   {
     id: "competitor",
     title: "跟踪竞品发布动态",
     description: "每天检查 3 个竞品页面，有变化时生成一份摘要。",
+    target: "https://example.com/competitors",
     status: "运行中",
     progress: 68,
     updated: "刚刚更新",
@@ -77,6 +92,7 @@ const initialTasks = [
     id: "weekly-report",
     title: "整理本周项目进展",
     description: "汇总项目文件和工作记录，生成周报草稿。",
+    target: "本地项目工作区",
     status: "待确认",
     progress: 92,
     updated: "8 分钟前",
@@ -85,6 +101,7 @@ const initialTasks = [
     id: "meeting",
     title: "准备产品评审材料",
     description: "整理评审议题、相关文件和待解决问题。",
+    target: "产品评审资料库",
     status: "已完成",
     progress: 100,
     updated: "今天 10:32",
@@ -93,6 +110,7 @@ const initialTasks = [
     id: "research",
     title: "收集 AI 浏览器产品资料",
     description: "保存产品页面并提取功能、定价和团队信息。",
+    target: "https://example.com/research",
     status: "已完成",
     progress: 100,
     updated: "昨天 18:06",
@@ -199,10 +217,13 @@ export default function HomePage() {
   const [selectedApprovalId, setSelectedApprovalId] = useState(initialApprovals[0].id);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
+  const [tasksReady, setTasksReady] = useState(false);
+  const [taskFilter, setTaskFilter] = useState<TaskFilter>("全部");
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [taskName, setTaskName] = useState("跟踪一个新网页");
   const [taskTarget, setTaskTarget] = useState("https://example.com");
-  const [queuedTasks, setQueuedTasks] = useState(0);
   const [settings, setSettings] = useState({
     approval: true,
     local: true,
@@ -212,14 +233,82 @@ export default function HomePage() {
   const pageTitle = viewTitles[activeView];
   const selectedApproval =
     approvals.find((item) => item.id === selectedApprovalId) ?? approvals[0];
+  const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = window.localStorage.getItem("unzoo-one-tasks");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setTasks(parsed as TaskItem[]);
+            const primaryTask = (parsed as TaskItem[]).find(
+              (task) => task.id === "competitor",
+            );
+            setIsRunning(primaryTask?.status !== "已暂停");
+          }
+        }
+      } catch {
+        window.localStorage.removeItem("unzoo-one-tasks");
+      } finally {
+        setTasksReady(true);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!tasksReady) return;
+    if (settings.local) {
+      window.localStorage.setItem("unzoo-one-tasks", JSON.stringify(tasks));
+    } else {
+      window.localStorage.removeItem("unzoo-one-tasks");
+    }
+  }, [settings.local, tasks, tasksReady]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 4200);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  useEffect(() => {
+    if (!composerOpen && !selectedTask) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setComposerOpen(false);
+      setSelectedTaskId(null);
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [composerOpen, selectedTask]);
+
+  const searchedTasks = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    if (!keyword) return tasks;
+    return tasks.filter((task) =>
+      `${task.title} ${task.description} ${task.target} ${task.status}`
+        .toLowerCase()
+        .includes(keyword),
+    );
+  }, [query, tasks]);
 
   const filteredTasks = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    if (!keyword) return initialTasks;
-    return initialTasks.filter((task) =>
-      `${task.title} ${task.description} ${task.status}`.toLowerCase().includes(keyword),
-    );
-  }, [query]);
+    if (taskFilter === "全部") return searchedTasks;
+    return searchedTasks.filter((task) => task.status === taskFilter);
+  }, [searchedTasks, taskFilter]);
+
+  const runningTaskCount = tasks.filter((task) => task.status === "运行中").length;
+  const completedTaskCount = tasks.filter((task) => task.status === "已完成").length;
 
   function approveCurrent() {
     if (!selectedApproval) return;
@@ -238,14 +327,86 @@ export default function HomePage() {
   function createTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!taskName.trim() || !taskTarget.trim()) return;
-    setQueuedTasks((count) => count + 1);
+    const newTask: TaskItem = {
+      id: `task-${Date.now()}`,
+      title: taskName.trim(),
+      description: `检查 ${taskTarget.trim()}，识别变化并整理成可阅读的结果。`,
+      target: taskTarget.trim(),
+      status: "运行中",
+      progress: 3,
+      updated: "刚刚创建",
+    };
+    setTasks((items) => [newTask, ...items]);
+    setTaskFilter("全部");
+    setActiveView("tasks");
+    setSelectedTaskId(newTask.id);
     setComposerOpen(false);
-    setNotice(`任务“${taskName.trim()}”已开始准备`);
+    setTaskName("");
+    setTaskTarget("");
+    setNotice(`任务“${newTask.title}”已开始运行`);
   }
 
   function openView(view: ViewId) {
     setActiveView(view);
     setNotificationsOpen(false);
+    setSelectedTaskId(null);
+  }
+
+  function openTask(taskId: string) {
+    setSelectedTaskId(taskId);
+    setNotificationsOpen(false);
+  }
+
+  function updateTaskStatus(task: TaskItem) {
+    if (task.status === "待确认") {
+      setSelectedTaskId(null);
+      openView("approvals");
+      return;
+    }
+
+    const nextStatus: TaskStatus =
+      task.status === "运行中" ? "已暂停" : "运行中";
+    const nextProgress =
+      task.status === "已完成" ? Math.max(3, Math.min(task.progress, 12)) : task.progress;
+
+    setTasks((items) =>
+      items.map((item) =>
+        item.id === task.id
+          ? {
+              ...item,
+              status: nextStatus,
+              progress: nextProgress,
+              updated: nextStatus === "已暂停" ? "刚刚暂停" : "刚刚继续",
+            }
+          : item,
+      ),
+    );
+
+    if (task.id === "competitor") {
+      setIsRunning(nextStatus === "运行中");
+    }
+
+    setNotice(
+      nextStatus === "已暂停"
+        ? `任务“${task.title}”已暂停`
+        : `任务“${task.title}”已继续运行`,
+    );
+  }
+
+  function togglePrimaryTask() {
+    const nextRunning = !isRunning;
+    setIsRunning(nextRunning);
+    setTasks((items) =>
+      items.map((task) =>
+        task.id === "competitor"
+          ? {
+              ...task,
+              status: nextRunning ? "运行中" : "已暂停",
+              updated: nextRunning ? "刚刚继续" : "刚刚暂停",
+            }
+          : task,
+      ),
+    );
   }
 
   return (
@@ -363,7 +524,7 @@ export default function HomePage() {
                 <i><Play size={14} /></i>
                 <span>
                   <small>正在运行</small>
-                  <strong>{4 + queuedTasks}</strong>
+                  <strong>{runningTaskCount}</strong>
                 </span>
               </span>
               <span className="summary-waiting">
@@ -377,7 +538,7 @@ export default function HomePage() {
                 <i><CheckCircle2 size={14} /></i>
                 <span>
                   <small>今天已完成</small>
-                  <strong>12</strong>
+                  <strong>{completedTaskCount}</strong>
                 </span>
               </span>
             </div>
@@ -409,6 +570,8 @@ export default function HomePage() {
                   </div>
 
                   <div className="task-ai-visual" aria-label="AI 正在整合网页证据">
+                    {/* The source WebP is already optimized; vinext has no Next image proxy. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/ai-core-premium.webp" alt="" aria-hidden="true" />
                     <span className="task-ai-visual-status">
                       <Sparkles size={15} />
@@ -494,7 +657,7 @@ export default function HomePage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setIsRunning((running) => !running)}
+                    onClick={togglePrimaryTask}
                   >
                     {isRunning ? <Pause size={15} /> : <Play size={15} />}
                     {isRunning ? "暂停" : "继续"}
@@ -614,12 +777,12 @@ export default function HomePage() {
                 </button>
               </div>
               <div className="recent-task-list">
-                {filteredTasks.slice(0, 3).map((task) => (
+                {searchedTasks.slice(0, 3).map((task) => (
                   <button
                     className="recent-task-row"
                     key={task.id}
                     type="button"
-                    onClick={() => setNotice(`已打开任务：${task.title}`)}
+                    onClick={() => openTask(task.id)}
                   >
                     <span className={`recent-task-icon status-${task.status}`}>
                       {task.status === "运行中" && <Activity size={17} />}
@@ -652,10 +815,18 @@ export default function HomePage() {
           <section className="tasks-view">
             <div className="view-toolbar">
               <div className="view-filter-tabs" role="tablist" aria-label="任务筛选">
-                <button className="active" type="button">全部</button>
-                <button type="button">运行中</button>
-                <button type="button">待确认</button>
-                <button type="button">已完成</button>
+                {taskFilters.map((filter) => (
+                  <button
+                    className={taskFilter === filter ? "active" : ""}
+                    key={filter}
+                    type="button"
+                    role="tab"
+                    aria-selected={taskFilter === filter}
+                    onClick={() => setTaskFilter(filter)}
+                  >
+                    {filter}
+                  </button>
+                ))}
               </div>
               <button
                 className="clarity-secondary-button"
@@ -680,7 +851,7 @@ export default function HomePage() {
                   className="task-table-row"
                   key={task.id}
                   type="button"
-                  onClick={() => setNotice(`已打开任务：${task.title}`)}
+                  onClick={() => openTask(task.id)}
                 >
                   <span>
                     <strong>{task.title}</strong>
@@ -695,6 +866,22 @@ export default function HomePage() {
                   <ChevronRight size={16} />
                 </button>
               ))}
+              {filteredTasks.length === 0 && (
+                <div className="task-empty-state">
+                  <Search size={22} />
+                  <strong>没有符合条件的任务</strong>
+                  <p>换一个筛选条件或清除搜索内容。</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTaskFilter("全部");
+                      setQuery("");
+                    }}
+                  >
+                    清除筛选
+                  </button>
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -869,6 +1056,142 @@ export default function HomePage() {
           </section>
         )}
       </section>
+
+      {selectedTask && (
+        <div
+          className="task-detail-backdrop"
+          onMouseDown={() => setSelectedTaskId(null)}
+        >
+          <aside
+            className="task-detail-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`任务详情：${selectedTask.title}`}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="task-detail-heading">
+              <div>
+                <span>任务详情</span>
+                <em className={`status-label status-${selectedTask.status}`}>
+                  {selectedTask.status}
+                </em>
+              </div>
+              <button
+                type="button"
+                aria-label="关闭任务详情"
+                onClick={() => setSelectedTaskId(null)}
+              >
+                <X size={18} />
+              </button>
+            </header>
+
+            <div className="task-detail-intro">
+              <span className={`task-detail-icon status-${selectedTask.status}`}>
+                {selectedTask.status === "运行中" && <Activity size={21} />}
+                {selectedTask.status === "待确认" && <ShieldCheck size={21} />}
+                {selectedTask.status === "已暂停" && <Pause size={21} />}
+                {selectedTask.status === "已完成" && <CheckCircle2 size={21} />}
+              </span>
+              <h2>{selectedTask.title}</h2>
+              <p>{selectedTask.description}</p>
+            </div>
+
+            <section className="task-detail-progress" aria-label="任务进度">
+              <div>
+                <span>整体进度</span>
+                <strong>{selectedTask.progress}%</strong>
+              </div>
+              <span>
+                <i style={{ width: `${selectedTask.progress}%` }} />
+              </span>
+              <small>{selectedTask.updated}</small>
+            </section>
+
+            <section className="task-detail-facts">
+              <div>
+                <Globe2 size={17} />
+                <span>
+                  <small>任务目标</small>
+                  <strong>{selectedTask.target}</strong>
+                </span>
+              </div>
+              <div>
+                <ShieldCheck size={17} />
+                <span>
+                  <small>执行策略</small>
+                  <strong>对外操作前必须确认</strong>
+                </span>
+              </div>
+            </section>
+
+            <section className="task-detail-trace">
+              <div>
+                <span>最近动作</span>
+                <button type="button" onClick={() => openView("activity")}>
+                  完整记录
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+              <ol>
+                <li className="complete">
+                  <i><Check size={13} /></i>
+                  <span>
+                    <strong>任务已安全启动</strong>
+                    <small>已加载目标和本机执行策略</small>
+                  </span>
+                </li>
+                <li className={selectedTask.progress >= 40 ? "complete" : "current"}>
+                  <i>
+                    {selectedTask.progress >= 40 ? <Check size={13} /> : <Brain size={13} />}
+                  </i>
+                  <span>
+                    <strong>AI 正在整理信息</strong>
+                    <small>保留证据，只提取有意义的变化</small>
+                  </span>
+                </li>
+                <li className={selectedTask.status === "已完成" ? "complete" : ""}>
+                  <i>
+                    {selectedTask.status === "已完成" ? (
+                      <Check size={13} />
+                    ) : (
+                      <ShieldCheck size={13} />
+                    )}
+                  </i>
+                  <span>
+                    <strong>生成可审计结果</strong>
+                    <small>
+                      {selectedTask.status === "待确认"
+                        ? "正在等待你的确认"
+                        : "完成后可随时回看执行记录"}
+                    </small>
+                  </span>
+                </li>
+              </ol>
+            </section>
+
+            <footer className="task-detail-actions">
+              <button
+                className="primary"
+                type="button"
+                onClick={() => updateTaskStatus(selectedTask)}
+              >
+                {selectedTask.status === "运行中" && <Pause size={16} />}
+                {selectedTask.status === "待确认" && <ShieldCheck size={16} />}
+                {(selectedTask.status === "已暂停" || selectedTask.status === "已完成") && (
+                  <Play size={16} />
+                )}
+                {selectedTask.status === "运行中" && "暂停任务"}
+                {selectedTask.status === "待确认" && "处理确认"}
+                {selectedTask.status === "已暂停" && "继续任务"}
+                {selectedTask.status === "已完成" && "再次运行"}
+              </button>
+              <button type="button" onClick={() => setSelectedTaskId(null)}>
+                关闭
+              </button>
+            </footer>
+          </aside>
+        </div>
+      )}
 
       {composerOpen && (
         <div className="clarity-dialog-backdrop" onMouseDown={() => setComposerOpen(false)}>

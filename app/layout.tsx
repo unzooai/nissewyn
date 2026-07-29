@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Unzoo One Console",
+  title: "Unzoo One | AI 任务操作系统",
   description:
-    "A front-end console prototype for Unzoo One's local-first AI operating system.",
+    "运行、审批并追踪长期 AI 任务，让每一步执行都有证据、边界和清晰结果。",
   openGraph: {
     title: "Unzoo One | AI 任务控制台",
     description: "让长期 AI 任务的执行、审批和证据都清晰可见。",
