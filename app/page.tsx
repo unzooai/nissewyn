@@ -14,6 +14,7 @@ import {
   Download,
   FileText,
   Globe2,
+  HardDrive,
   History,
   Home,
   ListChecks,
@@ -22,12 +23,14 @@ import {
   Pencil,
   Play,
   Plus,
+  RotateCcw,
   Search,
   Send,
   Settings2,
   ShieldCheck,
   Sparkles,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 
@@ -40,6 +43,15 @@ type SettingsState = {
   approval: boolean;
   local: boolean;
   notifications: boolean;
+};
+type WorkspaceBackup = {
+  version: 1;
+  product: "Unzoo One";
+  exportedAt: string;
+  tasks: TaskItem[];
+  settings: SettingsState;
+  approvalIds: string[];
+  activity: ActivityItem[];
 };
 type ActivityKind = "任务" | "审批" | "系统";
 type ActivityFilter = "全部" | ActivityKind;
@@ -94,6 +106,87 @@ type SearchResult = {
 };
 
 const weekdays: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+const defaultSettings: SettingsState = {
+  approval: true,
+  local: true,
+  notifications: true,
+};
+
+function isTaskItem(value: unknown): value is TaskItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<TaskItem>;
+  return (
+    typeof item.id === "string" &&
+    typeof item.title === "string" &&
+    typeof item.description === "string" &&
+    typeof item.target === "string" &&
+    ["运行中", "待确认", "已完成", "已暂停"].includes(item.status ?? "") &&
+    typeof item.progress === "number" &&
+    Number.isFinite(item.progress) &&
+    typeof item.updated === "string" &&
+    (item.schedule === undefined ||
+      ["仅运行一次", "每天", "每周"].includes(item.schedule)) &&
+    (item.scheduleTime === undefined || typeof item.scheduleTime === "string") &&
+    (item.scheduleDay === undefined || weekdays.includes(item.scheduleDay)) &&
+    (item.requiresApproval === undefined ||
+      typeof item.requiresApproval === "boolean") &&
+    (item.pinned === undefined || typeof item.pinned === "boolean")
+  );
+}
+
+function isActivityItem(value: unknown): value is ActivityItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<ActivityItem>;
+  return (
+    typeof item.id === "string" &&
+    typeof item.time === "string" &&
+    typeof item.createdAt === "string" &&
+    typeof item.title === "string" &&
+    typeof item.detail === "string" &&
+    [
+      "activity",
+      "brain",
+      "clock",
+      "copy",
+      "globe",
+      "settings",
+      "shield",
+      "sparkles",
+      "trash",
+    ].includes(item.icon ?? "") &&
+    ["blue", "violet", "green", "amber", "red", "neutral"].includes(
+      item.tone ?? "",
+    ) &&
+    ["任务", "审批", "系统"].includes(item.kind ?? "") &&
+    (item.taskId === undefined || typeof item.taskId === "string")
+  );
+}
+
+function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
+  if (!value || typeof value !== "object") {
+    throw new Error("Invalid workspace backup");
+  }
+  const backup = value as Partial<WorkspaceBackup>;
+  if (
+    backup.version !== 1 ||
+    backup.product !== "Unzoo One" ||
+    typeof backup.exportedAt !== "string" ||
+    !Array.isArray(backup.tasks) ||
+    backup.tasks.length === 0 ||
+    !backup.tasks.every(isTaskItem) ||
+    !backup.settings ||
+    typeof backup.settings.approval !== "boolean" ||
+    typeof backup.settings.local !== "boolean" ||
+    typeof backup.settings.notifications !== "boolean" ||
+    !Array.isArray(backup.approvalIds) ||
+    !backup.approvalIds.every((id) => typeof id === "string") ||
+    !Array.isArray(backup.activity) ||
+    !backup.activity.every(isActivityItem)
+  ) {
+    throw new Error("Invalid workspace backup");
+  }
+  return backup as WorkspaceBackup;
+}
 
 function formatSchedule(
   schedule: TaskSchedule = "仅运行一次",
@@ -393,6 +486,7 @@ export default function HomePage() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+  const [workspaceResetOpen, setWorkspaceResetOpen] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
   const [tasksReady, setTasksReady] = useState(false);
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("全部");
@@ -407,13 +501,10 @@ export default function HomePage() {
   const [taskScheduleTime, setTaskScheduleTime] = useState("09:00");
   const [taskScheduleDay, setTaskScheduleDay] = useState<Weekday>("周一");
   const [taskApproval, setTaskApproval] = useState(true);
-  const [settings, setSettings] = useState<SettingsState>({
-    approval: true,
-    local: true,
-    notifications: true,
-  });
+  const [settings, setSettings] = useState<SettingsState>(defaultSettings);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const pageTitle = viewTitles[activeView];
   const selectedApproval =
@@ -572,7 +663,8 @@ export default function HomePage() {
         event.key.toLowerCase() === "k" &&
         !composerOpen &&
         !selectedTask &&
-        !deletingTask
+        !deletingTask &&
+        !workspaceResetOpen
       ) {
         event.preventDefault();
         setNotificationsOpen(false);
@@ -592,10 +684,18 @@ export default function HomePage() {
       document.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleSearchShortcut);
     };
-  }, [composerOpen, deletingTask, searchOpen, selectedTask]);
+  }, [
+    composerOpen,
+    deletingTask,
+    searchOpen,
+    selectedTask,
+    workspaceResetOpen,
+  ]);
 
   useEffect(() => {
-    if (!composerOpen && !selectedTask && !deletingTask) return;
+    if (!composerOpen && !selectedTask && !deletingTask && !workspaceResetOpen) {
+      return;
+    }
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -605,6 +705,7 @@ export default function HomePage() {
       setComposerOpen(false);
       setEditingTaskId(null);
       setSelectedTaskId(null);
+      setWorkspaceResetOpen(false);
     }
 
     window.addEventListener("keydown", handleEscape);
@@ -612,7 +713,7 @@ export default function HomePage() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [composerOpen, deletingTask, selectedTask]);
+  }, [composerOpen, deletingTask, selectedTask, workspaceResetOpen]);
 
   const searchedTasks = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -713,6 +814,15 @@ export default function HomePage() {
 
   const runningTaskCount = tasks.filter((task) => task.status === "运行中").length;
   const completedTaskCount = tasks.filter((task) => task.status === "已完成").length;
+  const workspaceDataSize = useMemo(() => {
+    const serialized = JSON.stringify({
+      tasks,
+      settings,
+      approvalIds: approvals.map((item) => item.id),
+      activity: activityLog,
+    });
+    return Math.max(1, Math.ceil(serialized.length / 1024));
+  }, [activityLog, approvals, settings, tasks]);
   const latestActivity = activityLog[0] ?? initialActivityItems[0];
   const LatestActivityIcon = activityIconMap[latestActivity.icon] ?? Activity;
 
@@ -764,6 +874,107 @@ export default function HomePage() {
       kind: "系统",
     });
     setNotice(`已导出 ${activityLog.length} 条审计记录`);
+  }
+
+  function exportWorkspace() {
+    const payload: WorkspaceBackup = {
+      version: 1,
+      product: "Unzoo One",
+      exportedAt: new Date().toISOString(),
+      tasks,
+      settings,
+      approvalIds: approvals.map((item) => item.id),
+      activity: activityLog,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `unzoo-one-workspace-${new Date()
+      .toISOString()
+      .slice(0, 10)}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+    recordActivity({
+      title: "工作区备份已导出",
+      detail: `已备份 ${tasks.length} 个任务、${activityLog.length} 条运行记录和当前设置。`,
+      icon: "activity",
+      tone: "blue",
+      kind: "系统",
+    });
+    setNotice("工作区备份已保存到本机");
+  }
+
+  async function importWorkspace(event: React.ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    try {
+      if (file.size > 2_000_000) {
+        throw new Error("Workspace backup is too large");
+      }
+      const backup = parseWorkspaceBackup(JSON.parse(await file.text()));
+      const restoredApprovals = initialApprovals.filter((item) =>
+        backup.approvalIds.includes(item.id),
+      );
+      const restoredPrimary =
+        backup.tasks.find((task) => task.id === "competitor") ?? backup.tasks[0];
+
+      setTasks(backup.tasks);
+      setSettings(backup.settings);
+      setApprovals(restoredApprovals);
+      setSelectedApprovalId(restoredApprovals[0]?.id ?? "");
+      setActivityLog(backup.activity.slice(0, 100));
+      setIsRunning(restoredPrimary.status !== "已暂停");
+      setSelectedStep("analyze");
+      setTaskFilter("全部");
+      setActivityFilter("全部");
+      setActivityTaskId(null);
+      setSelectedTaskId(null);
+      setNotificationsOpen(false);
+      recordActivity({
+        title: "工作区备份已恢复",
+        detail: `已从“${file.name}”恢复 ${backup.tasks.length} 个任务和 ${backup.activity.length} 条运行记录。`,
+        icon: "activity",
+        tone: "green",
+        kind: "系统",
+      });
+      setNotice(`已恢复 ${backup.tasks.length} 个任务，工作区可以继续使用`);
+    } catch {
+      setNotice("导入失败，请选择由 Unzoo One 导出的工作区备份");
+    } finally {
+      input.value = "";
+    }
+  }
+
+  function resetWorkspace() {
+    setTasks(initialTasks.map((task) => ({ ...task })));
+    setSettings({ ...defaultSettings });
+    setApprovals(initialApprovals.map((item) => ({ ...item })));
+    setSelectedApprovalId(initialApprovals[0].id);
+    setActivityLog(initialActivityItems.map((item) => ({ ...item })));
+    setIsRunning(true);
+    setSelectedStep("analyze");
+    setTaskFilter("全部");
+    setActivityFilter("全部");
+    setActivityTaskId(null);
+    setSelectedTaskId(null);
+    setDeleteTaskId(null);
+    setNotificationsOpen(false);
+    setWorkspaceResetOpen(false);
+    recordActivity({
+      title: "工作区已恢复初始状态",
+      detail: "任务、待确认事项、运行记录和设置已重新初始化。",
+      icon: "settings",
+      tone: "amber",
+      kind: "系统",
+    });
+    setNotice("工作区已恢复初始状态");
   }
 
   function openActivityItem(item: ActivityItem) {
@@ -1910,10 +2121,50 @@ export default function HomePage() {
 
         {activeView === "settings" && (
           <section className="settings-view">
-            <div className="settings-group">
+            <div
+              className={`workspace-overview ${settings.local ? "" : "is-temporary"}`}
+            >
+              <div className="workspace-overview-status">
+                <span className="workspace-overview-icon">
+                  <HardDrive size={22} />
+                  <i />
+                </span>
+                <div>
+                  <span>工作区状态</span>
+                  <h2>
+                    {settings.local ? "本机数据正常" : "当前为临时会话"}
+                  </h2>
+                  <p>
+                    {settings.local
+                      ? "任务、审批和运行记录会自动保存在这台设备。"
+                      : "关闭页面后，本次任务和运行记录不会保留。"}
+                  </p>
+                </div>
+              </div>
+              <div className="workspace-overview-metrics">
+                <span>
+                  <small>任务</small>
+                  <strong>{tasks.length}</strong>
+                </span>
+                <span>
+                  <small>运行记录</small>
+                  <strong>{activityLog.length}</strong>
+                </span>
+                <span>
+                  <small>待确认</small>
+                  <strong>{approvals.length}</strong>
+                </span>
+                <span>
+                  <small>数据量</small>
+                  <strong>{workspaceDataSize} KB</strong>
+                </span>
+              </div>
+            </div>
+
+            <div className="settings-group settings-preferences-group">
               <div>
-                <span>安全与确认</span>
-                <h2>任务执行规则</h2>
+                <span>运行偏好</span>
+                <h2>安全、保存与通知</h2>
               </div>
               <label className="setting-row">
                 <span>
@@ -1945,13 +2196,6 @@ export default function HomePage() {
                   <i />
                 </button>
               </label>
-            </div>
-
-            <div className="settings-group">
-              <div>
-                <span>通知</span>
-                <h2>什么时候提醒我</h2>
-              </div>
               <label className="setting-row">
                 <span>
                   <strong>需要确认时通知</strong>
@@ -1967,6 +2211,68 @@ export default function HomePage() {
                   <i />
                 </button>
               </label>
+            </div>
+
+            <div className="settings-group workspace-data-group">
+              <div>
+                <span>数据与恢复</span>
+                <h2>备份或迁移工作区</h2>
+              </div>
+              <div className="workspace-data-summary">
+                <span>
+                  <HardDrive size={18} />
+                </span>
+                <div>
+                  <strong>约 {workspaceDataSize} KB 本机数据</strong>
+                  <small>备份包含任务、审批状态、运行记录和全部设置。</small>
+                </div>
+              </div>
+              <div className="workspace-data-actions">
+                <button type="button" onClick={exportWorkspace}>
+                  <span className="workspace-data-action-icon export">
+                    <Download size={18} />
+                  </span>
+                  <span>
+                    <strong>导出工作区备份</strong>
+                    <small>下载一个可随时恢复的 JSON 文件</small>
+                  </span>
+                  <ChevronRight size={17} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => importInputRef.current?.click()}
+                >
+                  <span className="workspace-data-action-icon import">
+                    <Upload size={18} />
+                  </span>
+                  <span>
+                    <strong>从备份恢复</strong>
+                    <small>校验文件后替换当前本机工作区</small>
+                  </span>
+                  <ChevronRight size={17} />
+                </button>
+                <button
+                  className="workspace-data-reset"
+                  type="button"
+                  onClick={() => setWorkspaceResetOpen(true)}
+                >
+                  <span className="workspace-data-action-icon reset">
+                    <RotateCcw size={18} />
+                  </span>
+                  <span>
+                    <strong>恢复初始状态</strong>
+                    <small>清除当前改动并载入示例工作区</small>
+                  </span>
+                  <ChevronRight size={17} />
+                </button>
+              </div>
+              <input
+                ref={importInputRef}
+                className="workspace-import-input"
+                type="file"
+                accept=".json,application/json"
+                onChange={importWorkspace}
+              />
             </div>
           </section>
         )}
@@ -2384,6 +2690,70 @@ export default function HomePage() {
               <button className="danger" type="button" onClick={confirmDeleteTask}>
                 <Trash2 size={15} />
                 确认删除
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {workspaceResetOpen && (
+        <div
+          className="clarity-dialog-backdrop"
+          onMouseDown={() => setWorkspaceResetOpen(false)}
+        >
+          <section
+            className="workspace-reset-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="workspace-reset-title"
+            aria-describedby="workspace-reset-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="workspace-reset-close"
+              type="button"
+              aria-label="关闭重置确认"
+              onClick={() => setWorkspaceResetOpen(false)}
+            >
+              <X size={17} />
+            </button>
+            <span className="workspace-reset-icon">
+              <RotateCcw size={21} />
+            </span>
+            <span className="workspace-reset-eyebrow">恢复初始状态</span>
+            <h2 id="workspace-reset-title">重置当前本机工作区？</h2>
+            <p id="workspace-reset-description">
+              当前任务、审批状态、运行记录和设置会被示例工作区替换。建议先导出备份。
+            </p>
+            <div className="workspace-reset-facts">
+              <span>
+                <small>当前任务</small>
+                <strong>{tasks.length} 个</strong>
+              </span>
+              <span>
+                <small>运行记录</small>
+                <strong>{activityLog.length} 条</strong>
+              </span>
+              <span>
+                <small>待确认</small>
+                <strong>{approvals.length} 件</strong>
+              </span>
+            </div>
+            <button
+              className="workspace-reset-backup"
+              type="button"
+              onClick={exportWorkspace}
+            >
+              <Download size={16} />
+              先导出备份
+            </button>
+            <div className="workspace-reset-actions">
+              <button type="button" onClick={() => setWorkspaceResetOpen(false)}>
+                保留当前数据
+              </button>
+              <button className="danger" type="button" onClick={resetWorkspace}>
+                <RotateCcw size={15} />
+                确认重置
               </button>
             </div>
           </section>

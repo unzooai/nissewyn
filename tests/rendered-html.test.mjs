@@ -61,6 +61,12 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function confirmDeleteTask/);
   assert.match(page, /function recordActivity/);
   assert.match(page, /function exportActivity/);
+  assert.match(page, /function exportWorkspace/);
+  assert.match(page, /async function importWorkspace/);
+  assert.match(page, /function resetWorkspace/);
+  assert.match(page, /function parseWorkspaceBackup/);
+  assert.match(page, /workspaceResetOpen/);
+  assert.match(page, /accept="\.json,application\/json"/);
   assert.match(page, /function openTaskActivity/);
   assert.match(page, /const scopedActivityLog = useMemo/);
   assert.match(page, /selectedTaskActivity\.map/);
@@ -103,6 +109,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.activity-scope-clear/);
   assert.match(css, /\.task-activity-list/);
   assert.match(css, /\.task-trace-empty/);
+  assert.match(css, /\.workspace-overview/);
+  assert.match(css, /\.workspace-data-actions/);
+  assert.match(css, /\.workspace-reset-dialog/);
   assert.match(css, /\.timeline-kind/);
   assert.match(css, /\.clarity-search-panel/);
   assert.match(css, /\.clarity-search-results/);
