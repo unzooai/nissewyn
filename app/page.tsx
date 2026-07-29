@@ -67,6 +67,7 @@ type WorkspaceRoute = {
   view: ViewId;
   taskId: string | null;
   runId: string | null;
+  artifactId?: string | null;
   taskFilter?: TaskFilter | null;
   approvalFilter?: ApprovalRiskFilter | null;
 };
@@ -1369,13 +1370,16 @@ function readWorkspaceRoute(): WorkspaceRoute {
   const runId = taskId
     ? url.searchParams.get("run")?.trim() || null
     : null;
+  const artifactId = taskId
+    ? null
+    : url.searchParams.get("artifact")?.trim() || null;
   const requestedTaskFilter = url.searchParams.get("status");
   const taskFilter =
     requestedTaskFilter &&
     taskFilters.includes(requestedTaskFilter as TaskFilter)
       ? (requestedTaskFilter as TaskFilter)
       : null;
-  const resolvedView = taskId ? "tasks" : view;
+  const resolvedView = taskId ? "tasks" : artifactId ? "artifacts" : view;
   const requestedApprovalFilter = url.searchParams.get("risk");
   const approvalFilter =
     requestedApprovalFilter &&
@@ -1386,6 +1390,7 @@ function readWorkspaceRoute(): WorkspaceRoute {
     view: resolvedView,
     taskId,
     runId,
+    artifactId: resolvedView === "artifacts" ? artifactId : null,
     taskFilter: resolvedView === "tasks" ? taskFilter : null,
     approvalFilter: resolvedView === "approvals" ? approvalFilter : null,
   };
@@ -1411,6 +1416,11 @@ function writeWorkspaceRoute(
     url.searchParams.set("run", route.runId);
   } else {
     url.searchParams.delete("run");
+  }
+  if (route.view === "artifacts" && route.artifactId) {
+    url.searchParams.set("artifact", route.artifactId);
+  } else {
+    url.searchParams.delete("artifact");
   }
   if (
     route.view === "tasks" &&
@@ -3474,10 +3484,24 @@ export default function HomePage() {
               (run) => run.id === requestedRoute.runId,
             ) ?? null
           : null;
+      const routeArtifact =
+        !routeTask && requestedRoute.artifactId
+          ? artifacts.find(
+              (artifact) => artifact.id === requestedRoute.artifactId,
+            ) ?? null
+          : null;
+      const fallbackArtifact =
+        !routeTask && requestedRoute.view === "artifacts"
+          ? (artifacts[0] ?? null)
+          : null;
       const resolvedRoute: WorkspaceRoute = {
         view: routeTask ? "tasks" : requestedRoute.view,
         taskId: routeTask?.id ?? null,
         runId: routeRun?.id ?? null,
+        artifactId:
+          !routeTask && requestedRoute.view === "artifacts"
+            ? (routeArtifact?.id ?? fallbackArtifact?.id ?? null)
+            : null,
         taskFilter:
           requestedRoute.view === "tasks"
             ? (requestedRoute.taskFilter ?? null)
@@ -3511,8 +3535,27 @@ export default function HomePage() {
         resolvedRoute.runId ? resolvedRoute.taskId : null,
       );
       setInspectedRunId(resolvedRoute.runId);
+      setArtifactTaskId(null);
+      setArtifactFilter("全部");
+      setArtifactListQuery("");
+      setSelectedArtifactId(
+        resolvedRoute.view === "artifacts"
+          ? (resolvedRoute.artifactId ?? "")
+          : (artifacts[0]?.id ?? ""),
+      );
       setNotificationsOpen(false);
       setSearchOpen(false);
+      if (
+        requestedRoute.view === "artifacts" &&
+        requestedRoute.artifactId &&
+        !routeArtifact
+      ) {
+        setNotice(
+          fallbackArtifact
+            ? "该成果已不存在，已打开最新可用成果"
+            : "该成果已不存在，当前工作区还没有其他成果",
+        );
+      }
       writeWorkspaceRoute(
         resolvedRoute,
         "replace",
@@ -3527,7 +3570,7 @@ export default function HomePage() {
 
     window.addEventListener("popstate", restoreWorkspaceRoute);
     return () => window.removeEventListener("popstate", restoreWorkspaceRoute);
-  }, [tasks, tasksReady]);
+  }, [artifacts, tasks, tasksReady]);
 
   useEffect(() => {
     if (!tasksReady) return;
@@ -4301,6 +4344,21 @@ export default function HomePage() {
     filteredArtifacts.find((artifact) => artifact.id === selectedArtifactId) ??
     filteredArtifacts[0] ??
     null;
+  useEffect(() => {
+    if (!tasksReady || activeView !== "artifacts") return;
+    const nextArtifactId = selectedArtifact?.id ?? "";
+    if (nextArtifactId === selectedArtifactId) return;
+    writeWorkspaceRoute(
+      {
+        view: "artifacts",
+        taskId: null,
+        runId: null,
+        artifactId: nextArtifactId || null,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
+  }, [activeView, selectedArtifact?.id, selectedArtifactId, tasksReady]);
   const SelectedArtifactIcon = selectedArtifact
     ? artifactIconMap[selectedArtifact.type]
     : Files;
@@ -4980,8 +5038,18 @@ export default function HomePage() {
       index: Math.max(0, artifactIndex),
     });
     setArtifacts((items) => items.filter((item) => item.id !== artifact.id));
-    setSelectedArtifactId(
-      nextVisibleArtifact?.id ?? nextWorkspaceArtifact?.id ?? "",
+    const nextArtifactId =
+      nextVisibleArtifact?.id ?? nextWorkspaceArtifact?.id ?? "";
+    setSelectedArtifactId(nextArtifactId);
+    writeWorkspaceRoute(
+      {
+        view: "artifacts",
+        taskId: null,
+        runId: null,
+        artifactId: nextArtifactId || null,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
     );
     setArtifactDeleteId(null);
     recordActivity({
@@ -5007,6 +5075,16 @@ export default function HomePage() {
       return restored;
     });
     setSelectedArtifactId(artifact.id);
+    writeWorkspaceRoute(
+      {
+        view: "artifacts",
+        taskId: null,
+        runId: null,
+        artifactId: artifact.id,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
     setArtifactDeleteSnapshot(null);
     recordActivity({
       title: `已撤销成果删除：${artifact.title}`,
@@ -5098,7 +5176,12 @@ export default function HomePage() {
     setActiveView("artifacts");
     setSelectedArtifactId(artifact.id);
     writeWorkspaceRoute(
-      { view: "artifacts", taskId: null, runId: null },
+      {
+        view: "artifacts",
+        taskId: null,
+        runId: null,
+        artifactId: artifact.id,
+      },
       "push",
     );
     setEditingArtifactId(artifact.id);
@@ -7312,12 +7395,19 @@ export default function HomePage() {
       scrollToTop?: boolean;
       taskFilter?: TaskFilter;
       approvalFilter?: ApprovalRiskFilter;
+      artifactId?: string;
     } = {},
   ) {
     const nextTaskFilter =
       view === "tasks" ? (options.taskFilter ?? "全部") : "全部";
     const nextApprovalFilter =
       view === "approvals" ? (options.approvalFilter ?? "全部") : "全部";
+    const nextArtifact =
+      view === "artifacts"
+        ? (artifacts.find((artifact) => artifact.id === options.artifactId) ??
+          artifacts[0] ??
+          null)
+        : null;
     setActiveView(view);
     if (view === "tasks") {
       setTaskFilter(nextTaskFilter);
@@ -7346,7 +7436,8 @@ export default function HomePage() {
     if (view === "artifacts") {
       setArtifactTaskId(null);
       setArtifactFilter("全部");
-      setSelectedArtifactId(artifacts[0]?.id ?? "");
+      setArtifactListQuery("");
+      setSelectedArtifactId(nextArtifact?.id ?? "");
     }
     setNotificationsOpen(false);
     setWorkspaceMenuOpen(false);
@@ -7358,6 +7449,7 @@ export default function HomePage() {
         view,
         taskId: null,
         runId: null,
+        artifactId: view === "artifacts" ? (nextArtifact?.id ?? null) : null,
         taskFilter: view === "tasks" ? nextTaskFilter : null,
         approvalFilter:
           view === "approvals" ? nextApprovalFilter : null,
@@ -7654,21 +7746,76 @@ export default function HomePage() {
 
   function openTaskArtifacts(taskId: string) {
     const taskArtifacts = artifacts.filter((artifact) => artifact.taskId === taskId);
+    const nextArtifact = taskArtifacts[0] ?? null;
     setArtifactTaskId(taskId);
     setArtifactFilter("全部");
     setArtifactListQuery("");
     setArtifactSort("最近更新");
-    setSelectedArtifactId(taskArtifacts[0]?.id ?? "");
+    setSelectedArtifactId(nextArtifact?.id ?? "");
     setActiveView("artifacts");
     setSelectedTaskId(null);
     setInspectedRunTaskId(null);
     setInspectedRunId(null);
     setNotificationsOpen(false);
     writeWorkspaceRoute(
-      { view: "artifacts", taskId: null, runId: null },
+      {
+        view: "artifacts",
+        taskId: null,
+        runId: null,
+        artifactId: nextArtifact?.id ?? null,
+      },
       "push",
     );
     scrollWorkspaceTop();
+  }
+
+  function openArtifact(
+    artifactId: string,
+    options: { taskId?: string; scrollToTop?: boolean } = {},
+  ) {
+    const artifact = artifacts.find((item) => item.id === artifactId);
+    if (!artifact) {
+      openView("artifacts");
+      setNotice("该成果已不存在，已打开成果列表");
+      return;
+    }
+    setArtifactTaskId(options.taskId ?? null);
+    setArtifactFilter("全部");
+    setArtifactListQuery("");
+    setArtifactSort("最近更新");
+    setSelectedArtifactId(artifact.id);
+    setActiveView("artifacts");
+    setSelectedTaskId(null);
+    setInspectedRunTaskId(null);
+    setInspectedRunId(null);
+    setNotificationsOpen(false);
+    writeWorkspaceRoute(
+      {
+        view: "artifacts",
+        taskId: null,
+        runId: null,
+        artifactId: artifact.id,
+      },
+      "push",
+    );
+    if (options.scrollToTop !== false) {
+      scrollWorkspaceTop();
+    }
+  }
+
+  function selectArtifact(artifactId: string) {
+    if (!artifacts.some((artifact) => artifact.id === artifactId)) return;
+    setSelectedArtifactId(artifactId);
+    writeWorkspaceRoute(
+      {
+        view: "artifacts",
+        taskId: null,
+        runId: null,
+        artifactId,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
   }
 
   function chooseArtifactFilter(filter: ArtifactFilter) {
@@ -7679,7 +7826,18 @@ export default function HomePage() {
           ? scopedArtifacts.find((artifact) => artifact.starred)
           : scopedArtifacts.find((artifact) => artifact.type === filter);
     setArtifactFilter(filter);
-    setSelectedArtifactId(nextArtifact?.id ?? "");
+    const nextArtifactId = nextArtifact?.id ?? "";
+    setSelectedArtifactId(nextArtifactId);
+    writeWorkspaceRoute(
+      {
+        view: "artifacts",
+        taskId: null,
+        runId: null,
+        artifactId: nextArtifactId || null,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
   }
 
   function chooseSearchResult(result: SearchResult) {
@@ -7694,14 +7852,7 @@ export default function HomePage() {
     if (result.kind === "task") {
       openTask(result.id);
     } else if (result.kind === "artifact") {
-      setActiveView("artifacts");
-      setArtifactTaskId(null);
-      setArtifactFilter("全部");
-      setSelectedArtifactId(result.id);
-      writeWorkspaceRoute(
-        { view: "artifacts", taskId: null, runId: null },
-        "push",
-      );
+      openArtifact(result.id);
     } else if (result.kind === "view") {
       openView(result.id as ViewId);
     } else if (result.id === "new-task") {
@@ -7792,8 +7943,11 @@ export default function HomePage() {
       openView("activity");
       if (item.targetId) setSelectedActivityId(item.targetId);
     } else if (item.target === "artifact") {
-      openView("artifacts");
-      if (item.targetId) setSelectedArtifactId(item.targetId);
+      if (item.targetId) {
+        openArtifact(item.targetId);
+      } else {
+        openView("artifacts");
+      }
     } else {
       if (item.targetId) {
         openTask(item.targetId);
@@ -10079,7 +10233,19 @@ export default function HomePage() {
                     onClick={() => {
                       setArtifactTaskId(null);
                       setArtifactFilter("全部");
-                      setSelectedArtifactId(artifacts[0]?.id ?? "");
+                      setArtifactListQuery("");
+                      const nextArtifactId = artifacts[0]?.id ?? "";
+                      setSelectedArtifactId(nextArtifactId);
+                      writeWorkspaceRoute(
+                        {
+                          view: "artifacts",
+                          taskId: null,
+                          runId: null,
+                          artifactId: nextArtifactId || null,
+                        },
+                        "replace",
+                        canReturnToWorkspaceParent(),
+                      );
                     }}
                   >
                     <X size={14} />
@@ -10154,7 +10320,7 @@ export default function HomePage() {
                         <button
                           className="artifact-list-main"
                           type="button"
-                          onClick={() => setSelectedArtifactId(artifact.id)}
+                          onClick={() => selectArtifact(artifact.id)}
                         >
                           <span className={`artifact-type-icon type-${artifact.type}`}>
                             <ArtifactIcon size={18} />
@@ -10243,6 +10409,16 @@ export default function HomePage() {
                           <span>编辑</span>
                         </button>
                       )}
+                      <button
+                        className="view-link-copy artifact-link-copy"
+                        type="button"
+                        aria-label="复制当前成果链接"
+                        title="复制当前成果链接"
+                        onClick={() => copyCurrentViewLink("成果链接")}
+                      >
+                        <Link2 size={16} />
+                        <span>复制链接</span>
+                      </button>
                       <button
                         className={selectedArtifact.starred ? "active" : ""}
                         type="button"
@@ -12594,21 +12770,9 @@ export default function HomePage() {
                       <button
                         key={artifact.id}
                         type="button"
-                        onClick={() => {
-                          setArtifactTaskId(selectedTask.id);
-                          setArtifactFilter("全部");
-                          setSelectedArtifactId(artifact.id);
-                          setActiveView("artifacts");
-                          setSelectedTaskId(null);
-                          writeWorkspaceRoute(
-                            {
-                              view: "artifacts",
-                              taskId: null,
-                              runId: null,
-                            },
-                            "push",
-                          );
-                        }}
+                        onClick={() =>
+                          openArtifact(artifact.id, { taskId: selectedTask.id })
+                        }
                       >
                         <span className={`type-${artifact.type}`}>
                           <ArtifactIcon size={15} />

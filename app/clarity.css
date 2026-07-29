@@ -11254,6 +11254,17 @@ body {
   color: #ca8525;
 }
 
+.artifact-preview-actions button.artifact-link-copy {
+  border-color: #c9dae9;
+  background: #f2f7fc;
+  color: #315f96;
+}
+
+.artifact-preview-actions button.artifact-link-copy:hover {
+  border-color: #9bb7d1;
+  background: #e8f2fb;
+}
+
 .artifact-preview-actions button:not(.download) > span {
   display: none;
 }
@@ -17054,7 +17065,7 @@ body {
 
 @media (max-width: 680px) {
   .artifact-preview-actions {
-    grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .artifact-editor-backdrop {

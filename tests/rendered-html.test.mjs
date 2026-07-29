@@ -96,6 +96,11 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /searchParams\.set\("status", route\.taskFilter\)/);
   assert.match(page, /searchParams\.get\("risk"\)/);
   assert.match(page, /searchParams\.set\("risk", route\.approvalFilter\)/);
+  assert.match(page, /searchParams\.get\("artifact"\)/);
+  assert.match(page, /searchParams\.set\("artifact", route\.artifactId\)/);
+  assert.match(page, /function openArtifact/);
+  assert.match(page, /function selectArtifact/);
+  assert.match(page, /复制当前成果链接/);
   assert.match(page, /复制当前审批视图链接/);
   assert.match(page, /className="summary-running"/);
   assert.match(page, /className="task-filter-context"/);
@@ -493,6 +498,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.artifact-editor-actions/);
   assert.match(css, /\.artifact-discard-dialog/);
   assert.match(css, /\.artifact-preview-actions button\.edit/);
+  assert.match(css, /\.artifact-preview-actions button\.artifact-link-copy/);
   assert.match(css, /\.artifact-preview-actions button\.delete/);
   assert.match(css, /\.artifact-delete-dialog/);
   assert.match(css, /\.artifact-delete-facts/);
