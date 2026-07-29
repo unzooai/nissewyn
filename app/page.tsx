@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
+  ArrowUpDown,
   Ban,
   Bell,
   Brain,
@@ -26,6 +27,7 @@ import {
   Mail,
   Pause,
   Pencil,
+  Pin,
   Play,
   Plus,
   RotateCcw,
@@ -51,6 +53,7 @@ type ViewId =
   | "settings";
 type TaskStatus = "运行中" | "待确认" | "已完成" | "已暂停";
 type TaskFilter = "全部" | TaskStatus;
+type TaskSort = "状态优先" | "进度最高" | "名称";
 type TaskSchedule = "仅运行一次" | "每天" | "每周";
 type Weekday = "周一" | "周二" | "周三" | "周四" | "周五" | "周六" | "周日";
 type ArtifactType = "报告" | "数据" | "证据" | "草稿";
@@ -791,6 +794,8 @@ export default function HomePage() {
   );
   const [tasksReady, setTasksReady] = useState(false);
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("全部");
+  const [taskListQuery, setTaskListQuery] = useState("");
+  const [taskSort, setTaskSort] = useState<TaskSort>("状态优先");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [taskName, setTaskName] = useState("跟踪一个新网页");
@@ -1293,10 +1298,41 @@ export default function HomePage() {
       .slice(0, 8);
   }, [approvals.length, artifacts, query, tasks]);
 
+  const taskFilterCounts = useMemo<Record<TaskFilter, number>>(
+    () => ({
+      全部: tasks.length,
+      运行中: tasks.filter((task) => task.status === "运行中").length,
+      待确认: tasks.filter((task) => task.status === "待确认").length,
+      已完成: tasks.filter((task) => task.status === "已完成").length,
+      已暂停: tasks.filter((task) => task.status === "已暂停").length,
+    }),
+    [tasks],
+  );
+
   const filteredTasks = useMemo(() => {
-    if (taskFilter === "全部") return searchedTasks;
-    return searchedTasks.filter((task) => task.status === taskFilter);
-  }, [searchedTasks, taskFilter]);
+    const keyword = taskListQuery.trim().toLowerCase();
+    const statusPriority: Record<TaskStatus, number> = {
+      运行中: 0,
+      待确认: 1,
+      已暂停: 2,
+      已完成: 3,
+    };
+    const matchingTasks = tasks.filter((task) => {
+      if (taskFilter !== "全部" && task.status !== taskFilter) return false;
+      if (!keyword) return true;
+      return `${task.title} ${task.description} ${task.target} ${task.status} ${formatTaskSchedule(task)}`
+        .toLowerCase()
+        .includes(keyword);
+    });
+
+    return [...matchingTasks].sort((first, second) => {
+      if (taskSort === "进度最高") return second.progress - first.progress;
+      if (taskSort === "名称") {
+        return first.title.localeCompare(second.title, "zh-CN");
+      }
+      return statusPriority[first.status] - statusPriority[second.status];
+    });
+  }, [taskFilter, taskListQuery, taskSort, tasks]);
 
   const scopedActivityLog = useMemo(
     () =>
@@ -2726,7 +2762,8 @@ export default function HomePage() {
                     aria-selected={taskFilter === filter}
                     onClick={() => setTaskFilter(filter)}
                   >
-                    {filter}
+                    <span>{filter}</span>
+                    <em>{taskFilterCounts[filter]}</em>
                   </button>
                 ))}
               </div>
@@ -2738,6 +2775,47 @@ export default function HomePage() {
                 <Plus size={16} />
                 新建任务
               </button>
+            </div>
+
+            <div className="task-list-controls">
+              <label className="task-list-search">
+                <Search size={16} />
+                <input
+                  type="search"
+                  aria-label="搜索任务列表"
+                  autoComplete="off"
+                  placeholder="搜索名称、来源或运行计划"
+                  value={taskListQuery}
+                  onChange={(event) => setTaskListQuery(event.target.value)}
+                />
+                {taskListQuery && (
+                  <button
+                    type="button"
+                    aria-label="清除任务搜索"
+                    onClick={() => setTaskListQuery("")}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </label>
+
+              <label className="task-sort-control">
+                <ArrowUpDown size={15} />
+                <span>排序</span>
+                <select
+                  aria-label="任务排序"
+                  value={taskSort}
+                  onChange={(event) => setTaskSort(event.target.value as TaskSort)}
+                >
+                  <option value="状态优先">状态优先</option>
+                  <option value="进度最高">进度最高</option>
+                  <option value="名称">名称</option>
+                </select>
+              </label>
+
+              <span className="task-result-count" aria-live="polite">
+                显示 <strong>{filteredTasks.length}</strong> / {tasks.length} 个任务
+              </span>
             </div>
 
             <div className="task-table">
@@ -2755,9 +2833,21 @@ export default function HomePage() {
                   type="button"
                   onClick={() => openTask(task.id)}
                 >
-                  <span>
-                    <strong>{task.title}</strong>
+                  <span className="task-table-title">
+                    <span className="task-table-title-line">
+                      <strong>{task.title}</strong>
+                      {task.pinned && (
+                        <em title="首页主任务">
+                          <Pin size={11} />
+                          首页任务
+                        </em>
+                      )}
+                    </span>
                     <small>{task.description}</small>
+                    <small className="task-table-schedule">
+                      <CalendarDays size={12} />
+                      {formatTaskSchedule(task)}
+                    </small>
                   </span>
                   <em className={`status-label status-${task.status}`}>{task.status}</em>
                   <span className="table-progress">
@@ -2771,16 +2861,27 @@ export default function HomePage() {
               {filteredTasks.length === 0 && (
                 <div className="task-empty-state">
                   <Search size={22} />
-                  <strong>没有符合条件的任务</strong>
-                  <p>换一个筛选条件或清除搜索内容。</p>
+                  <strong>
+                    {taskListQuery.trim()
+                      ? `没有找到“${taskListQuery.trim()}”`
+                      : "这个状态下还没有任务"}
+                  </strong>
+                  <p>
+                    {taskListQuery.trim()
+                      ? "可以搜索任务名称、来源地址或运行计划。"
+                      : "切换状态筛选，查看其他任务。"}
+                  </p>
                   <button
                     type="button"
                     onClick={() => {
-                      setTaskFilter("全部");
-                      setQuery("");
+                      if (taskListQuery.trim()) {
+                        setTaskListQuery("");
+                      } else {
+                        setTaskFilter("全部");
+                      }
                     }}
                   >
-                    清除筛选
+                    {taskListQuery.trim() ? "清除搜索" : "查看全部任务"}
                   </button>
                 </div>
               )}

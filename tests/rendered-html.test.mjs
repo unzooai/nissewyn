@@ -130,6 +130,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /handleOverlayKeyDown/);
   assert.match(page, /data-overlay-initial-focus/);
   assert.match(page, /notificationWrapRef/);
+  assert.match(page, /aria-label="搜索任务列表"/);
+  assert.match(page, /aria-label="任务排序"/);
+  assert.match(css, /\.task-list-controls/);
   assert.match(css, /\.task-template-picker/);
   assert.match(css, /\.composer-policy/);
   assert.match(css, /\.composer-schedule-detail/);
