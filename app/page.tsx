@@ -185,6 +185,15 @@ type NotificationItem = {
 type TaskFormErrors = Partial<
   Record<"name" | "target" | "description" | "scheduleTime", string>
 >;
+type TaskDraftSnapshot = {
+  name: string;
+  target: string;
+  description: string;
+  schedule: TaskSchedule;
+  scheduleTime: string;
+  scheduleDay: Weekday;
+  approval: boolean;
+};
 type ArtifactFormErrors = Partial<
   Record<"title" | "filename" | "content", string>
 >;
@@ -1367,6 +1376,9 @@ export default function HomePage() {
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [taskDraftBaseline, setTaskDraftBaseline] =
+    useState<TaskDraftSnapshot | null>(null);
+  const [taskDiscardOpen, setTaskDiscardOpen] = useState(false);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [rejectApprovalId, setRejectApprovalId] = useState<string | null>(null);
   const [temporaryModeOpen, setTemporaryModeOpen] = useState(false);
@@ -1770,8 +1782,10 @@ export default function HomePage() {
   const deletingTask = tasks.find((task) => task.id === deleteTaskId) ?? null;
   const rejectedApproval =
     approvals.find((item) => item.id === rejectApprovalId) ?? null;
-  const activeOverlayKind = artifactDiscardOpen
-    ? "artifact-discard"
+  const activeOverlayKind = taskDiscardOpen
+    ? "task-discard"
+    : artifactDiscardOpen
+      ? "artifact-discard"
     : editingArtifact
       ? "artifact-editor"
       : deletingArtifact
@@ -1858,6 +1872,17 @@ export default function HomePage() {
     return errors;
   }, [taskDescription, taskName, taskSchedule, taskScheduleTime, taskTarget]);
   const taskFormHasErrors = Object.keys(taskFormErrors).length > 0;
+  const taskComposerDirty = Boolean(
+    composerOpen &&
+      taskDraftBaseline &&
+      (taskName !== taskDraftBaseline.name ||
+        taskTarget !== taskDraftBaseline.target ||
+        taskDescription !== taskDraftBaseline.description ||
+        taskSchedule !== taskDraftBaseline.schedule ||
+        taskScheduleTime !== taskDraftBaseline.scheduleTime ||
+        taskScheduleDay !== taskDraftBaseline.scheduleDay ||
+        taskApproval !== taskDraftBaseline.approval),
+  );
   const teamInviteFormErrors = useMemo<TeamInviteFormErrors>(() => {
     const errors: TeamInviteFormErrors = {};
     const normalizedName = inviteName.trim();
@@ -2257,6 +2282,7 @@ export default function HomePage() {
     if (!activeOverlayKind) return;
 
     const selectorByKind = {
+      "task-discard": ".task-discard-dialog",
       "artifact-discard": ".artifact-discard-dialog",
       "artifact-editor": ".artifact-editor-dialog",
       "artifact-delete": ".artifact-delete-dialog",
@@ -2292,7 +2318,9 @@ export default function HomePage() {
     });
 
     function closeTopOverlay() {
-      if (activeOverlayKind === "artifact-discard") {
+      if (activeOverlayKind === "task-discard") {
+        setTaskDiscardOpen(false);
+      } else if (activeOverlayKind === "artifact-discard") {
         setArtifactDiscardOpen(false);
       } else if (activeOverlayKind === "artifact-editor") {
         if (artifactSavingRef.current || isSavingArtifact) return;
@@ -2326,7 +2354,15 @@ export default function HomePage() {
       } else if (activeOverlayKind === "reset") {
         setWorkspaceResetOpen(false);
       } else if (activeOverlayKind === "composer") {
-        closeComposer();
+        if (taskSavingRef.current || isSavingTask) return;
+        if (taskComposerDirty) {
+          setTaskDiscardOpen(true);
+        } else {
+          setComposerOpen(false);
+          setEditingTaskId(null);
+          setTaskDraftBaseline(null);
+          setTaskFormSubmitted(false);
+        }
       } else if (activeOverlayKind === "team-invite") {
         closeTeamInvite();
       } else if (activeOverlayKind === "team-member") {
@@ -2408,6 +2444,8 @@ export default function HomePage() {
     artifactEditorDirty,
     inspectedRunTaskId,
     isSavingArtifact,
+    isSavingTask,
+    taskComposerDirty,
   ]);
 
   const searchedTasks = useMemo(() => {
@@ -3791,9 +3829,7 @@ export default function HomePage() {
               : item,
           ),
         );
-        setComposerOpen(false);
-        setEditingTaskId(null);
-        setTaskFormSubmitted(false);
+        closeComposer();
         setSelectedTaskId(task.id);
         recordActivity({
           title: `任务配置已更新：${taskName.trim()}`,
@@ -3840,9 +3876,7 @@ export default function HomePage() {
       setSelectedTaskIds([]);
       setActiveView("tasks");
       setSelectedTaskId(newTask.id);
-      setComposerOpen(false);
-      setEditingTaskId(null);
-      setTaskFormSubmitted(false);
+      closeComposer();
       setTaskName("");
       setTaskTarget("");
       setTaskDescription("");
@@ -3866,6 +3900,15 @@ export default function HomePage() {
   }
 
   function beginCreateTask() {
+    const draft: TaskDraftSnapshot = {
+      name: "跟踪一个新网页",
+      target: "https://example.com",
+      description: "检查页面内容变化，只保留有意义的更新并生成摘要。",
+      schedule: "每天",
+      scheduleTime: "09:00",
+      scheduleDay: "周一",
+      approval: settings.approval,
+    };
     if (
       !overlayTriggerRef.current &&
       document.activeElement instanceof HTMLElement
@@ -3873,31 +3916,44 @@ export default function HomePage() {
       overlayTriggerRef.current = document.activeElement;
     }
     setEditingTaskId(null);
-    setTaskName("跟踪一个新网页");
-    setTaskTarget("https://example.com");
-    setTaskDescription("检查页面内容变化，只保留有意义的更新并生成摘要。");
-    setTaskSchedule("每天");
-    setTaskScheduleTime("09:00");
-    setTaskScheduleDay("周一");
-    setTaskApproval(settings.approval);
+    setTaskName(draft.name);
+    setTaskTarget(draft.target);
+    setTaskDescription(draft.description);
+    setTaskSchedule(draft.schedule);
+    setTaskScheduleTime(draft.scheduleTime);
+    setTaskScheduleDay(draft.scheduleDay);
+    setTaskApproval(draft.approval);
+    setTaskDraftBaseline(draft);
+    setTaskDiscardOpen(false);
     setTaskFormSubmitted(false);
     setComposerOpen(true);
   }
 
   function beginEditTask(task: TaskItem) {
+    const draft: TaskDraftSnapshot = {
+      name: task.title,
+      target: task.target,
+      description: task.description,
+      schedule: task.schedule ?? "仅运行一次",
+      scheduleTime: task.scheduleTime ?? "09:00",
+      scheduleDay: task.scheduleDay ?? "周一",
+      approval: task.requiresApproval ?? true,
+    };
     if (
       !overlayTriggerRef.current &&
       document.activeElement instanceof HTMLElement
     ) {
       overlayTriggerRef.current = document.activeElement;
     }
-    setTaskName(task.title);
-    setTaskTarget(task.target);
-    setTaskDescription(task.description);
-    setTaskSchedule(task.schedule ?? "仅运行一次");
-    setTaskScheduleTime(task.scheduleTime ?? "09:00");
-    setTaskScheduleDay(task.scheduleDay ?? "周一");
-    setTaskApproval(task.requiresApproval ?? true);
+    setTaskName(draft.name);
+    setTaskTarget(draft.target);
+    setTaskDescription(draft.description);
+    setTaskSchedule(draft.schedule);
+    setTaskScheduleTime(draft.scheduleTime);
+    setTaskScheduleDay(draft.scheduleDay);
+    setTaskApproval(draft.approval);
+    setTaskDraftBaseline(draft);
+    setTaskDiscardOpen(false);
     setTaskFormSubmitted(false);
     setEditingTaskId(task.id);
     setSelectedTaskId(null);
@@ -3905,10 +3961,30 @@ export default function HomePage() {
   }
 
   function closeComposer() {
-    if (taskSavingRef.current) return;
+    setTaskDiscardOpen(false);
     setComposerOpen(false);
     setEditingTaskId(null);
+    setTaskDraftBaseline(null);
     setTaskFormSubmitted(false);
+  }
+
+  function requestCloseComposer() {
+    if (taskSavingRef.current || isSavingTask) return;
+    if (taskComposerDirty) {
+      setTaskDiscardOpen(true);
+      return;
+    }
+    closeComposer();
+  }
+
+  function confirmDiscardTaskDraft() {
+    const wasEditing = Boolean(editingTaskId);
+    closeComposer();
+    setNotice(
+      wasEditing
+        ? "未保存的任务修改已放弃"
+        : "未保存的新任务草稿已放弃",
+    );
   }
 
   function applyTaskTemplate(template: (typeof taskTemplates)[number]) {
@@ -9130,14 +9206,19 @@ export default function HomePage() {
       )}
 
       {composerOpen && (
-        <div className="clarity-dialog-backdrop" onMouseDown={closeComposer}>
+        <div
+          className="clarity-dialog-backdrop"
+          onMouseDown={requestCloseComposer}
+        >
           <form
             className="clarity-dialog"
             role="dialog"
             aria-modal="true"
             aria-busy={isSavingTask}
+            aria-hidden={taskDiscardOpen || undefined}
             aria-label={editingTaskId ? "编辑任务" : "新建任务"}
             aria-labelledby="task-composer-title"
+            inert={taskDiscardOpen}
             onSubmit={createTask}
             onMouseDown={(event) => event.stopPropagation()}
             noValidate
@@ -9158,7 +9239,7 @@ export default function HomePage() {
                 type="button"
                 aria-label="关闭"
                 disabled={isSavingTask}
-                onClick={closeComposer}
+                onClick={requestCloseComposer}
               >
                 <X size={17} />
               </button>
@@ -9389,7 +9470,17 @@ export default function HomePage() {
                   请先修正标出的内容
                 </span>
               )}
-              <button type="button" disabled={isSavingTask} onClick={closeComposer}>
+              {!(taskFormSubmitted && taskFormHasErrors) && taskComposerDirty && (
+                <span className="composer-dirty-summary" aria-live="polite">
+                  <Pencil size={14} />
+                  有未保存修改
+                </span>
+              )}
+              <button
+                type="button"
+                disabled={isSavingTask}
+                onClick={requestCloseComposer}
+              >
                 取消
               </button>
               <button className="confirm" type="submit" disabled={isSavingTask}>
@@ -9410,6 +9501,58 @@ export default function HomePage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {taskDiscardOpen && composerOpen && (
+        <div
+          className="clarity-dialog-backdrop task-discard-backdrop"
+          onMouseDown={() => setTaskDiscardOpen(false)}
+        >
+          <section
+            className="task-discard-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="task-discard-title"
+            aria-describedby="task-discard-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label="关闭放弃任务草稿确认"
+              onClick={() => setTaskDiscardOpen(false)}
+            >
+              <X size={17} />
+            </button>
+            <span>
+              <AlertTriangle size={20} />
+            </span>
+            <small>未保存修改</small>
+            <h2 id="task-discard-title">
+              {editingTaskId ? "放弃任务修改？" : "放弃这个新任务？"}
+            </h2>
+            <p id="task-discard-description">
+              {editingTaskId
+                ? `对“${taskDraftBaseline?.name ?? taskName}”的配置修改还没有保存，放弃后无法恢复。`
+                : "名称、目标、运行计划和审批设置还没有创建，放弃后需要重新填写。"}
+            </p>
+            <div>
+              <button
+                type="button"
+                data-overlay-initial-focus
+                onClick={() => setTaskDiscardOpen(false)}
+              >
+                继续编辑
+              </button>
+              <button
+                className="danger"
+                type="button"
+                onClick={confirmDiscardTaskDraft}
+              >
+                {editingTaskId ? "放弃修改" : "放弃草稿"}
+              </button>
+            </div>
+          </section>
         </div>
       )}
 

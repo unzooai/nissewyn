@@ -1614,6 +1614,16 @@
   font-weight: 760;
 }
 
+.composer-dirty-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  color: #8b6326;
+  font-size: 11px;
+  font-weight: 760;
+}
+
 .clarity-dialog button:disabled {
   cursor: wait;
   opacity: 0.62;
@@ -1700,7 +1710,8 @@
     grid-row: 1;
   }
 
-  .composer-error-summary {
+  .composer-error-summary,
+  .composer-dirty-summary {
     width: 100%;
     margin-bottom: 2px;
   }
@@ -12178,11 +12189,13 @@ body {
   box-shadow: 0 0 0 3px rgba(190, 63, 57, 0.1);
 }
 
-.clarity-dialog-actions:has(.composer-error-summary) {
+.clarity-dialog-actions:has(.composer-error-summary),
+.clarity-dialog-actions:has(.composer-dirty-summary) {
   flex-wrap: wrap;
 }
 
-.clarity-dialog-actions:has(.composer-error-summary) .composer-error-summary {
+.clarity-dialog-actions:has(.composer-error-summary) .composer-error-summary,
+.clarity-dialog-actions:has(.composer-dirty-summary) .composer-dirty-summary {
   flex: 1 0 100%;
 }
 
@@ -12209,18 +12222,21 @@ body {
     left: 10px;
   }
 
-  .clarity-dialog-actions:has(.composer-error-summary) {
+  .clarity-dialog-actions:has(.composer-error-summary),
+  .clarity-dialog-actions:has(.composer-dirty-summary) {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .clarity-dialog-actions:has(.composer-error-summary) .composer-error-summary {
+  .clarity-dialog-actions:has(.composer-error-summary) .composer-error-summary,
+  .clarity-dialog-actions:has(.composer-dirty-summary) .composer-dirty-summary {
     grid-column: 1 / -1;
     width: auto;
     margin: 0 0 2px;
   }
 
-  .clarity-dialog-actions:has(.composer-error-summary) button {
+  .clarity-dialog-actions:has(.composer-error-summary) button,
+  .clarity-dialog-actions:has(.composer-dirty-summary) button {
     width: auto;
     min-width: 0;
   }
@@ -16059,13 +16075,15 @@ body {
   opacity: 0.45;
 }
 
-.artifact-discard-backdrop {
+.artifact-discard-backdrop,
+.task-discard-backdrop {
   z-index: 89;
   background: rgba(22, 30, 43, 0.38);
   backdrop-filter: blur(9px);
 }
 
-.artifact-discard-dialog {
+.artifact-discard-dialog,
+.task-discard-dialog {
   position: relative;
   width: min(100%, 430px);
   padding: 26px;
@@ -16077,7 +16095,8 @@ body {
   animation: clarity-dialog-in 200ms cubic-bezier(0.2, 0.78, 0.3, 1) both;
 }
 
-.artifact-discard-dialog > button:first-child {
+.artifact-discard-dialog > button:first-child,
+.task-discard-dialog > button:first-child {
   position: absolute;
   top: 14px;
   right: 14px;
@@ -16093,7 +16112,8 @@ body {
   cursor: pointer;
 }
 
-.artifact-discard-dialog > span {
+.artifact-discard-dialog > span,
+.task-discard-dialog > span {
   display: grid;
   place-items: center;
   width: 46px;
@@ -16104,33 +16124,38 @@ body {
   color: #bb6529;
 }
 
-.artifact-discard-dialog > small {
+.artifact-discard-dialog > small,
+.task-discard-dialog > small {
   color: #9f632d;
   font-size: 11px;
   font-weight: 850;
 }
 
-.artifact-discard-dialog h2 {
+.artifact-discard-dialog h2,
+.task-discard-dialog h2 {
   margin: 6px 0 0;
   color: #292f38;
   font-size: 19px;
 }
 
-.artifact-discard-dialog p {
+.artifact-discard-dialog p,
+.task-discard-dialog p {
   margin: 9px 0 0;
   color: #727984;
   font-size: 11px;
   line-height: 1.6;
 }
 
-.artifact-discard-dialog > div {
+.artifact-discard-dialog > div,
+.task-discard-dialog > div {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 9px;
   margin-top: 21px;
 }
 
-.artifact-discard-dialog > div > button {
+.artifact-discard-dialog > div > button,
+.task-discard-dialog > div > button {
   min-height: 41px;
   border: 1px solid #d9dde2;
   border-radius: 6px;
@@ -16141,7 +16166,8 @@ body {
   font-weight: 800;
 }
 
-.artifact-discard-dialog > div > button.danger {
+.artifact-discard-dialog > div > button.danger,
+.task-discard-dialog > div > button.danger {
   border-color: #b85049;
   background: #b85049;
   color: #ffffff;
@@ -16248,15 +16274,18 @@ body {
     min-width: 126px;
   }
 
-  .artifact-discard-dialog {
+  .artifact-discard-dialog,
+  .task-discard-dialog {
     padding: 24px 18px 18px;
   }
 
-  .artifact-discard-dialog > div {
+  .artifact-discard-dialog > div,
+  .task-discard-dialog > div {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .artifact-discard-dialog > div > button.danger {
+  .artifact-discard-dialog > div > button.danger,
+  .task-discard-dialog > div > button.danger {
     grid-row: 1;
   }
 }

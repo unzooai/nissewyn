@@ -275,8 +275,14 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /className="workspace-loading"/);
   assert.match(page, /role="status"/);
   assert.match(page, /type TaskFormErrors =/);
+  assert.match(page, /type TaskDraftSnapshot =/);
   assert.match(page, /taskFormSubmitted/);
   assert.match(page, /taskFormHasErrors/);
+  assert.match(page, /taskComposerDirty/);
+  assert.match(page, /function requestCloseComposer/);
+  assert.match(page, /function confirmDiscardTaskDraft/);
+  assert.match(page, /aria-labelledby="task-discard-title"/);
+  assert.match(page, /有未保存修改/);
   assert.match(page, /aria-invalid=/);
   assert.match(page, /composer-error-summary/);
   assert.match(page, /role="alert"/);
@@ -298,6 +304,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.clarity-notification-badge/);
   assert.match(css, /\.artifact-list-controls/);
   assert.match(css, /\.task-template-picker/);
+  assert.match(css, /\.task-discard-dialog/);
+  assert.match(css, /\.composer-dirty-summary/);
   assert.match(css, /\.composer-policy/);
   assert.match(css, /\.composer-schedule-detail/);
   assert.match(css, /\.schedule-timezone/);
