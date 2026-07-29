@@ -141,6 +141,15 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /<select/);
   assert.match(page, /type="time"/);
   assert.match(page, /function updateTaskStatus/);
+  assert.match(page, /selectedTaskIds/);
+  assert.match(page, /function toggleAllVisibleTasks/);
+  assert.match(page, /function bulkPauseTasks/);
+  assert.match(page, /function bulkResumeTasks/);
+  assert.match(page, /function bulkEnableApproval/);
+  assert.match(page, /function confirmBulkDelete/);
+  assert.match(page, /function undoBulkDelete/);
+  assert.match(page, /role="toolbar"/);
+  assert.match(page, /全选当前/);
   assert.match(page, /useRef<HTMLInputElement>/);
   assert.match(page, /function chooseSearchResult/);
   assert.match(page, /function handleSearchKeyDown/);
@@ -190,6 +199,11 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /aria-label="搜索成果列表"/);
   assert.match(page, /aria-label="成果排序"/);
   assert.match(css, /\.task-list-controls/);
+  assert.match(css, /\.task-bulk-bar/);
+  assert.match(css, /\.task-selection-control/);
+  assert.match(css, /\.task-table-row-shell/);
+  assert.match(css, /\.bulk-delete-dialog/);
+  assert.match(css, /\.clarity-toast-undo/);
   assert.match(css, /\.clarity-search-section/);
   assert.match(css, /\.notification-item\.unread/);
   assert.match(css, /\.clarity-notification-badge/);

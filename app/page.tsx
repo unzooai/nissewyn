@@ -93,6 +93,13 @@ type TeamMember = {
   lastActive: string;
 };
 type TeamInviteFormErrors = Partial<Record<"name" | "email", string>>;
+type BulkDeleteSnapshot = {
+  tasks: TaskItem[];
+  artifacts: ArtifactItem[];
+  activity: ActivityItem[];
+  approvals: ApprovalItem[];
+  deletedCount: number;
+};
 type WorkspaceBackup = {
   version: 1;
   product: "Unzoo One";
@@ -1014,6 +1021,10 @@ export default function HomePage() {
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("全部");
   const [taskListQuery, setTaskListQuery] = useState("");
   const [taskSort, setTaskSort] = useState<TaskSort>("状态优先");
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleteSnapshot, setBulkDeleteSnapshot] =
+    useState<BulkDeleteSnapshot | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [workspaceLoadWarning, setWorkspaceLoadWarning] = useState("");
@@ -1098,6 +1109,8 @@ export default function HomePage() {
     approvals.find((item) => item.id === rejectApprovalId) ?? null;
   const activeOverlayKind = pendingWorkspaceImport
     ? "import"
+    : bulkDeleteOpen
+      ? "bulk-delete"
     : deletingTask
     ? "delete"
     : rejectedApproval
@@ -1419,7 +1432,8 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(""), 4200);
+    const timeout = notice.startsWith("已删除") ? 10000 : 4200;
+    const timer = window.setTimeout(() => setNotice(""), timeout);
     return () => window.clearTimeout(timer);
   }, [notice]);
 
@@ -1444,6 +1458,7 @@ export default function HomePage() {
         (event.metaKey || event.ctrlKey) &&
         event.key.toLowerCase() === "k" &&
         !composerOpen &&
+        !bulkDeleteOpen &&
         !teamInviteOpen &&
         !selectedTeamMember &&
         !selectedConnector &&
@@ -1481,6 +1496,7 @@ export default function HomePage() {
     };
   }, [
     composerOpen,
+    bulkDeleteOpen,
     deletingTask,
     rejectedApproval,
     notificationsOpen,
@@ -1522,6 +1538,7 @@ export default function HomePage() {
 
     const selectorByKind = {
       import: ".workspace-import-dialog",
+      "bulk-delete": ".bulk-delete-dialog",
       delete: ".confirm-delete-dialog",
       reject: ".approval-reject-dialog",
       temporary: ".temporary-session-dialog",
@@ -1551,6 +1568,8 @@ export default function HomePage() {
     function closeTopOverlay() {
       if (activeOverlayKind === "import") {
         setPendingWorkspaceImport(null);
+      } else if (activeOverlayKind === "bulk-delete") {
+        setBulkDeleteOpen(false);
       } else if (activeOverlayKind === "delete") {
         setDeleteTaskId(null);
       } else if (activeOverlayKind === "reject") {
@@ -1871,6 +1890,27 @@ export default function HomePage() {
       return statusPriority[first.status] - statusPriority[second.status];
     });
   }, [taskFilter, taskListQuery, taskSort, tasks]);
+  const selectedTasks = tasks.filter((task) =>
+    selectedTaskIds.includes(task.id),
+  );
+  const selectedVisibleTaskCount = filteredTasks.filter((task) =>
+    selectedTaskIds.includes(task.id),
+  ).length;
+  const allVisibleTasksSelected =
+    filteredTasks.length > 0 &&
+    selectedVisibleTaskCount === filteredTasks.length;
+  const deletableSelectedTasks = selectedTasks.filter((task) => !task.pinned);
+  const protectedSelectedTaskCount =
+    selectedTasks.length - deletableSelectedTasks.length;
+  const pausableSelectedTaskCount = selectedTasks.filter(
+    (task) => task.status === "运行中" || task.status === "待确认",
+  ).length;
+  const resumableSelectedTaskCount = selectedTasks.filter(
+    (task) => task.status === "已暂停" || task.status === "已完成",
+  ).length;
+  const unprotectedSelectedTaskCount = selectedTasks.filter(
+    (task) => !(task.requiresApproval ?? true),
+  ).length;
 
   const scopedActivityLog = useMemo(
     () =>
@@ -2233,6 +2273,9 @@ export default function HomePage() {
     setIsRunning(restoredPrimary.status !== "已暂停");
     setSelectedStep("analyze");
     setTaskFilter("全部");
+    setSelectedTaskIds([]);
+    setBulkDeleteOpen(false);
+    setBulkDeleteSnapshot(null);
     setActivityFilter("全部");
     setActivityTaskId(null);
     setActivityListQuery("");
@@ -2280,6 +2323,9 @@ export default function HomePage() {
     setIsRunning(true);
     setSelectedStep("analyze");
     setTaskFilter("全部");
+    setSelectedTaskIds([]);
+    setBulkDeleteOpen(false);
+    setBulkDeleteSnapshot(null);
     setActivityFilter("全部");
     setActivityTaskId(null);
     setActivityListQuery("");
@@ -2548,6 +2594,7 @@ export default function HomePage() {
       };
       setTasks((items) => [newTask, ...items]);
       setTaskFilter("全部");
+      setSelectedTaskIds([]);
       setActiveView("tasks");
       setSelectedTaskId(newTask.id);
       setComposerOpen(false);
@@ -2669,12 +2716,19 @@ export default function HomePage() {
 
   function confirmDeleteTask() {
     if (!deletingTask) return;
+    const deletingTaskId = deletingTask.id;
     setTasks((items) => items.filter((item) => item.id !== deletingTask.id));
     setArtifacts((items) =>
       items.filter((artifact) => artifact.taskId !== deletingTask.id),
     );
     setActivityLog((items) =>
       items.filter((activity) => activity.taskId !== deletingTask.id),
+    );
+    setApprovals((items) =>
+      items.filter((approval) => approval.taskId !== deletingTask.id),
+    );
+    setSelectedTaskIds((selectedIds) =>
+      selectedIds.filter((id) => id !== deletingTaskId),
     );
     if (activityTaskId === deletingTask.id) {
       setActivityTaskId(null);
@@ -2691,6 +2745,185 @@ export default function HomePage() {
       kind: "任务",
     });
     setNotice(`任务“${deletingTask.title}”已删除`);
+  }
+
+  function toggleTaskSelection(taskId: string) {
+    setSelectedTaskIds((selectedIds) =>
+      selectedIds.includes(taskId)
+        ? selectedIds.filter((id) => id !== taskId)
+        : [...selectedIds, taskId],
+    );
+  }
+
+  function toggleAllVisibleTasks() {
+    const visibleIds = filteredTasks.map((task) => task.id);
+    setSelectedTaskIds((selectedIds) => {
+      if (allVisibleTasksSelected) {
+        return selectedIds.filter((id) => !visibleIds.includes(id));
+      }
+      return Array.from(new Set([...selectedIds, ...visibleIds]));
+    });
+  }
+
+  function bulkPauseTasks() {
+    const targetIds = new Set(
+      selectedTasks
+        .filter((task) => task.status === "运行中" || task.status === "待确认")
+        .map((task) => task.id),
+    );
+    if (targetIds.size === 0) {
+      setNotice("所选任务中没有可以暂停的任务");
+      return;
+    }
+    setTasks((items) =>
+      items.map((task) =>
+        targetIds.has(task.id)
+          ? { ...task, status: "已暂停", updated: "刚刚批量暂停" }
+          : task,
+      ),
+    );
+    if (targetIds.has("competitor")) setIsRunning(false);
+    setSelectedTaskIds([]);
+    recordActivity({
+      title: `已批量暂停 ${targetIds.size} 个任务`,
+      detail: "任务保留当前进度和已保存证据，可随时继续运行。",
+      icon: "clock",
+      tone: "amber",
+      kind: "任务",
+    });
+    setNotice(`已暂停 ${targetIds.size} 个任务`);
+  }
+
+  function bulkResumeTasks() {
+    const targetIds = new Set(
+      selectedTasks
+        .filter((task) => task.status === "已暂停" || task.status === "已完成")
+        .map((task) => task.id),
+    );
+    if (targetIds.size === 0) {
+      setNotice("所选任务中没有可以继续的任务");
+      return;
+    }
+    setTasks((items) =>
+      items.map((task) =>
+        targetIds.has(task.id)
+          ? {
+              ...task,
+              status: "运行中",
+              progress:
+                task.status === "已完成"
+                  ? Math.max(3, Math.min(task.progress, 12))
+                  : task.progress,
+              updated: "刚刚批量继续",
+            }
+          : task,
+      ),
+    );
+    if (targetIds.has("competitor")) setIsRunning(true);
+    setSelectedTaskIds([]);
+    recordActivity({
+      title: `已批量继续 ${targetIds.size} 个任务`,
+      detail: "任务已从各自保存的进度重新开始运行。",
+      icon: "activity",
+      tone: "green",
+      kind: "任务",
+    });
+    setNotice(`已继续 ${targetIds.size} 个任务`);
+  }
+
+  function bulkEnableApproval() {
+    const targetIds = new Set(
+      selectedTasks
+        .filter((task) => !(task.requiresApproval ?? true))
+        .map((task) => task.id),
+    );
+    if (targetIds.size === 0) {
+      setNotice("所选任务已经启用审批保护");
+      return;
+    }
+    setTasks((items) =>
+      items.map((task) =>
+        targetIds.has(task.id) ? { ...task, requiresApproval: true } : task,
+      ),
+    );
+    setSelectedTaskIds([]);
+    recordActivity({
+      title: `已为 ${targetIds.size} 个任务启用审批保护`,
+      detail: "这些任务执行外部操作前会暂停并等待人工确认。",
+      icon: "shield",
+      tone: "blue",
+      kind: "系统",
+    });
+    setNotice(`已保护 ${targetIds.size} 个任务`);
+  }
+
+  function requestBulkDelete() {
+    if (deletableSelectedTasks.length === 0) {
+      setNotice("首页主任务不能删除，请选择其他任务");
+      return;
+    }
+    setBulkDeleteOpen(true);
+  }
+
+  function confirmBulkDelete() {
+    if (deletableSelectedTasks.length === 0) return;
+    const deletedIds = new Set(deletableSelectedTasks.map((task) => task.id));
+    const deletedCount = deletedIds.size;
+    const snapshot: BulkDeleteSnapshot = {
+      tasks,
+      artifacts,
+      activity: activityLog,
+      approvals,
+      deletedCount,
+    };
+    setBulkDeleteSnapshot(snapshot);
+    setTasks((items) => items.filter((task) => !deletedIds.has(task.id)));
+    setArtifacts((items) =>
+      items.filter((artifact) => !deletedIds.has(artifact.taskId)),
+    );
+    setActivityLog((items) =>
+      items.filter((activity) => !activity.taskId || !deletedIds.has(activity.taskId)),
+    );
+    setApprovals((items) =>
+      items.filter((approval) => !deletedIds.has(approval.taskId)),
+    );
+    setSelectedTaskIds([]);
+    setBulkDeleteOpen(false);
+    recordActivity({
+      title: `已批量删除 ${deletedCount} 个任务`,
+      detail: "关联成果、审批事项和任务运行记录已一并移除，可在当前提示中撤销。",
+      icon: "trash",
+      tone: "red",
+      kind: "系统",
+    });
+    setNotice(
+      `已删除 ${deletedCount} 个任务${
+        protectedSelectedTaskCount ? "，首页任务已保留" : ""
+      }`,
+    );
+  }
+
+  function undoBulkDelete() {
+    if (!bulkDeleteSnapshot) return;
+    const snapshot = bulkDeleteSnapshot;
+    setTasks(snapshot.tasks);
+    setArtifacts(snapshot.artifacts);
+    setActivityLog(snapshot.activity);
+    setApprovals(snapshot.approvals);
+    setSelectedApprovalId(snapshot.approvals[0]?.id ?? "");
+    setIsRunning(
+      snapshot.tasks.find((task) => task.id === "competitor")?.status !==
+        "已暂停",
+    );
+    setBulkDeleteSnapshot(null);
+    recordActivity({
+      title: `已撤销删除 ${snapshot.deletedCount} 个任务`,
+      detail: "任务、关联成果、审批事项和运行记录已恢复。",
+      icon: "activity",
+      tone: "green",
+      kind: "系统",
+    });
+    setNotice(`已恢复 ${snapshot.deletedCount} 个任务`);
   }
 
   function toggleSetting(key: keyof SettingsState, label: string) {
@@ -2929,6 +3162,10 @@ export default function HomePage() {
 
   function openView(view: ViewId) {
     setActiveView(view);
+    if (view !== "tasks") {
+      setSelectedTaskIds([]);
+      setBulkDeleteOpen(false);
+    }
     if (view === "activity") {
       setActivityTaskId(null);
       setActivityFilter("全部");
@@ -3997,8 +4234,100 @@ export default function HomePage() {
               </span>
             </div>
 
+            {selectedTasks.length > 0 && (
+              <section
+                className="task-bulk-bar"
+                role="toolbar"
+                aria-label="批量任务操作"
+              >
+                <div className="task-bulk-summary">
+                  <span>
+                    <CheckCircle2 size={17} />
+                  </span>
+                  <span>
+                    <strong>已选择 {selectedTasks.length} 个任务</strong>
+                    <small>
+                      {selectedVisibleTaskCount === selectedTasks.length
+                        ? "操作只会影响当前选择"
+                        : `其中 ${selectedVisibleTaskCount} 个在当前筛选中`}
+                    </small>
+                  </span>
+                </div>
+                <div className="task-bulk-actions">
+                  <button
+                    className="task-bulk-select-all"
+                    type="button"
+                    onClick={toggleAllVisibleTasks}
+                  >
+                    <ListChecks size={15} />
+                    {allVisibleTasksSelected ? "取消全选" : "全选当前"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pausableSelectedTaskCount === 0}
+                    onClick={bulkPauseTasks}
+                  >
+                    <Pause size={15} />
+                    暂停
+                  </button>
+                  <button
+                    type="button"
+                    disabled={resumableSelectedTaskCount === 0}
+                    onClick={bulkResumeTasks}
+                  >
+                    <Play size={15} />
+                    继续
+                  </button>
+                  <button
+                    type="button"
+                    disabled={unprotectedSelectedTaskCount === 0}
+                    onClick={bulkEnableApproval}
+                  >
+                    <ShieldCheck size={15} />
+                    开启审批
+                  </button>
+                  <button
+                    className="danger"
+                    type="button"
+                    disabled={deletableSelectedTasks.length === 0}
+                    onClick={requestBulkDelete}
+                  >
+                    <Trash2 size={15} />
+                    删除
+                  </button>
+                  <button
+                    className="task-bulk-clear"
+                    type="button"
+                    aria-label="清除任务选择"
+                    title="清除选择"
+                    onClick={() => setSelectedTaskIds([])}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </section>
+            )}
+
             <div className="task-table">
               <div className="task-table-head">
+                <label className="task-selection-control task-select-all">
+                  <input
+                    type="checkbox"
+                    aria-label="选择当前筛选中的全部任务"
+                    checked={allVisibleTasksSelected}
+                    ref={(input) => {
+                      if (input) {
+                        input.indeterminate =
+                          selectedVisibleTaskCount > 0 &&
+                          !allVisibleTasksSelected;
+                      }
+                    }}
+                    onChange={toggleAllVisibleTasks}
+                  />
+                  <span aria-hidden="true">
+                    <Check size={13} />
+                  </span>
+                </label>
                 <span>任务</span>
                 <span>状态</span>
                 <span>进度</span>
@@ -4006,12 +4335,29 @@ export default function HomePage() {
                 <span />
               </div>
               {filteredTasks.map((task) => (
-                <button
-                  className="task-table-row"
+                <div
+                  className={`task-table-row-shell ${
+                    selectedTaskIds.includes(task.id) ? "is-selected" : ""
+                  }`}
                   key={task.id}
-                  type="button"
-                  onClick={() => openTask(task.id)}
                 >
+                  <label className="task-selection-control">
+                    <input
+                      type="checkbox"
+                      aria-label={`选择任务：${task.title}`}
+                      checked={selectedTaskIds.includes(task.id)}
+                      onChange={() => toggleTaskSelection(task.id)}
+                    />
+                    <span aria-hidden="true">
+                      <Check size={13} />
+                    </span>
+                  </label>
+                  <button
+                    className="task-table-row"
+                    type="button"
+                    aria-label={`打开任务：${task.title}`}
+                    onClick={() => openTask(task.id)}
+                  >
                   <span className="task-table-title">
                     <span className="task-table-title-line">
                       <strong>{task.title}</strong>
@@ -4035,7 +4381,8 @@ export default function HomePage() {
                   </span>
                   <span className="task-updated">{task.updated}</span>
                   <ChevronRight size={16} />
-                </button>
+                  </button>
+                </div>
               ))}
               {filteredTasks.length === 0 && (
                 <div className="task-empty-state">
@@ -6425,6 +6772,96 @@ export default function HomePage() {
         </div>
       )}
 
+      {bulkDeleteOpen && (
+        <div
+          className="clarity-dialog-backdrop"
+          onMouseDown={() => setBulkDeleteOpen(false)}
+        >
+          <section
+            className="bulk-delete-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="bulk-delete-title"
+            aria-describedby="bulk-delete-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="bulk-delete-close"
+              type="button"
+              aria-label="关闭批量删除确认"
+              onClick={() => setBulkDeleteOpen(false)}
+            >
+              <X size={17} />
+            </button>
+            <span className="bulk-delete-icon">
+              <Trash2 size={21} />
+            </span>
+            <span className="bulk-delete-eyebrow">批量删除任务</span>
+            <h2 id="bulk-delete-title">
+              删除 {deletableSelectedTasks.length} 个任务？
+            </h2>
+            <p id="bulk-delete-description">
+              关联成果、审批事项和任务运行记录会一并移除。完成后可在底部提示中撤销。
+            </p>
+
+            <div className="bulk-delete-facts">
+              <span>
+                <small>当前选择</small>
+                <strong>{selectedTasks.length} 个</strong>
+              </span>
+              <span>
+                <small>可以删除</small>
+                <strong>{deletableSelectedTasks.length} 个</strong>
+              </span>
+              <span>
+                <small>受保护</small>
+                <strong>{protectedSelectedTaskCount} 个</strong>
+              </span>
+            </div>
+
+            <div className="bulk-delete-list" aria-label="将删除的任务">
+              {deletableSelectedTasks.slice(0, 4).map((task) => (
+                <span key={task.id}>
+                  <span>
+                    <strong>{task.title}</strong>
+                    <small>{task.target}</small>
+                  </span>
+                  <em>{task.status}</em>
+                </span>
+              ))}
+              {deletableSelectedTasks.length > 4 && (
+                <small>另有 {deletableSelectedTasks.length - 4} 个任务</small>
+              )}
+            </div>
+
+            {protectedSelectedTaskCount > 0 && (
+              <div className="bulk-delete-protected-note">
+                <Pin size={16} />
+                <span>首页主任务受到保护，不会被删除。</span>
+              </div>
+            )}
+
+            <div className="bulk-delete-actions">
+              <button
+                type="button"
+                data-overlay-initial-focus
+                onClick={() => setBulkDeleteOpen(false)}
+              >
+                返回检查
+              </button>
+              <button
+                className="danger"
+                type="button"
+                onClick={confirmBulkDelete}
+              >
+                <Trash2 size={15} />
+                删除 {deletableSelectedTasks.length} 个任务
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {deletingTask && (
         <div
           className="clarity-dialog-backdrop"
@@ -6835,7 +7272,9 @@ export default function HomePage() {
 
       {notice && (
         <div
-          className={`clarity-toast ${noticeIsCaution ? "caution" : ""}`}
+          className={`clarity-toast ${noticeIsCaution ? "caution" : ""} ${
+            bulkDeleteSnapshot && notice.startsWith("已删除") ? "has-action" : ""
+          }`}
           role={noticeIsCaution ? "alert" : "status"}
         >
           {noticeIsCaution ? (
@@ -6844,7 +7283,22 @@ export default function HomePage() {
             <CheckCircle2 size={18} />
           )}
           <span>{notice}</span>
-          <button type="button" aria-label="关闭提示" onClick={() => setNotice("")}>
+          {bulkDeleteSnapshot && notice.startsWith("已删除") && (
+            <button
+              className="clarity-toast-undo"
+              type="button"
+              onClick={undoBulkDelete}
+            >
+              <RotateCcw size={14} />
+              撤销
+            </button>
+          )}
+          <button
+            className="clarity-toast-close"
+            type="button"
+            aria-label="关闭提示"
+            onClick={() => setNotice("")}
+          >
             <X size={15} />
           </button>
         </div>
