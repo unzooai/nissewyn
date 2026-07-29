@@ -82,6 +82,12 @@ type SettingsState = {
   local: boolean;
   notifications: boolean;
 };
+type DesktopNotificationPermission =
+  | "checking"
+  | "unsupported"
+  | "default"
+  | "granted"
+  | "denied";
 type BudgetAlertThreshold = 50 | 75 | 90;
 type UsageSettings = {
   monthlyBudget: number;
@@ -373,7 +379,7 @@ const taskDraftRecoveryMaxAge = 7 * 24 * 60 * 60 * 1000;
 const defaultSettings: SettingsState = {
   approval: true,
   local: true,
-  notifications: true,
+  notifications: false,
 };
 const defaultUsageSettings: UsageSettings = {
   monthlyBudget: 1000,
@@ -1741,6 +1747,12 @@ export default function HomePage() {
   const [taskFormSubmitted, setTaskFormSubmitted] = useState(false);
   const [isSavingTask, setIsSavingTask] = useState(false);
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
+  const [desktopNotificationPermission, setDesktopNotificationPermission] =
+    useState<DesktopNotificationPermission>("checking");
+  const [
+    isRequestingNotificationPermission,
+    setIsRequestingNotificationPermission,
+  ] = useState(false);
   const [usageSettings, setUsageSettings] =
     useState<UsageSettings>(defaultUsageSettings);
   const [usageBudgetOpen, setUsageBudgetOpen] = useState(false);
@@ -1780,6 +1792,8 @@ export default function HomePage() {
   const notificationWrapRef = useRef<HTMLDivElement>(null);
   const notificationButtonRef = useRef<HTMLButtonElement>(null);
   const notificationPanelRef = useRef<HTMLDivElement>(null);
+  const desktopNotificationIdsRef = useRef<Set<string>>(new Set());
+  const desktopNotificationTrackingReadyRef = useRef(false);
   const workspaceMenuWrapRef = useRef<HTMLDivElement>(null);
   const workspaceMenuButtonRef = useRef<HTMLButtonElement>(null);
   const workspaceMenuPanelRef = useRef<HTMLDivElement>(null);
@@ -2284,6 +2298,17 @@ export default function HomePage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      setDesktopNotificationPermission(
+        "Notification" in window
+          ? window.Notification.permission
+          : "unsupported",
+      );
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
       try {
         const savedDraft = window.sessionStorage.getItem(taskDraftRecoveryKey);
         if (!savedDraft) return;
@@ -2642,6 +2667,23 @@ export default function HomePage() {
 
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (
+      !tasksReady ||
+      desktopNotificationPermission === "checking" ||
+      desktopNotificationPermission === "granted" ||
+      !settings.notifications
+    ) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setSettings((current) =>
+        current.notifications ? { ...current, notifications: false } : current,
+      );
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [desktopNotificationPermission, settings.notifications, tasksReady]);
 
   useEffect(() => {
     if (!tasksReady) return;
@@ -3524,6 +3566,100 @@ export default function HomePage() {
           (item) => !readNotificationIds.includes(item.id),
         )
       : notificationItems;
+  const desktopNotificationPreferenceDetail =
+    desktopNotificationPermission === "checking"
+      ? "正在检查浏览器通知权限。"
+      : desktopNotificationPermission === "unsupported"
+        ? "当前浏览器不支持桌面通知，页面内通知仍会保留。"
+        : desktopNotificationPermission === "denied"
+          ? "浏览器已阻止桌面通知，页面内通知仍会保留。"
+          : settings.notifications
+            ? "浏览器授权已通过，需要确认时会发送桌面提醒。"
+            : desktopNotificationPermission === "granted"
+              ? "浏览器权限可用，当前未开启主动提醒。"
+              : "开启后浏览器会请求一次桌面通知权限。";
+  const desktopNotificationSummary =
+    desktopNotificationPermission === "checking"
+      ? "正在检查浏览器通知权限"
+      : desktopNotificationPermission === "unsupported"
+        ? "当前浏览器不支持桌面提醒"
+        : desktopNotificationPermission === "denied"
+          ? "浏览器已阻止桌面提醒"
+          : settings.notifications
+            ? "任务暂停时发送桌面提醒"
+            : "当前不会主动发送桌面提醒";
+  const desktopNotificationStateLabel =
+    desktopNotificationPermission === "checking"
+      ? "检查中"
+      : desktopNotificationPermission === "unsupported"
+        ? "不支持"
+        : desktopNotificationPermission === "denied"
+          ? "需授权"
+          : settings.notifications
+            ? "已开启"
+            : "已关闭";
+  const desktopNotificationStateClass = settings.notifications
+    ? "is-safe"
+    : desktopNotificationPermission === "denied"
+      ? "is-caution"
+      : "is-neutral";
+  const desktopNotificationActionLabel = settings.notifications
+    ? "关闭提醒"
+    : desktopNotificationPermission === "denied"
+      ? "检查权限"
+      : desktopNotificationPermission === "unsupported"
+        ? "查看状态"
+        : "开启提醒";
+
+  useEffect(() => {
+    const actionableItems = notificationItems.filter(
+      (item) => item.target === "task" || item.target === "approvals",
+    );
+    const currentIds = new Set(actionableItems.map((item) => item.id));
+
+    if (!desktopNotificationTrackingReadyRef.current) {
+      desktopNotificationTrackingReadyRef.current = true;
+      desktopNotificationIdsRef.current = currentIds;
+      return;
+    }
+
+    const newItem = actionableItems.find(
+      (item) => !desktopNotificationIdsRef.current.has(item.id),
+    );
+    desktopNotificationIdsRef.current = currentIds;
+    if (
+      !newItem ||
+      !tasksReady ||
+      !settings.notifications ||
+      desktopNotificationPermission !== "granted" ||
+      !("Notification" in window)
+    ) {
+      return;
+    }
+
+    try {
+      const desktopNotification = new window.Notification(newItem.title, {
+        body: newItem.detail,
+        icon: "/unzoo-one-mark.svg",
+        tag: `unzoo-one-${newItem.id}`,
+      });
+      desktopNotification.onclick = () => {
+        window.focus();
+        desktopNotification.close();
+      };
+    } catch {
+      window.setTimeout(
+        () =>
+          setDesktopNotificationPermission(window.Notification.permission),
+        0,
+      );
+    }
+  }, [
+    desktopNotificationPermission,
+    notificationItems,
+    settings.notifications,
+    tasksReady,
+  ]);
 
   function recordActivity(
     item: Omit<ActivityItem, "id" | "time" | "createdAt">,
@@ -5333,6 +5469,90 @@ export default function HomePage() {
       kind: "系统",
     });
     setNotice(`${label}已${nextValue ? "开启" : "关闭"}`);
+  }
+
+  async function toggleDesktopNotifications() {
+    if (
+      isRequestingNotificationPermission ||
+      desktopNotificationPermission === "checking"
+    ) {
+      return;
+    }
+
+    if (settings.notifications) {
+      setSettings((current) => ({ ...current, notifications: false }));
+      recordActivity({
+        title: "桌面确认提醒已关闭",
+        detail: "页面内通知中心仍会保留任务、审批和成果动态。",
+        icon: "settings",
+        tone: "neutral",
+        kind: "系统",
+      });
+      setNotice("桌面提醒已关闭，页面内通知仍会保留");
+      return;
+    }
+
+    if (!("Notification" in window)) {
+      setDesktopNotificationPermission("unsupported");
+      setNotice("当前浏览器不支持桌面通知，页面内通知仍可正常使用");
+      return;
+    }
+
+    setIsRequestingNotificationPermission(true);
+    try {
+      let permission = window.Notification.permission;
+      if (permission === "default") {
+        permission = await window.Notification.requestPermission();
+      }
+      setDesktopNotificationPermission(permission);
+
+      if (permission !== "granted") {
+        setSettings((current) => ({ ...current, notifications: false }));
+        recordActivity({
+          title: "桌面通知授权未通过",
+          detail:
+            permission === "denied"
+              ? "浏览器已阻止当前站点发送桌面通知。"
+              : "本次未授予桌面通知权限，页面内通知不受影响。",
+          icon: "settings",
+          tone: "amber",
+          kind: "系统",
+        });
+        setNotice(
+          permission === "denied"
+            ? "浏览器已阻止桌面通知，请在网站权限中允许后重试"
+            : "未开启桌面通知，页面内通知仍会保留",
+        );
+        return;
+      }
+
+      setSettings((current) => ({ ...current, notifications: true }));
+      recordActivity({
+        title: "桌面确认提醒已开启",
+        detail: "后续任务需要确认或安全停止时，浏览器会主动发送桌面提醒。",
+        icon: "settings",
+        tone: "green",
+        kind: "系统",
+      });
+      setNotice("桌面提醒已开启");
+
+      try {
+        const confirmation = new window.Notification("Unzoo One 提醒已开启", {
+          body: "后续需要你决定的任务会在这里提醒。",
+          icon: "/unzoo-one-mark.svg",
+          tag: "unzoo-one-notifications-enabled",
+        });
+        window.setTimeout(() => confirmation.close(), 5000);
+      } catch {
+        // The saved permission remains authoritative if the preview is suppressed.
+      }
+    } catch {
+      setSettings((current) => ({ ...current, notifications: false }));
+      setDesktopNotificationPermission(window.Notification.permission);
+      setNotice("无法开启桌面通知，页面内通知仍可正常使用");
+    } finally {
+      setIsRequestingNotificationPermission(false);
+    }
   }
 
   function requestToggleLocalPersistence() {
@@ -8792,14 +9012,20 @@ export default function HomePage() {
               <label className="setting-row">
                 <span>
                   <strong>需要确认时通知</strong>
-                  <small>任务需要你做决定时，在桌面显示通知。</small>
+                  <small>{desktopNotificationPreferenceDetail}</small>
                 </span>
                 <button
                   className={`switch-control ${settings.notifications ? "on" : ""}`}
                   type="button"
                   role="switch"
                   aria-checked={settings.notifications}
-                  onClick={() => toggleSetting("notifications", "确认通知")}
+                  aria-label="需要确认时发送桌面通知"
+                  aria-busy={isRequestingNotificationPermission}
+                  disabled={
+                    isRequestingNotificationPermission ||
+                    desktopNotificationPermission === "checking"
+                  }
+                  onClick={toggleDesktopNotifications}
                 >
                   <i />
                 </button>
@@ -9058,23 +9284,24 @@ export default function HomePage() {
                     </span>
                     <div>
                       <span>确认提醒</span>
-                      <strong>
-                        {settings.notifications
-                          ? "任务暂停时显示提醒"
-                          : "当前不会主动提醒"}
-                      </strong>
+                      <strong>{desktopNotificationSummary}</strong>
                       <small>只影响后续需要你决定的任务，不改变执行规则</small>
                     </div>
-                    <em
-                      className={settings.notifications ? "is-safe" : "is-neutral"}
-                    >
-                      {settings.notifications ? "已开启" : "已关闭"}
+                    <em className={desktopNotificationStateClass}>
+                      {desktopNotificationStateLabel}
                     </em>
                     <button
                       type="button"
-                      onClick={() => toggleSetting("notifications", "确认通知")}
+                      aria-busy={isRequestingNotificationPermission}
+                      disabled={
+                        isRequestingNotificationPermission ||
+                        desktopNotificationPermission === "checking"
+                      }
+                      onClick={toggleDesktopNotifications}
                     >
-                      {settings.notifications ? "关闭提醒" : "开启提醒"}
+                      {isRequestingNotificationPermission
+                        ? "等待授权"
+                        : desktopNotificationActionLabel}
                       <ChevronRight size={15} />
                     </button>
                   </div>

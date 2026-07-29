@@ -53,6 +53,14 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /const taskFilters: TaskFilter\[\]/);
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-tasks"/);
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-settings"/);
+  assert.match(page, /type DesktopNotificationPermission =/);
+  assert.match(page, /notifications: false/);
+  assert.match(page, /function toggleDesktopNotifications/);
+  assert.match(page, /window\.Notification\.requestPermission/);
+  assert.match(page, /new window\.Notification/);
+  assert.match(page, /desktopNotificationTrackingReadyRef/);
+  assert.match(page, /aria-label="需要确认时发送桌面通知"/);
+  assert.match(page, /页面内通知仍会保留/);
   assert.match(page, /"unzoo-one-connectors"/);
   assert.match(page, /"unzoo-one-team"/);
   assert.match(page, /"unzoo-one-usage"/);
@@ -269,6 +277,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /执行边界与审计/);
   assert.match(page, /打开完整运行记录/);
   assert.match(css, /\.settings-trust-center/);
+  assert.match(css, /\.switch-control:disabled/);
+  assert.match(css, /\.settings-policy-row > button:disabled/);
   assert.match(css, /\.settings-connectors-center/);
   assert.match(css, /\.settings-connector-grid/);
   assert.match(css, /\.connector-detail-dialog/);

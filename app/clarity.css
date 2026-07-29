@@ -4283,6 +4283,11 @@ textarea:focus-visible {
   background: var(--clarity-blue);
 }
 
+.switch-control:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .switch-control.on > i {
   transform: translateX(15px);
 }
@@ -9391,12 +9396,17 @@ body {
     transform 160ms ease;
 }
 
-.settings-policy-row > button:hover,
+.settings-policy-row > button:hover:not(:disabled),
 .settings-audit-open:hover {
   border-color: #b9cee5;
   background: #f3f8fd;
   color: #245da4;
   transform: translateY(-1px);
+}
+
+.settings-policy-row > button:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 .settings-audit-preview {
