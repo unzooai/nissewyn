@@ -19,7 +19,6 @@ import {
   Mail,
   MonitorCog,
   MousePointer2,
-  Network,
   Pause,
   Play,
   Plus,
@@ -60,13 +59,55 @@ const brainRoutes = [
 ];
 
 const nodes = [
-  { label: "每天 09:00", sub: "Cron 触发", icon: Clock3, className: "node-cron" },
-  { label: "读取竞品页面", sub: "Unzoo Browser", icon: Globe2, className: "node-browser" },
-  { label: "Codex 分析", sub: "Brain Router", icon: Bot, className: "node-brain" },
-  { label: "权限闸门", sub: "Policy Engine", icon: Shield, className: "node-policy" },
-  { label: "生成简报", sub: "Artifact Registry", icon: FileText, className: "node-doc" },
-  { label: "领导审批", sub: "Approval", icon: Fingerprint, className: "node-approval" },
-  { label: "发送摘要", sub: "Mail Connector", icon: Send, className: "node-send" },
+  {
+    label: "定时触发",
+    desc: "每天 09:00 自动开始，不需要打开桌面端。",
+    status: "完成",
+    icon: Clock3,
+    className: "done",
+  },
+  {
+    label: "读取竞品页面",
+    desc: "Unzoo 打开目标网页，截图并提取页面结构。",
+    status: "完成",
+    icon: Globe2,
+    className: "done",
+  },
+  {
+    label: "Codex 分析",
+    desc: "把收集到的页面变化整理成可读结论。",
+    status: "进行中",
+    icon: Bot,
+    className: "active",
+  },
+  {
+    label: "权限检查",
+    desc: "判断下一步是否会修改本地文件或影响外部渠道。",
+    status: "等待",
+    icon: Shield,
+    className: "waiting",
+  },
+  {
+    label: "生成简报",
+    desc: "把结论保存为报告产物，自动关联任务证据。",
+    status: "等待",
+    icon: FileText,
+    className: "waiting",
+  },
+  {
+    label: "领导审批",
+    desc: "发送前由你确认内容、对象和授权范围。",
+    status: "等待",
+    icon: Fingerprint,
+    className: "waiting",
+  },
+  {
+    label: "发送摘要",
+    desc: "批准后再发送到指定沟通渠道。",
+    status: "未开始",
+    icon: Send,
+    className: "idle",
+  },
 ];
 
 const evidence = [
@@ -130,7 +171,8 @@ export default function Home() {
               <Sparkles size={14} />
               MVP 操作台 · 本地优先
             </span>
-            <h1>把长期任务交给 AI，但每一步都能看见、批准和追溯。</h1>
+            <h1>AI 任务控制台</h1>
+            <p>把长期任务、能力调用、审批和证据沉淀在同一个可靠的操作面里。</p>
           </div>
 
           <div className="header-tools">
@@ -233,26 +275,37 @@ export default function Home() {
             </div>
 
             <div className="workflow-canvas">
-              <div className="canvas-line line-a" />
-              <div className="canvas-line line-b" />
-              <div className="canvas-line line-c" />
-              <div className="canvas-line line-d" />
-              <div className="canvas-line line-e" />
-              <div className="canvas-line line-f" />
+              <div className="run-summary-card">
+                <span>当前任务</span>
+                <strong>收集竞品发布信号，并生成可发送给领导的摘要</strong>
+                <p>系统会先观察页面，再由大脑分析，最后在任何外部发送前停下来等你批准。</p>
+              </div>
 
-              {nodes.map((node) => (
-                <div className={`flow-node ${node.className}`} key={node.label}>
-                  <node.icon size={18} />
-                  <div>
-                    <strong>{node.label}</strong>
-                    <small>{node.sub}</small>
+              <div className="run-timeline" aria-label="任务运行步骤">
+                {nodes.map((node, index) => (
+                  <div className={`timeline-step ${node.className}`} key={node.label}>
+                    <div className="step-marker">
+                      <span>{index + 1}</span>
+                    </div>
+                    <div className="step-card">
+                      <node.icon size={18} />
+                      <div>
+                        <strong>{node.label}</strong>
+                        <p>{node.desc}</p>
+                      </div>
+                      <em>{node.status}</em>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
 
-              <div className="canvas-center">
-                <Network size={28} />
-                <span>Observe · Act · Verify</span>
+              <div className="current-step-card">
+                <Bot size={22} />
+                <div>
+                  <span>当前步骤</span>
+                  <strong>Codex 正在分析页面变化</strong>
+                  <p>已读取 12 张截图和 38 次工具调用记录，下一步会生成简报草稿。</p>
+                </div>
               </div>
             </div>
 

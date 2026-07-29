@@ -194,10 +194,18 @@ button {
 .title-group h1 {
   max-width: 880px;
   margin: 10px 0 0;
-  font-size: 34px;
-  line-height: 1.18;
+  font-size: 32px;
+  line-height: 1.12;
   letter-spacing: 0;
   word-break: keep-all;
+}
+
+.title-group p {
+  max-width: 720px;
+  margin: 8px 0 0;
+  color: var(--soft);
+  font-size: 14px;
+  line-height: 1.65;
 }
 
 .workspace-chip {
@@ -486,7 +494,11 @@ button {
 
 .workflow-canvas {
   position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 18px;
   min-height: 460px;
+  padding: 22px;
   overflow: hidden;
   background:
     linear-gradient(90deg, rgba(244, 245, 239, 0.05) 1px, transparent 1px),
@@ -496,55 +508,124 @@ button {
   background-size: 28px 28px, 28px 28px, auto, auto;
 }
 
-.canvas-center {
+.run-summary-card,
+.current-step-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(9, 12, 9, 0.82);
+}
+
+.run-summary-card {
+  grid-column: 1 / -1;
+  padding: 16px;
+  background:
+    linear-gradient(135deg, rgba(215, 255, 93, 0.13), rgba(100, 240, 174, 0.04)),
+    rgba(9, 12, 9, 0.84);
+}
+
+.run-summary-card span,
+.run-summary-card strong,
+.run-summary-card p,
+.current-step-card span,
+.current-step-card strong,
+.current-step-card p {
+  display: block;
+}
+
+.run-summary-card span,
+.current-step-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.run-summary-card strong {
+  margin-top: 7px;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.run-summary-card p,
+.current-step-card p {
+  margin: 7px 0 0;
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.run-timeline {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.timeline-step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  position: relative;
+}
+
+.timeline-step::before {
   position: absolute;
-  top: 44%;
-  left: 49%;
+  top: 34px;
+  bottom: -10px;
+  left: 16px;
+  width: 2px;
+  background: rgba(244, 245, 239, 0.09);
+  content: "";
+}
+
+.timeline-step:last-child::before {
+  display: none;
+}
+
+.step-marker {
   display: grid;
   place-items: center;
-  width: 132px;
-  height: 132px;
-  border: 1px solid rgba(215, 255, 93, 0.4);
-  border-radius: 28px;
-  background:
-    linear-gradient(135deg, rgba(215, 255, 93, 0.22), rgba(100, 240, 174, 0.1)),
-    rgba(11, 14, 10, 0.96);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.36), 0 0 44px rgba(215, 255, 93, 0.14);
-  transform: translate(-50%, -50%) rotate(45deg);
-}
-
-.canvas-center svg,
-.canvas-center span {
-  transform: rotate(-45deg);
-}
-
-.canvas-center span {
-  max-width: 92px;
-  color: #f1ffd5;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(244, 245, 239, 0.06);
+  color: var(--muted);
   font-family: var(--font-geist-mono), monospace;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
-  line-height: 1.35;
-  text-align: center;
 }
 
-.flow-node {
-  position: absolute;
-  z-index: 2;
+.timeline-step.done .step-marker {
+  border-color: rgba(100, 240, 174, 0.32);
+  background: rgba(100, 240, 174, 0.12);
+  color: var(--mint);
+}
+
+.timeline-step.active .step-marker {
+  border-color: rgba(130, 183, 255, 0.38);
+  background: rgba(130, 183, 255, 0.14);
+  color: var(--blue);
+}
+
+.step-card {
   display: grid;
-  grid-template-columns: 34px 1fr;
+  grid-template-columns: 34px minmax(0, 1fr) 64px;
   align-items: center;
   gap: 10px;
-  width: 186px;
-  min-height: 70px;
-  padding: 11px;
-  border: 1px solid var(--line-strong);
+  min-height: 64px;
+  padding: 10px;
+  border: 1px solid var(--line);
   border-radius: 16px;
-  background: rgba(17, 21, 17, 0.92);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+  background: rgba(17, 21, 17, 0.9);
 }
 
-.flow-node svg {
+.timeline-step.active .step-card {
+  border-color: rgba(130, 183, 255, 0.42);
+  box-shadow: 0 0 0 1px rgba(130, 183, 255, 0.1);
+}
+
+.step-card svg,
+.current-step-card > svg {
   display: block;
   width: 34px;
   height: 34px;
@@ -553,107 +634,65 @@ button {
   background: rgba(244, 245, 239, 0.07);
 }
 
-.flow-node strong,
-.flow-node small {
+.step-card strong {
   display: block;
-}
-
-.flow-node strong {
   font-size: 13px;
 }
 
-.flow-node small {
-  margin-top: 4px;
+.step-card p {
+  margin: 3px 0 0;
   color: var(--muted);
   font-size: 11px;
+  line-height: 1.4;
 }
 
-.node-cron {
-  top: 36px;
-  left: 38px;
-}
-
-.node-browser {
-  top: 58px;
-  left: 276px;
-}
-
-.node-brain {
-  top: 188px;
-  left: 218px;
-  border-color: rgba(130, 183, 255, 0.38);
-}
-
-.node-policy {
-  top: 196px;
-  right: 40px;
-  border-color: rgba(255, 189, 102, 0.45);
-}
-
-.node-doc {
-  bottom: 76px;
-  left: 58px;
-}
-
-.node-approval {
-  bottom: 58px;
-  left: 330px;
-  border-color: rgba(255, 116, 108, 0.42);
-}
-
-.node-send {
-  bottom: 126px;
-  right: 48px;
-  border-color: rgba(100, 240, 174, 0.36);
-}
-
-.canvas-line {
-  position: absolute;
-  z-index: 1;
-  height: 2px;
+.step-card em {
+  justify-self: end;
+  min-width: 50px;
+  padding: 5px 7px;
   border-radius: 999px;
-  background: linear-gradient(90deg, transparent, rgba(215, 255, 93, 0.75), transparent);
-  transform-origin: left center;
+  background: rgba(244, 245, 239, 0.06);
+  color: var(--soft);
+  font-size: 11px;
+  font-style: normal;
+  text-align: center;
 }
 
-.line-a {
-  top: 104px;
-  left: 224px;
-  width: 116px;
+.timeline-step.done .step-card em {
+  background: rgba(100, 240, 174, 0.12);
+  color: #caffe4;
 }
 
-.line-b {
-  top: 155px;
-  left: 400px;
-  width: 134px;
-  transform: rotate(44deg);
+.timeline-step.active .step-card em {
+  background: rgba(130, 183, 255, 0.14);
+  color: #d5e7ff;
 }
 
-.line-c {
-  top: 266px;
-  left: 442px;
-  width: 136px;
+.current-step-card {
+  align-self: start;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  padding: 14px;
+  border-color: rgba(130, 183, 255, 0.24);
+  background:
+    linear-gradient(150deg, rgba(130, 183, 255, 0.13), rgba(215, 255, 93, 0.06)),
+    rgba(10, 13, 10, 0.92);
 }
 
-.line-d {
-  top: 298px;
-  right: 234px;
-  width: 126px;
-  transform: rotate(-28deg);
+.current-step-card > svg {
+  width: 42px;
+  height: 42px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(130, 183, 255, 0.14);
+  color: var(--blue);
 }
 
-.line-e {
-  bottom: 156px;
-  left: 268px;
-  width: 124px;
-  transform: rotate(-12deg);
-}
-
-.line-f {
-  bottom: 142px;
-  right: 246px;
-  width: 120px;
-  transform: rotate(10deg);
+.current-step-card strong {
+  margin-top: 6px;
+  font-size: 16px;
+  line-height: 1.35;
 }
 
 .evidence-strip {
@@ -852,25 +891,6 @@ button:hover {
     grid-template-columns: 250px minmax(390px, 1fr) 280px;
   }
 
-  .flow-node {
-    width: 170px;
-  }
-
-  .node-browser {
-    left: 248px;
-  }
-
-  .node-brain {
-    left: 190px;
-  }
-
-  .node-policy {
-    right: 24px;
-  }
-
-  .node-approval {
-    left: 300px;
-  }
 }
 
 @media (max-width: 1060px) {
@@ -930,6 +950,7 @@ button:hover {
   }
 
   .workflow-canvas {
+    grid-template-columns: 1fr;
     min-height: 560px;
   }
 }
@@ -959,46 +980,7 @@ button:hover {
 
   .workflow-canvas {
     min-height: 760px;
-  }
-
-  .flow-node {
-    left: 50% !important;
-    right: auto !important;
-    width: min(82%, 250px);
-    transform: translateX(-50%);
-  }
-
-  .node-cron {
-    top: 34px;
-  }
-
-  .node-browser {
-    top: 130px;
-  }
-
-  .node-brain {
-    top: 226px;
-  }
-
-  .node-policy {
-    top: 322px;
-  }
-
-  .node-doc {
-    bottom: 236px;
-  }
-
-  .node-approval {
-    bottom: 136px;
-  }
-
-  .node-send {
-    bottom: 36px;
-  }
-
-  .canvas-center,
-  .canvas-line {
-    display: none;
+    padding: 22px;
   }
 
   .evidence-strip,
