@@ -2080,3 +2080,496 @@ input:focus-visible {
     transition-duration: 1ms !important;
   }
 }
+
+/* Readability and surface polish. */
+.clarity-main {
+  width: min(100%, 1360px);
+  padding: 28px 32px 52px;
+}
+
+.clarity-brand strong {
+  font-size: 14px;
+}
+
+.clarity-brand small {
+  font-size: 11px;
+}
+
+.clarity-nav button {
+  min-height: 44px;
+  font-size: 13px;
+}
+
+.clarity-sidebar-status strong {
+  font-size: 11px;
+}
+
+.clarity-sidebar-status small {
+  font-size: 10px;
+}
+
+.clarity-header {
+  min-height: 88px;
+  margin-bottom: 22px;
+}
+
+.clarity-page-title > span {
+  font-size: 11px;
+}
+
+.clarity-page-title h1 {
+  margin-top: 7px;
+  font-size: 29px;
+  line-height: 1.18;
+}
+
+.clarity-page-title p {
+  margin-top: 7px;
+  font-size: 13px;
+}
+
+.clarity-search input,
+.clarity-primary-button,
+.clarity-secondary-button {
+  font-size: 12px;
+}
+
+.clarity-notifications > div > strong {
+  font-size: 13px;
+}
+
+.clarity-notifications > button strong {
+  font-size: 11px;
+}
+
+.clarity-notifications > button small {
+  font-size: 10px;
+}
+
+.home-summary {
+  gap: 30px;
+  min-height: 46px;
+}
+
+.home-summary > span {
+  font-size: 11px;
+}
+
+.home-summary strong {
+  font-size: 12px;
+}
+
+.home-focus-grid {
+  grid-template-columns: minmax(0, 1fr) 342px;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.active-task-panel,
+.needs-action-panel {
+  position: relative;
+  border-color: #e1e4e8;
+  box-shadow:
+    0 1px 2px rgba(24, 25, 28, 0.03),
+    0 10px 30px rgba(24, 25, 28, 0.045);
+}
+
+.active-task-panel::before,
+.needs-action-panel::before {
+  position: absolute;
+  z-index: 2;
+  top: -1px;
+  right: 18px;
+  left: 18px;
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+  content: "";
+}
+
+.active-task-panel::before {
+  background: #4a73d1;
+}
+
+.needs-action-panel::before {
+  background: #d08a42;
+}
+
+.focus-panel-heading {
+  padding: 24px 26px 0;
+}
+
+.focus-panel-heading > div > span {
+  font-size: 11px;
+}
+
+.focus-panel-heading > div > strong {
+  margin-top: 8px;
+  font-size: 21px;
+}
+
+.live-state {
+  min-height: 27px;
+  padding: 0 9px;
+  font-size: 10px;
+}
+
+.task-purpose {
+  margin: 12px 26px 0;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.simple-progress {
+  margin: 22px 26px 0;
+}
+
+.simple-progress > div {
+  font-size: 11px;
+}
+
+.simple-progress > div strong {
+  font-size: 12px;
+}
+
+.simple-progress > span {
+  height: 6px;
+  margin-top: 9px;
+}
+
+.plain-steps {
+  margin-top: 22px;
+}
+
+.plain-steps > button {
+  grid-template-columns: 38px minmax(0, 1fr) auto 16px;
+  min-height: 72px;
+  padding: 10px 26px;
+}
+
+.plain-step-marker {
+  width: 36px;
+  height: 36px;
+}
+
+.plain-steps strong {
+  font-size: 13px;
+}
+
+.plain-steps small {
+  margin-top: 5px;
+  font-size: 11px;
+}
+
+.plain-steps em {
+  padding: 5px 8px;
+  font-size: 10px;
+}
+
+.plain-steps > button.selected {
+  background: #f0f5fe;
+}
+
+.plain-steps > button:hover .plain-step-marker,
+.recent-task-row:hover > svg {
+  transform: translateX(2px);
+}
+
+.current-work {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 14px;
+  margin: 20px 26px;
+  padding: 15px;
+  border-color: #d7e1f3;
+  background: #f6f9fe;
+}
+
+.current-work-icon {
+  width: 42px;
+  height: 42px;
+}
+
+.current-work span {
+  font-size: 10px;
+}
+
+.current-work strong {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.current-work small {
+  margin-top: 5px;
+  font-size: 11px;
+}
+
+.current-work > button {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 11px;
+}
+
+.task-tools {
+  min-height: 56px;
+  gap: 10px;
+  padding: 0 26px;
+}
+
+.task-tools > span,
+.task-tools > button {
+  font-size: 10px;
+}
+
+.needs-action-panel {
+  padding: 22px;
+}
+
+.attention-heading > span {
+  font-size: 11px;
+}
+
+.attention-heading > strong {
+  min-width: 24px;
+  height: 24px;
+  font-size: 10px;
+}
+
+.attention-icon {
+  width: 44px;
+  height: 44px;
+  margin-top: 28px;
+}
+
+.needs-action-panel h2 {
+  margin-top: 16px;
+  font-size: 20px;
+}
+
+.needs-action-panel > p {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.plain-impact {
+  grid-template-columns: 26px 1fr;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 14px;
+}
+
+.plain-impact strong {
+  font-size: 11px;
+}
+
+.plain-impact small {
+  margin-top: 5px;
+  font-size: 11px;
+}
+
+.attention-actions {
+  margin-top: 20px;
+}
+
+.attention-actions button,
+.approval-detail-actions button,
+.clarity-dialog-actions button {
+  min-height: 40px;
+  font-size: 11px;
+}
+
+.all-approvals-link {
+  margin-top: 17px;
+  font-size: 11px;
+}
+
+.recent-section {
+  margin-top: 16px;
+  border-color: #e1e4e8;
+  box-shadow: 0 1px 2px rgba(24, 25, 28, 0.025);
+}
+
+.section-title-row {
+  min-height: 74px;
+  padding: 0 22px;
+}
+
+.section-title-row span {
+  font-size: 10px;
+}
+
+.section-title-row h2 {
+  margin-top: 5px;
+  font-size: 15px;
+}
+
+.section-title-row > button {
+  font-size: 11px;
+}
+
+.recent-task-row {
+  grid-template-columns: 8px minmax(0, 1fr) 76px 96px 16px;
+  min-height: 70px;
+  padding: 9px 22px;
+}
+
+.recent-task-row strong {
+  font-size: 12px;
+}
+
+.recent-task-row small {
+  margin-top: 5px;
+  font-size: 11px;
+}
+
+.status-label,
+.task-updated {
+  font-size: 10px;
+}
+
+.view-filter-tabs button,
+.task-table-head,
+.table-progress > small {
+  font-size: 10px;
+}
+
+.task-table-row {
+  min-height: 76px;
+}
+
+.task-table-row > span:first-child strong {
+  font-size: 12px;
+}
+
+.task-table-row > span:first-child small {
+  margin-top: 5px;
+  font-size: 11px;
+}
+
+.approval-queue-heading span,
+.approval-queue-heading strong {
+  font-size: 11px;
+}
+
+.approval-queue > button {
+  min-height: 80px;
+}
+
+.approval-queue > button strong {
+  font-size: 12px;
+}
+
+.approval-queue > button small {
+  margin-top: 5px;
+  font-size: 11px;
+}
+
+.approval-kicker {
+  min-height: 27px;
+  font-size: 10px;
+}
+
+.approval-detail h2 {
+  font-size: 25px;
+}
+
+.approval-detail > p {
+  font-size: 12px;
+}
+
+.approval-explanation strong,
+.approval-explanation p,
+.approval-scope span {
+  font-size: 11px;
+}
+
+.activity-summary strong {
+  font-size: 13px;
+}
+
+.activity-summary small {
+  font-size: 11px;
+}
+
+.timeline-row time,
+.timeline-row p,
+.timeline-row button {
+  font-size: 11px;
+}
+
+.timeline-row strong {
+  font-size: 12px;
+}
+
+.settings-group > div:first-child span {
+  font-size: 10px;
+}
+
+.settings-group > div:first-child h2 {
+  font-size: 15px;
+}
+
+.setting-row {
+  min-height: 84px;
+}
+
+.setting-row strong {
+  font-size: 12px;
+}
+
+.setting-row small {
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.clarity-dialog-heading span,
+.clarity-dialog > label > span,
+.clarity-dialog-note p {
+  font-size: 11px;
+}
+
+.clarity-dialog input {
+  font-size: 12px;
+}
+
+.clarity-toast span {
+  font-size: 11px;
+}
+
+@media (max-width: 920px) {
+  .clarity-main {
+    padding: 22px 20px 40px;
+  }
+
+  .home-focus-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .clarity-main {
+    padding: 15px 11px 30px;
+  }
+
+  .clarity-page-title h1 {
+    font-size: 24px;
+  }
+
+  .focus-panel-heading {
+    padding: 20px 17px 0;
+  }
+
+  .task-purpose,
+  .simple-progress {
+    margin-right: 17px;
+    margin-left: 17px;
+  }
+
+  .plain-steps > button {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    padding: 10px 17px;
+  }
+
+  .current-work {
+    margin: 17px;
+  }
+}
