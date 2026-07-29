@@ -68,6 +68,12 @@ type SettingsState = {
   local: boolean;
   notifications: boolean;
 };
+type BudgetAlertThreshold = 50 | 75 | 90;
+type UsageSettings = {
+  monthlyBudget: number;
+  alertThreshold: BudgetAlertThreshold;
+  pauseAtLimit: boolean;
+};
 type ConnectorId = "browser" | "workspace" | "mail" | "calendar";
 type ConnectorState = Record<ConnectorId, boolean>;
 type ConnectorDefinition = {
@@ -106,6 +112,7 @@ type WorkspaceBackup = {
   exportedAt: string;
   tasks: TaskItem[];
   settings: SettingsState;
+  usage?: UsageSettings;
   connectors?: ConnectorState;
   members?: TeamMember[];
   approvalIds: string[];
@@ -241,6 +248,11 @@ const defaultSettings: SettingsState = {
   local: true,
   notifications: true,
 };
+const defaultUsageSettings: UsageSettings = {
+  monthlyBudget: 1000,
+  alertThreshold: 75,
+  pauseAtLimit: true,
+};
 const defaultConnectorStates: ConnectorState = {
   browser: true,
   workspace: true,
@@ -351,6 +363,19 @@ function isConnectorState(value: unknown): value is ConnectorState {
     typeof state.workspace === "boolean" &&
     typeof state.mail === "boolean" &&
     typeof state.calendar === "boolean"
+  );
+}
+
+function isUsageSettings(value: unknown): value is UsageSettings {
+  if (!value || typeof value !== "object") return false;
+  const usage = value as Partial<UsageSettings>;
+  return (
+    typeof usage.monthlyBudget === "number" &&
+    Number.isFinite(usage.monthlyBudget) &&
+    usage.monthlyBudget >= 100 &&
+    usage.monthlyBudget <= 50000 &&
+    [50, 75, 90].includes(usage.alertThreshold ?? 0) &&
+    typeof usage.pauseAtLimit === "boolean"
   );
 }
 
@@ -473,6 +498,7 @@ function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
     typeof backup.settings.approval !== "boolean" ||
     typeof backup.settings.local !== "boolean" ||
     typeof backup.settings.notifications !== "boolean" ||
+    (backup.usage !== undefined && !isUsageSettings(backup.usage)) ||
     (backup.connectors !== undefined && !isConnectorState(backup.connectors)) ||
     (backup.members !== undefined &&
       (!Array.isArray(backup.members) ||
@@ -1055,6 +1081,17 @@ export default function HomePage() {
   const [taskFormSubmitted, setTaskFormSubmitted] = useState(false);
   const [isSavingTask, setIsSavingTask] = useState(false);
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
+  const [usageSettings, setUsageSettings] =
+    useState<UsageSettings>(defaultUsageSettings);
+  const [usageBudgetOpen, setUsageBudgetOpen] = useState(false);
+  const [usageBudgetDraft, setUsageBudgetDraft] = useState(
+    String(defaultUsageSettings.monthlyBudget),
+  );
+  const [usageAlertDraft, setUsageAlertDraft] =
+    useState<BudgetAlertThreshold>(defaultUsageSettings.alertThreshold);
+  const [usagePauseDraft, setUsagePauseDraft] = useState(
+    defaultUsageSettings.pauseAtLimit,
+  );
   const [connectorStates, setConnectorStates] = useState<ConnectorState>(
     defaultConnectorStates,
   );
@@ -1167,11 +1204,92 @@ export default function HomePage() {
     ).length,
     calendar: tasks.filter((task) => task.schedule !== "仅运行一次").length,
   };
+  const reasoningCredits =
+    120 +
+    Math.ceil(
+      tasks.reduce((total, task) => total + task.progress, 0) * 0.72,
+    ) +
+    activityLog.filter((item) => item.icon === "brain").length * 5;
+  const browserCredits =
+    Math.ceil(
+      tasks
+        .filter((task) => /^https?:\/\//i.test(task.target))
+        .reduce((total, task) => total + task.progress, 0) * 0.58,
+    ) +
+    artifacts
+      .filter((artifact) => artifact.type === "证据")
+      .reduce(
+        (total, artifact) => total + Math.ceil(artifact.sizeKb * 0.4),
+        0,
+      );
+  const connectorCredits =
+    connectedConnectorCount * 18 +
+    approvals.length * 6 +
+    activityLog.filter((item) => item.kind === "审批").length * 4;
+  const storageCredits = Math.ceil(
+    artifacts.reduce((total, artifact) => total + artifact.sizeKb, 0) * 0.75,
+  );
+  const usageBreakdown = [
+    {
+      id: "reasoning",
+      label: "AI 分析与推理",
+      detail: "页面理解、摘要与报告生成",
+      credits: reasoningCredits,
+      icon: Brain,
+      tone: "blue",
+    },
+    {
+      id: "browser",
+      label: "浏览器执行",
+      detail: "页面读取、截图与结构提取",
+      credits: browserCredits,
+      icon: Globe2,
+      tone: "green",
+    },
+    {
+      id: "connectors",
+      label: "连接器调用",
+      detail: "邮件、工作区与审批动作",
+      credits: connectorCredits,
+      icon: Link2,
+      tone: "amber",
+    },
+    {
+      id: "storage",
+      label: "成果与证据保存",
+      detail: "报告、数据与审计证据",
+      credits: storageCredits,
+      icon: HardDrive,
+      tone: "violet",
+    },
+  ] as const;
+  const usedCredits = usageBreakdown.reduce(
+    (total, item) => total + item.credits,
+    0,
+  );
+  const forecastCredits =
+    usedCredits +
+    tasks.filter((task) => task.status === "运行中").length * 65 +
+    tasks.filter((task) => task.schedule !== "仅运行一次").length * 22;
+  const usagePercent = Math.min(
+    100,
+    Math.round((usedCredits / usageSettings.monthlyBudget) * 100),
+  );
+  const budgetExceeded = usedCredits >= usageSettings.monthlyBudget;
+  const budgetAlertReached =
+    usagePercent >= usageSettings.alertThreshold || budgetExceeded;
+  const usageBudgetDraftValue = Number(usageBudgetDraft);
+  const usageBudgetDraftInvalid =
+    !Number.isFinite(usageBudgetDraftValue) ||
+    usageBudgetDraftValue < 100 ||
+    usageBudgetDraftValue > 50000;
   const deletingTask = tasks.find((task) => task.id === deleteTaskId) ?? null;
   const rejectedApproval =
     approvals.find((item) => item.id === rejectApprovalId) ?? null;
-  const activeOverlayKind = pendingWorkspaceImport
-    ? "import"
+  const activeOverlayKind = usageBudgetOpen
+    ? "usage-budget"
+    : pendingWorkspaceImport
+      ? "import"
     : bulkApprovalDecision
       ? "bulk-approval"
       : bulkDeleteOpen
@@ -1277,6 +1395,7 @@ export default function HomePage() {
       try {
         const saved = window.localStorage.getItem("unzoo-one-tasks");
         const savedSettings = window.localStorage.getItem("unzoo-one-settings");
+        const savedUsage = window.localStorage.getItem("unzoo-one-usage");
         const savedConnectors = window.localStorage.getItem(
           "unzoo-one-connectors",
         );
@@ -1344,6 +1463,14 @@ export default function HomePage() {
                 ? parsedSettings.notifications
                 : current.notifications,
           }));
+        }
+        if (savedUsage) {
+          const parsedUsage = JSON.parse(savedUsage);
+          if (isUsageSettings(parsedUsage)) {
+            setUsageSettings(parsedUsage);
+          } else {
+            window.localStorage.removeItem("unzoo-one-usage");
+          }
         }
         if (savedConnectors) {
           const parsedConnectors = JSON.parse(savedConnectors);
@@ -1419,10 +1546,11 @@ export default function HomePage() {
             setReadNotificationIds(parsedReadNotifications.slice(0, 30));
           }
         }
-        window.localStorage.setItem("unzoo-one-schema-version", "6");
+        window.localStorage.setItem("unzoo-one-schema-version", "7");
       } catch {
         window.localStorage.removeItem("unzoo-one-tasks");
         window.localStorage.removeItem("unzoo-one-settings");
+        window.localStorage.removeItem("unzoo-one-usage");
         window.localStorage.removeItem("unzoo-one-connectors");
         window.localStorage.removeItem("unzoo-one-team");
         window.localStorage.removeItem("unzoo-one-pending-approvals");
@@ -1446,6 +1574,10 @@ export default function HomePage() {
     if (settings.local) {
       window.localStorage.setItem("unzoo-one-tasks", JSON.stringify(tasks));
       window.localStorage.setItem("unzoo-one-settings", JSON.stringify(settings));
+      window.localStorage.setItem(
+        "unzoo-one-usage",
+        JSON.stringify(usageSettings),
+      );
       window.localStorage.setItem(
         "unzoo-one-connectors",
         JSON.stringify(connectorStates),
@@ -1474,6 +1606,7 @@ export default function HomePage() {
     } else {
       window.localStorage.removeItem("unzoo-one-tasks");
       window.localStorage.removeItem("unzoo-one-settings");
+      window.localStorage.removeItem("unzoo-one-usage");
       window.localStorage.removeItem("unzoo-one-connectors");
       window.localStorage.removeItem("unzoo-one-team");
       window.localStorage.removeItem("unzoo-one-pending-approvals");
@@ -1493,6 +1626,7 @@ export default function HomePage() {
     tasks,
     tasksReady,
     teamMembers,
+    usageSettings,
   ]);
 
   useEffect(() => {
@@ -1523,6 +1657,7 @@ export default function HomePage() {
         (event.metaKey || event.ctrlKey) &&
         event.key.toLowerCase() === "k" &&
         !composerOpen &&
+        !usageBudgetOpen &&
         !bulkApprovalDecision &&
         !bulkDeleteOpen &&
         !teamInviteOpen &&
@@ -1574,6 +1709,7 @@ export default function HomePage() {
     selectedTask,
     teamInviteOpen,
     temporaryModeOpen,
+    usageBudgetOpen,
     workspaceResetOpen,
   ]);
 
@@ -1604,6 +1740,7 @@ export default function HomePage() {
     if (!activeOverlayKind) return;
 
     const selectorByKind = {
+      "usage-budget": ".usage-budget-dialog",
       import: ".workspace-import-dialog",
       "bulk-approval": ".bulk-approval-dialog",
       "bulk-delete": ".bulk-delete-dialog",
@@ -1634,7 +1771,9 @@ export default function HomePage() {
     });
 
     function closeTopOverlay() {
-      if (activeOverlayKind === "import") {
+      if (activeOverlayKind === "usage-budget") {
+        setUsageBudgetOpen(false);
+      } else if (activeOverlayKind === "import") {
         setPendingWorkspaceImport(null);
       } else if (activeOverlayKind === "bulk-approval") {
         setBulkApprovalDecision(null);
@@ -2050,12 +2189,13 @@ export default function HomePage() {
     const serialized = JSON.stringify({
       tasks,
       settings,
+      usage: usageSettings,
       approvalIds: approvals.map((item) => item.id),
       activity: activityLog,
       artifacts,
     });
     return Math.max(1, Math.ceil(serialized.length / 1024));
-  }, [activityLog, approvals, artifacts, settings, tasks]);
+  }, [activityLog, approvals, artifacts, settings, tasks, usageSettings]);
   const latestActivity = activityLog[0] ?? initialActivityItems[0];
   const latestArtifact = artifacts[0] ?? null;
   const notificationItems = useMemo<NotificationItem[]>(() => {
@@ -2198,6 +2338,7 @@ export default function HomePage() {
       exportedAt: new Date().toISOString(),
       tasks,
       settings,
+      usage: usageSettings,
       connectors: connectorStates,
       members: teamMembers,
       approvalIds: approvals.map((item) => item.id),
@@ -2330,6 +2471,8 @@ export default function HomePage() {
     setArtifactSort("最近更新");
     setSelectedArtifactId(restoredArtifacts[0]?.id ?? "");
     setSettings(backup.settings);
+    setUsageSettings(backup.usage ?? { ...defaultUsageSettings });
+    setUsageBudgetOpen(false);
     setConnectorStates(backup.connectors ?? { ...defaultConnectorStates });
     setSelectedConnectorId(null);
     setConnectorDisconnectConfirm(false);
@@ -2385,6 +2528,11 @@ export default function HomePage() {
     setArtifactSort("最近更新");
     setSelectedArtifactId(initialArtifacts[0].id);
     setSettings({ ...defaultSettings });
+    setUsageSettings({ ...defaultUsageSettings });
+    setUsageBudgetOpen(false);
+    setUsageBudgetDraft(String(defaultUsageSettings.monthlyBudget));
+    setUsageAlertDraft(defaultUsageSettings.alertThreshold);
+    setUsagePauseDraft(defaultUsageSettings.pauseAtLimit);
     setConnectorStates({ ...defaultConnectorStates });
     setSelectedConnectorId(null);
     setConnectorDisconnectConfirm(false);
@@ -3186,6 +3334,109 @@ export default function HomePage() {
       kind: "系统",
     });
     setNotice(`已恢复 ${snapshot.deletedCount} 个任务`);
+  }
+
+  function openUsageBudget() {
+    setUsageBudgetDraft(String(usageSettings.monthlyBudget));
+    setUsageAlertDraft(usageSettings.alertThreshold);
+    setUsagePauseDraft(usageSettings.pauseAtLimit);
+    setUsageBudgetOpen(true);
+  }
+
+  function saveUsageBudget() {
+    if (usageBudgetDraftInvalid) return;
+    const monthlyBudget = Math.round(usageBudgetDraftValue);
+    const nextSettings: UsageSettings = {
+      monthlyBudget,
+      alertThreshold: usageAlertDraft,
+      pauseAtLimit: usagePauseDraft,
+    };
+    const shouldPause = usagePauseDraft && usedCredits >= monthlyBudget;
+    const runningTaskIds = tasks
+      .filter((task) => task.status === "运行中")
+      .map((task) => task.id);
+
+    setUsageSettings(nextSettings);
+    setUsageBudgetOpen(false);
+    if (shouldPause && runningTaskIds.length > 0) {
+      const runningIds = new Set(runningTaskIds);
+      setTasks((items) =>
+        items.map((task) =>
+          runningIds.has(task.id)
+            ? {
+                ...task,
+                status: "已暂停",
+                updated: "因用量到限保护暂停",
+              }
+            : task,
+        ),
+      );
+      if (runningIds.has("competitor")) {
+        setIsRunning(false);
+      }
+      recordActivity({
+        title: `月度额度已更新：${monthlyBudget} 点`,
+        detail: `当前已使用 ${usedCredits} 点，达到预算上限；已暂停 ${runningTaskIds.length} 个运行中任务。提醒阈值：${usageAlertDraft}%。`,
+        icon: "settings",
+        tone: "amber",
+        kind: "系统",
+      });
+      setNotice(
+        `预算已保存，${runningTaskIds.length} 个任务因用量到限保护暂停`,
+      );
+      return;
+    }
+
+    recordActivity({
+      title: `月度额度已更新：${monthlyBudget} 点`,
+      detail: `提醒阈值：${usageAlertDraft}% · 到限自动暂停：${usagePauseDraft ? "开启" : "关闭"}。`,
+      icon: "settings",
+      tone: "blue",
+      kind: "系统",
+    });
+    setNotice(`月度额度已更新为 ${monthlyBudget} 点`);
+  }
+
+  function exportUsageReport() {
+    const rows = [
+      ["项目", "本月额度", "占已用比例"],
+      ...usageBreakdown.map((item) => [
+        item.label,
+        String(item.credits),
+        `${Math.round((item.credits / Math.max(1, usedCredits)) * 100)}%`,
+      ]),
+      ["合计", String(usedCredits), "100%"],
+      ["月度预算", String(usageSettings.monthlyBudget), ""],
+      ["月底预计", String(forecastCredits), ""],
+    ];
+    const csv = rows
+      .map((row) =>
+        row
+          .map((value) => `"${value.replace(/"/g, '""')}"`)
+          .join(","),
+      )
+      .join("\r\n");
+    const blob = new Blob([`\uFEFF${csv}`], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `unzoo-one-usage-${new Date()
+      .toISOString()
+      .slice(0, 7)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+    recordActivity({
+      title: "用量报告已导出",
+      detail: `已导出本月 ${usedCredits} 点 AI 用量及分类明细。`,
+      icon: "activity",
+      tone: "blue",
+      kind: "系统",
+    });
+    setNotice("本月用量报告已导出");
   }
 
   function toggleSetting(key: keyof SettingsState, label: string) {
@@ -5730,6 +5981,191 @@ export default function HomePage() {
               </div>
             </div>
 
+            <section
+              className={`settings-usage-center ${
+                budgetExceeded
+                  ? "is-over"
+                  : budgetAlertReached
+                    ? "is-alert"
+                    : ""
+              }`}
+            >
+              <header className="settings-usage-heading">
+                <div>
+                  <span>用量与预算</span>
+                  <h2>看清 AI 消耗，并在超额前自动保护</h2>
+                  <p>本月额度根据任务执行、连接器调用和本机成果记录实时估算。</p>
+                </div>
+                <div className="settings-usage-heading-actions">
+                  <span className="settings-plan-badge">
+                    <Sparkles size={15} />
+                    Team 方案
+                  </span>
+                  <button type="button" onClick={exportUsageReport}>
+                    <Download size={15} />
+                    导出用量
+                  </button>
+                  <button className="primary" type="button" onClick={openUsageBudget}>
+                    <Pencil size={15} />
+                    调整预算
+                  </button>
+                </div>
+              </header>
+
+              <div className="settings-usage-layout">
+                <div className="usage-meter-panel">
+                  <div className="usage-meter-heading">
+                    <span>
+                      <small>本月已使用</small>
+                      <strong>
+                        {usedCredits}
+                        <em> 点</em>
+                      </strong>
+                    </span>
+                    <span>
+                      <small>月度预算</small>
+                      <strong>
+                        {usageSettings.monthlyBudget}
+                        <em> 点</em>
+                      </strong>
+                    </span>
+                  </div>
+                  <div
+                    className="usage-budget-track"
+                    role="progressbar"
+                    aria-label="本月 AI 额度使用"
+                    aria-valuemin={0}
+                    aria-valuemax={usageSettings.monthlyBudget}
+                    aria-valuenow={Math.min(
+                      usedCredits,
+                      usageSettings.monthlyBudget,
+                    )}
+                  >
+                    <span style={{ width: `${usagePercent}%` }} />
+                    <i
+                      style={{
+                        left: `${Math.min(100, usageSettings.alertThreshold)}%`,
+                      }}
+                      title={`${usageSettings.alertThreshold}% 提醒线`}
+                    />
+                  </div>
+                  <div className="usage-meter-legend">
+                    <span>{usagePercent}% 已使用</span>
+                    <span>{usageSettings.alertThreshold}% 提醒</span>
+                  </div>
+                  <div className="usage-forecast">
+                    <span>
+                      <Activity size={16} />
+                      <span>
+                        <small>月底预计</small>
+                        <strong>{forecastCredits} 点</strong>
+                      </span>
+                    </span>
+                    <span>
+                      <Clock3 size={16} />
+                      <span>
+                        <small>额度刷新</small>
+                        <strong>8 月 1 日</strong>
+                      </span>
+                    </span>
+                  </div>
+                  {budgetAlertReached && (
+                    <div className="usage-budget-alert" role="status">
+                      <AlertTriangle size={16} />
+                      <span>
+                        <strong>
+                          {budgetExceeded ? "已达到月度预算" : "用量已超过提醒线"}
+                        </strong>
+                        <small>
+                          {usageSettings.pauseAtLimit
+                            ? "到达 100% 后会自动暂停运行中的任务。"
+                            : "当前未开启到限自动暂停，请关注后续消耗。"}
+                        </small>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="usage-breakdown-panel">
+                  <div className="usage-section-heading">
+                    <span>消耗分布</span>
+                    <strong>{usageBreakdown.length} 类</strong>
+                  </div>
+                  <div className="usage-breakdown-list">
+                    {usageBreakdown.map((item) => {
+                      const UsageIcon = item.icon;
+                      const share = Math.round(
+                        (item.credits / Math.max(1, usedCredits)) * 100,
+                      );
+                      return (
+                        <div className={`tone-${item.tone}`} key={item.id}>
+                          <span className="usage-breakdown-icon">
+                            <UsageIcon size={16} />
+                          </span>
+                          <span className="usage-breakdown-copy">
+                            <span>
+                              <strong>{item.label}</strong>
+                              <em>{item.credits} 点</em>
+                            </span>
+                            <small>{item.detail}</small>
+                            <i>
+                              <span style={{ width: `${Math.max(5, share)}%` }} />
+                            </i>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <aside className="usage-guard-panel">
+                  <div className="usage-section-heading">
+                    <span>预算保护</span>
+                    <strong>{budgetExceeded ? "已触发" : "运行中"}</strong>
+                  </div>
+                  <div className="usage-guard-list">
+                    <div>
+                      <Bell size={17} />
+                      <span>
+                        <small>用量提醒</small>
+                        <strong>达到 {usageSettings.alertThreshold}% 时提醒</strong>
+                      </span>
+                    </div>
+                    <div>
+                      <Pause size={17} />
+                      <span>
+                        <small>到限处理</small>
+                        <strong>
+                          {usageSettings.pauseAtLimit
+                            ? "自动暂停运行中任务"
+                            : "继续运行并仅显示提醒"}
+                        </strong>
+                      </span>
+                    </div>
+                    <div>
+                      <ShieldCheck size={17} />
+                      <span>
+                        <small>影响范围</small>
+                        <strong>只影响当前工作区</strong>
+                      </span>
+                    </div>
+                  </div>
+                  <button type="button" onClick={openUsageBudget}>
+                    <Settings2 size={15} />
+                    管理预算保护
+                    <ChevronRight size={15} />
+                  </button>
+                </aside>
+              </div>
+
+              <footer className="settings-usage-footnote">
+                <ShieldCheck size={15} />
+                <span>
+                  用量为本机运行记录估算，不包含未连接服务的外部账单；预算变更会写入审计记录。
+                </span>
+              </footer>
+            </section>
+
             <section className="settings-team-center">
               <header className="settings-team-heading">
                 <div>
@@ -7220,6 +7656,162 @@ export default function HomePage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {usageBudgetOpen && (
+        <div
+          className="clarity-dialog-backdrop"
+          onMouseDown={() => setUsageBudgetOpen(false)}
+        >
+          <section
+            className="usage-budget-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="usage-budget-title"
+            aria-describedby="usage-budget-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="usage-budget-close"
+              type="button"
+              aria-label="关闭预算设置"
+              onClick={() => setUsageBudgetOpen(false)}
+            >
+              <X size={17} />
+            </button>
+            <span className="usage-budget-icon">
+              <Sparkles size={21} />
+            </span>
+            <span className="usage-budget-eyebrow">用量与预算</span>
+            <h2 id="usage-budget-title">设置当前工作区的月度额度</h2>
+            <p id="usage-budget-description">
+              额度只影响当前工作区。提醒和到限保护会依据本机估算用量执行。
+            </p>
+
+            <div className="usage-budget-facts">
+              <span>
+                <small>当前已用</small>
+                <strong>{usedCredits} 点</strong>
+              </span>
+              <span>
+                <small>月底预计</small>
+                <strong>{forecastCredits} 点</strong>
+              </span>
+              <span>
+                <small>运行中任务</small>
+                <strong>{runningTaskCount} 个</strong>
+              </span>
+            </div>
+
+            <label className="usage-budget-field">
+              <span>
+                <strong>月度额度</strong>
+                <small>100 - 50,000 点</small>
+              </span>
+              <span className={usageBudgetDraftInvalid ? "has-error" : ""}>
+                <input
+                  data-overlay-initial-focus
+                  type="number"
+                  min={100}
+                  max={50000}
+                  step={50}
+                  aria-label="月度 AI 额度"
+                  aria-invalid={usageBudgetDraftInvalid}
+                  value={usageBudgetDraft}
+                  onChange={(event) => setUsageBudgetDraft(event.target.value)}
+                />
+                <em>点 / 月</em>
+              </span>
+              {usageBudgetDraftInvalid && (
+                <small className="usage-budget-error" role="alert">
+                  请输入 100 到 50,000 之间的额度。
+                </small>
+              )}
+            </label>
+
+            <div className="usage-budget-presets" aria-label="常用额度">
+              {[500, 1000, 2000, 5000].map((value) => (
+                <button
+                  className={
+                    usageBudgetDraftValue === value ? "active" : ""
+                  }
+                  key={value}
+                  type="button"
+                  onClick={() => setUsageBudgetDraft(String(value))}
+                >
+                  {value.toLocaleString()} 点
+                </button>
+              ))}
+            </div>
+
+            <fieldset className="usage-alert-threshold">
+              <legend>
+                <strong>提醒阈值</strong>
+                <small>达到预算比例时显示提醒</small>
+              </legend>
+              <div role="radiogroup" aria-label="预算提醒阈值">
+                {([50, 75, 90] as const).map((threshold) => (
+                  <button
+                    className={usageAlertDraft === threshold ? "active" : ""}
+                    key={threshold}
+                    type="button"
+                    role="radio"
+                    aria-checked={usageAlertDraft === threshold}
+                    onClick={() => setUsageAlertDraft(threshold)}
+                  >
+                    {threshold}%
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <div className="usage-pause-setting">
+              <span>
+                <Pause size={17} />
+                <span>
+                  <strong>达到预算后暂停运行中任务</strong>
+                  <small>不会删除任务，调整额度或手动继续后可恢复。</small>
+                </span>
+              </span>
+              <button
+                className={`switch-control ${usagePauseDraft ? "on" : ""}`}
+                type="button"
+                role="switch"
+                aria-checked={usagePauseDraft}
+                aria-label="达到预算后暂停运行中任务"
+                onClick={() => setUsagePauseDraft((current) => !current)}
+              >
+                <i />
+              </button>
+            </div>
+
+            {!usageBudgetDraftInvalid &&
+              usagePauseDraft &&
+              usageBudgetDraftValue <= usedCredits && (
+                <div className="usage-budget-warning">
+                  <AlertTriangle size={16} />
+                  <span>
+                    保存后会立即暂停 {runningTaskCount} 个运行中任务，因为当前用量已经达到新预算。
+                  </span>
+                </div>
+              )}
+
+            <div className="usage-budget-actions">
+              <button type="button" onClick={() => setUsageBudgetOpen(false)}>
+                取消
+              </button>
+              <button
+                className="confirm"
+                type="button"
+                disabled={usageBudgetDraftInvalid}
+                onClick={saveUsageBudget}
+              >
+                <Check size={15} />
+                保存预算
+              </button>
+            </div>
+          </section>
         </div>
       )}
 

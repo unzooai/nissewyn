@@ -55,6 +55,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-settings"/);
   assert.match(page, /"unzoo-one-connectors"/);
   assert.match(page, /"unzoo-one-team"/);
+  assert.match(page, /"unzoo-one-usage"/);
+  assert.match(page, /"unzoo-one-schema-version", "7"/);
   assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-activity"/);
   assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-artifacts"/);
   assert.match(page, /"unzoo-one-pending-approvals"/);
@@ -91,6 +93,14 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function confirmRemoveTeamMember/);
   assert.match(page, /members: teamMembers/);
   assert.match(page, /teamInviteFormErrors/);
+  assert.match(page, /type UsageSettings =/);
+  assert.match(page, /const defaultUsageSettings: UsageSettings/);
+  assert.match(page, /function isUsageSettings/);
+  assert.match(page, /function openUsageBudget/);
+  assert.match(page, /function saveUsageBudget/);
+  assert.match(page, /function exportUsageReport/);
+  assert.match(page, /usage: usageSettings/);
+  assert.match(page, /aria-label="本月 AI 额度使用"/);
   assert.match(page, /function scrollWorkspaceTop/);
   assert.match(page, /temporaryModeOpen/);
   assert.match(page, /关闭页面后保留工作区/);
@@ -186,6 +196,12 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.team-invite-dialog/);
   assert.match(css, /\.team-member-dialog/);
   assert.match(css, /\.team-member-remove-confirm/);
+  assert.match(css, /\.settings-usage-center/);
+  assert.match(css, /\.settings-usage-center\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/s);
+  assert.match(css, /\.usage-budget-track/);
+  assert.match(css, /\.usage-breakdown-list/);
+  assert.match(css, /\.usage-budget-dialog/);
+  assert.match(css, /\.usage-budget-warning/);
   assert.match(page, /handleOverlayKeyDown/);
   assert.match(page, /data-overlay-initial-focus/);
   assert.match(page, /notificationWrapRef/);
