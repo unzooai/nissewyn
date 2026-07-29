@@ -56,8 +56,13 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(brandMark, /id="unzoo-accent"/);
   assert.match(brandMark, /stroke-width="10"/);
   assert.match(page, /const taskFilters: TaskFilter\[\]/);
-  assert.match(page, /window\.localStorage\.setItem\("unzoo-one-tasks"/);
-  assert.match(page, /window\.localStorage\.setItem\("unzoo-one-settings"/);
+  assert.match(page, /type WorkspacePersistenceStatus =/);
+  assert.match(page, /const legacyWorkspaceStorageKeys =/);
+  assert.match(page, /function removeLocalStorageItems/);
+  assert.match(page, /function getWorkspacePersistenceError/);
+  assert.match(page, /function retryWorkspaceSave/);
+  assert.match(page, /function exportEmergencyWorkspaceBackup/);
+  assert.match(page, /className={`workspace-storage-banner/);
   assert.match(page, /type WorkspaceSyncSnapshot =/);
   assert.match(page, /const workspaceSyncKey = "unzoo-one-workspace-sync"/);
   assert.match(page, /function parseWorkspaceSyncSnapshot/);
@@ -103,8 +108,11 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /"unzoo-one-team"/);
   assert.match(page, /"unzoo-one-usage"/);
   assert.match(page, /"unzoo-one-schema-version", "9"/);
-  assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-activity"/);
-  assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-artifacts"/);
+  assert.match(
+    page,
+    /window\.localStorage\.setItem\(\s*workspaceSyncKey,\s*JSON\.stringify\(snapshot\)/,
+  );
+  assert.match(page, /removeLocalStorageItems\(legacyWorkspaceStorageKeys\)/);
   assert.match(page, /"unzoo-one-pending-approvals"/);
   assert.match(page, /function createTask/);
   assert.match(page, /function beginEditTask/);
@@ -317,6 +325,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.settings-trust-center/);
   assert.match(css, /\.switch-control:disabled/);
   assert.match(css, /\.settings-policy-row > button:disabled/);
+  assert.match(css, /\.workspace-storage-banner/);
+  assert.match(css, /\.workspace-storage-actions/);
+  assert.match(css, /\.clarity-sidebar-status > i\.storage-failed/);
   assert.match(css, /\.network-status-banner/);
   assert.match(css, /\.workspace-sync-banner/);
   assert.match(css, /\.workspace-sync-banner\.has-conflict/);

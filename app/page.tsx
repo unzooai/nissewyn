@@ -218,6 +218,11 @@ type WorkspaceSyncNotice = {
   sections: WorkspaceSyncSection[];
   conflicts: WorkspaceSyncConflict[];
 };
+type WorkspacePersistenceStatus =
+  | "saved"
+  | "retrying"
+  | "failed"
+  | "temporary";
 type PendingWorkspaceImport = {
   backup: WorkspaceBackup;
   fileName: string;
@@ -412,6 +417,20 @@ const taskSchedules: TaskSchedule[] = ["仅运行一次", "每天", "每周"];
 const taskDraftRecoveryKey = "unzoo-one-task-draft-recovery";
 const artifactDraftRecoveryKey = "unzoo-one-artifact-draft-recovery";
 const workspaceSyncKey = "unzoo-one-workspace-sync";
+const legacyWorkspaceStorageKeys = [
+  "unzoo-one-tasks",
+  "unzoo-one-settings",
+  "unzoo-one-usage",
+  "unzoo-one-connectors",
+  "unzoo-one-team",
+  "unzoo-one-pending-approvals",
+  "unzoo-one-activity",
+  "unzoo-one-artifacts",
+] as const;
+const workspacePreferenceStorageKeys = [
+  "unzoo-one-recent-searches",
+  "unzoo-one-read-notifications",
+] as const;
 const taskDraftRecoveryMaxAge = 7 * 24 * 60 * 60 * 1000;
 const workspaceSyncSectionLabels: Record<WorkspaceSyncSection, string> = {
   tasks: "任务",
@@ -670,6 +689,36 @@ function clearDraftRecoveryStorage(key: string) {
   } catch {
     // Browsers may disable session storage; the active form remains usable.
   }
+}
+
+function removeLocalStorageItems(keys: readonly string[]) {
+  let cleared = true;
+  for (const key of keys) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      cleared = false;
+    }
+  }
+  return cleared;
+}
+
+function getWorkspacePersistenceError(error: unknown, clearing = false) {
+  const errorName =
+    error && typeof error === "object" && "name" in error
+      ? String(error.name)
+      : "";
+  const quotaExceeded =
+    errorName === "QuotaExceededError" ||
+    errorName === "NS_ERROR_DOM_QUOTA_REACHED";
+
+  if (clearing) {
+    return "浏览器阻止了本机数据清理。请重试，或先导出备份后检查浏览器的站点存储权限。";
+  }
+  if (quotaExceeded) {
+    return "本机存储空间不足，新的修改还没有安全落盘。请导出备份并清理浏览器站点数据后重试。";
+  }
+  return "浏览器暂时阻止了本机保存，当前页面中的修改仍然保留。请重试保存或立即导出备份。";
 }
 
 function DraftRecoveryNotice({
@@ -1901,6 +1950,14 @@ export default function HomePage() {
   const [workspaceSyncNotice, setWorkspaceSyncNotice] =
     useState<WorkspaceSyncNotice | null>(null);
   const [workspaceLoadWarning, setWorkspaceLoadWarning] = useState("");
+  const [workspacePersistenceStatus, setWorkspacePersistenceStatus] =
+    useState<WorkspacePersistenceStatus>("saved");
+  const [workspacePersistenceDetail, setWorkspacePersistenceDetail] =
+    useState("");
+  const [workspaceLastSavedAt, setWorkspaceLastSavedAt] = useState<
+    string | null
+  >(null);
+  const [workspaceSaveRetryToken, setWorkspaceSaveRetryToken] = useState(0);
   const [taskName, setTaskName] = useState("跟踪一个新网页");
   const [taskTarget, setTaskTarget] = useState("https://example.com");
   const [taskDescription, setTaskDescription] = useState(
@@ -1972,6 +2029,7 @@ export default function HomePage() {
   const externalWorkspaceSyncSignatureRef = useRef("");
   const applyingExternalWorkspaceSyncRef = useRef(false);
   const pendingWorkspaceSyncRef = useRef<WorkspaceSyncSnapshot | null>(null);
+  const workspaceSaveRetryingRef = useRef(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const approvalDetailRef = useRef<HTMLDivElement>(null);
   const activityInspectorRef = useRef<HTMLElement>(null);
@@ -1991,21 +2049,45 @@ export default function HomePage() {
   const failedTaskCount = tasks.filter((task) => task.status === "失败").length;
   const attentionCount = approvals.length + failedTaskCount;
   const workspaceToday = getWorkspaceToday();
-  const systemStatusTone = !isOnline
-    ? "offline"
-    : isRunning
-      ? "online"
-      : "paused";
-  const systemStatusLabel = !isOnline
-    ? "设备当前离线"
-    : isRunning
-      ? "系统运行正常"
-      : "自动运行已暂停";
-  const systemStatusDetail = !isOnline
-    ? "本机数据可用 · 在线能力暂停"
-    : settings.local
-      ? "数据保存在本机"
-      : "临时会话 · 关闭后清空";
+  const workspaceLastSavedLabel = workspaceLastSavedAt
+    ? new Intl.DateTimeFormat("zh-CN", {
+        timeZone: "Asia/Shanghai",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(workspaceLastSavedAt))
+    : "";
+  const systemStatusTone =
+    workspacePersistenceStatus === "failed"
+      ? "storage-failed"
+      : workspacePersistenceStatus === "retrying"
+        ? "storage-retrying"
+        : !isOnline
+          ? "offline"
+          : isRunning
+            ? "online"
+            : "paused";
+  const systemStatusLabel =
+    workspacePersistenceStatus === "failed"
+      ? "本机保存失败"
+      : workspacePersistenceStatus === "retrying"
+        ? "正在重试保存"
+        : !isOnline
+          ? "设备当前离线"
+          : isRunning
+            ? "系统运行正常"
+            : "自动运行已暂停";
+  const systemStatusDetail =
+    workspacePersistenceStatus === "failed"
+      ? "请重试或导出紧急备份"
+      : workspacePersistenceStatus === "retrying"
+        ? "正在验证本机存储"
+        : !isOnline
+          ? "本机数据可用 · 在线能力暂停"
+          : settings.local
+            ? workspaceLastSavedLabel
+              ? `本机已保存 · ${workspaceLastSavedLabel}`
+              : "数据保存在本机"
+            : "临时会话 · 关闭后清空";
   const pageTitle =
     activeView === "home"
       ? {
@@ -2521,6 +2603,9 @@ export default function HomePage() {
 
     applyingExternalWorkspaceSyncRef.current = true;
     externalWorkspaceSyncSignatureRef.current = signature;
+    setWorkspacePersistenceStatus("saved");
+    setWorkspacePersistenceDetail("");
+    setWorkspaceLastSavedAt(snapshot.updatedAt);
     setTasks(snapshot.tasks);
     setSettings(snapshot.settings);
     setUsageSettings(snapshot.usage);
@@ -2782,6 +2867,7 @@ export default function HomePage() {
         if (syncedWorkspace) {
           lastWorkspaceSyncSignatureRef.current =
             workspaceSyncSignature(syncedWorkspace);
+          setWorkspaceLastSavedAt(syncedWorkspace.updatedAt);
         }
         const saved = syncedWorkspace
           ? JSON.stringify(syncedWorkspace.tasks)
@@ -2954,22 +3040,25 @@ export default function HomePage() {
           }
         }
         window.localStorage.setItem("unzoo-one-schema-version", "9");
-      } catch {
-        window.localStorage.removeItem("unzoo-one-tasks");
-        window.localStorage.removeItem("unzoo-one-settings");
-        window.localStorage.removeItem("unzoo-one-usage");
-        window.localStorage.removeItem("unzoo-one-connectors");
-        window.localStorage.removeItem("unzoo-one-team");
-        window.localStorage.removeItem("unzoo-one-pending-approvals");
-        window.localStorage.removeItem("unzoo-one-activity");
-        window.localStorage.removeItem("unzoo-one-artifacts");
-        window.localStorage.removeItem("unzoo-one-recent-searches");
-        window.localStorage.removeItem("unzoo-one-read-notifications");
-        window.localStorage.removeItem(workspaceSyncKey);
+      } catch (error) {
         lastWorkspaceSyncSignatureRef.current = "";
-        setWorkspaceLoadWarning(
-          "检测到损坏的本机数据，已使用安全的默认工作区启动。你可以继续使用，或从备份恢复原有内容。",
-        );
+        if (error instanceof SyntaxError) {
+          removeLocalStorageItems([
+            ...legacyWorkspaceStorageKeys,
+            ...workspacePreferenceStorageKeys,
+            workspaceSyncKey,
+          ]);
+          setWorkspaceLoadWarning(
+            "检测到损坏的本机数据，已使用安全的默认工作区启动。你可以继续使用，或从备份恢复原有内容。",
+          );
+        } else {
+          const detail = getWorkspacePersistenceError(error);
+          setWorkspacePersistenceStatus("failed");
+          setWorkspacePersistenceDetail(detail);
+          setWorkspaceLoadWarning(
+            "浏览器未能完成本机数据校验，当前页面已使用安全的默认工作区。请先重试保存，或从备份恢复。",
+          );
+        }
       } finally {
         setTasksReady(true);
       }
@@ -3070,62 +3159,95 @@ export default function HomePage() {
       return;
     }
 
+    let persistenceStatusTimer: number | null = null;
+    function queuePersistenceStatus(update: () => void) {
+      if (persistenceStatusTimer !== null) {
+        window.clearTimeout(persistenceStatusTimer);
+      }
+      persistenceStatusTimer = window.setTimeout(update, 0);
+    }
+
     if (settings.local) {
-      window.localStorage.setItem("unzoo-one-tasks", JSON.stringify(tasks));
-      window.localStorage.setItem("unzoo-one-settings", JSON.stringify(settings));
-      window.localStorage.setItem(
-        "unzoo-one-usage",
-        JSON.stringify(usageSettings),
-      );
-      window.localStorage.setItem(
-        "unzoo-one-connectors",
-        JSON.stringify(connectorStates),
-      );
-      window.localStorage.setItem("unzoo-one-team", JSON.stringify(teamMembers));
-      window.localStorage.setItem(
-        "unzoo-one-pending-approvals",
-        JSON.stringify(approvals.map((item) => item.id)),
-      );
-      window.localStorage.setItem(
-        "unzoo-one-activity",
-        JSON.stringify(activityLog.slice(0, 100)),
-      );
-      window.localStorage.setItem(
-        "unzoo-one-artifacts",
-        JSON.stringify(artifacts.slice(0, 100)),
-      );
-      window.localStorage.setItem(
-        "unzoo-one-recent-searches",
-        JSON.stringify(recentSearchKeys.slice(0, 4)),
-      );
-      window.localStorage.setItem(
-        "unzoo-one-read-notifications",
-        JSON.stringify(readNotificationIds.slice(0, 30)),
-      );
-      if (lastWorkspaceSyncSignatureRef.current !== signature) {
-        const snapshot: WorkspaceSyncSnapshot = {
-          version: 1,
-          source: workspaceTabIdRef.current,
-          updatedAt: new Date().toISOString(),
-          ...workspaceData,
-        };
-        window.localStorage.setItem(workspaceSyncKey, JSON.stringify(snapshot));
-        lastWorkspaceSyncSignatureRef.current = signature;
+      try {
+        const savedAt = new Date().toISOString();
+        if (lastWorkspaceSyncSignatureRef.current !== signature) {
+          const snapshot: WorkspaceSyncSnapshot = {
+            version: 1,
+            source: workspaceTabIdRef.current,
+            updatedAt: savedAt,
+            ...workspaceData,
+          };
+          window.localStorage.setItem(
+            workspaceSyncKey,
+            JSON.stringify(snapshot),
+          );
+          lastWorkspaceSyncSignatureRef.current = signature;
+        }
+        window.localStorage.setItem(
+          "unzoo-one-recent-searches",
+          JSON.stringify(recentSearchKeys.slice(0, 4)),
+        );
+        window.localStorage.setItem(
+          "unzoo-one-read-notifications",
+          JSON.stringify(readNotificationIds.slice(0, 30)),
+        );
+        removeLocalStorageItems(legacyWorkspaceStorageKeys);
+        queuePersistenceStatus(() => {
+          setWorkspacePersistenceStatus("saved");
+          setWorkspacePersistenceDetail("");
+          setWorkspaceLastSavedAt(savedAt);
+          if (workspaceSaveRetryingRef.current) {
+            workspaceSaveRetryingRef.current = false;
+            setNotice("本机保存已恢复，当前工作区已经安全落盘");
+          }
+        });
+      } catch (error) {
+        lastWorkspaceSyncSignatureRef.current = "";
+        const detail = getWorkspacePersistenceError(error);
+        queuePersistenceStatus(() => {
+          setWorkspacePersistenceStatus("failed");
+          setWorkspacePersistenceDetail(detail);
+          if (workspaceSaveRetryingRef.current) {
+            workspaceSaveRetryingRef.current = false;
+            setNotice("重试保存失败，请先导出紧急备份");
+          }
+        });
       }
     } else {
-      window.localStorage.removeItem("unzoo-one-tasks");
-      window.localStorage.removeItem("unzoo-one-settings");
-      window.localStorage.removeItem("unzoo-one-usage");
-      window.localStorage.removeItem("unzoo-one-connectors");
-      window.localStorage.removeItem("unzoo-one-team");
-      window.localStorage.removeItem("unzoo-one-pending-approvals");
-      window.localStorage.removeItem("unzoo-one-activity");
-      window.localStorage.removeItem("unzoo-one-artifacts");
-      window.localStorage.removeItem("unzoo-one-recent-searches");
-      window.localStorage.removeItem("unzoo-one-read-notifications");
-      window.localStorage.removeItem(workspaceSyncKey);
+      const cleared = removeLocalStorageItems([
+        ...legacyWorkspaceStorageKeys,
+        ...workspacePreferenceStorageKeys,
+        workspaceSyncKey,
+      ]);
       lastWorkspaceSyncSignatureRef.current = "";
+      if (cleared) {
+        queuePersistenceStatus(() => {
+          setWorkspacePersistenceStatus("temporary");
+          setWorkspacePersistenceDetail("");
+          setWorkspaceLastSavedAt(null);
+          if (workspaceSaveRetryingRef.current) {
+            workspaceSaveRetryingRef.current = false;
+            setNotice("本机数据已清理，当前为临时会话");
+          }
+        });
+      } else {
+        const detail = getWorkspacePersistenceError(null, true);
+        queuePersistenceStatus(() => {
+          setWorkspacePersistenceStatus("failed");
+          setWorkspacePersistenceDetail(detail);
+          if (workspaceSaveRetryingRef.current) {
+            workspaceSaveRetryingRef.current = false;
+            setNotice("重试清理失败，请检查浏览器的站点存储权限");
+          }
+        });
+      }
     }
+
+    return () => {
+      if (persistenceStatusTimer !== null) {
+        window.clearTimeout(persistenceStatusTimer);
+      }
+    };
   }, [
     activityLog,
     approvals,
@@ -3138,6 +3260,7 @@ export default function HomePage() {
     tasksReady,
     teamMembers,
     usageSettings,
+    workspaceSaveRetryToken,
   ]);
 
   useEffect(() => {
@@ -5528,6 +5651,20 @@ export default function HomePage() {
     importInputRef.current?.click();
   }
 
+  function retryWorkspaceSave() {
+    if (workspacePersistenceStatus === "retrying") return;
+    workspaceSaveRetryingRef.current = true;
+    lastWorkspaceSyncSignatureRef.current = "";
+    setWorkspacePersistenceStatus("retrying");
+    setWorkspacePersistenceDetail("正在重新验证本机存储并保存完整工作区。");
+    setWorkspaceSaveRetryToken((value) => value + 1);
+  }
+
+  function exportEmergencyWorkspaceBackup() {
+    exportWorkspace();
+    setNotice("紧急备份已导出；本机保存恢复前请保留这份文件");
+  }
+
   function reviewWorkspaceSync() {
     const sections = workspaceSyncNotice?.sections ?? [];
     setWorkspaceSyncNotice(null);
@@ -7762,6 +7899,58 @@ export default function HomePage() {
             </button>
           </div>
         </header>
+
+        {tasksReady &&
+          (workspacePersistenceStatus === "failed" ||
+            workspacePersistenceStatus === "retrying") && (
+            <section
+              className={`workspace-storage-banner ${
+                workspacePersistenceStatus === "retrying" ? "is-retrying" : ""
+              }`}
+              role="alert"
+              aria-live="assertive"
+            >
+              <span className="workspace-storage-icon" aria-hidden="true">
+                {workspacePersistenceStatus === "retrying" ? (
+                  <LoaderCircle className="spinning" size={18} />
+                ) : (
+                  <HardDrive size={18} />
+                )}
+              </span>
+              <span className="workspace-storage-copy">
+                <strong>
+                  {workspacePersistenceStatus === "retrying"
+                    ? "正在恢复本机保存"
+                    : "本机保存未完成"}
+                </strong>
+                <small>{workspacePersistenceDetail}</small>
+              </span>
+              <span className="workspace-storage-actions">
+                <button
+                  className="retry"
+                  type="button"
+                  disabled={workspacePersistenceStatus === "retrying"}
+                  onClick={retryWorkspaceSave}
+                >
+                  {workspacePersistenceStatus === "retrying" ? (
+                    <LoaderCircle className="spinning" size={15} />
+                  ) : (
+                    <RotateCcw size={15} />
+                  )}
+                  {workspacePersistenceStatus === "retrying"
+                    ? "正在重试"
+                    : "重试保存"}
+                </button>
+                <button
+                  type="button"
+                  onClick={exportEmergencyWorkspaceBackup}
+                >
+                  <Download size={15} />
+                  导出紧急备份
+                </button>
+              </span>
+            </section>
+          )}
 
         {!isOnline && (
           <section
