@@ -567,6 +567,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
     /\.clarity-header-actions\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*44px\s*44px/s,
   );
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
+  assert.match(css, /@media \(min-width:\s*1800px\)/);
+  assert.match(css, /width:\s*min\(100%,\s*1720px\)/);
+  assert.match(css, /grid-template-columns:\s*232px\s+minmax\(0,\s*1fr\)/);
   const pixelFontSizes = [...css.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)].map(
     (match) => Number(match[1]),
   );

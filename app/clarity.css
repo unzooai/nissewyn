@@ -20218,3 +20218,157 @@ body {
     transform: none;
   }
 }
+
+/* Wide workstations: use the available canvas instead of shrinking the console. */
+@media (min-width: 1800px) {
+  .clarity-shell {
+    grid-template-columns: 232px minmax(0, 1fr);
+  }
+
+  .clarity-sidebar {
+    padding: 22px 14px;
+  }
+
+  .clarity-brand {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 11px;
+    padding: 0 8px;
+  }
+
+  .clarity-brand > span {
+    width: 42px;
+    height: 42px;
+  }
+
+  .clarity-brand-mark img {
+    width: 34px;
+    height: 34px;
+  }
+
+  .clarity-brand strong {
+    font-size: 15px;
+  }
+
+  .clarity-brand small {
+    font-size: 12px;
+  }
+
+  .clarity-nav {
+    gap: 6px;
+    margin-top: 38px;
+  }
+
+  .clarity-nav button {
+    min-height: 48px;
+    padding: 0 13px;
+    font-size: 14px;
+  }
+
+  .clarity-sidebar-status {
+    padding: 14px;
+  }
+
+  .clarity-sidebar-status strong,
+  .clarity-sidebar-status small {
+    font-size: 12px;
+  }
+
+  .clarity-main {
+    width: min(100%, 1720px);
+    padding: 32px 40px 64px;
+  }
+
+  .clarity-header {
+    min-height: 96px;
+    margin-bottom: 24px;
+  }
+
+  .clarity-page-title > span {
+    font-size: 12px;
+  }
+
+  .clarity-page-title h1 {
+    font-size: 31px;
+  }
+
+  .clarity-page-title p {
+    font-size: 14px;
+  }
+
+  .clarity-header-actions {
+    grid-template-columns: minmax(320px, 1fr) 44px auto auto;
+    gap: 12px;
+  }
+
+  .clarity-search input,
+  .clarity-primary-button,
+  .clarity-secondary-button,
+  .clarity-main input,
+  .clarity-main textarea,
+  .clarity-main select {
+    font-size: 13px;
+  }
+
+  .clarity-main small {
+    font-size: 12px;
+  }
+
+  .home-focus-grid {
+    grid-template-columns: minmax(0, 1fr) 390px;
+    gap: 20px;
+  }
+
+  .home-summary > button {
+    min-height: 66px;
+    padding: 0 18px;
+  }
+
+  .home-summary > button small {
+    font-size: 12px;
+  }
+
+  .home-summary > button strong {
+    font-size: 21px;
+  }
+
+  .focus-panel-heading,
+  .recent-heading {
+    min-height: 58px;
+  }
+
+  .recent-task-list {
+    gap: 16px;
+  }
+
+  .recent-task-row {
+    min-height: 150px;
+    padding: 17px;
+  }
+
+  .task-list-controls,
+  .artifact-list-controls,
+  .activity-list-controls {
+    gap: 14px;
+  }
+
+  .task-table-head,
+  .task-table-row {
+    grid-template-columns: minmax(360px, 1fr) 112px 172px 124px 20px;
+  }
+
+  .approvals-view {
+    grid-template-columns: minmax(360px, 0.82fr) minmax(600px, 1.18fr);
+  }
+
+  .artifact-workspace {
+    grid-template-columns: minmax(340px, 0.68fr) minmax(680px, 1.32fr);
+  }
+
+  .activity-workspace {
+    grid-template-columns: minmax(0, 1.2fr) minmax(400px, 0.8fr);
+  }
+
+  .settings-view {
+    gap: 20px;
+  }
+}
