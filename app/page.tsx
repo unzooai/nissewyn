@@ -42,6 +42,8 @@ import {
   Timer,
   Trash2,
   Upload,
+  UserPlus,
+  Users,
   X,
 } from "lucide-react";
 
@@ -78,6 +80,19 @@ type ConnectorDefinition = {
   icon: typeof Globe2;
   tone: "blue" | "green" | "amber" | "violet";
 };
+type TeamRole = "所有者" | "管理员" | "审批者" | "成员";
+type TeamMemberStatus = "在线" | "离线" | "已邀请";
+type TeamMember = {
+  id: string;
+  name: string;
+  email: string;
+  role: TeamRole;
+  status: TeamMemberStatus;
+  avatar: string;
+  tone: "blue" | "green" | "amber" | "violet";
+  lastActive: string;
+};
+type TeamInviteFormErrors = Partial<Record<"name" | "email", string>>;
 type WorkspaceBackup = {
   version: 1;
   product: "Unzoo One";
@@ -85,6 +100,7 @@ type WorkspaceBackup = {
   tasks: TaskItem[];
   settings: SettingsState;
   connectors?: ConnectorState;
+  members?: TeamMember[];
   approvalIds: string[];
   activity: ActivityItem[];
   artifacts?: ArtifactItem[];
@@ -264,6 +280,59 @@ const connectorCatalog: ConnectorDefinition[] = [
     tone: "violet",
   },
 ];
+const teamRoleDetails: Record<
+  TeamRole,
+  { summary: string; permissions: string[] }
+> = {
+  所有者: {
+    summary: "管理工作区、成员、任务与全部审批",
+    permissions: ["管理成员与角色", "创建和编辑任务", "审批外部操作"],
+  },
+  管理员: {
+    summary: "管理任务、连接器与团队日常设置",
+    permissions: ["邀请新成员", "创建和编辑任务", "审批外部操作"],
+  },
+  审批者: {
+    summary: "查看任务成果并处理待确认操作",
+    permissions: ["查看全部任务", "查看和下载成果", "审批外部操作"],
+  },
+  成员: {
+    summary: "查看任务与成果，不可修改安全设置",
+    permissions: ["查看全部任务", "查看和下载成果", "添加任务备注"],
+  },
+};
+const initialTeamMembers: TeamMember[] = [
+  {
+    id: "member-owner",
+    name: "刘一帆",
+    email: "yifan@unzoo.local",
+    role: "所有者",
+    status: "在线",
+    avatar: "刘",
+    tone: "blue",
+    lastActive: "正在使用",
+  },
+  {
+    id: "member-admin",
+    name: "王安",
+    email: "wangan@unzoo.local",
+    role: "管理员",
+    status: "在线",
+    avatar: "王",
+    tone: "green",
+    lastActive: "12 分钟前",
+  },
+  {
+    id: "member-approver",
+    name: "陈默",
+    email: "chenmo@unzoo.local",
+    role: "审批者",
+    status: "离线",
+    avatar: "陈",
+    tone: "amber",
+    lastActive: "昨天 18:42",
+  },
+];
 
 function isConnectorState(value: unknown): value is ConnectorState {
   if (!value || typeof value !== "object") return false;
@@ -273,6 +342,21 @@ function isConnectorState(value: unknown): value is ConnectorState {
     typeof state.workspace === "boolean" &&
     typeof state.mail === "boolean" &&
     typeof state.calendar === "boolean"
+  );
+}
+
+function isTeamMember(value: unknown): value is TeamMember {
+  if (!value || typeof value !== "object") return false;
+  const member = value as Partial<TeamMember>;
+  return (
+    typeof member.id === "string" &&
+    typeof member.name === "string" &&
+    typeof member.email === "string" &&
+    ["所有者", "管理员", "审批者", "成员"].includes(member.role ?? "") &&
+    ["在线", "离线", "已邀请"].includes(member.status ?? "") &&
+    typeof member.avatar === "string" &&
+    ["blue", "green", "amber", "violet"].includes(member.tone ?? "") &&
+    typeof member.lastActive === "string"
   );
 }
 
@@ -381,6 +465,10 @@ function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
     typeof backup.settings.local !== "boolean" ||
     typeof backup.settings.notifications !== "boolean" ||
     (backup.connectors !== undefined && !isConnectorState(backup.connectors)) ||
+    (backup.members !== undefined &&
+      (!Array.isArray(backup.members) ||
+        backup.members.length === 0 ||
+        !backup.members.every(isTeamMember))) ||
     !Array.isArray(backup.approvalIds) ||
     !backup.approvalIds.every((id) => typeof id === "string") ||
     !Array.isArray(backup.activity) ||
@@ -950,6 +1038,18 @@ export default function HomePage() {
     useState<ConnectorId | null>(null);
   const [connectorDisconnectConfirm, setConnectorDisconnectConfirm] =
     useState(false);
+  const [teamMembers, setTeamMembers] =
+    useState<TeamMember[]>(initialTeamMembers);
+  const [teamInviteOpen, setTeamInviteOpen] = useState(false);
+  const [selectedTeamMemberId, setSelectedTeamMemberId] =
+    useState<string | null>(null);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<TeamRole>("成员");
+  const [inviteFormSubmitted, setInviteFormSubmitted] = useState(false);
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [memberRoleDraft, setMemberRoleDraft] = useState<TeamRole>("成员");
+  const [memberRemoveConfirm, setMemberRemoveConfirm] = useState(false);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const notificationWrapRef = useRef<HTMLDivElement>(null);
@@ -964,6 +1064,7 @@ export default function HomePage() {
   const taskDescriptionRef = useRef<HTMLTextAreaElement>(null);
   const taskScheduleTimeRef = useRef<HTMLInputElement>(null);
   const taskSavingRef = useRef(false);
+  const inviteSavingRef = useRef(false);
 
   const pageTitle = viewTitles[activeView];
   const selectedApproval =
@@ -972,6 +1073,14 @@ export default function HomePage() {
   const selectedConnector =
     connectorCatalog.find((connector) => connector.id === selectedConnectorId) ??
     null;
+  const selectedTeamMember =
+    teamMembers.find((member) => member.id === selectedTeamMemberId) ?? null;
+  const approverMemberCount = teamMembers.filter((member) =>
+    ["所有者", "管理员", "审批者"].includes(member.role),
+  ).length;
+  const onlineMemberCount = teamMembers.filter(
+    (member) => member.status === "在线",
+  ).length;
   const SelectedConnectorIcon = selectedConnector?.icon ?? Link2;
   const connectedConnectorCount = connectorCatalog.filter(
     (connector) => connectorStates[connector.id],
@@ -999,6 +1108,10 @@ export default function HomePage() {
           ? "reset"
           : composerOpen
             ? "composer"
+            : teamInviteOpen
+              ? "team-invite"
+              : selectedTeamMember
+                ? "team-member"
             : selectedConnector
               ? "connector"
             : selectedTask
@@ -1057,6 +1170,28 @@ export default function HomePage() {
     return errors;
   }, [taskDescription, taskName, taskSchedule, taskScheduleTime, taskTarget]);
   const taskFormHasErrors = Object.keys(taskFormErrors).length > 0;
+  const teamInviteFormErrors = useMemo<TeamInviteFormErrors>(() => {
+    const errors: TeamInviteFormErrors = {};
+    const normalizedName = inviteName.trim();
+    const normalizedEmail = inviteEmail.trim().toLowerCase();
+    if (!normalizedName) {
+      errors.name = "请输入成员姓名";
+    } else if (normalizedName.length > 40) {
+      errors.name = "成员姓名不能超过 40 个字";
+    }
+    if (!normalizedEmail) {
+      errors.email = "请输入工作邮箱";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      errors.email = "请输入有效的邮箱地址";
+    } else if (
+      teamMembers.some((member) => member.email.toLowerCase() === normalizedEmail)
+    ) {
+      errors.email = "这个邮箱已经在当前工作区中";
+    }
+    return errors;
+  }, [inviteEmail, inviteName, teamMembers]);
+  const teamInviteFormHasErrors =
+    Object.keys(teamInviteFormErrors).length > 0;
   const noticeIsCaution = /失败|不能|请先|无效|损坏/.test(notice);
 
   useEffect(() => {
@@ -1067,6 +1202,7 @@ export default function HomePage() {
         const savedConnectors = window.localStorage.getItem(
           "unzoo-one-connectors",
         );
+        const savedTeam = window.localStorage.getItem("unzoo-one-team");
         const savedApprovalIds = window.localStorage.getItem(
           "unzoo-one-pending-approvals",
         );
@@ -1139,6 +1275,18 @@ export default function HomePage() {
             window.localStorage.removeItem("unzoo-one-connectors");
           }
         }
+        if (savedTeam) {
+          const parsedTeam = JSON.parse(savedTeam);
+          if (
+            Array.isArray(parsedTeam) &&
+            parsedTeam.length > 0 &&
+            parsedTeam.every(isTeamMember)
+          ) {
+            setTeamMembers(parsedTeam);
+          } else {
+            window.localStorage.removeItem("unzoo-one-team");
+          }
+        }
         if (savedApprovalIds) {
           const approvalIds = JSON.parse(savedApprovalIds);
           if (Array.isArray(approvalIds)) {
@@ -1193,11 +1341,12 @@ export default function HomePage() {
             setReadNotificationIds(parsedReadNotifications.slice(0, 30));
           }
         }
-        window.localStorage.setItem("unzoo-one-schema-version", "5");
+        window.localStorage.setItem("unzoo-one-schema-version", "6");
       } catch {
         window.localStorage.removeItem("unzoo-one-tasks");
         window.localStorage.removeItem("unzoo-one-settings");
         window.localStorage.removeItem("unzoo-one-connectors");
+        window.localStorage.removeItem("unzoo-one-team");
         window.localStorage.removeItem("unzoo-one-pending-approvals");
         window.localStorage.removeItem("unzoo-one-activity");
         window.localStorage.removeItem("unzoo-one-artifacts");
@@ -1223,6 +1372,7 @@ export default function HomePage() {
         "unzoo-one-connectors",
         JSON.stringify(connectorStates),
       );
+      window.localStorage.setItem("unzoo-one-team", JSON.stringify(teamMembers));
       window.localStorage.setItem(
         "unzoo-one-pending-approvals",
         JSON.stringify(approvals.map((item) => item.id)),
@@ -1247,6 +1397,7 @@ export default function HomePage() {
       window.localStorage.removeItem("unzoo-one-tasks");
       window.localStorage.removeItem("unzoo-one-settings");
       window.localStorage.removeItem("unzoo-one-connectors");
+      window.localStorage.removeItem("unzoo-one-team");
       window.localStorage.removeItem("unzoo-one-pending-approvals");
       window.localStorage.removeItem("unzoo-one-activity");
       window.localStorage.removeItem("unzoo-one-artifacts");
@@ -1263,6 +1414,7 @@ export default function HomePage() {
     settings,
     tasks,
     tasksReady,
+    teamMembers,
   ]);
 
   useEffect(() => {
@@ -1292,6 +1444,8 @@ export default function HomePage() {
         (event.metaKey || event.ctrlKey) &&
         event.key.toLowerCase() === "k" &&
         !composerOpen &&
+        !teamInviteOpen &&
+        !selectedTeamMember &&
         !selectedConnector &&
         !selectedTask &&
         !deletingTask &&
@@ -1333,7 +1487,9 @@ export default function HomePage() {
     pendingWorkspaceImport,
     searchOpen,
     selectedConnector,
+    selectedTeamMember,
     selectedTask,
+    teamInviteOpen,
     temporaryModeOpen,
     workspaceResetOpen,
   ]);
@@ -1371,6 +1527,8 @@ export default function HomePage() {
       temporary: ".temporary-session-dialog",
       reset: ".workspace-reset-dialog",
       composer: ".clarity-dialog",
+      "team-invite": ".team-invite-dialog",
+      "team-member": ".team-member-dialog",
       connector: ".connector-detail-dialog",
       task: ".task-detail-drawer",
     } as const;
@@ -1403,6 +1561,11 @@ export default function HomePage() {
         setWorkspaceResetOpen(false);
       } else if (activeOverlayKind === "composer") {
         closeComposer();
+      } else if (activeOverlayKind === "team-invite") {
+        closeTeamInvite();
+      } else if (activeOverlayKind === "team-member") {
+        setSelectedTeamMemberId(null);
+        setMemberRemoveConfirm(false);
       } else if (activeOverlayKind === "connector") {
         setSelectedConnectorId(null);
         setConnectorDisconnectConfirm(false);
@@ -1924,6 +2087,7 @@ export default function HomePage() {
       tasks,
       settings,
       connectors: connectorStates,
+      members: teamMembers,
       approvalIds: approvals.map((item) => item.id),
       activity: activityLog,
       artifacts,
@@ -1943,7 +2107,7 @@ export default function HomePage() {
     window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
     recordActivity({
       title: "工作区备份已导出",
-      detail: `已备份 ${tasks.length} 个任务、${artifacts.length} 个成果和 ${activityLog.length} 条运行记录。`,
+      detail: `已备份 ${tasks.length} 个任务、${artifacts.length} 个成果、${teamMembers.length} 位成员和 ${activityLog.length} 条运行记录。`,
       icon: "activity",
       tone: "blue",
       kind: "系统",
@@ -2057,6 +2221,12 @@ export default function HomePage() {
     setConnectorStates(backup.connectors ?? { ...defaultConnectorStates });
     setSelectedConnectorId(null);
     setConnectorDisconnectConfirm(false);
+    setTeamMembers(
+      backup.members ?? initialTeamMembers.map((member) => ({ ...member })),
+    );
+    setTeamInviteOpen(false);
+    setSelectedTeamMemberId(null);
+    setMemberRemoveConfirm(false);
     setApprovals(restoredApprovals);
     setSelectedApprovalId(restoredApprovals[0]?.id ?? "");
     setActivityLog(backup.activity.slice(0, 100));
@@ -2077,7 +2247,7 @@ export default function HomePage() {
     setActiveView("settings");
     recordActivity({
       title: "工作区备份已恢复",
-      detail: `已从“${fileName}”恢复 ${backup.tasks.length} 个任务、${restoredArtifacts.length} 个成果和 ${backup.activity.length} 条运行记录。`,
+      detail: `已从“${fileName}”恢复 ${backup.tasks.length} 个任务、${restoredArtifacts.length} 个成果、${(backup.members ?? initialTeamMembers).length} 位成员和 ${backup.activity.length} 条运行记录。`,
       icon: "activity",
       tone: "green",
       kind: "系统",
@@ -2099,6 +2269,11 @@ export default function HomePage() {
     setSelectedConnectorId(null);
     setConnectorDisconnectConfirm(false);
     setConnectorTestingId(null);
+    setTeamMembers(initialTeamMembers.map((member) => ({ ...member })));
+    setTeamInviteOpen(false);
+    setSelectedTeamMemberId(null);
+    setMemberRemoveConfirm(false);
+    setInviteFormSubmitted(false);
     setApprovals(initialApprovals.map((item) => ({ ...item })));
     setSelectedApprovalId(initialApprovals[0].id);
     setActivityLog(initialActivityItems.map((item) => ({ ...item })));
@@ -2122,7 +2297,7 @@ export default function HomePage() {
     setWorkspaceLoadWarning("");
     recordActivity({
       title: "工作区已恢复初始状态",
-      detail: "任务、成果、待确认事项、运行记录和设置已重新初始化。",
+      detail: "任务、成果、团队成员、待确认事项、运行记录和设置已重新初始化。",
       icon: "settings",
       tone: "amber",
       kind: "系统",
@@ -2612,6 +2787,132 @@ export default function HomePage() {
       kind: "系统",
     });
     setNotice(`${selectedConnector.name}已断开`);
+  }
+
+  function openTeamInvite() {
+    setInviteName("");
+    setInviteEmail("");
+    setInviteRole("成员");
+    setInviteFormSubmitted(false);
+    setTeamInviteOpen(true);
+  }
+
+  function closeTeamInvite() {
+    if (inviteSavingRef.current) return;
+    setTeamInviteOpen(false);
+    setInviteFormSubmitted(false);
+  }
+
+  async function inviteTeamMember(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (inviteSavingRef.current) return;
+    setInviteFormSubmitted(true);
+    if (teamInviteFormHasErrors) return;
+
+    inviteSavingRef.current = true;
+    setIsSendingInvite(true);
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 520));
+      const normalizedName = inviteName.trim();
+      const normalizedEmail = inviteEmail.trim().toLowerCase();
+      const tones: TeamMember["tone"][] = ["violet", "blue", "green", "amber"];
+      const member: TeamMember = {
+        id: `member-${Date.now()}`,
+        name: normalizedName,
+        email: normalizedEmail,
+        role: inviteRole,
+        status: "已邀请",
+        avatar: normalizedName.slice(0, 1).toUpperCase(),
+        tone: tones[teamMembers.length % tones.length],
+        lastActive: "邀请刚刚发送",
+      };
+      setTeamMembers((members) => [...members, member]);
+      setTeamInviteOpen(false);
+      setInviteFormSubmitted(false);
+      recordActivity({
+        title: `已邀请团队成员：${member.name}`,
+        detail: `${member.email} · ${member.role} · 邀请邮件已发送。`,
+        icon: "settings",
+        tone: "blue",
+        kind: "系统",
+      });
+      setNotice(`邀请已发送给 ${member.name}`);
+    } finally {
+      inviteSavingRef.current = false;
+      setIsSendingInvite(false);
+    }
+  }
+
+  function openTeamMember(member: TeamMember) {
+    setMemberRoleDraft(member.role);
+    setMemberRemoveConfirm(false);
+    setSelectedTeamMemberId(member.id);
+  }
+
+  function closeTeamMember() {
+    setSelectedTeamMemberId(null);
+    setMemberRemoveConfirm(false);
+  }
+
+  function saveTeamMemberRole() {
+    if (!selectedTeamMember || selectedTeamMember.role === "所有者") return;
+    if (memberRoleDraft === selectedTeamMember.role) {
+      setNotice("成员角色没有变化");
+      return;
+    }
+    const previousRole = selectedTeamMember.role;
+    setTeamMembers((members) =>
+      members.map((member) =>
+        member.id === selectedTeamMember.id
+          ? { ...member, role: memberRoleDraft }
+          : member,
+      ),
+    );
+    recordActivity({
+      title: `成员角色已更新：${selectedTeamMember.name}`,
+      detail: `${previousRole} → ${memberRoleDraft}；新权限已立即生效。`,
+      icon: "shield",
+      tone: "violet",
+      kind: "系统",
+    });
+    setNotice(`${selectedTeamMember.name} 已设为${memberRoleDraft}`);
+  }
+
+  function resendTeamInvite() {
+    if (!selectedTeamMember || selectedTeamMember.status !== "已邀请") return;
+    setTeamMembers((members) =>
+      members.map((member) =>
+        member.id === selectedTeamMember.id
+          ? { ...member, lastActive: "邀请刚刚重新发送" }
+          : member,
+      ),
+    );
+    recordActivity({
+      title: `团队邀请已重发：${selectedTeamMember.name}`,
+      detail: `新的邀请邮件已发送至 ${selectedTeamMember.email}。`,
+      icon: "settings",
+      tone: "blue",
+      kind: "系统",
+    });
+    setNotice(`已重新发送邀请给 ${selectedTeamMember.name}`);
+  }
+
+  function confirmRemoveTeamMember() {
+    if (!selectedTeamMember || selectedTeamMember.role === "所有者") return;
+    const removedMember = selectedTeamMember;
+    setTeamMembers((members) =>
+      members.filter((member) => member.id !== removedMember.id),
+    );
+    setSelectedTeamMemberId(null);
+    setMemberRemoveConfirm(false);
+    recordActivity({
+      title: `团队成员已移除：${removedMember.name}`,
+      detail: `${removedMember.email} 已失去当前工作区访问权限。`,
+      icon: "settings",
+      tone: "red",
+      kind: "系统",
+    });
+    setNotice(`${removedMember.name} 已从工作区移除`);
   }
 
   function scrollWorkspaceTop() {
@@ -4631,6 +4932,107 @@ export default function HomePage() {
               </div>
             </div>
 
+            <section className="settings-team-center">
+              <header className="settings-team-heading">
+                <div>
+                  <span>团队与权限</span>
+                  <h2>知道谁可以查看、修改和审批</h2>
+                  <p>成员角色会直接决定任务、成果和外部操作的访问边界。</p>
+                </div>
+                <button type="button" onClick={openTeamInvite}>
+                  <UserPlus size={16} />
+                  邀请成员
+                </button>
+              </header>
+
+              <div className="settings-team-summary" aria-label="团队概览">
+                <span>
+                  <Users size={18} />
+                  <span>
+                    <small>工作区成员</small>
+                    <strong>{teamMembers.length} 位</strong>
+                  </span>
+                </span>
+                <span>
+                  <ShieldCheck size={18} />
+                  <span>
+                    <small>可以审批</small>
+                    <strong>{approverMemberCount} 位</strong>
+                  </span>
+                </span>
+                <span>
+                  <Activity size={18} />
+                  <span>
+                    <small>当前在线</small>
+                    <strong>{onlineMemberCount} 位</strong>
+                  </span>
+                </span>
+                <span>
+                  <CheckCircle2 size={18} />
+                  <span>
+                    <small>安全策略</small>
+                    <strong>已生效</strong>
+                  </span>
+                </span>
+              </div>
+
+              <div className="settings-team-table">
+                <div className="settings-team-table-head" aria-hidden="true">
+                  <span>成员</span>
+                  <span>角色与权限</span>
+                  <span>状态</span>
+                  <span>最近活动</span>
+                  <span>操作</span>
+                </div>
+                <div className="settings-team-list">
+                  {teamMembers.map((member) => (
+                    <article className="settings-team-row" key={member.id}>
+                      <div className="settings-team-identity">
+                        <span className={`settings-team-avatar tone-${member.tone}`}>
+                          {member.avatar}
+                          <i className={`status-${member.status}`} />
+                        </span>
+                        <span>
+                          <strong>
+                            {member.name}
+                            {member.role === "所有者" && <em>你</em>}
+                          </strong>
+                          <small>{member.email}</small>
+                        </span>
+                      </div>
+                      <div className="settings-team-role">
+                        <strong>{member.role}</strong>
+                        <small>{teamRoleDetails[member.role].summary}</small>
+                      </div>
+                      <span
+                        className={`settings-team-member-status status-${member.status}`}
+                      >
+                        <i />
+                        {member.status}
+                      </span>
+                      <span className="settings-team-last-active">
+                        <Clock3 size={14} />
+                        {member.lastActive}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`管理成员：${member.name}`}
+                        onClick={() => openTeamMember(member)}
+                      >
+                        管理
+                        <ChevronRight size={15} />
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </div>
+
+              <footer className="settings-team-footnote">
+                <ShieldCheck size={16} />
+                <span>只有所有者和管理员可以邀请成员或修改角色。</span>
+              </footer>
+            </section>
+
             <div className="settings-group settings-preferences-group">
               <div>
                 <span>运行偏好</span>
@@ -4707,7 +5109,7 @@ export default function HomePage() {
                   </strong>
                   <small>
                     {settings.local
-                      ? "备份包含任务、成果、审批状态、运行记录和全部设置。"
+                      ? "备份包含任务、成果、团队成员、审批状态、运行记录和全部设置。"
                       : "关闭页面前可以导出备份，或重新开启本机持久保存。"}
                   </small>
                 </div>
@@ -4975,6 +5377,351 @@ export default function HomePage() {
           </section>
         )}
       </section>
+
+      {teamInviteOpen && (
+        <div
+          className="clarity-dialog-backdrop team-dialog-backdrop"
+          onMouseDown={closeTeamInvite}
+        >
+          <form
+            className="team-invite-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="team-invite-title"
+            aria-describedby="team-invite-description"
+            aria-busy={isSendingInvite}
+            onSubmit={inviteTeamMember}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="team-dialog-close"
+              type="button"
+              aria-label="关闭邀请成员"
+              onClick={closeTeamInvite}
+            >
+              <X size={17} />
+            </button>
+            <header className="team-dialog-heading">
+              <span className="team-dialog-icon">
+                <UserPlus size={22} />
+              </span>
+              <div>
+                <span>团队协作</span>
+                <h2 id="team-invite-title">邀请成员加入工作区</h2>
+                <p id="team-invite-description">
+                  发送邀请前先选择角色，成员接受后会获得对应权限。
+                </p>
+              </div>
+            </header>
+
+            <div className="team-invite-fields">
+              <label
+                className={
+                  inviteFormSubmitted && teamInviteFormErrors.name
+                    ? "has-error"
+                    : ""
+                }
+              >
+                <span>成员姓名</span>
+                <input
+                  type="text"
+                  value={inviteName}
+                  disabled={isSendingInvite}
+                  data-overlay-initial-focus
+                  aria-invalid={
+                    inviteFormSubmitted && Boolean(teamInviteFormErrors.name)
+                  }
+                  aria-describedby={
+                    inviteFormSubmitted && teamInviteFormErrors.name
+                      ? "team-invite-name-error"
+                      : undefined
+                  }
+                  placeholder="例如：张宁"
+                  onChange={(event) => {
+                    setInviteName(event.target.value);
+                    if (inviteFormSubmitted) setInviteFormSubmitted(false);
+                  }}
+                />
+                {inviteFormSubmitted && teamInviteFormErrors.name && (
+                  <small id="team-invite-name-error">
+                    {teamInviteFormErrors.name}
+                  </small>
+                )}
+              </label>
+              <label
+                className={
+                  inviteFormSubmitted && teamInviteFormErrors.email
+                    ? "has-error"
+                    : ""
+                }
+              >
+                <span>工作邮箱</span>
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  disabled={isSendingInvite}
+                  aria-invalid={
+                    inviteFormSubmitted && Boolean(teamInviteFormErrors.email)
+                  }
+                  aria-describedby={
+                    inviteFormSubmitted && teamInviteFormErrors.email
+                      ? "team-invite-email-error"
+                      : undefined
+                  }
+                  placeholder="name@company.com"
+                  onChange={(event) => {
+                    setInviteEmail(event.target.value);
+                    if (inviteFormSubmitted) setInviteFormSubmitted(false);
+                  }}
+                />
+                {inviteFormSubmitted && teamInviteFormErrors.email && (
+                  <small id="team-invite-email-error">
+                    {teamInviteFormErrors.email}
+                  </small>
+                )}
+              </label>
+              <label>
+                <span>成员角色</span>
+                <select
+                  value={inviteRole}
+                  disabled={isSendingInvite}
+                  onChange={(event) =>
+                    setInviteRole(event.target.value as TeamRole)
+                  }
+                >
+                  {(["管理员", "审批者", "成员"] as TeamRole[]).map((role) => (
+                    <option key={role} value={role}>
+                      {role}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="team-role-preview">
+              <div>
+                <ShieldCheck size={17} />
+                <span>
+                  <small>{inviteRole}权限</small>
+                  <strong>{teamRoleDetails[inviteRole].summary}</strong>
+                </span>
+              </div>
+              <div>
+                {teamRoleDetails[inviteRole].permissions.map((permission) => (
+                  <span key={permission}>
+                    <Check size={14} />
+                    {permission}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {inviteFormSubmitted && teamInviteFormHasErrors && (
+              <div className="team-form-error-summary" role="alert">
+                <AlertTriangle size={16} />
+                请先修正上方信息，再发送邀请。
+              </div>
+            )}
+
+            <footer className="team-dialog-actions">
+              <button
+                type="button"
+                disabled={isSendingInvite}
+                onClick={closeTeamInvite}
+              >
+                取消
+              </button>
+              <button
+                className="primary"
+                type="submit"
+                disabled={isSendingInvite}
+              >
+                {isSendingInvite ? (
+                  <LoaderCircle className="is-spinning" size={16} />
+                ) : (
+                  <Send size={16} />
+                )}
+                {isSendingInvite ? "正在发送" : "发送邀请"}
+              </button>
+            </footer>
+          </form>
+        </div>
+      )}
+
+      {selectedTeamMember && (
+        <div
+          className="clarity-dialog-backdrop team-dialog-backdrop"
+          onMouseDown={closeTeamMember}
+        >
+          <section
+            className="team-member-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="team-member-title"
+            aria-describedby="team-member-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="team-dialog-close"
+              type="button"
+              aria-label="关闭成员管理"
+              onClick={closeTeamMember}
+            >
+              <X size={17} />
+            </button>
+            <header className="team-member-heading">
+              <span
+                className={`team-member-avatar tone-${selectedTeamMember.tone}`}
+              >
+                {selectedTeamMember.avatar}
+              </span>
+              <div>
+                <span>成员权限</span>
+                <h2 id="team-member-title">{selectedTeamMember.name}</h2>
+                <p id="team-member-description">{selectedTeamMember.email}</p>
+              </div>
+              <span
+                className={`team-member-dialog-status status-${selectedTeamMember.status}`}
+              >
+                <i />
+                {selectedTeamMember.status}
+              </span>
+            </header>
+
+            <div className="team-member-facts">
+              <span>
+                <small>当前角色</small>
+                <strong>{selectedTeamMember.role}</strong>
+              </span>
+              <span>
+                <small>最近活动</small>
+                <strong>{selectedTeamMember.lastActive}</strong>
+              </span>
+              <span>
+                <small>审批权限</small>
+                <strong>
+                  {["所有者", "管理员", "审批者"].includes(
+                    selectedTeamMember.role,
+                  )
+                    ? "可以审批"
+                    : "不可审批"}
+                </strong>
+              </span>
+            </div>
+
+            <div className="team-member-role-editor">
+              <label>
+                <span>工作区角色</span>
+                <select
+                  value={memberRoleDraft}
+                  disabled={selectedTeamMember.role === "所有者"}
+                  onChange={(event) =>
+                    setMemberRoleDraft(event.target.value as TeamRole)
+                  }
+                >
+                  {(["管理员", "审批者", "成员"] as TeamRole[]).map((role) => (
+                    <option key={role} value={role}>
+                      {role}
+                    </option>
+                  ))}
+                  {selectedTeamMember.role === "所有者" && (
+                    <option value="所有者">所有者</option>
+                  )}
+                </select>
+              </label>
+              <div>
+                <small>{memberRoleDraft}将获得</small>
+                <strong>{teamRoleDetails[memberRoleDraft].summary}</strong>
+                <div>
+                  {teamRoleDetails[memberRoleDraft].permissions.map(
+                    (permission) => (
+                      <span key={permission}>
+                        <Check size={14} />
+                        {permission}
+                      </span>
+                    ),
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {selectedTeamMember.role === "所有者" && (
+              <div className="team-owner-note">
+                <ShieldCheck size={17} />
+                <span>
+                  <strong>工作区所有者</strong>
+                  <small>为避免失去管理权限，所有者角色不能在这里修改或移除。</small>
+                </span>
+              </div>
+            )}
+
+            {memberRemoveConfirm ? (
+              <div className="team-member-remove-confirm" role="alert">
+                <AlertTriangle size={18} />
+                <span>
+                  <strong>移除 {selectedTeamMember.name}？</strong>
+                  <small>该成员会立即失去任务、成果和审批访问权限。</small>
+                </span>
+                <div>
+                  <button
+                    type="button"
+                    data-overlay-initial-focus
+                    onClick={() => setMemberRemoveConfirm(false)}
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="danger"
+                    type="button"
+                    onClick={confirmRemoveTeamMember}
+                  >
+                    确认移除
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <footer className="team-member-actions">
+                {selectedTeamMember.role === "所有者" ? (
+                  <button
+                    className="primary"
+                    type="button"
+                    data-overlay-initial-focus
+                    onClick={closeTeamMember}
+                  >
+                    完成
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className="remove"
+                      type="button"
+                      onClick={() => setMemberRemoveConfirm(true)}
+                    >
+                      <Trash2 size={15} />
+                      移除成员
+                    </button>
+                    {selectedTeamMember.status === "已邀请" && (
+                      <button type="button" onClick={resendTeamInvite}>
+                        <Mail size={15} />
+                        重发邀请
+                      </button>
+                    )}
+                    <button
+                      className="primary"
+                      type="button"
+                      data-overlay-initial-focus
+                      onClick={saveTeamMemberRole}
+                    >
+                      <CheckCircle2 size={15} />
+                      保存角色
+                    </button>
+                  </>
+                )}
+              </footer>
+            )}
+          </section>
+        </div>
+      )}
 
       {selectedConnector && (
         <div
@@ -5834,7 +6581,7 @@ export default function HomePage() {
               恢复“{pendingWorkspaceImport.fileName}”中的工作区？
             </h2>
             <p id="workspace-import-description">
-              确认后，当前任务、成果、审批状态、运行记录和设置会被这份备份替换。
+              确认后，当前任务、成果、团队成员、审批状态、运行记录和设置会被这份备份替换。
             </p>
 
             <div className="workspace-import-meta">

@@ -54,6 +54,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-tasks"/);
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-settings"/);
   assert.match(page, /"unzoo-one-connectors"/);
+  assert.match(page, /"unzoo-one-team"/);
   assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-activity"/);
   assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-artifacts"/);
   assert.match(page, /"unzoo-one-pending-approvals"/);
@@ -81,6 +82,15 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function confirmDisconnectConnector/);
   assert.match(page, /connectors: connectorStates/);
   assert.match(page, /selectedConnectorId/);
+  assert.match(page, /type TeamMember =/);
+  assert.match(page, /const initialTeamMembers/);
+  assert.match(page, /const teamRoleDetails/);
+  assert.match(page, /function isTeamMember/);
+  assert.match(page, /function inviteTeamMember/);
+  assert.match(page, /function saveTeamMemberRole/);
+  assert.match(page, /function confirmRemoveTeamMember/);
+  assert.match(page, /members: teamMembers/);
+  assert.match(page, /teamInviteFormErrors/);
   assert.match(page, /function scrollWorkspaceTop/);
   assert.match(page, /temporaryModeOpen/);
   assert.match(page, /关闭页面后保留工作区/);
@@ -152,6 +162,11 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.settings-connector-grid/);
   assert.match(css, /\.connector-detail-dialog/);
   assert.match(css, /\.connector-disconnect-confirm/);
+  assert.match(css, /\.settings-team-center/);
+  assert.match(css, /\.settings-team-row/);
+  assert.match(css, /\.team-invite-dialog/);
+  assert.match(css, /\.team-member-dialog/);
+  assert.match(css, /\.team-member-remove-confirm/);
   assert.match(page, /handleOverlayKeyDown/);
   assert.match(page, /data-overlay-initial-focus/);
   assert.match(page, /notificationWrapRef/);
