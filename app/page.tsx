@@ -102,6 +102,30 @@ type ConnectorDefinition = {
 };
 type TeamRole = "所有者" | "管理员" | "审批者" | "成员";
 type TeamMemberStatus = "在线" | "离线" | "已邀请";
+type SettingsDraftTarget = "budget" | "invite" | "member";
+const settingsDraftDiscardCopy: Record<
+  SettingsDraftTarget,
+  { eyebrow: string; title: string; description: string; discardLabel: string }
+> = {
+  budget: {
+    eyebrow: "预算尚未保存",
+    title: "放弃这次预算调整？",
+    description: "月度额度、提醒阈值和到限保护会恢复为当前已保存的设置。",
+    discardLabel: "放弃调整",
+  },
+  invite: {
+    eyebrow: "邀请尚未发送",
+    title: "放弃这份成员邀请？",
+    description: "已经填写的姓名、工作邮箱和成员角色不会被保留。",
+    discardLabel: "放弃邀请",
+  },
+  member: {
+    eyebrow: "角色尚未保存",
+    title: "放弃这次角色修改？",
+    description: "成员会继续使用当前角色，新选择的权限不会生效。",
+    discardLabel: "放弃修改",
+  },
+};
 type TeamMember = {
   id: string;
   name: string;
@@ -1728,6 +1752,8 @@ export default function HomePage() {
   const [usagePauseDraft, setUsagePauseDraft] = useState(
     defaultUsageSettings.pauseAtLimit,
   );
+  const [settingsDiscardTarget, setSettingsDiscardTarget] =
+    useState<SettingsDraftTarget | null>(null);
   const [connectorStates, setConnectorStates] = useState<ConnectorState>(
     defaultConnectorStates,
   );
@@ -2017,6 +2043,22 @@ export default function HomePage() {
     !Number.isFinite(usageBudgetDraftValue) ||
     usageBudgetDraftValue < 100 ||
     usageBudgetDraftValue > 50000;
+  const usageBudgetDirty =
+    usageBudgetOpen &&
+    (usageBudgetDraft !== String(usageSettings.monthlyBudget) ||
+      usageAlertDraft !== usageSettings.alertThreshold ||
+      usagePauseDraft !== usageSettings.pauseAtLimit);
+  const teamInviteDirty =
+    teamInviteOpen &&
+    (inviteName.length > 0 || inviteEmail.length > 0 || inviteRole !== "成员");
+  const teamMemberRoleDirty = Boolean(
+    selectedTeamMember && memberRoleDraft !== selectedTeamMember.role,
+  );
+  const settingsDraftDirty =
+    usageBudgetDirty || teamInviteDirty || teamMemberRoleDirty;
+  const activeSettingsDiscardCopy = settingsDiscardTarget
+    ? settingsDraftDiscardCopy[settingsDiscardTarget]
+    : null;
   const editingArtifact =
     artifacts.find((artifact) => artifact.id === editingArtifactId) ?? null;
   const deletingArtifact =
@@ -2087,7 +2129,9 @@ export default function HomePage() {
   const deletingTask = tasks.find((task) => task.id === deleteTaskId) ?? null;
   const rejectedApproval =
     approvals.find((item) => item.id === rejectApprovalId) ?? null;
-  const activeOverlayKind = taskDiscardOpen
+  const activeOverlayKind = settingsDiscardTarget
+    ? "settings-discard"
+    : taskDiscardOpen
     ? "task-discard"
     : artifactDiscardOpen
       ? "artifact-discard"
@@ -2279,7 +2323,7 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!taskComposerDirty && !artifactEditorDirty) return;
+    if (!taskComposerDirty && !artifactEditorDirty && !settingsDraftDirty) return;
 
     function protectUnsavedWork(event: BeforeUnloadEvent) {
       event.preventDefault();
@@ -2288,7 +2332,7 @@ export default function HomePage() {
 
     window.addEventListener("beforeunload", protectUnsavedWork);
     return () => window.removeEventListener("beforeunload", protectUnsavedWork);
-  }, [artifactEditorDirty, taskComposerDirty]);
+  }, [artifactEditorDirty, settingsDraftDirty, taskComposerDirty]);
 
   useEffect(() => {
     if (!composerOpen || !taskDraftBaseline) return;
@@ -2845,6 +2889,7 @@ export default function HomePage() {
     if (!activeOverlayKind) return;
 
     const selectorByKind = {
+      "settings-discard": ".settings-discard-dialog",
       "task-discard": ".task-discard-dialog",
       "artifact-discard": ".artifact-discard-dialog",
       "artifact-editor": ".artifact-editor-dialog",
@@ -2881,7 +2926,9 @@ export default function HomePage() {
     });
 
     function closeTopOverlay() {
-      if (activeOverlayKind === "task-discard") {
+      if (activeOverlayKind === "settings-discard") {
+        setSettingsDiscardTarget(null);
+      } else if (activeOverlayKind === "task-discard") {
         setTaskDiscardOpen(false);
       } else if (activeOverlayKind === "artifact-discard") {
         setArtifactDiscardOpen(false);
@@ -2907,7 +2954,11 @@ export default function HomePage() {
       } else if (activeOverlayKind === "artifact-delete") {
         setArtifactDeleteId(null);
       } else if (activeOverlayKind === "usage-budget") {
-        setUsageBudgetOpen(false);
+        if (usageBudgetDirty) {
+          setSettingsDiscardTarget("budget");
+        } else {
+          setUsageBudgetOpen(false);
+        }
       } else if (activeOverlayKind === "import") {
         setPendingWorkspaceImport(null);
       } else if (activeOverlayKind === "bulk-approval") {
@@ -2943,10 +2994,20 @@ export default function HomePage() {
           setTaskFormSubmitted(false);
         }
       } else if (activeOverlayKind === "team-invite") {
-        closeTeamInvite();
+        if (inviteSavingRef.current) return;
+        if (teamInviteDirty) {
+          setSettingsDiscardTarget("invite");
+        } else {
+          setTeamInviteOpen(false);
+          setInviteFormSubmitted(false);
+        }
       } else if (activeOverlayKind === "team-member") {
-        setSelectedTeamMemberId(null);
-        setMemberRemoveConfirm(false);
+        if (teamMemberRoleDirty) {
+          setSettingsDiscardTarget("member");
+        } else {
+          setSelectedTeamMemberId(null);
+          setMemberRemoveConfirm(false);
+        }
       } else if (activeOverlayKind === "connector") {
         setSelectedConnectorId(null);
         setConnectorDisconnectConfirm(false);
@@ -3049,6 +3110,9 @@ export default function HomePage() {
     isSavingArtifact,
     isSavingTask,
     taskComposerDirty,
+    teamInviteDirty,
+    teamMemberRoleDirty,
+    usageBudgetDirty,
   ]);
 
   const searchedTasks = useMemo(() => {
@@ -3952,6 +4016,7 @@ export default function HomePage() {
     setSettings(backup.settings);
     setUsageSettings(backup.usage ?? { ...defaultUsageSettings });
     setUsageBudgetOpen(false);
+    setSettingsDiscardTarget(null);
     setConnectorStates(backup.connectors ?? { ...defaultConnectorStates });
     setSelectedConnectorId(null);
     setConnectorDisconnectConfirm(false);
@@ -4023,6 +4088,7 @@ export default function HomePage() {
     setUsageBudgetDraft(String(defaultUsageSettings.monthlyBudget));
     setUsageAlertDraft(defaultUsageSettings.alertThreshold);
     setUsagePauseDraft(defaultUsageSettings.pauseAtLimit);
+    setSettingsDiscardTarget(null);
     setConnectorStates({ ...defaultConnectorStates });
     setSelectedConnectorId(null);
     setConnectorDisconnectConfirm(false);
@@ -5124,7 +5190,36 @@ export default function HomePage() {
     setUsageBudgetDraft(String(usageSettings.monthlyBudget));
     setUsageAlertDraft(usageSettings.alertThreshold);
     setUsagePauseDraft(usageSettings.pauseAtLimit);
+    setSettingsDiscardTarget(null);
     setUsageBudgetOpen(true);
+  }
+
+  function requestCloseUsageBudget() {
+    if (usageBudgetDirty) {
+      setSettingsDiscardTarget("budget");
+      return;
+    }
+    setUsageBudgetOpen(false);
+  }
+
+  function discardSettingsDraft() {
+    if (settingsDiscardTarget === "budget") {
+      setUsageBudgetDraft(String(usageSettings.monthlyBudget));
+      setUsageAlertDraft(usageSettings.alertThreshold);
+      setUsagePauseDraft(usageSettings.pauseAtLimit);
+      setUsageBudgetOpen(false);
+    } else if (settingsDiscardTarget === "invite") {
+      setInviteName("");
+      setInviteEmail("");
+      setInviteRole("成员");
+      setInviteFormSubmitted(false);
+      setTeamInviteOpen(false);
+    } else if (settingsDiscardTarget === "member") {
+      if (selectedTeamMember) setMemberRoleDraft(selectedTeamMember.role);
+      setSelectedTeamMemberId(null);
+      setMemberRemoveConfirm(false);
+    }
+    setSettingsDiscardTarget(null);
   }
 
   function saveUsageBudget() {
@@ -5368,11 +5463,16 @@ export default function HomePage() {
     setInviteEmail("");
     setInviteRole("成员");
     setInviteFormSubmitted(false);
+    setSettingsDiscardTarget(null);
     setTeamInviteOpen(true);
   }
 
   function closeTeamInvite() {
     if (inviteSavingRef.current) return;
+    if (teamInviteDirty) {
+      setSettingsDiscardTarget("invite");
+      return;
+    }
     setTeamInviteOpen(false);
     setInviteFormSubmitted(false);
   }
@@ -5420,10 +5520,15 @@ export default function HomePage() {
   function openTeamMember(member: TeamMember) {
     setMemberRoleDraft(member.role);
     setMemberRemoveConfirm(false);
+    setSettingsDiscardTarget(null);
     setSelectedTeamMemberId(member.id);
   }
 
   function closeTeamMember() {
+    if (teamMemberRoleDirty) {
+      setSettingsDiscardTarget("member");
+      return;
+    }
     setSelectedTeamMemberId(null);
     setMemberRemoveConfirm(false);
   }
@@ -11097,10 +11202,60 @@ export default function HomePage() {
         </div>
       )}
 
+      {settingsDiscardTarget && activeSettingsDiscardCopy && (
+        <div
+          className="clarity-dialog-backdrop settings-discard-backdrop"
+          onMouseDown={() => setSettingsDiscardTarget(null)}
+        >
+          <section
+            className="settings-discard-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="settings-discard-title"
+            aria-describedby="settings-discard-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label="关闭放弃设置确认"
+              onClick={() => setSettingsDiscardTarget(null)}
+            >
+              <X size={17} />
+            </button>
+            <span>
+              <AlertTriangle size={22} />
+            </span>
+            <small>{activeSettingsDiscardCopy.eyebrow}</small>
+            <h2 id="settings-discard-title">
+              {activeSettingsDiscardCopy.title}
+            </h2>
+            <p id="settings-discard-description">
+              {activeSettingsDiscardCopy.description}
+            </p>
+            <div>
+              <button
+                type="button"
+                data-overlay-initial-focus
+                onClick={() => setSettingsDiscardTarget(null)}
+              >
+                继续编辑
+              </button>
+              <button
+                className="danger"
+                type="button"
+                onClick={discardSettingsDraft}
+              >
+                {activeSettingsDiscardCopy.discardLabel}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {usageBudgetOpen && (
         <div
           className="clarity-dialog-backdrop"
-          onMouseDown={() => setUsageBudgetOpen(false)}
+          onMouseDown={requestCloseUsageBudget}
         >
           <section
             className="usage-budget-dialog"
@@ -11114,7 +11269,7 @@ export default function HomePage() {
               className="usage-budget-close"
               type="button"
               aria-label="关闭预算设置"
-              onClick={() => setUsageBudgetOpen(false)}
+              onClick={requestCloseUsageBudget}
             >
               <X size={17} />
             </button>
@@ -11236,7 +11391,7 @@ export default function HomePage() {
               )}
 
             <div className="usage-budget-actions">
-              <button type="button" onClick={() => setUsageBudgetOpen(false)}>
+              <button type="button" onClick={requestCloseUsageBudget}>
                 取消
               </button>
               <button

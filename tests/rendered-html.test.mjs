@@ -124,6 +124,14 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /const defaultUsageSettings: UsageSettings/);
   assert.match(page, /function isUsageSettings/);
   assert.match(page, /function openUsageBudget/);
+  assert.match(page, /type SettingsDraftTarget =/);
+  assert.match(page, /function requestCloseUsageBudget/);
+  assert.match(page, /function discardSettingsDraft/);
+  assert.match(page, /settingsDraftDirty/);
+  assert.match(page, /aria-labelledby="settings-discard-title"/);
+  assert.match(page, /放弃这次预算调整/);
+  assert.match(page, /放弃这份成员邀请/);
+  assert.match(page, /放弃这次角色修改/);
   assert.match(page, /function saveUsageBudget/);
   assert.match(page, /function exportUsageReport/);
   assert.match(page, /usage: usageSettings/);
@@ -351,6 +359,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.artifact-list-controls/);
   assert.match(css, /\.task-template-picker/);
   assert.match(css, /\.task-discard-dialog/);
+  assert.match(css, /\.settings-discard-backdrop/);
+  assert.match(css, /\.settings-discard-dialog/);
   assert.match(css, /\.composer-dirty-summary/);
   assert.match(css, /\.composer-policy/);
   assert.match(css, /\.composer-schedule-detail/);
