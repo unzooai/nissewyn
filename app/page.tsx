@@ -1228,6 +1228,13 @@ function formatSchedule(
   return "立即运行一次";
 }
 
+function formatApprovalDecisionLabel(action: string) {
+  if (action.startsWith("允许")) {
+    return `批准${action.slice(2)}`;
+  }
+  return `批准并${action}`;
+}
+
 function formatTaskSchedule(task: TaskItem) {
   return formatSchedule(
     task.schedule ?? "仅运行一次",
@@ -2303,6 +2310,9 @@ export default function HomePage() {
   const [taskDiscardOpen, setTaskDiscardOpen] = useState(false);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [rejectApprovalId, setRejectApprovalId] = useState<string | null>(null);
+  const [approvalConfirmId, setApprovalConfirmId] = useState<string | null>(null);
+  const [approvalConfirmAcknowledged, setApprovalConfirmAcknowledged] =
+    useState(false);
   const [temporaryModeOpen, setTemporaryModeOpen] = useState(false);
   const [workspaceResetOpen, setWorkspaceResetOpen] = useState(false);
   const [pendingWorkspaceImport, setPendingWorkspaceImport] =
@@ -2920,6 +2930,8 @@ export default function HomePage() {
   const deletingTask = tasks.find((task) => task.id === deleteTaskId) ?? null;
   const rejectedApproval =
     approvals.find((item) => item.id === rejectApprovalId) ?? null;
+  const approvalConfirmTarget =
+    approvals.find((item) => item.id === approvalConfirmId) ?? null;
   const activeOverlayKind = settingsDiscardTarget
     ? "settings-discard"
     : workspaceProfileOpen
@@ -2944,6 +2956,8 @@ export default function HomePage() {
     ? "delete"
     : approvalSnoozeTarget
       ? "approval-snooze"
+      : approvalConfirmTarget
+        ? "approval-confirm"
     : rejectedApproval
       ? "reject"
       : temporaryModeOpen
@@ -4399,6 +4413,7 @@ export default function HomePage() {
         !inspectedRun &&
         !selectedTask &&
         !deletingTask &&
+        !approvalConfirmTarget &&
         !rejectedApproval &&
         !temporaryModeOpen &&
         !workspaceResetOpen &&
@@ -4436,6 +4451,7 @@ export default function HomePage() {
     bulkDeleteOpen,
     deletingArtifact,
     deletingTask,
+    approvalConfirmTarget,
     rejectedApproval,
     notificationsOpen,
     pendingWorkspaceImport,
@@ -4572,6 +4588,7 @@ export default function HomePage() {
       "bulk-delete": ".bulk-delete-dialog",
       delete: ".confirm-delete-dialog",
       "approval-snooze": ".approval-snooze-dialog",
+      "approval-confirm": ".approval-confirm-dialog",
       reject: ".approval-reject-dialog",
       temporary: ".temporary-session-dialog",
       reset: ".workspace-reset-dialog",
@@ -4650,6 +4667,9 @@ export default function HomePage() {
         setDeleteTaskId(null);
       } else if (activeOverlayKind === "approval-snooze") {
         setApprovalSnoozeId(null);
+      } else if (activeOverlayKind === "approval-confirm") {
+        setApprovalConfirmId(null);
+        setApprovalConfirmAcknowledged(false);
       } else if (activeOverlayKind === "reject") {
         setRejectApprovalId(null);
         setApprovalRejectReason("");
@@ -6493,8 +6513,29 @@ export default function HomePage() {
     }
   }
 
-  function approveCurrent() {
+  function requestApproveCurrent() {
     if (!selectedApproval) return;
+    if (selectedApproval.risk === "高风险") {
+      setApprovalConfirmAcknowledged(false);
+      setApprovalConfirmId(selectedApproval.id);
+      return;
+    }
+    approveCurrent(selectedApproval);
+  }
+
+  function cancelApprovalConfirmation() {
+    setApprovalConfirmId(null);
+    setApprovalConfirmAcknowledged(false);
+  }
+
+  function confirmHighRiskApproval() {
+    if (!approvalConfirmTarget || !approvalConfirmAcknowledged) return;
+    const approved = approvalConfirmTarget;
+    cancelApprovalConfirmation();
+    approveCurrent(approved);
+  }
+
+  function approveCurrent(approval: ApprovalItem) {
     if (
       !requireOnline(
         "设备离线，未执行批准操作；这项操作仍保留在待确认列表中",
@@ -6502,14 +6543,14 @@ export default function HomePage() {
     ) {
       return;
     }
-    const approved = selectedApproval;
+    const approved = approval;
     const relatedTask = tasks.find((task) => task.id === approved.taskId);
     const shouldResume = relatedTask?.status === "待确认";
     const nextApproval = approvals.find(
-      (item) => item.id !== selectedApproval.id,
+      (item) => item.id !== approved.id,
     );
-    setApprovals((items) => items.filter((item) => item.id !== selectedApproval.id));
-    removeApprovalDeferrals(new Set([selectedApproval.id]));
+    setApprovals((items) => items.filter((item) => item.id !== approved.id));
+    removeApprovalDeferrals(new Set([approved.id]));
     replaceApprovalSelection(nextApproval);
     setSelectedApprovalIds((selectedIds) =>
       selectedIds.filter((id) => id !== approved.id),
@@ -11016,10 +11057,16 @@ export default function HomePage() {
                           <button
                             className="confirm"
                             type="button"
-                            onClick={approveCurrent}
+                            onClick={requestApproveCurrent}
                           >
-                            <Check size={16} />
-                            {selectedApproval.action}
+                            {selectedApproval.risk === "高风险" ? (
+                              <ShieldCheck size={16} />
+                            ) : (
+                              <Check size={16} />
+                            )}
+                            {selectedApproval.risk === "高风险"
+                              ? "核对后批准"
+                              : formatApprovalDecisionLabel(selectedApproval.action)}
                           </button>
                           <button type="button" onClick={holdCurrent}>
                             <Timer size={16} />
@@ -15445,6 +15492,98 @@ export default function HomePage() {
               <button className="danger" type="button" onClick={confirmDeleteTask}>
                 <Trash2 size={15} />
                 确认删除
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {approvalConfirmTarget && (
+        <div
+          className="clarity-dialog-backdrop approval-confirm-backdrop"
+          onMouseDown={cancelApprovalConfirmation}
+        >
+          <section
+            className="approval-confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="approval-confirm-title"
+            aria-describedby="approval-confirm-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="approval-confirm-close"
+              type="button"
+              aria-label="关闭高风险审批确认"
+              onClick={cancelApprovalConfirmation}
+            >
+              <X size={17} />
+            </button>
+            <span className="approval-confirm-icon">
+              <ShieldCheck size={22} />
+            </span>
+            <span className="approval-confirm-eyebrow">高风险操作 · 二次核对</span>
+            <h2 id="approval-confirm-title">
+              确认批准“{approvalConfirmTarget.title}”？
+            </h2>
+            <p id="approval-confirm-description">
+              批准后系统会立即执行这项操作。本次授权只生效一次，并完整写入审计记录。
+            </p>
+
+            <div className="approval-confirm-facts">
+              <span>
+                <small>执行对象</small>
+                <strong>{approvalConfirmTarget.target}</strong>
+              </span>
+              <span>
+                <small>授权范围</small>
+                <strong>{approvalConfirmTarget.scope}</strong>
+              </span>
+              <span>
+                <small>授权失效</small>
+                <strong>{approvalConfirmTarget.expiresAt}</strong>
+              </span>
+            </div>
+
+            <div className="approval-confirm-impact">
+              <AlertTriangle size={17} />
+              <span>
+                <strong>执行后会发生什么</strong>
+                <small>{approvalConfirmTarget.impact}</small>
+              </span>
+            </div>
+
+            <label className="approval-confirm-check">
+              <input
+                type="checkbox"
+                aria-label="我已核对执行对象和授权范围"
+                data-overlay-initial-focus
+                checked={approvalConfirmAcknowledged}
+                onChange={(event) =>
+                  setApprovalConfirmAcknowledged(event.target.checked)
+                }
+              />
+              <span aria-hidden="true">
+                <Check size={14} />
+              </span>
+              <span>
+                <strong>我已核对执行对象和授权范围</strong>
+                <small>这不是长期授权，任务结束或超时后会自动失效。</small>
+              </span>
+            </label>
+
+            <div className="approval-confirm-actions">
+              <button type="button" onClick={cancelApprovalConfirmation}>
+                返回检查
+              </button>
+              <button
+                className="confirm"
+                type="button"
+                disabled={!approvalConfirmAcknowledged}
+                onClick={confirmHighRiskApproval}
+              >
+                <ShieldCheck size={16} />
+                确认批准并执行
               </button>
             </div>
           </section>

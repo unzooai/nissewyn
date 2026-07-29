@@ -190,6 +190,13 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function isApprovalDeferrals/);
   assert.match(page, /function getApprovalSnoozeUntil/);
   assert.match(page, /function formatApprovalDeferredUntil/);
+  assert.match(page, /function formatApprovalDecisionLabel/);
+  assert.match(page, /function requestApproveCurrent/);
+  assert.match(page, /function confirmHighRiskApproval/);
+  assert.match(page, /approvalConfirmAcknowledged/);
+  assert.match(page, /className="approval-confirm-dialog"/);
+  assert.match(page, /aria-label="我已核对执行对象和授权范围"/);
+  assert.match(page, /disabled=\{!approvalConfirmAcknowledged\}/);
   assert.match(page, /function confirmApprovalSnooze/);
   assert.match(page, /function restoreDeferredApproval/);
   assert.match(page, /className="approval-snooze-dialog"/);
@@ -526,6 +533,10 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.confirm-delete-dialog/);
   assert.match(css, /\.approval-context-grid/);
   assert.match(css, /\.approval-policy-review/);
+  assert.match(css, /\.approval-confirm-backdrop/);
+  assert.match(css, /\.approval-confirm-dialog/);
+  assert.match(css, /\.approval-confirm-check:has\(input:checked\)/);
+  assert.match(css, /\.approval-confirm-actions/);
   assert.match(css, /\.approval-reject-dialog/);
   assert.match(css, /\.approval-inbox-toolbar/);
   assert.match(css, /\.approval-bulk-bar/);
