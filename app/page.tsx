@@ -413,10 +413,13 @@ export default function HomePage() {
     <main className="clarity-shell">
       <aside className="clarity-sidebar" aria-label="主导航">
         <div className="clarity-brand">
-          <span>U1</span>
+          <span className="clarity-brand-mark">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/unzoo-mark.svg" alt="Unzoo One" />
+          </span>
           <div>
             <strong>Unzoo One</strong>
-            <small>AI 工作助理</small>
+            <small>可信 AI 执行</small>
           </div>
         </div>
 

@@ -3042,11 +3042,20 @@ body {
 
 .clarity-brand > span::after {
   position: absolute;
+  z-index: 2;
   inset: 0;
   background: linear-gradient(135deg, transparent 35%, rgba(77, 177, 255, 0.8), transparent 63%);
   content: "";
   transform: translateX(-110%);
   animation: premium-brand-sweep 7s ease-in-out infinite;
+}
+
+.clarity-brand-mark img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .clarity-brand strong {
