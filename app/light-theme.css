@@ -511,7 +511,8 @@ input:focus-visible {
 }
 
 .canvas-panel {
-  grid-template-rows: auto minmax(440px, 1fr) auto;
+  align-self: start;
+  grid-template-rows: auto auto auto;
 }
 
 .canvas-toolbar {
@@ -521,9 +522,10 @@ input:focus-visible {
 }
 
 .workflow-canvas {
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto;
+  align-content: start;
   gap: 14px;
-  min-height: 500px;
+  min-height: 0;
   padding: 18px;
   background:
     linear-gradient(90deg, rgba(66, 99, 82, 0.055) 1px, transparent 1px),
@@ -608,12 +610,14 @@ input:focus-visible {
 
 .stage-board {
   gap: 10px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .stage-card {
-  height: 258px;
-  min-height: 258px;
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  min-height: 284px;
   padding: 14px;
   color: var(--ink);
   box-shadow: 0 3px 12px rgba(30, 57, 43, 0.04);
@@ -631,7 +635,8 @@ input:focus-visible {
 }
 
 .stage-card::before {
-  background: #f5f8f6;
+  display: none;
+  content: none;
 }
 
 .stage-card.observe,
@@ -697,11 +702,49 @@ input:focus-visible {
 }
 
 .stage-card h3 {
+  margin-top: 12px;
   color: #1d2b23;
 }
 
 .stage-card p {
+  display: -webkit-box;
+  min-height: 58px;
+  margin-bottom: 14px;
+  overflow: hidden;
   color: #69786f;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+.mini-browser,
+.signal-lines,
+.approval-preview {
+  position: static;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  width: 100%;
+  margin-top: auto;
+}
+
+.mini-browser {
+  padding: 10px;
+  border-radius: 6px;
+  background: #f1f7f4;
+}
+
+.signal-lines {
+  height: 58px;
+  padding: 7px 10px 0;
+  border-radius: 6px;
+  background: #f2f6fb;
+}
+
+.approval-preview {
+  padding: 13px 10px;
+  border-radius: 6px;
+  background: #fff7ec;
 }
 
 .mini-browser span {
@@ -1003,6 +1046,181 @@ input:focus-visible {
   color: #47705d;
 }
 
+.mission-strip,
+.palette-panel,
+.canvas-panel,
+.inspector-panel {
+  animation: surface-in 420ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.palette-panel {
+  animation-delay: 45ms;
+}
+
+.canvas-panel {
+  animation-delay: 90ms;
+}
+
+.inspector-panel {
+  animation-delay: 135ms;
+}
+
+.canvas-panel.is-running .run-progress {
+  animation: progress-breathe 2.8s ease-in-out infinite;
+}
+
+.canvas-panel.is-running .stage-card.analyze {
+  animation: active-stage 2.8s ease-in-out infinite;
+}
+
+.canvas-panel.is-running .stage-card.analyze .signal-lines i {
+  transform-origin: center bottom;
+  animation: signal-rise 1.4s ease-in-out infinite;
+}
+
+.canvas-panel.is-running .stage-card.analyze .signal-lines i:nth-child(2) {
+  animation-delay: 160ms;
+}
+
+.canvas-panel.is-running .stage-card.analyze .signal-lines i:nth-child(3) {
+  animation-delay: 320ms;
+}
+
+.canvas-panel.is-paused .run-progress,
+.canvas-panel.is-paused .signal-lines {
+  filter: grayscale(0.65);
+  opacity: 0.72;
+}
+
+.notification-popover {
+  transform-origin: top right;
+  animation: popover-in 180ms ease-out both;
+}
+
+.dialog-backdrop {
+  animation: backdrop-in 180ms ease-out both;
+}
+
+.task-dialog {
+  animation: dialog-in 240ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+.action-toast {
+  animation: toast-in 240ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+.pulse-dot {
+  animation: runtime-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progress-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(24, 168, 115, 0);
+    transform: scale(1);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(24, 168, 115, 0.08);
+    transform: scale(1.025);
+  }
+}
+
+@keyframes active-stage {
+  0%,
+  100% {
+    box-shadow: 0 8px 20px rgba(55, 120, 201, 0.08);
+  }
+
+  50% {
+    box-shadow: 0 12px 28px rgba(55, 120, 201, 0.15);
+  }
+}
+
+@keyframes signal-rise {
+  0%,
+  100% {
+    opacity: 0.62;
+    transform: scaleY(0.72);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    background: rgba(25, 38, 31, 0);
+    backdrop-filter: blur(0);
+  }
+
+  to {
+    background: rgba(25, 38, 31, 0.28);
+    backdrop-filter: blur(5px);
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes runtime-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(22, 166, 115, 0.09);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(22, 166, 115, 0.02);
+  }
+}
+
 button {
   transition:
     transform 140ms ease,
@@ -1126,8 +1344,8 @@ button {
   }
 
   .stage-card {
-    height: 205px;
-    min-height: 205px;
+    height: auto;
+    min-height: 248px;
   }
 
   .run-output-card {
@@ -1157,5 +1375,16 @@ button {
     bottom: 12px;
     left: 12px;
     min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
   }
 }

@@ -381,7 +381,10 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="canvas-panel" aria-label="任务流画布">
+          <section
+            className={`canvas-panel ${isRunning ? "is-running" : "is-paused"}`}
+            aria-label="任务流画布"
+          >
             <div className="canvas-toolbar">
               <div>
                 <span>自动化流程</span>
