@@ -192,6 +192,14 @@ type TaskRun = {
   errorMessage?: string;
 };
 
+type TaskRunStageStatus = "成功" | "失败" | "运行中" | "已取消" | "已跳过";
+type TaskRunStage = {
+  id: string;
+  title: string;
+  detail: string;
+  status: TaskRunStageStatus;
+};
+
 type TaskItem = {
   id: string;
   title: string;
@@ -638,9 +646,89 @@ function formatTaskRunTime(value: string) {
 function formatTaskRunDuration(seconds?: number) {
   if (seconds === undefined) return "进行中";
   if (seconds < 60) return `${seconds} 秒`;
+  if (seconds >= 3600) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return minutes ? `${hours} 小时 ${minutes} 分` : `${hours} 小时`;
+  }
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   return remainder ? `${minutes} 分 ${remainder} 秒` : `${minutes} 分钟`;
+}
+
+function stopActiveTaskRuns(
+  runs: TaskRun[] | undefined,
+  summary: string,
+  stoppedAt = new Date(),
+) {
+  let stopped = false;
+  return (runs ?? []).map((run) => {
+    if (stopped || run.status !== "运行中") return run;
+    stopped = true;
+    const startedAt = new Date(run.startedAt).getTime();
+    const elapsed = Number.isNaN(startedAt)
+      ? 1
+      : Math.max(1, Math.round((stoppedAt.getTime() - startedAt) / 1000));
+    return {
+      ...run,
+      status: "已取消" as const,
+      durationSeconds: elapsed,
+      summary,
+    };
+  });
+}
+
+function getTaskRunStages(run: TaskRun): TaskRunStage[] {
+  const failedDuringAuthorization =
+    run.status === "失败" &&
+    /AUTH|PERMISSION|ACCESS/.test(
+      `${run.errorCode ?? ""} ${run.errorMessage ?? ""}`,
+    );
+  const executionStatus: TaskRunStageStatus =
+    run.status === "运行中"
+      ? "运行中"
+      : run.status === "成功"
+        ? "成功"
+        : run.status === "已取消"
+          ? "已取消"
+          : failedDuringAuthorization
+            ? "已跳过"
+            : "失败";
+
+  return [
+    {
+      id: "configuration",
+      title: "载入任务配置",
+      detail: "已读取任务目标、运行计划和执行边界。",
+      status: "成功",
+    },
+    {
+      id: "authorization",
+      title: "验证连接器与权限",
+      detail: failedDuringAuthorization
+        ? run.errorMessage ?? "连接器授权验证未通过。"
+        : "连接器和审批边界已通过运行前检查。",
+      status: failedDuringAuthorization ? "失败" : "成功",
+    },
+    {
+      id: "execution",
+      title: "执行任务步骤",
+      detail:
+        executionStatus === "已跳过"
+          ? "为避免越过授权边界，系统没有进入外部执行。"
+          : run.summary,
+      status: executionStatus,
+    },
+    {
+      id: "audit",
+      title: "保存结果与审计",
+      detail:
+        run.status === "运行中"
+          ? "运行结束后会保存结果、耗时和完整审计。"
+          : "运行结果和安全边界已写入本机审计记录。",
+      status: run.status === "运行中" ? "已跳过" : "成功",
+    },
+  ];
 }
 
 function formatAuditTimestamp(createdAt: string) {
@@ -1291,6 +1379,9 @@ export default function HomePage() {
   const [bulkDeleteSnapshot, setBulkDeleteSnapshot] =
     useState<BulkDeleteSnapshot | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [inspectedRunTaskId, setInspectedRunTaskId] =
+    useState<string | null>(null);
+  const [inspectedRunId, setInspectedRunId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [workspaceLoadWarning, setWorkspaceLoadWarning] = useState("");
   const [taskName, setTaskName] = useState("跟踪一个新网页");
@@ -1445,6 +1536,30 @@ export default function HomePage() {
           selectedTaskRunDurations.length,
       )
     : undefined;
+  const inspectedRunTask =
+    tasks.find((task) => task.id === inspectedRunTaskId) ?? null;
+  const inspectedRun =
+    inspectedRunTask?.runs?.find((run) => run.id === inspectedRunId) ?? null;
+  const inspectedRunStages = inspectedRun ? getTaskRunStages(inspectedRun) : [];
+  const inspectedRunArtifacts = inspectedRunTask
+    ? artifacts.filter((artifact) => artifact.taskId === inspectedRunTask.id)
+    : [];
+  const inspectedRunActivity = inspectedRunTask
+    ? activityLog.filter((item) => item.taskId === inspectedRunTask.id).slice(0, 5)
+    : [];
+  const inspectedRunAuthorizationBlocked = Boolean(
+    inspectedRun?.status === "失败" &&
+      /AUTH|PERMISSION|ACCESS/.test(
+        `${inspectedRun.errorCode ?? ""} ${inspectedRun.errorMessage ?? ""}`,
+      ),
+  );
+  const inspectedRunLaunchType = inspectedRun?.summary.includes("重试")
+    ? "人工重试"
+    : inspectedRun?.summary.includes("继续")
+      ? "断点继续"
+      : inspectedRunTask?.schedule === "仅运行一次"
+        ? "手动启动"
+        : "计划触发";
   const connectorIssueTasks: Record<ConnectorId, TaskItem[]> = {
     browser: tasks.filter((task) =>
       connectorErrorCodes.browser.includes(task.errorCode ?? ""),
@@ -1651,9 +1766,11 @@ export default function HomePage() {
                 ? "team-member"
             : selectedConnector
               ? "connector"
-            : selectedTask
-              ? "task"
-              : null;
+              : inspectedRun
+                ? "run"
+                : selectedTask
+                  ? "task"
+                  : null;
   const overlayOpen = activeOverlayKind !== null;
   const primaryTask = tasks.find((task) => task.id === "competitor") ?? initialTasks[0];
   const activityTask = tasks.find((task) => task.id === activityTaskId) ?? null;
@@ -2009,6 +2126,7 @@ export default function HomePage() {
         !teamInviteOpen &&
         !selectedTeamMember &&
         !selectedConnector &&
+        !inspectedRun &&
         !selectedTask &&
         !deletingTask &&
         !rejectedApproval &&
@@ -2050,6 +2168,7 @@ export default function HomePage() {
     notificationsOpen,
     pendingWorkspaceImport,
     searchOpen,
+    inspectedRun,
     selectedConnector,
     selectedTeamMember,
     selectedTask,
@@ -2100,6 +2219,7 @@ export default function HomePage() {
       "team-invite": ".team-invite-dialog",
       "team-member": ".team-member-dialog",
       connector: ".connector-detail-dialog",
+      run: ".run-detail-dialog",
       task: ".task-detail-drawer",
     } as const;
     const overlay = document.querySelector<HTMLElement>(
@@ -2160,6 +2280,10 @@ export default function HomePage() {
       } else if (activeOverlayKind === "connector") {
         setSelectedConnectorId(null);
         setConnectorDisconnectConfirm(false);
+      } else if (activeOverlayKind === "run") {
+        setInspectedRunTaskId(null);
+        setInspectedRunId(null);
+        if (inspectedRunTaskId) setSelectedTaskId(inspectedRunTaskId);
       } else {
         setSelectedTaskId(null);
       }
@@ -2227,6 +2351,7 @@ export default function HomePage() {
   }, [
     activeOverlayKind,
     artifactEditorDirty,
+    inspectedRunTaskId,
     isSavingArtifact,
   ]);
 
@@ -3028,6 +3153,8 @@ export default function HomePage() {
     setActivitySort("最新优先");
     setSelectedActivityId(backup.activity[0]?.id ?? "");
     setSelectedTaskId(null);
+    setInspectedRunTaskId(null);
+    setInspectedRunId(null);
     setRejectApprovalId(null);
     setTemporaryModeOpen(false);
     setNotificationsOpen(false);
@@ -3092,6 +3219,8 @@ export default function HomePage() {
     setReadNotificationIds([]);
     setNotificationFilter("全部");
     setSelectedTaskId(null);
+    setInspectedRunTaskId(null);
+    setInspectedRunId(null);
     setDeleteTaskId(null);
     setRejectApprovalId(null);
     setTemporaryModeOpen(false);
@@ -3430,6 +3559,10 @@ export default function HomePage() {
               ...task,
               status: "已暂停",
               updated: "因审批拒绝暂停",
+              runs: stopActiveTaskRuns(
+                task.runs,
+                "审批被拒绝，本次运行未执行外部操作。",
+              ),
             }
           : task,
       ),
@@ -3728,7 +3861,15 @@ export default function HomePage() {
     setTasks((items) =>
       items.map((task) =>
         targetIds.has(task.id)
-          ? { ...task, status: "已暂停", updated: "刚刚批量暂停" }
+          ? {
+              ...task,
+              status: "已暂停",
+              updated: "刚刚批量暂停",
+              runs: stopActiveTaskRuns(
+                task.runs,
+                "任务已由批量操作暂停，当前检查点已保存。",
+              ),
+            }
           : task,
       ),
     );
@@ -3776,18 +3917,20 @@ export default function HomePage() {
                 task.status === "失败"
                   ? (task.retryCount ?? 0) + 1
                   : task.retryCount,
-              runs:
-                task.status === "失败"
-                  ? [
-                      {
-                        id: `run-${task.id}-${Date.now()}`,
-                        status: "运行中" as const,
-                        startedAt: new Date().toISOString(),
-                        summary: "批量重试已启动，正在重新验证任务依赖。",
-                      },
-                      ...(task.runs ?? []),
-                    ].slice(0, 12)
-                  : task.runs,
+              runs: [
+                {
+                  id: `run-${task.id}-${Date.now()}`,
+                  status: "运行中" as const,
+                  startedAt: new Date().toISOString(),
+                  summary:
+                    task.status === "失败"
+                      ? "批量重试已启动，正在重新验证任务依赖。"
+                      : task.status === "已完成"
+                        ? "批量再次运行已启动，正在重新读取任务目标。"
+                        : "任务已由批量操作从保存的检查点继续运行。",
+                },
+                ...(task.runs ?? []),
+              ].slice(0, 12),
             }
           : task,
       ),
@@ -3930,6 +4073,10 @@ export default function HomePage() {
                 ...task,
                 status: "已暂停",
                 updated: "因用量到限保护暂停",
+                runs: stopActiveTaskRuns(
+                  task.runs,
+                  "达到预算上限，系统已停止本次运行。",
+                ),
               }
             : task,
         ),
@@ -4302,12 +4449,128 @@ export default function HomePage() {
     }
     setNotificationsOpen(false);
     setSelectedTaskId(null);
+    setInspectedRunTaskId(null);
+    setInspectedRunId(null);
     scrollWorkspaceTop();
   }
 
   function openTask(taskId: string) {
+    setInspectedRunTaskId(null);
+    setInspectedRunId(null);
     setSelectedTaskId(taskId);
     setNotificationsOpen(false);
+  }
+
+  function openTaskRun(taskId: string, runId: string) {
+    setSelectedTaskId(null);
+    setInspectedRunTaskId(taskId);
+    setInspectedRunId(runId);
+    setNotificationsOpen(false);
+  }
+
+  function dismissRunDetail() {
+    setInspectedRunTaskId(null);
+    setInspectedRunId(null);
+  }
+
+  function closeRunDetail() {
+    const taskId = inspectedRunTaskId;
+    dismissRunDetail();
+    if (taskId) setSelectedTaskId(taskId);
+  }
+
+  function openInspectedRunTask() {
+    if (!inspectedRunTask) return;
+    const taskId = inspectedRunTask.id;
+    dismissRunDetail();
+    setActiveView("tasks");
+    setSelectedTaskId(taskId);
+  }
+
+  async function copyTaskRunId(run: TaskRun) {
+    try {
+      await window.navigator.clipboard.writeText(run.id);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = run.id;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    setNotice(`已复制运行 ID：${run.id}`);
+  }
+
+  function downloadTaskRun(task: TaskItem, run: TaskRun) {
+    const payload = {
+      product: "Unzoo One",
+      exportedAt: new Date().toISOString(),
+      task: {
+        id: task.id,
+        title: task.title,
+        target: task.target,
+        schedule: formatTaskSchedule(task),
+        requiresApproval: task.requiresApproval ?? true,
+      },
+      run,
+      stages: getTaskRunStages(run),
+      evidence: {
+        externalActions:
+          run.status === "失败" &&
+          /AUTH|PERMISSION|ACCESS/.test(
+            `${run.errorCode ?? ""} ${run.errorMessage ?? ""}`,
+          )
+            ? 0
+            : null,
+        artifactCount: inspectedRunArtifacts.length,
+        artifacts: inspectedRunArtifacts.map((artifact) => ({
+          id: artifact.id,
+          title: artifact.title,
+          filename: artifact.filename,
+          version: artifact.version ?? 1,
+        })),
+        auditRecordCount: inspectedRunActivity.length,
+        activity: inspectedRunActivity,
+      },
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `unzoo-one-run-${run.id.replace(/[^a-z0-9-]/gi, "-")}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+    recordActivity({
+      title: `运行记录已导出：${task.title}`,
+      detail: `${run.id} · ${run.status} · ${formatTaskRunDuration(run.durationSeconds)}`,
+      icon: "activity",
+      tone: "blue",
+      kind: "系统",
+      taskId: task.id,
+    });
+    setNotice("运行记录已导出为 JSON");
+  }
+
+  function pauseInspectedRun(task: TaskItem) {
+    updateTaskStatus(task);
+    dismissRunDetail();
+    setSelectedTaskId(task.id);
+  }
+
+  function retryInspectedRun(task: TaskItem) {
+    if (task.status === "运行中") {
+      openInspectedRunTask();
+      return;
+    }
+    retryTask(task);
+    dismissRunDetail();
+    setSelectedTaskId(task.id);
   }
 
   function openTaskActivity(taskId: string) {
@@ -4319,6 +4582,8 @@ export default function HomePage() {
     setSelectedActivityId(taskActivities[0]?.id ?? "");
     setActiveView("activity");
     setSelectedTaskId(null);
+    setInspectedRunTaskId(null);
+    setInspectedRunId(null);
     setNotificationsOpen(false);
     scrollWorkspaceTop();
   }
@@ -4332,6 +4597,8 @@ export default function HomePage() {
     setSelectedArtifactId(taskArtifacts[0]?.id ?? "");
     setActiveView("artifacts");
     setSelectedTaskId(null);
+    setInspectedRunTaskId(null);
+    setInspectedRunId(null);
     setNotificationsOpen(false);
     scrollWorkspaceTop();
   }
@@ -4538,7 +4805,10 @@ export default function HomePage() {
                       },
                       ...(item.runs ?? []),
                     ].slice(0, 12)
-                  : item.runs,
+                  : stopActiveTaskRuns(
+                      item.runs,
+                      "用户暂停运行，当前检查点已保存。",
+                    ),
             }
           : item,
       ),
@@ -4576,6 +4846,20 @@ export default function HomePage() {
               ...task,
               status: nextRunning ? "运行中" : "已暂停",
               updated: nextRunning ? "刚刚继续" : "刚刚暂停",
+              runs: nextRunning
+                ? [
+                    {
+                      id: `run-${task.id}-${Date.now()}`,
+                      status: "运行中" as const,
+                      startedAt: new Date().toISOString(),
+                      summary: "首页主任务已从保存的检查点继续运行。",
+                    },
+                    ...(task.runs ?? []),
+                  ].slice(0, 12)
+                : stopActiveTaskRuns(
+                    task.runs,
+                    "用户从首页暂停运行，当前检查点已保存。",
+                  ),
             }
           : task,
       ),
@@ -7971,6 +8255,229 @@ export default function HomePage() {
         </div>
       )}
 
+      {inspectedRunTask && inspectedRun && (
+        <div
+          className="clarity-dialog-backdrop run-detail-backdrop"
+          onMouseDown={closeRunDetail}
+        >
+          <section
+            className={`run-detail-dialog status-${inspectedRun.status}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="run-detail-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="run-detail-close"
+              type="button"
+              data-overlay-initial-focus
+              aria-label="返回任务详情"
+              title="返回任务详情"
+              onClick={closeRunDetail}
+            >
+              <X size={18} />
+            </button>
+
+            <header className="run-detail-heading">
+              <span className="run-detail-result-icon" aria-hidden="true">
+                {inspectedRun.status === "成功" && <CheckCircle2 size={22} />}
+                {inspectedRun.status === "失败" && <AlertTriangle size={22} />}
+                {inspectedRun.status === "运行中" && (
+                  <LoaderCircle className="is-spinning" size={22} />
+                )}
+                {inspectedRun.status === "已取消" && <Pause size={22} />}
+              </span>
+              <div>
+                <span>运行详情</span>
+                <h2 id="run-detail-title">{inspectedRunTask.title}</h2>
+                <p>{inspectedRun.summary}</p>
+              </div>
+              <em>{inspectedRun.status}</em>
+            </header>
+
+            <div className="run-detail-identity" aria-label="运行信息">
+              <span className="run-detail-id">
+                <small>运行 ID</small>
+                <span>
+                  <code>{inspectedRun.id}</code>
+                  <button
+                    type="button"
+                    aria-label="复制运行 ID"
+                    title="复制运行 ID"
+                    onClick={() => copyTaskRunId(inspectedRun)}
+                  >
+                    <Copy size={14} />
+                  </button>
+                </span>
+              </span>
+              <span>
+                <small>开始时间</small>
+                <strong>{formatTaskRunTime(inspectedRun.startedAt)}</strong>
+              </span>
+              <span>
+                <small>实际耗时</small>
+                <strong>
+                  {formatTaskRunDuration(inspectedRun.durationSeconds)}
+                </strong>
+              </span>
+              <span>
+                <small>启动方式</small>
+                <strong>{inspectedRunLaunchType}</strong>
+              </span>
+            </div>
+
+            <section className="run-stage-section">
+              <div className="run-section-heading">
+                <span>
+                  <small>执行路径</small>
+                  <h3>从配置到审计的完整阶段</h3>
+                </span>
+                <em>
+                  {inspectedRunStages.filter((stage) => stage.status === "成功")
+                    .length}
+                  /{inspectedRunStages.length} 已完成
+                </em>
+              </div>
+              <ol className="run-stage-list" aria-label="运行阶段">
+                {inspectedRunStages.map((stage, index) => (
+                  <li className={`stage-${stage.status}`} key={stage.id}>
+                    <span className="run-stage-index">
+                      {stage.status === "成功" ? (
+                        <Check size={15} />
+                      ) : stage.status === "失败" ? (
+                        <AlertTriangle size={15} />
+                      ) : stage.status === "运行中" ? (
+                        <LoaderCircle className="is-spinning" size={15} />
+                      ) : stage.status === "已取消" ? (
+                        <Pause size={15} />
+                      ) : (
+                        String(index + 1).padStart(2, "0")
+                      )}
+                    </span>
+                    <span>
+                      <strong>{stage.title}</strong>
+                      <small>{stage.detail}</small>
+                    </span>
+                    <em>{stage.status}</em>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            <section
+              className={`run-boundary-panel status-${inspectedRun.status}`}
+              aria-label="结果与安全边界"
+            >
+              <div className="run-section-heading">
+                <span>
+                  <small>结果与安全边界</small>
+                  <h3>
+                    {inspectedRun.status === "失败"
+                      ? "失败已被安全拦截"
+                      : inspectedRun.status === "运行中"
+                        ? "正在受控执行"
+                        : inspectedRun.status === "已取消"
+                          ? "运行已在检查点停止"
+                          : "运行结果已完成保存"}
+                  </h3>
+                </span>
+                <ShieldCheck size={19} />
+              </div>
+              {inspectedRun.status === "失败" && (
+                <div className="run-error-summary" role="alert">
+                  <code>{inspectedRun.errorCode ?? "RUN_FAILED"}</code>
+                  <p>
+                    {inspectedRun.errorMessage ??
+                      "本次运行没有完成，系统已保留失败现场和审计记录。"}
+                  </p>
+                </div>
+              )}
+              <div className="run-evidence-grid">
+                <span>
+                  <small>外部动作</small>
+                  <strong>
+                    {inspectedRunAuthorizationBlocked ? "0 次" : "已记录"}
+                  </strong>
+                  <em>
+                    {inspectedRunAuthorizationBlocked
+                      ? "授权通过前未执行"
+                      : "全部进入审计"}
+                  </em>
+                </span>
+                <span>
+                  <small>关联成果</small>
+                  <strong>{inspectedRunArtifacts.length} 项</strong>
+                  <em>版本和来源可追溯</em>
+                </span>
+                <span>
+                  <small>审计证据</small>
+                  <strong>{inspectedRunActivity.length} 条</strong>
+                  <em>保存在本机工作区</em>
+                </span>
+              </div>
+            </section>
+
+            <footer className="run-detail-actions">
+              <button
+                type="button"
+                title="复制运行 ID"
+                onClick={() => copyTaskRunId(inspectedRun)}
+              >
+                <Copy size={15} />
+                复制 ID
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadTaskRun(inspectedRunTask, inspectedRun)}
+              >
+                <Download size={15} />
+                导出 JSON
+              </button>
+              {inspectedRun.status === "运行中" &&
+              inspectedRunTask.status === "运行中" ? (
+                <button
+                  className="primary is-caution"
+                  type="button"
+                  onClick={() => pauseInspectedRun(inspectedRunTask)}
+                >
+                  <Pause size={16} />
+                  暂停本次运行
+                </button>
+              ) : inspectedRun.status === "失败" &&
+                inspectedRunTask.status !== "运行中" ? (
+                <button
+                  className="primary"
+                  type="button"
+                  onClick={() => retryInspectedRun(inspectedRunTask)}
+                >
+                  <RotateCcw size={16} />
+                  从安全检查点重试
+                </button>
+              ) : inspectedRun.status === "成功" &&
+                inspectedRunArtifacts.length > 0 ? (
+                <button
+                  className="primary"
+                  type="button"
+                  onClick={() => openTaskArtifacts(inspectedRunTask.id)}
+                >
+                  <Files size={16} />
+                  查看运行成果
+                </button>
+              ) : (
+                <button
+                  className="primary"
+                  type="button"
+                  onClick={openInspectedRunTask}
+                >
+                  查看当前任务
+                  <ChevronRight size={16} />
+                </button>
+              )}
+            </footer>
+          </section>
+        </div>
+      )}
+
       {selectedTask && (
         <div
           className="task-detail-backdrop"
@@ -8206,24 +8713,33 @@ export default function HomePage() {
                 <ol className="task-run-list">
                   {selectedTaskRuns.slice(0, 3).map((run) => (
                     <li className={`run-${run.status}`} key={run.id}>
-                      <span>
-                        {run.status === "成功" && <CheckCircle2 size={14} />}
-                        {run.status === "失败" && <AlertTriangle size={14} />}
-                        {run.status === "运行中" && (
-                          <LoaderCircle className="is-spinning" size={14} />
-                        )}
-                        {run.status === "已取消" && <Pause size={14} />}
-                      </span>
-                      <span>
-                        <strong>{run.status}</strong>
-                        <small>{run.summary}</small>
-                      </span>
-                      <span>
-                        <time dateTime={run.startedAt}>
-                          {formatTaskRunTime(run.startedAt)}
-                        </time>
-                        <small>{formatTaskRunDuration(run.durationSeconds)}</small>
-                      </span>
+                      <button
+                        type="button"
+                        aria-label={`查看运行：${run.id}`}
+                        onClick={() => openTaskRun(selectedTask.id, run.id)}
+                      >
+                        <span>
+                          {run.status === "成功" && <CheckCircle2 size={14} />}
+                          {run.status === "失败" && <AlertTriangle size={14} />}
+                          {run.status === "运行中" && (
+                            <LoaderCircle className="is-spinning" size={14} />
+                          )}
+                          {run.status === "已取消" && <Pause size={14} />}
+                        </span>
+                        <span>
+                          <strong>{run.status}</strong>
+                          <small>{run.summary}</small>
+                        </span>
+                        <span>
+                          <time dateTime={run.startedAt}>
+                            {formatTaskRunTime(run.startedAt)}
+                          </time>
+                          <small>
+                            {formatTaskRunDuration(run.durationSeconds)}
+                          </small>
+                        </span>
+                        <ChevronRight size={14} aria-hidden="true" />
+                      </button>
                     </li>
                   ))}
                 </ol>
