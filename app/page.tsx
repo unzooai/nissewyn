@@ -64,6 +64,7 @@ const stageCards = [
     title: "观察网页",
     status: "已完成",
     body: "Unzoo 打开目标页面，完成截图、DOM 结构读取和页面变化提取。",
+    activities: ["目标页面已打开", "12 张页面截图已保存", "DOM 结构与变化已提取"],
     icon: Globe2,
     className: "observe",
   },
@@ -73,6 +74,7 @@ const stageCards = [
     title: "AI 分析",
     status: "进行中",
     body: "Codex 正在把页面变化整理成结论，并准备生成领导可读的简报。",
+    activities: ["12 张截图已完成索引", "38 次工具调用已核对", "正在生成领导摘要"],
     icon: Bot,
     className: "analyze",
   },
@@ -82,6 +84,7 @@ const stageCards = [
     title: "发送前确认",
     status: "待审批",
     body: "发送对象、内容和授权范围都会在这里确认，批准后才会继续。",
+    activities: ["发送对象等待确认", "凭证访问范围待授权", "报告写入目录已准备"],
     icon: Shield,
     className: "approve",
   },
@@ -413,56 +416,69 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="stage-board" aria-label="任务运行看板">
+              <div className="stage-stepper" aria-label="任务运行步骤">
                 {stageCards.map((stage) => (
                   <button
-                    className={`stage-card ${stage.className} ${selectedStageId === stage.id ? "selected" : ""}`}
+                    className={`stage-step ${stage.className} ${selectedStageId === stage.id ? "active" : ""}`}
                     key={stage.id}
                     type="button"
                     onClick={() => setSelectedStageId(stage.id)}
                   >
-                    <div className="stage-topline">
-                      <span>{stage.number}</span>
-                      <em>{stage.id === "analyze" && !isRunning ? "已暂停" : stage.status}</em>
+                    <span className="step-number">{stage.number}</span>
+                    <span className="step-icon">
+                      <stage.icon size={18} />
+                    </span>
+                    <div>
+                      <strong>{stage.title}</strong>
+                      <small>{stage.id === "analyze" && !isRunning ? "已暂停" : stage.status}</small>
                     </div>
-                    <div className="stage-icon">
-                      <stage.icon size={22} />
-                    </div>
-                    <h3>{stage.title}</h3>
-                    <p>{stage.body}</p>
-                    {stage.id === "observe" && (
-                      <div className="mini-browser" aria-hidden="true">
-                        <span />
-                        <span />
-                        <span />
-                      </div>
-                    )}
-                    {stage.id === "analyze" && (
-                      <div className="signal-lines" aria-hidden="true">
-                        <i />
-                        <i />
-                        <i />
-                      </div>
-                    )}
-                    {stage.id === "approve" && (
-                      <div className="approval-preview" aria-hidden="true">
-                        <b />
-                        <span />
-                      </div>
-                    )}
+                    <ChevronRight size={16} />
                   </button>
                 ))}
               </div>
 
-              <div className="run-output-card">
-                <selectedStage.icon size={20} />
-                <div>
-                  <span>当前选择</span>
-                  <strong>{selectedStage.title} · {selectedStage.status}</strong>
+              <div className={`stage-detail ${selectedStage.className}`}>
+                <div className="stage-detail-copy">
+                  <div className="detail-eyebrow">
+                    <span className="detail-icon">
+                      <selectedStage.icon size={19} />
+                    </span>
+                    <span>当前步骤</span>
+                    <em>{selectedStage.id === "analyze" && !isRunning ? "已暂停" : selectedStage.status}</em>
+                  </div>
+                  <h3>{selectedStage.title}</h3>
+                  <p>{selectedStage.body}</p>
+                  <div className="detail-actions">
+                    <button type="button" onClick={() => setIsRunning((running) => !running)}>
+                      {isRunning ? <Pause size={15} /> : <Play size={15} />}
+                      {isRunning ? "暂停任务" : "继续任务"}
+                    </button>
+                    <button className="primary" type="button" onClick={() => setSelectedStageId("approve")}>
+                      <Shield size={15} />
+                      查看审批
+                    </button>
+                  </div>
                 </div>
-                <button type="button" onClick={() => setSelectedStageId("approve")}>
-                  查看审批
-                </button>
+                <div className="activity-panel" aria-label="实时活动">
+                  <div className="activity-heading">
+                    <span>实时活动</span>
+                    <strong>
+                      <i />
+                      {isRunning ? "运行中" : "已暂停"}
+                    </strong>
+                  </div>
+                  {selectedStage.activities.map((activity, index) => (
+                    <div className="activity-row" key={activity}>
+                      <span className={index === selectedStage.activities.length - 1 ? "current" : ""}>
+                        {index === selectedStage.activities.length - 1 ? <Radio size={14} /> : <Check size={14} />}
+                      </span>
+                      <div>
+                        <strong>{activity}</strong>
+                        <small>{index === selectedStage.activities.length - 1 ? "刚刚更新" : `${index + 2} 分钟前`}</small>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
