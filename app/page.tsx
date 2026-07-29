@@ -188,6 +188,36 @@ type WorkspaceBackup = {
   activity: ActivityItem[];
   artifacts?: ArtifactItem[];
 };
+type WorkspaceSyncSection =
+  | "tasks"
+  | "approvals"
+  | "artifacts"
+  | "activity"
+  | "settings"
+  | "usage"
+  | "connectors"
+  | "team";
+type WorkspaceSyncConflict = "task" | "artifact" | "budget" | "member";
+type WorkspaceSyncData = {
+  tasks: TaskItem[];
+  settings: SettingsState;
+  usage: UsageSettings;
+  connectors: ConnectorState;
+  members: TeamMember[];
+  approvalIds: string[];
+  activity: ActivityItem[];
+  artifacts: ArtifactItem[];
+};
+type WorkspaceSyncSnapshot = WorkspaceSyncData & {
+  version: 1;
+  source: string;
+  updatedAt: string;
+};
+type WorkspaceSyncNotice = {
+  id: string;
+  sections: WorkspaceSyncSection[];
+  conflicts: WorkspaceSyncConflict[];
+};
 type PendingWorkspaceImport = {
   backup: WorkspaceBackup;
   fileName: string;
@@ -381,7 +411,18 @@ const weekdays: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "
 const taskSchedules: TaskSchedule[] = ["仅运行一次", "每天", "每周"];
 const taskDraftRecoveryKey = "unzoo-one-task-draft-recovery";
 const artifactDraftRecoveryKey = "unzoo-one-artifact-draft-recovery";
+const workspaceSyncKey = "unzoo-one-workspace-sync";
 const taskDraftRecoveryMaxAge = 7 * 24 * 60 * 60 * 1000;
+const workspaceSyncSectionLabels: Record<WorkspaceSyncSection, string> = {
+  tasks: "任务",
+  approvals: "待确认操作",
+  artifacts: "成果",
+  activity: "运行记录",
+  settings: "工作设置",
+  usage: "预算",
+  connectors: "连接器",
+  team: "团队成员",
+};
 const defaultSettings: SettingsState = {
   approval: true,
   local: true,
@@ -837,6 +878,100 @@ function isActivityItem(value: unknown): value is ActivityItem {
     ["任务", "审批", "系统"].includes(item.kind ?? "") &&
     (item.taskId === undefined || typeof item.taskId === "string")
   );
+}
+
+function isSettingsState(value: unknown): value is SettingsState {
+  if (!value || typeof value !== "object") return false;
+  const settings = value as Partial<SettingsState>;
+  return (
+    typeof settings.approval === "boolean" &&
+    typeof settings.local === "boolean" &&
+    typeof settings.notifications === "boolean"
+  );
+}
+
+function parseWorkspaceSyncSnapshot(value: string | null) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<WorkspaceSyncSnapshot>;
+    if (
+      parsed.version !== 1 ||
+      typeof parsed.source !== "string" ||
+      typeof parsed.updatedAt !== "string" ||
+      Number.isNaN(Date.parse(parsed.updatedAt)) ||
+      !Array.isArray(parsed.tasks) ||
+      parsed.tasks.length === 0 ||
+      !parsed.tasks.every(isTaskItem) ||
+      !isSettingsState(parsed.settings) ||
+      !isUsageSettings(parsed.usage) ||
+      !isConnectorState(parsed.connectors) ||
+      !Array.isArray(parsed.members) ||
+      parsed.members.length === 0 ||
+      !parsed.members.every(isTeamMember) ||
+      !Array.isArray(parsed.approvalIds) ||
+      !parsed.approvalIds.every((id) => typeof id === "string") ||
+      !Array.isArray(parsed.activity) ||
+      !parsed.activity.every(isActivityItem) ||
+      !Array.isArray(parsed.artifacts) ||
+      !parsed.artifacts.every(isArtifactItem)
+    ) {
+      return null;
+    }
+    return parsed as WorkspaceSyncSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function workspaceSyncSignature(data: WorkspaceSyncData) {
+  return JSON.stringify({
+    tasks: data.tasks,
+    settings: data.settings,
+    usage: data.usage,
+    connectors: data.connectors,
+    members: data.members,
+    approvalIds: data.approvalIds,
+    activity: data.activity,
+    artifacts: data.artifacts,
+  });
+}
+
+function getWorkspaceSyncSections(
+  current: WorkspaceSyncData,
+  incoming: WorkspaceSyncData,
+) {
+  const sections: WorkspaceSyncSection[] = [];
+  if (JSON.stringify(current.tasks) !== JSON.stringify(incoming.tasks)) {
+    sections.push("tasks");
+  }
+  if (
+    JSON.stringify(current.approvalIds) !==
+    JSON.stringify(incoming.approvalIds)
+  ) {
+    sections.push("approvals");
+  }
+  if (JSON.stringify(current.artifacts) !== JSON.stringify(incoming.artifacts)) {
+    sections.push("artifacts");
+  }
+  if (JSON.stringify(current.activity) !== JSON.stringify(incoming.activity)) {
+    sections.push("activity");
+  }
+  if (JSON.stringify(current.settings) !== JSON.stringify(incoming.settings)) {
+    sections.push("settings");
+  }
+  if (JSON.stringify(current.usage) !== JSON.stringify(incoming.usage)) {
+    sections.push("usage");
+  }
+  if (
+    JSON.stringify(current.connectors) !==
+    JSON.stringify(incoming.connectors)
+  ) {
+    sections.push("connectors");
+  }
+  if (JSON.stringify(current.members) !== JSON.stringify(incoming.members)) {
+    sections.push("team");
+  }
+  return sections;
 }
 
 function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
@@ -1763,6 +1898,8 @@ export default function HomePage() {
     useState<string | null>(null);
   const [inspectedRunId, setInspectedRunId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [workspaceSyncNotice, setWorkspaceSyncNotice] =
+    useState<WorkspaceSyncNotice | null>(null);
   const [workspaceLoadWarning, setWorkspaceLoadWarning] = useState("");
   const [taskName, setTaskName] = useState("跟踪一个新网页");
   const [taskTarget, setTaskTarget] = useState("https://example.com");
@@ -1828,6 +1965,13 @@ export default function HomePage() {
   const workspaceMenuPanelRef = useRef<HTMLDivElement>(null);
   const overlayTriggerRef = useRef<HTMLElement | null>(null);
   const routeReadyRef = useRef(false);
+  const workspaceTabIdRef = useRef(
+    `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  const lastWorkspaceSyncSignatureRef = useRef("");
+  const externalWorkspaceSyncSignatureRef = useRef("");
+  const applyingExternalWorkspaceSyncRef = useRef(false);
+  const pendingWorkspaceSyncRef = useRef<WorkspaceSyncSnapshot | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const approvalDetailRef = useRef<HTMLDivElement>(null);
   const activityInspectorRef = useRef<HTMLElement>(null);
@@ -2330,6 +2474,22 @@ export default function HomePage() {
     Object.keys(teamInviteFormErrors).length > 0;
   const noticeIsCaution =
     /失败|不能|请先|无效|损坏|已拒绝|离线|无法连接/.test(notice);
+  const workspaceSyncHasConflict = Boolean(
+    workspaceSyncNotice?.conflicts.length,
+  );
+  const taskWorkspaceConflict =
+    workspaceSyncNotice?.conflicts.includes("task") ?? false;
+  const artifactWorkspaceConflict =
+    workspaceSyncNotice?.conflicts.includes("artifact") ?? false;
+  const budgetWorkspaceConflict =
+    workspaceSyncNotice?.conflicts.includes("budget") ?? false;
+  const memberWorkspaceConflict =
+    workspaceSyncNotice?.conflicts.includes("member") ?? false;
+  const workspaceSyncLabel = workspaceSyncNotice
+    ? workspaceSyncNotice.sections
+        .map((section) => workspaceSyncSectionLabels[section])
+        .join("、")
+    : "";
   const artifactUndoAvailable = Boolean(
     artifactDeleteSnapshot &&
       notice === `已删除成果“${artifactDeleteSnapshot.artifact.title}”`,
@@ -2340,6 +2500,69 @@ export default function HomePage() {
   const approvalRejectUndoAvailable = Boolean(
     approvalRejectSnapshot && notice.startsWith("已拒绝"),
   );
+
+  function applyWorkspaceSyncSnapshot(snapshot: WorkspaceSyncSnapshot) {
+    const signature = workspaceSyncSignature(snapshot);
+    const nextApprovals = initialApprovals.filter((approval) =>
+      snapshot.approvalIds.includes(approval.id),
+    );
+    const nextTaskIds = new Set(snapshot.tasks.map((task) => task.id));
+    const nextArtifactIds = new Set(
+      snapshot.artifacts.map((artifact) => artifact.id),
+    );
+    const nextActivityIds = new Set(
+      snapshot.activity.map((activity) => activity.id),
+    );
+    const nextApprovalIds = new Set(nextApprovals.map((approval) => approval.id));
+    const nextMemberIds = new Set(snapshot.members.map((member) => member.id));
+    const nextRunIds = new Set(
+      snapshot.tasks.flatMap((task) => (task.runs ?? []).map((run) => run.id)),
+    );
+
+    applyingExternalWorkspaceSyncRef.current = true;
+    externalWorkspaceSyncSignatureRef.current = signature;
+    setTasks(snapshot.tasks);
+    setSettings(snapshot.settings);
+    setUsageSettings(snapshot.usage);
+    setConnectorStates(snapshot.connectors);
+    setTeamMembers(snapshot.members);
+    setApprovals(nextApprovals);
+    setActivityLog(snapshot.activity.slice(0, 100));
+    setArtifacts(snapshot.artifacts.slice(0, 100));
+    setIsRunning(
+      snapshot.tasks.find((task) => task.id === "competitor")?.status !==
+        "已暂停",
+    );
+    setSelectedTaskIds((ids) => ids.filter((id) => nextTaskIds.has(id)));
+    setSelectedTaskId((id) => (id && nextTaskIds.has(id) ? id : null));
+    setDeleteTaskId((id) => (id && nextTaskIds.has(id) ? id : null));
+    setActivityTaskId((id) => (id && nextTaskIds.has(id) ? id : null));
+    setArtifactTaskId((id) => (id && nextTaskIds.has(id) ? id : null));
+    setInspectedRunTaskId((id) => (id && nextTaskIds.has(id) ? id : null));
+    setInspectedRunId((id) => (id && nextRunIds.has(id) ? id : null));
+    setSelectedApprovalIds((ids) =>
+      ids.filter((id) => nextApprovalIds.has(id)),
+    );
+    setSelectedApprovalId((id) =>
+      id && nextApprovalIds.has(id) ? id : (nextApprovals[0]?.id ?? ""),
+    );
+    setSelectedArtifactId((id) =>
+      id && nextArtifactIds.has(id)
+        ? id
+        : (snapshot.artifacts[0]?.id ?? ""),
+    );
+    setArtifactDeleteId((id) =>
+      id && nextArtifactIds.has(id) ? id : null,
+    );
+    setSelectedActivityId((id) =>
+      id && nextActivityIds.has(id)
+        ? id
+        : (snapshot.activity[0]?.id ?? ""),
+    );
+    setSelectedTeamMemberId((id) =>
+      id && nextMemberIds.has(id) ? id : null,
+    );
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -2549,18 +2772,41 @@ export default function HomePage() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
-        const saved = window.localStorage.getItem("unzoo-one-tasks");
-        const savedSettings = window.localStorage.getItem("unzoo-one-settings");
-        const savedUsage = window.localStorage.getItem("unzoo-one-usage");
-        const savedConnectors = window.localStorage.getItem(
-          "unzoo-one-connectors",
-        );
-        const savedTeam = window.localStorage.getItem("unzoo-one-team");
-        const savedApprovalIds = window.localStorage.getItem(
-          "unzoo-one-pending-approvals",
-        );
-        const savedActivity = window.localStorage.getItem("unzoo-one-activity");
-        const savedArtifacts = window.localStorage.getItem("unzoo-one-artifacts");
+        const savedWorkspaceSync =
+          window.localStorage.getItem(workspaceSyncKey);
+        const syncedWorkspace =
+          parseWorkspaceSyncSnapshot(savedWorkspaceSync);
+        if (savedWorkspaceSync && !syncedWorkspace) {
+          window.localStorage.removeItem(workspaceSyncKey);
+        }
+        if (syncedWorkspace) {
+          lastWorkspaceSyncSignatureRef.current =
+            workspaceSyncSignature(syncedWorkspace);
+        }
+        const saved = syncedWorkspace
+          ? JSON.stringify(syncedWorkspace.tasks)
+          : window.localStorage.getItem("unzoo-one-tasks");
+        const savedSettings = syncedWorkspace
+          ? JSON.stringify(syncedWorkspace.settings)
+          : window.localStorage.getItem("unzoo-one-settings");
+        const savedUsage = syncedWorkspace
+          ? JSON.stringify(syncedWorkspace.usage)
+          : window.localStorage.getItem("unzoo-one-usage");
+        const savedConnectors = syncedWorkspace
+          ? JSON.stringify(syncedWorkspace.connectors)
+          : window.localStorage.getItem("unzoo-one-connectors");
+        const savedTeam = syncedWorkspace
+          ? JSON.stringify(syncedWorkspace.members)
+          : window.localStorage.getItem("unzoo-one-team");
+        const savedApprovalIds = syncedWorkspace
+          ? JSON.stringify(syncedWorkspace.approvalIds)
+          : window.localStorage.getItem("unzoo-one-pending-approvals");
+        const savedActivity = syncedWorkspace
+          ? JSON.stringify(syncedWorkspace.activity)
+          : window.localStorage.getItem("unzoo-one-activity");
+        const savedArtifacts = syncedWorkspace
+          ? JSON.stringify(syncedWorkspace.artifacts)
+          : window.localStorage.getItem("unzoo-one-artifacts");
         const savedRecentSearches = window.localStorage.getItem(
           "unzoo-one-recent-searches",
         );
@@ -2719,6 +2965,8 @@ export default function HomePage() {
         window.localStorage.removeItem("unzoo-one-artifacts");
         window.localStorage.removeItem("unzoo-one-recent-searches");
         window.localStorage.removeItem("unzoo-one-read-notifications");
+        window.localStorage.removeItem(workspaceSyncKey);
+        lastWorkspaceSyncSignatureRef.current = "";
         setWorkspaceLoadWarning(
           "检测到损坏的本机数据，已使用安全的默认工作区启动。你可以继续使用，或从备份恢复原有内容。",
         );
@@ -2800,6 +3048,28 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!tasksReady) return;
+    if (pendingWorkspaceSyncRef.current) return;
+    const workspaceData: WorkspaceSyncData = {
+      tasks,
+      settings,
+      usage: usageSettings,
+      connectors: connectorStates,
+      members: teamMembers,
+      approvalIds: approvals.map((item) => item.id),
+      activity: activityLog.slice(0, 100),
+      artifacts: artifacts.slice(0, 100),
+    };
+    const signature = workspaceSyncSignature(workspaceData);
+
+    if (applyingExternalWorkspaceSyncRef.current) {
+      if (signature === externalWorkspaceSyncSignatureRef.current) {
+        applyingExternalWorkspaceSyncRef.current = false;
+        externalWorkspaceSyncSignatureRef.current = "";
+        lastWorkspaceSyncSignatureRef.current = signature;
+      }
+      return;
+    }
+
     if (settings.local) {
       window.localStorage.setItem("unzoo-one-tasks", JSON.stringify(tasks));
       window.localStorage.setItem("unzoo-one-settings", JSON.stringify(settings));
@@ -2832,6 +3102,16 @@ export default function HomePage() {
         "unzoo-one-read-notifications",
         JSON.stringify(readNotificationIds.slice(0, 30)),
       );
+      if (lastWorkspaceSyncSignatureRef.current !== signature) {
+        const snapshot: WorkspaceSyncSnapshot = {
+          version: 1,
+          source: workspaceTabIdRef.current,
+          updatedAt: new Date().toISOString(),
+          ...workspaceData,
+        };
+        window.localStorage.setItem(workspaceSyncKey, JSON.stringify(snapshot));
+        lastWorkspaceSyncSignatureRef.current = signature;
+      }
     } else {
       window.localStorage.removeItem("unzoo-one-tasks");
       window.localStorage.removeItem("unzoo-one-settings");
@@ -2843,6 +3123,8 @@ export default function HomePage() {
       window.localStorage.removeItem("unzoo-one-artifacts");
       window.localStorage.removeItem("unzoo-one-recent-searches");
       window.localStorage.removeItem("unzoo-one-read-notifications");
+      window.localStorage.removeItem(workspaceSyncKey);
+      lastWorkspaceSyncSignatureRef.current = "";
     }
   }, [
     activityLog,
@@ -2857,6 +3139,121 @@ export default function HomePage() {
     teamMembers,
     usageSettings,
   ]);
+
+  useEffect(() => {
+    if (!tasksReady || !settings.local) return;
+
+    function receiveWorkspaceSync(event: StorageEvent) {
+      if (event.key !== workspaceSyncKey || !event.newValue) return;
+      const incoming = parseWorkspaceSyncSnapshot(event.newValue);
+      if (!incoming || incoming.source === workspaceTabIdRef.current) return;
+      const incomingSignature = workspaceSyncSignature(incoming);
+      if (incomingSignature === lastWorkspaceSyncSignatureRef.current) return;
+
+      const currentData: WorkspaceSyncData = {
+        tasks,
+        settings,
+        usage: usageSettings,
+        connectors: connectorStates,
+        members: teamMembers,
+        approvalIds: approvals.map((approval) => approval.id),
+        activity: activityLog.slice(0, 100),
+        artifacts: artifacts.slice(0, 100),
+      };
+      const sections = getWorkspaceSyncSections(currentData, incoming);
+      if (sections.length === 0) {
+        lastWorkspaceSyncSignatureRef.current = incomingSignature;
+        return;
+      }
+
+      const conflicts: WorkspaceSyncConflict[] = [];
+      if (editingTaskId && taskComposerDirty) {
+        const currentTask =
+          tasks.find((task) => task.id === editingTaskId) ?? null;
+        const incomingTask =
+          incoming.tasks.find((task) => task.id === editingTaskId) ?? null;
+        if (JSON.stringify(currentTask) !== JSON.stringify(incomingTask)) {
+          conflicts.push("task");
+        }
+      }
+      if (editingArtifactId && artifactEditorDirty) {
+        const currentArtifact =
+          artifacts.find((artifact) => artifact.id === editingArtifactId) ??
+          null;
+        const incomingArtifact =
+          incoming.artifacts.find(
+            (artifact) => artifact.id === editingArtifactId,
+          ) ?? null;
+        if (
+          JSON.stringify(currentArtifact) !== JSON.stringify(incomingArtifact)
+        ) {
+          conflicts.push("artifact");
+        }
+      }
+      if (
+        usageBudgetDirty &&
+        JSON.stringify(usageSettings) !== JSON.stringify(incoming.usage)
+      ) {
+        conflicts.push("budget");
+      }
+      if (selectedTeamMemberId && teamMemberRoleDirty) {
+        const currentMember =
+          teamMembers.find((member) => member.id === selectedTeamMemberId) ??
+          null;
+        const incomingMember =
+          incoming.members.find(
+            (member) => member.id === selectedTeamMemberId,
+          ) ?? null;
+        if (JSON.stringify(currentMember) !== JSON.stringify(incomingMember)) {
+          conflicts.push("member");
+        }
+      }
+
+      if (conflicts.length > 0) {
+        pendingWorkspaceSyncRef.current = incoming;
+      } else {
+        pendingWorkspaceSyncRef.current = null;
+        applyWorkspaceSyncSnapshot(incoming);
+      }
+      setWorkspaceSyncNotice({
+        id: `${incoming.updatedAt}-${incoming.source}`,
+        sections,
+        conflicts,
+      });
+    }
+
+    window.addEventListener("storage", receiveWorkspaceSync);
+    return () => window.removeEventListener("storage", receiveWorkspaceSync);
+  }, [
+    activityLog,
+    approvals,
+    artifactEditorDirty,
+    artifacts,
+    connectorStates,
+    editingArtifactId,
+    editingTaskId,
+    selectedTeamMemberId,
+    settings,
+    taskComposerDirty,
+    tasks,
+    tasksReady,
+    teamMemberRoleDirty,
+    teamMembers,
+    usageBudgetDirty,
+    usageSettings,
+  ]);
+
+  useEffect(() => {
+    if (!workspaceSyncNotice || workspaceSyncNotice.conflicts.length > 0) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setWorkspaceSyncNotice((current) =>
+        current?.id === workspaceSyncNotice.id ? null : current,
+      );
+    }, 7000);
+    return () => window.clearTimeout(timer);
+  }, [workspaceSyncNotice]);
 
   useEffect(() => {
     if (!notice) return;
@@ -4162,6 +4559,10 @@ export default function HomePage() {
   }
 
   async function saveArtifactEdit() {
+    if (artifactWorkspaceConflict) {
+      setNotice("成果已在另一窗口更新，请先处理版本冲突");
+      return;
+    }
     if (
       !editingArtifact ||
       artifactSavingRef.current ||
@@ -4829,6 +5230,10 @@ export default function HomePage() {
 
   async function createTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (editingTaskId && taskWorkspaceConflict) {
+      setNotice("任务已在另一窗口更新，请先处理版本冲突");
+      return;
+    }
     setTaskFormSubmitted(true);
     if (taskFormHasErrors || taskSavingRef.current) {
       const firstInvalidField =
@@ -5121,6 +5526,114 @@ export default function HomePage() {
 
   function restoreWorkspaceFromWarning() {
     importInputRef.current?.click();
+  }
+
+  function reviewWorkspaceSync() {
+    const sections = workspaceSyncNotice?.sections ?? [];
+    setWorkspaceSyncNotice(null);
+    if (sections.includes("approvals")) {
+      openView("approvals");
+    } else if (sections.includes("tasks")) {
+      openView("tasks");
+    } else if (sections.includes("artifacts")) {
+      openView("artifacts");
+    } else if (sections.includes("activity")) {
+      openView("activity");
+    } else {
+      openView("settings");
+    }
+  }
+
+  function keepCurrentWorkspaceDrafts() {
+    const incoming = pendingWorkspaceSyncRef.current;
+    if (!incoming || !workspaceSyncNotice) {
+      setWorkspaceSyncNotice(null);
+      return;
+    }
+
+    let resolvedSnapshot = incoming;
+    if (artifactWorkspaceConflict && editingArtifactId) {
+      const currentArtifact =
+        artifacts.find((artifact) => artifact.id === editingArtifactId) ?? null;
+      const artifactStillExists = incoming.artifacts.some(
+        (artifact) => artifact.id === editingArtifactId,
+      );
+      if (currentArtifact && !artifactStillExists) {
+        resolvedSnapshot = {
+          ...incoming,
+          artifacts: [currentArtifact, ...incoming.artifacts],
+        };
+      }
+    }
+    if (
+      taskWorkspaceConflict &&
+      editingTaskId &&
+      !incoming.tasks.some((task) => task.id === editingTaskId)
+    ) {
+      setEditingTaskId(null);
+    }
+
+    pendingWorkspaceSyncRef.current = null;
+    applyWorkspaceSyncSnapshot(resolvedSnapshot);
+    setWorkspaceSyncNotice(null);
+    setNotice("当前草稿已保留，保存后将以这份内容为准");
+  }
+
+  function useLatestWorkspaceVersion() {
+    const incoming = pendingWorkspaceSyncRef.current;
+    const conflicts = workspaceSyncNotice?.conflicts ?? [];
+    if (!incoming) {
+      setWorkspaceSyncNotice(null);
+      return;
+    }
+
+    const latestTask = editingTaskId
+      ? incoming.tasks.find((task) => task.id === editingTaskId) ?? null
+      : null;
+    const latestArtifact = editingArtifactId
+      ? incoming.artifacts.find(
+          (artifact) => artifact.id === editingArtifactId,
+        ) ?? null
+      : null;
+    const latestMember = selectedTeamMemberId
+      ? incoming.members.find(
+          (member) => member.id === selectedTeamMemberId,
+        ) ?? null
+      : null;
+
+    pendingWorkspaceSyncRef.current = null;
+    applyWorkspaceSyncSnapshot(incoming);
+    if (conflicts.includes("task")) {
+      clearTaskDraftRecovery();
+      if (latestTask) {
+        beginEditTask(latestTask);
+      } else {
+        closeComposer({ clearRecovery: true });
+      }
+    }
+    if (conflicts.includes("artifact")) {
+      clearArtifactDraftRecovery();
+      if (latestArtifact) {
+        openArtifactEditor(latestArtifact);
+      } else {
+        closeArtifactEditor({ clearRecovery: true });
+      }
+    }
+    if (conflicts.includes("budget")) {
+      setUsageBudgetDraft(String(incoming.usage.monthlyBudget));
+      setUsageAlertDraft(incoming.usage.alertThreshold);
+      setUsagePauseDraft(incoming.usage.pauseAtLimit);
+    }
+    if (conflicts.includes("member")) {
+      if (latestMember) {
+        setMemberRoleDraft(latestMember.role);
+      } else {
+        setSelectedTeamMemberId(null);
+        setMemberRemoveConfirm(false);
+      }
+    }
+    setWorkspaceSyncNotice(null);
+    setNotice("已载入另一窗口的最新内容");
   }
 
   function duplicateTask(task: TaskItem) {
@@ -5530,6 +6043,10 @@ export default function HomePage() {
   }
 
   function saveUsageBudget() {
+    if (budgetWorkspaceConflict) {
+      setNotice("预算已在另一窗口更新，请先处理版本冲突");
+      return;
+    }
     if (usageBudgetDraftInvalid) return;
     const monthlyBudget = Math.round(usageBudgetDraftValue);
     const nextSettings: UsageSettings = {
@@ -5953,6 +6470,10 @@ export default function HomePage() {
   }
 
   function saveTeamMemberRole() {
+    if (memberWorkspaceConflict) {
+      setNotice("成员角色已在另一窗口更新，请先处理版本冲突");
+      return;
+    }
     if (!selectedTeamMember || selectedTeamMember.role === "所有者") return;
     if (memberRoleDraft === selectedTeamMember.role) {
       setNotice("成员角色没有变化");
@@ -7269,6 +7790,73 @@ export default function HomePage() {
               )}
               {isCheckingNetwork ? "正在检查" : "检查连接"}
             </button>
+          </section>
+        )}
+
+        {tasksReady && workspaceSyncNotice && (
+          <section
+            className={`workspace-sync-banner ${
+              workspaceSyncHasConflict ? "has-conflict" : ""
+            }`}
+            role={workspaceSyncHasConflict ? "alert" : "status"}
+            aria-live="polite"
+          >
+            <span className="workspace-sync-icon" aria-hidden="true">
+              {workspaceSyncHasConflict ? (
+                <AlertTriangle size={18} />
+              ) : (
+                <RotateCcw size={18} />
+              )}
+            </span>
+            <span className="workspace-sync-copy">
+              <strong>
+                {workspaceSyncHasConflict
+                  ? "另一窗口更新了你正在编辑的内容"
+                  : `另一窗口更新了${workspaceSyncLabel}`}
+              </strong>
+              <small>
+                {workspaceSyncHasConflict
+                  ? `已暂停同步${workspaceSyncLabel}，当前草稿没有被覆盖。`
+                  : "当前工作区已自动同步，无需重新加载页面。"}
+              </small>
+            </span>
+            <span className="workspace-sync-actions">
+              {workspaceSyncHasConflict ? (
+                <>
+                  <button
+                    className="latest"
+                    type="button"
+                    onClick={useLatestWorkspaceVersion}
+                  >
+                    <RotateCcw size={14} />
+                    载入最新版本
+                  </button>
+                  <button
+                    className="keep"
+                    type="button"
+                    onClick={keepCurrentWorkspaceDrafts}
+                  >
+                    <Save size={14} />
+                    保留当前草稿
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={reviewWorkspaceSync}>
+                  查看更新
+                  <ChevronRight size={14} />
+                </button>
+              )}
+            </span>
+            {!workspaceSyncHasConflict && (
+              <button
+                className="workspace-sync-dismiss"
+                type="button"
+                aria-label="关闭同步提示"
+                onClick={() => setWorkspaceSyncNotice(null)}
+              >
+                <X size={15} />
+              </button>
+            )}
           </section>
         )}
 
@@ -10992,7 +11580,7 @@ export default function HomePage() {
 
       {composerOpen && (
         <div
-          className="clarity-dialog-backdrop"
+          className="clarity-dialog-backdrop task-composer-backdrop"
           onMouseDown={requestCloseComposer}
         >
           <form
