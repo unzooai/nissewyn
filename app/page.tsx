@@ -112,6 +112,14 @@ type ArtifactDeleteSnapshot = {
   artifact: ArtifactItem;
   index: number;
 };
+type ApprovalRejectSnapshot = {
+  tasks: TaskItem[];
+  approvals: ApprovalItem[];
+  selectedApprovalId: string;
+  selectedApprovalIds: string[];
+  rejectedCount: number;
+  isRunning: boolean;
+};
 type WorkspaceBackup = {
   version: 1;
   product: "Unzoo One";
@@ -1336,6 +1344,8 @@ export default function HomePage() {
   const [bulkApprovalDecision, setBulkApprovalDecision] =
     useState<BulkApprovalDecision | null>(null);
   const [approvalRejectReason, setApprovalRejectReason] = useState("");
+  const [approvalRejectSnapshot, setApprovalRejectSnapshot] =
+    useState<ApprovalRejectSnapshot | null>(null);
   const [activityLog, setActivityLog] = useState<ActivityItem[]>(initialActivityItems);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("全部");
   const [activityTaskId, setActivityTaskId] = useState<string | null>(null);
@@ -1863,13 +1873,16 @@ export default function HomePage() {
   }, [inviteEmail, inviteName, teamMembers]);
   const teamInviteFormHasErrors =
     Object.keys(teamInviteFormErrors).length > 0;
-  const noticeIsCaution = /失败|不能|请先|无效|损坏/.test(notice);
+  const noticeIsCaution = /失败|不能|请先|无效|损坏|已拒绝/.test(notice);
   const artifactUndoAvailable = Boolean(
     artifactDeleteSnapshot &&
       notice === `已删除成果“${artifactDeleteSnapshot.artifact.title}”`,
   );
   const bulkDeleteUndoAvailable = Boolean(
     bulkDeleteSnapshot && notice.startsWith("已删除 "),
+  );
+  const approvalRejectUndoAvailable = Boolean(
+    approvalRejectSnapshot && notice.startsWith("已拒绝"),
   );
 
   useEffect(() => {
@@ -2118,11 +2131,13 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!notice) return;
-    const timeout = notice.startsWith("已删除") ? 10000 : 4200;
+    const timeout =
+      notice.startsWith("已删除") || notice.startsWith("已拒绝") ? 10000 : 4200;
     const timer = window.setTimeout(() => {
       setNotice("");
       setBulkDeleteSnapshot(null);
       setArtifactDeleteSnapshot(null);
+      setApprovalRejectSnapshot(null);
     }, timeout);
     return () => window.clearTimeout(timer);
   }, [notice]);
@@ -3235,6 +3250,7 @@ export default function HomePage() {
     setSelectedApprovalIds([]);
     setBulkApprovalDecision(null);
     setApprovalRejectReason("");
+    setApprovalRejectSnapshot(null);
     setActivityLog(backup.activity.slice(0, 100));
     setIsRunning(restoredPrimary.status !== "已暂停");
     setSelectedStep("analyze");
@@ -3300,6 +3316,7 @@ export default function HomePage() {
     setSelectedApprovalIds([]);
     setBulkApprovalDecision(null);
     setApprovalRejectReason("");
+    setApprovalRejectSnapshot(null);
     setActivityLog(initialActivityItems.map((item) => ({ ...item })));
     setIsRunning(true);
     setSelectedStep("analyze");
@@ -3501,6 +3518,43 @@ export default function HomePage() {
     }
   }
 
+  function stageApprovalRejectUndo(rejectedCount: number) {
+    setBulkDeleteSnapshot(null);
+    setArtifactDeleteSnapshot(null);
+    setApprovalRejectSnapshot({
+      tasks,
+      approvals,
+      selectedApprovalId,
+      selectedApprovalIds,
+      rejectedCount,
+      isRunning,
+    });
+  }
+
+  function undoApprovalReject() {
+    if (!approvalRejectSnapshot) return;
+    const snapshot = approvalRejectSnapshot;
+    setTasks(snapshot.tasks);
+    setApprovals(snapshot.approvals);
+    setSelectedApprovalId(snapshot.selectedApprovalId);
+    setSelectedApprovalIds(snapshot.selectedApprovalIds);
+    setIsRunning(snapshot.isRunning);
+    setBulkApprovalDecision(null);
+    setRejectApprovalId(null);
+    setApprovalRejectReason("");
+    setApprovalRejectSnapshot(null);
+    setActiveView("approvals");
+    recordActivity({
+      title: `已撤销拒绝 ${snapshot.rejectedCount} 项操作`,
+      detail: "待确认操作、关联任务状态和原运行记录已恢复；之前的拒绝与本次恢复仍保留在审计中。",
+      icon: "activity",
+      tone: "green",
+      kind: "审批",
+    });
+    setNotice(`已恢复 ${snapshot.rejectedCount} 项待确认操作`);
+    scrollApprovalIntoView();
+  }
+
   function confirmBulkReject() {
     const reason = approvalRejectReason.trim();
     if (selectedApprovals.length === 0 || reason.length < 4) return;
@@ -3511,6 +3565,7 @@ export default function HomePage() {
     );
     const nextApproval = getNextApprovalAfterRemoving(rejectedIds);
 
+    stageApprovalRejectUndo(rejected.length);
     setApprovals((items) =>
       items.filter((approval) => !rejectedIds.has(approval.id)),
     );
@@ -3523,6 +3578,10 @@ export default function HomePage() {
               ...task,
               status: "已暂停",
               updated: "因批量审批拒绝暂停",
+              runs: stopActiveTaskRuns(
+                task.runs,
+                "批量审批被拒绝，本次运行未执行外部操作。",
+              ),
             }
           : task,
       ),
@@ -3644,6 +3703,7 @@ export default function HomePage() {
     const rejected = rejectedApproval;
     const relatedTask = tasks.find((task) => task.id === rejected.taskId);
     const nextApproval = approvals.find((item) => item.id !== rejected.id);
+    stageApprovalRejectUndo(1);
     setApprovals((items) => items.filter((item) => item.id !== rejected.id));
     setSelectedApprovalId(nextApproval?.id ?? "");
     setSelectedApprovalIds((selectedIds) =>
@@ -9907,7 +9967,7 @@ export default function HomePage() {
             <p id="bulk-approval-description">
               {bulkApprovalDecision === "approve"
                 ? "每项授权都只在原申请范围内生效，并会分别写入审计记录。"
-                : "系统不会执行这些外部操作，关联任务将暂停并等待修改。"}
+                : "系统不会执行这些外部操作，关联任务将暂停；完成后可在底部提示中撤销。"}
             </p>
 
             <div className="bulk-approval-facts">
@@ -10251,7 +10311,9 @@ export default function HomePage() {
             </label>
             <div className="approval-reject-note">
               <ShieldCheck size={16} />
-              <span>拒绝决定会写入审计记录，不会发生任何外部操作。</span>
+              <span>
+                不会发生任何外部操作；完成后 10 秒内可以撤销，决定仍会写入审计记录。
+              </span>
             </div>
             <div className="approval-reject-actions">
               <button
@@ -10561,7 +10623,9 @@ export default function HomePage() {
       {notice && (
         <div
           className={`clarity-toast ${noticeIsCaution ? "caution" : ""} ${
-            artifactUndoAvailable || bulkDeleteUndoAvailable
+            artifactUndoAvailable ||
+            bulkDeleteUndoAvailable ||
+            approvalRejectUndoAvailable
               ? "has-action"
               : ""
           }`}
@@ -10593,6 +10657,16 @@ export default function HomePage() {
               撤销
             </button>
           )}
+          {approvalRejectUndoAvailable && (
+            <button
+              className="clarity-toast-undo"
+              type="button"
+              onClick={undoApprovalReject}
+            >
+              <RotateCcw size={14} />
+              撤销拒绝
+            </button>
+          )}
           <button
             className="clarity-toast-close"
             type="button"
@@ -10601,6 +10675,7 @@ export default function HomePage() {
               setNotice("");
               setBulkDeleteSnapshot(null);
               setArtifactDeleteSnapshot(null);
+              setApprovalRejectSnapshot(null);
             }}
           >
             <X size={15} />

@@ -131,6 +131,15 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /aria-current=/);
   assert.match(page, /function requestRejectApproval/);
   assert.match(page, /function confirmRejectApproval/);
+  assert.match(page, /type ApprovalRejectSnapshot =/);
+  assert.match(page, /function stageApprovalRejectUndo/);
+  assert.match(page, /function undoApprovalReject/);
+  assert.match(page, /批量审批被拒绝，本次运行未执行外部操作/);
+  assert.match(page, /完成后 10 秒内可以撤销/);
+  assert.match(
+    page,
+    /notice\.startsWith\("已删除"\) \|\| notice\.startsWith\("已拒绝"\)/,
+  );
   assert.match(page, /function chooseApproval/);
   assert.match(page, /function scrollApprovalIntoView/);
   assert.match(page, /approvalDetailRef/);
