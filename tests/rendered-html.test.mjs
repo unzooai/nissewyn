@@ -76,6 +76,16 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /artifactWorkspaceConflict/);
   assert.match(page, /budgetWorkspaceConflict/);
   assert.match(page, /memberWorkspaceConflict/);
+  assert.match(page, /profileWorkspaceConflict/);
+  assert.match(page, /type WorkspaceProfile =/);
+  assert.match(page, /const defaultWorkspaceProfile: WorkspaceProfile/);
+  assert.match(page, /function isWorkspaceProfile/);
+  assert.match(page, /function getWorkspaceInitial/);
+  assert.match(page, /function openWorkspaceProfile/);
+  assert.match(page, /function requestCloseWorkspaceProfile/);
+  assert.match(page, /function saveWorkspaceProfile/);
+  assert.match(page, /className="workspace-profile-dialog"/);
+  assert.match(page, /profile: workspaceProfile/);
   assert.match(page, /type DesktopNotificationPermission =/);
   assert.match(page, /notifications: false/);
   assert.match(page, /useSyncExternalStore/);
@@ -106,7 +116,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /"unzoo-one-connectors"/);
   assert.match(page, /"unzoo-one-team"/);
   assert.match(page, /"unzoo-one-usage"/);
-  assert.match(page, /"unzoo-one-schema-version", "10"/);
+  assert.match(page, /"unzoo-one-schema-version", "11"/);
   assert.match(
     page,
     /window\.localStorage\.setItem\(\s*workspaceSyncKey,\s*JSON\.stringify\(snapshot\)/,

@@ -88,6 +88,13 @@ type SettingsState = {
   local: boolean;
   notifications: boolean;
 };
+type WorkspaceProfile = {
+  name: string;
+  description: string;
+};
+type WorkspaceProfileFormErrors = Partial<
+  Record<"name" | "description", string>
+>;
 type DesktopNotificationPermission =
   | "checking"
   | "unsupported"
@@ -114,11 +121,17 @@ type ConnectorDefinition = {
 };
 type TeamRole = "所有者" | "管理员" | "审批者" | "成员";
 type TeamMemberStatus = "在线" | "离线" | "已邀请";
-type SettingsDraftTarget = "budget" | "invite" | "member";
+type SettingsDraftTarget = "profile" | "budget" | "invite" | "member";
 const settingsDraftDiscardCopy: Record<
   SettingsDraftTarget,
   { eyebrow: string; title: string; description: string; discardLabel: string }
 > = {
+  profile: {
+    eyebrow: "工作区资料尚未保存",
+    title: "放弃这次工作区资料修改？",
+    description: "名称和说明会恢复为当前已保存的内容。",
+    discardLabel: "放弃修改",
+  },
   budget: {
     eyebrow: "预算尚未保存",
     title: "放弃这次预算调整？",
@@ -180,6 +193,7 @@ type WorkspaceBackup = {
   version: 1;
   product: "Unzoo One";
   exportedAt: string;
+  profile?: WorkspaceProfile;
   tasks: TaskItem[];
   settings: SettingsState;
   usage?: UsageSettings;
@@ -191,6 +205,7 @@ type WorkspaceBackup = {
   artifacts?: ArtifactItem[];
 };
 type WorkspaceSyncSection =
+  | "profile"
   | "tasks"
   | "approvals"
   | "artifacts"
@@ -199,8 +214,14 @@ type WorkspaceSyncSection =
   | "usage"
   | "connectors"
   | "team";
-type WorkspaceSyncConflict = "task" | "artifact" | "budget" | "member";
+type WorkspaceSyncConflict =
+  | "profile"
+  | "task"
+  | "artifact"
+  | "budget"
+  | "member";
 type WorkspaceSyncData = {
+  profile: WorkspaceProfile;
   tasks: TaskItem[];
   settings: SettingsState;
   usage: UsageSettings;
@@ -438,6 +459,7 @@ const workspacePreferenceStorageKeys = [
 ] as const;
 const taskDraftRecoveryMaxAge = 7 * 24 * 60 * 60 * 1000;
 const workspaceSyncSectionLabels: Record<WorkspaceSyncSection, string> = {
+  profile: "工作区资料",
   tasks: "任务",
   approvals: "待确认操作",
   artifacts: "成果",
@@ -446,6 +468,10 @@ const workspaceSyncSectionLabels: Record<WorkspaceSyncSection, string> = {
   usage: "预算",
   connectors: "连接器",
   team: "团队成员",
+};
+const defaultWorkspaceProfile: WorkspaceProfile = {
+  name: "MVP 工作区",
+  description: "长期 AI 任务、审批与成果协作",
 };
 const defaultSettings: SettingsState = {
   approval: true,
@@ -797,6 +823,20 @@ function isTeamMember(value: unknown): value is TeamMember {
   );
 }
 
+function getWorkspaceInitial(name: string) {
+  const normalized = name.trim();
+  if (!normalized) return "U";
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length > 1 && words.every((word) => /^[a-z0-9]/i.test(word))) {
+    return words
+      .slice(0, 2)
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase();
+  }
+  return Array.from(normalized)[0].toUpperCase();
+}
+
 function isTaskRun(value: unknown): value is TaskRun {
   if (!value || typeof value !== "object") return false;
   const run = value as Partial<TaskRun>;
@@ -944,6 +984,19 @@ function isSettingsState(value: unknown): value is SettingsState {
   );
 }
 
+function isWorkspaceProfile(value: unknown): value is WorkspaceProfile {
+  if (!value || typeof value !== "object") return false;
+  const profile = value as Partial<WorkspaceProfile>;
+  return (
+    typeof profile.name === "string" &&
+    profile.name.trim().length >= 2 &&
+    profile.name.trim().length <= 40 &&
+    typeof profile.description === "string" &&
+    profile.description.trim().length >= 4 &&
+    profile.description.trim().length <= 100
+  );
+}
+
 function isApprovalDeferrals(value: unknown): value is ApprovalDeferrals {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   return Object.entries(value).every(
@@ -963,6 +1016,7 @@ function parseWorkspaceSyncSnapshot(value: string | null) {
       typeof parsed.source !== "string" ||
       typeof parsed.updatedAt !== "string" ||
       Number.isNaN(Date.parse(parsed.updatedAt)) ||
+      (parsed.profile !== undefined && !isWorkspaceProfile(parsed.profile)) ||
       !Array.isArray(parsed.tasks) ||
       parsed.tasks.length === 0 ||
       !parsed.tasks.every(isTaskItem) ||
@@ -985,6 +1039,7 @@ function parseWorkspaceSyncSnapshot(value: string | null) {
     }
     return {
       ...parsed,
+      profile: parsed.profile ?? { ...defaultWorkspaceProfile },
       approvalDeferrals: parsed.approvalDeferrals ?? {},
     } as WorkspaceSyncSnapshot;
   } catch {
@@ -994,6 +1049,7 @@ function parseWorkspaceSyncSnapshot(value: string | null) {
 
 function workspaceSyncSignature(data: WorkspaceSyncData) {
   return JSON.stringify({
+    profile: data.profile,
     tasks: data.tasks,
     settings: data.settings,
     usage: data.usage,
@@ -1011,6 +1067,9 @@ function getWorkspaceSyncSections(
   incoming: WorkspaceSyncData,
 ) {
   const sections: WorkspaceSyncSection[] = [];
+  if (JSON.stringify(current.profile) !== JSON.stringify(incoming.profile)) {
+    sections.push("profile");
+  }
   if (JSON.stringify(current.tasks) !== JSON.stringify(incoming.tasks)) {
     sections.push("tasks");
   }
@@ -1060,6 +1119,7 @@ function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
     backup.product !== "Unzoo One" ||
     typeof backup.exportedAt !== "string" ||
     Number.isNaN(Date.parse(backup.exportedAt)) ||
+    (backup.profile !== undefined && !isWorkspaceProfile(backup.profile)) ||
     !Array.isArray(backup.tasks) ||
     backup.tasks.length === 0 ||
     !backup.tasks.every(isTaskItem) ||
@@ -1087,6 +1147,7 @@ function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
   }
   return {
     ...backup,
+    profile: backup.profile ?? { ...defaultWorkspaceProfile },
     approvalDeferrals: backup.approvalDeferrals ?? {},
   } as WorkspaceBackup;
 }
@@ -1966,6 +2027,18 @@ export default function HomePage() {
   );
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  const [workspaceProfile, setWorkspaceProfile] = useState<WorkspaceProfile>(
+    defaultWorkspaceProfile,
+  );
+  const [workspaceProfileOpen, setWorkspaceProfileOpen] = useState(false);
+  const [workspaceNameDraft, setWorkspaceNameDraft] = useState(
+    defaultWorkspaceProfile.name,
+  );
+  const [workspaceDescriptionDraft, setWorkspaceDescriptionDraft] = useState(
+    defaultWorkspaceProfile.description,
+  );
+  const [workspaceProfileSubmitted, setWorkspaceProfileSubmitted] =
+    useState(false);
   const [notificationFilter, setNotificationFilter] =
     useState<NotificationFilter>("全部");
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
@@ -2105,6 +2178,7 @@ export default function HomePage() {
   const workspaceMenuWrapRef = useRef<HTMLDivElement>(null);
   const workspaceMenuButtonRef = useRef<HTMLButtonElement>(null);
   const workspaceMenuPanelRef = useRef<HTMLDivElement>(null);
+  const workspaceNameRef = useRef<HTMLInputElement>(null);
   const overlayTriggerRef = useRef<HTMLElement | null>(null);
   const routeReadyRef = useRef(false);
   const workspaceTabIdRef = useRef(
@@ -2465,6 +2539,29 @@ export default function HomePage() {
     (usageBudgetDraft !== String(usageSettings.monthlyBudget) ||
       usageAlertDraft !== usageSettings.alertThreshold ||
       usagePauseDraft !== usageSettings.pauseAtLimit);
+  const workspaceProfileFormErrors = useMemo<WorkspaceProfileFormErrors>(() => {
+    const errors: WorkspaceProfileFormErrors = {};
+    const normalizedName = workspaceNameDraft.trim();
+    const normalizedDescription = workspaceDescriptionDraft.trim();
+    if (normalizedName.length < 2) {
+      errors.name = "工作区名称至少需要 2 个字";
+    } else if (normalizedName.length > 40) {
+      errors.name = "工作区名称不能超过 40 个字";
+    }
+    if (normalizedDescription.length < 4) {
+      errors.description = "请用至少 4 个字说明这个工作区的用途";
+    } else if (normalizedDescription.length > 100) {
+      errors.description = "工作区说明不能超过 100 个字";
+    }
+    return errors;
+  }, [workspaceDescriptionDraft, workspaceNameDraft]);
+  const workspaceProfileFormHasErrors =
+    Object.keys(workspaceProfileFormErrors).length > 0;
+  const workspaceProfileDirty =
+    workspaceProfileOpen &&
+    (workspaceNameDraft !== workspaceProfile.name ||
+      workspaceDescriptionDraft !== workspaceProfile.description);
+  const workspaceInitial = getWorkspaceInitial(workspaceProfile.name);
   const teamInviteDirty =
     teamInviteOpen &&
     (inviteName.length > 0 || inviteEmail.length > 0 || inviteRole !== "成员");
@@ -2472,7 +2569,10 @@ export default function HomePage() {
     selectedTeamMember && memberRoleDraft !== selectedTeamMember.role,
   );
   const settingsDraftDirty =
-    usageBudgetDirty || teamInviteDirty || teamMemberRoleDirty;
+    workspaceProfileDirty ||
+    usageBudgetDirty ||
+    teamInviteDirty ||
+    teamMemberRoleDirty;
   const activeSettingsDiscardCopy = settingsDiscardTarget
     ? settingsDraftDiscardCopy[settingsDiscardTarget]
     : null;
@@ -2548,6 +2648,8 @@ export default function HomePage() {
     approvals.find((item) => item.id === rejectApprovalId) ?? null;
   const activeOverlayKind = settingsDiscardTarget
     ? "settings-discard"
+    : workspaceProfileOpen
+      ? "workspace-profile"
     : taskDiscardOpen
     ? "task-discard"
     : artifactDiscardOpen
@@ -2702,6 +2804,8 @@ export default function HomePage() {
     workspaceSyncNotice?.conflicts.includes("budget") ?? false;
   const memberWorkspaceConflict =
     workspaceSyncNotice?.conflicts.includes("member") ?? false;
+  const profileWorkspaceConflict =
+    workspaceSyncNotice?.conflicts.includes("profile") ?? false;
   const workspaceSyncLabel = workspaceSyncNotice
     ? workspaceSyncNotice.sections
         .map((section) => workspaceSyncSectionLabels[section])
@@ -2718,7 +2822,10 @@ export default function HomePage() {
     approvalRejectSnapshot && notice.startsWith("已拒绝"),
   );
 
-  function applyWorkspaceSyncSnapshot(snapshot: WorkspaceSyncSnapshot) {
+  function applyWorkspaceSyncSnapshot(
+    snapshot: WorkspaceSyncSnapshot,
+    options: { preserveProfileDraft?: boolean } = {},
+  ) {
     const signature = workspaceSyncSignature(snapshot);
     const nextApprovals = initialApprovals.filter((approval) =>
       snapshot.approvalIds.includes(approval.id),
@@ -2746,6 +2853,11 @@ export default function HomePage() {
     setWorkspacePersistenceStatus("saved");
     setWorkspacePersistenceDetail("");
     setWorkspaceLastSavedAt(snapshot.updatedAt);
+    setWorkspaceProfile(snapshot.profile);
+    if (!options.preserveProfileDraft) {
+      setWorkspaceNameDraft(snapshot.profile.name);
+      setWorkspaceDescriptionDraft(snapshot.profile.description);
+    }
     setTasks(snapshot.tasks);
     setSettings(snapshot.settings);
     setUsageSettings(snapshot.usage);
@@ -3027,6 +3139,7 @@ export default function HomePage() {
           lastWorkspaceSyncSignatureRef.current =
             workspaceSyncSignature(syncedWorkspace);
           setWorkspaceLastSavedAt(syncedWorkspace.updatedAt);
+          setWorkspaceProfile(syncedWorkspace.profile);
         }
         const saved = syncedWorkspace
           ? JSON.stringify(syncedWorkspace.tasks)
@@ -3208,7 +3321,7 @@ export default function HomePage() {
             setReadNotificationIds(parsedReadNotifications.slice(0, 30));
           }
         }
-        window.localStorage.setItem("unzoo-one-schema-version", "10");
+        window.localStorage.setItem("unzoo-one-schema-version", "11");
       } catch (error) {
         lastWorkspaceSyncSignatureRef.current = "";
         if (error instanceof SyntaxError) {
@@ -3308,6 +3421,7 @@ export default function HomePage() {
     if (!tasksReady) return;
     if (pendingWorkspaceSyncRef.current) return;
     const workspaceData: WorkspaceSyncData = {
+      profile: workspaceProfile,
       tasks,
       settings,
       usage: usageSettings,
@@ -3431,6 +3545,7 @@ export default function HomePage() {
     tasksReady,
     teamMembers,
     usageSettings,
+    workspaceProfile,
     workspaceSaveRetryToken,
   ]);
 
@@ -3445,6 +3560,7 @@ export default function HomePage() {
       if (incomingSignature === lastWorkspaceSyncSignatureRef.current) return;
 
       const currentData: WorkspaceSyncData = {
+        profile: workspaceProfile,
         tasks,
         settings,
         usage: usageSettings,
@@ -3462,6 +3578,12 @@ export default function HomePage() {
       }
 
       const conflicts: WorkspaceSyncConflict[] = [];
+      if (
+        workspaceProfileDirty &&
+        JSON.stringify(workspaceProfile) !== JSON.stringify(incoming.profile)
+      ) {
+        conflicts.push("profile");
+      }
       if (editingTaskId && taskComposerDirty) {
         const currentTask =
           tasks.find((task) => task.id === editingTaskId) ?? null;
@@ -3537,6 +3659,8 @@ export default function HomePage() {
     teamMembers,
     usageBudgetDirty,
     usageSettings,
+    workspaceProfile,
+    workspaceProfileDirty,
   ]);
 
   useEffect(() => {
@@ -3763,6 +3887,7 @@ export default function HomePage() {
 
     const selectorByKind = {
       "settings-discard": ".settings-discard-dialog",
+      "workspace-profile": ".workspace-profile-dialog",
       "task-discard": ".task-discard-dialog",
       "artifact-discard": ".artifact-discard-dialog",
       "artifact-editor": ".artifact-editor-dialog",
@@ -3802,6 +3927,13 @@ export default function HomePage() {
     function closeTopOverlay() {
       if (activeOverlayKind === "settings-discard") {
         setSettingsDiscardTarget(null);
+      } else if (activeOverlayKind === "workspace-profile") {
+        if (workspaceProfileDirty) {
+          setSettingsDiscardTarget("profile");
+        } else {
+          setWorkspaceProfileOpen(false);
+          setWorkspaceProfileSubmitted(false);
+        }
       } else if (activeOverlayKind === "task-discard") {
         setTaskDiscardOpen(false);
       } else if (activeOverlayKind === "artifact-discard") {
@@ -3989,6 +4121,7 @@ export default function HomePage() {
     teamInviteDirty,
     teamMemberRoleDirty,
     usageBudgetDirty,
+    workspaceProfileDirty,
   ]);
 
   const searchedTasks = useMemo(() => {
@@ -4339,9 +4472,12 @@ export default function HomePage() {
     .slice(0, 3);
   const workspaceDataSize = useMemo(() => {
     const serialized = JSON.stringify({
+      profile: workspaceProfile,
       tasks,
       settings,
       usage: usageSettings,
+      connectors: connectorStates,
+      members: teamMembers,
       approvalIds: approvals.map((item) => item.id),
       approvalDeferrals,
       activity: activityLog,
@@ -4353,9 +4489,12 @@ export default function HomePage() {
     approvalDeferrals,
     approvals,
     artifacts,
+    connectorStates,
     settings,
     tasks,
+    teamMembers,
     usageSettings,
+    workspaceProfile,
   ]);
   const latestActivity = activityLog[0] ?? initialActivityItems[0];
   const latestArtifact = artifacts[0] ?? null;
@@ -4604,6 +4743,7 @@ export default function HomePage() {
       version: 1,
       product: "Unzoo One",
       exportedAt: new Date().toISOString(),
+      profile: workspaceProfile,
       tasks,
       settings,
       usage: usageSettings,
@@ -5007,6 +5147,9 @@ export default function HomePage() {
     setArtifactDeleteId(null);
     setArtifactDeleteSnapshot(null);
     setSettings(backup.settings);
+    setWorkspaceProfile(backup.profile ?? { ...defaultWorkspaceProfile });
+    setWorkspaceProfileOpen(false);
+    setWorkspaceProfileSubmitted(false);
     setUsageSettings(backup.usage ?? { ...defaultUsageSettings });
     setUsageBudgetOpen(false);
     setSettingsDiscardTarget(null);
@@ -5079,6 +5222,11 @@ export default function HomePage() {
     setArtifactDeleteId(null);
     setArtifactDeleteSnapshot(null);
     setSettings({ ...defaultSettings });
+    setWorkspaceProfile({ ...defaultWorkspaceProfile });
+    setWorkspaceNameDraft(defaultWorkspaceProfile.name);
+    setWorkspaceDescriptionDraft(defaultWorkspaceProfile.description);
+    setWorkspaceProfileOpen(false);
+    setWorkspaceProfileSubmitted(false);
     setUsageSettings({ ...defaultUsageSettings });
     setUsageBudgetOpen(false);
     setUsageBudgetDraft(String(defaultUsageSettings.monthlyBudget));
@@ -5964,7 +6112,9 @@ export default function HomePage() {
     }
 
     pendingWorkspaceSyncRef.current = null;
-    applyWorkspaceSyncSnapshot(resolvedSnapshot);
+    applyWorkspaceSyncSnapshot(resolvedSnapshot, {
+      preserveProfileDraft: profileWorkspaceConflict,
+    });
     setWorkspaceSyncNotice(null);
     setNotice("当前草稿已保留，保存后将以这份内容为准");
   }
@@ -5993,6 +6143,11 @@ export default function HomePage() {
 
     pendingWorkspaceSyncRef.current = null;
     applyWorkspaceSyncSnapshot(incoming);
+    if (conflicts.includes("profile")) {
+      setWorkspaceNameDraft(incoming.profile.name);
+      setWorkspaceDescriptionDraft(incoming.profile.description);
+      setWorkspaceProfileSubmitted(false);
+    }
     if (conflicts.includes("task")) {
       clearTaskDraftRecovery();
       if (latestTask) {
@@ -6408,6 +6563,72 @@ export default function HomePage() {
     setUsageBudgetOpen(true);
   }
 
+  function openWorkspaceProfile() {
+    if (
+      !overlayTriggerRef.current &&
+      document.activeElement instanceof HTMLElement
+    ) {
+      overlayTriggerRef.current = document.activeElement;
+    }
+    setWorkspaceNameDraft(workspaceProfile.name);
+    setWorkspaceDescriptionDraft(workspaceProfile.description);
+    setWorkspaceProfileSubmitted(false);
+    setSettingsDiscardTarget(null);
+    setWorkspaceMenuOpen(false);
+    setWorkspaceProfileOpen(true);
+  }
+
+  function requestCloseWorkspaceProfile() {
+    if (workspaceProfileDirty) {
+      setSettingsDiscardTarget("profile");
+      return;
+    }
+    setWorkspaceProfileOpen(false);
+    setWorkspaceProfileSubmitted(false);
+  }
+
+  function saveWorkspaceProfile(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWorkspaceProfileSubmitted(true);
+    if (profileWorkspaceConflict) {
+      setNotice("工作区资料已在另一窗口更新，请先处理版本冲突");
+      return;
+    }
+    if (workspaceProfileFormHasErrors) {
+      window.requestAnimationFrame(() => {
+        const target = workspaceProfileFormErrors.name
+          ? workspaceNameRef.current
+          : document.querySelector<HTMLTextAreaElement>(
+              "#workspace-description-field",
+            );
+        target?.focus();
+      });
+      return;
+    }
+
+    const nextProfile: WorkspaceProfile = {
+      name: workspaceNameDraft.trim(),
+      description: workspaceDescriptionDraft.trim(),
+    };
+    const previousName = workspaceProfile.name;
+    setWorkspaceProfile(nextProfile);
+    setWorkspaceNameDraft(nextProfile.name);
+    setWorkspaceDescriptionDraft(nextProfile.description);
+    setWorkspaceProfileSubmitted(false);
+    setWorkspaceProfileOpen(false);
+    recordActivity({
+      title: `工作区资料已更新：${nextProfile.name}`,
+      detail:
+        previousName === nextProfile.name
+          ? `工作区说明已更新为“${nextProfile.description}”。`
+          : `工作区已从“${previousName}”更名为“${nextProfile.name}”。`,
+      icon: "settings",
+      tone: "green",
+      kind: "系统",
+    });
+    setNotice(`工作区已更新为“${nextProfile.name}”`);
+  }
+
   function requestCloseUsageBudget() {
     if (usageBudgetDirty) {
       setSettingsDiscardTarget("budget");
@@ -6417,7 +6638,12 @@ export default function HomePage() {
   }
 
   function discardSettingsDraft() {
-    if (settingsDiscardTarget === "budget") {
+    if (settingsDiscardTarget === "profile") {
+      setWorkspaceNameDraft(workspaceProfile.name);
+      setWorkspaceDescriptionDraft(workspaceProfile.description);
+      setWorkspaceProfileSubmitted(false);
+      setWorkspaceProfileOpen(false);
+    } else if (settingsDiscardTarget === "budget") {
       setUsageBudgetDraft(String(usageSettings.monthlyBudget));
       setUsageAlertDraft(usageSettings.alertThreshold);
       setUsagePauseDraft(usageSettings.pauseAtLimit);
@@ -7991,7 +8217,7 @@ export default function HomePage() {
                   <Building2 size={17} />
                 </span>
                 <span className="workspace-menu-trigger-copy">
-                  <strong>MVP 工作区</strong>
+                  <strong>{workspaceProfile.name}</strong>
                   <small>Team 方案</small>
                 </span>
                 <ChevronDown
@@ -8018,10 +8244,12 @@ export default function HomePage() {
                     ref={workspaceMenuPanelRef}
                   >
                   <header className="workspace-menu-heading">
-                    <span className="workspace-menu-avatar">M</span>
+                    <span className="workspace-menu-avatar">
+                      {workspaceInitial}
+                    </span>
                     <div>
                       <span>当前工作区</span>
-                      <strong>MVP 工作区</strong>
+                      <strong>{workspaceProfile.name}</strong>
                       <small>
                         {!isOnline
                           ? "设备离线 · 本机数据可用"
@@ -8059,6 +8287,16 @@ export default function HomePage() {
                   </div>
 
                   <nav className="workspace-menu-nav" aria-label="工作区快捷操作">
+                    <button type="button" onClick={openWorkspaceProfile}>
+                      <span className="tone-green">
+                        <Pencil size={17} />
+                      </span>
+                      <span>
+                        <strong>工作区资料</strong>
+                        <small>{workspaceProfile.description}</small>
+                      </span>
+                      <ChevronRight size={15} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => openWorkspaceSection("settings-team")}
@@ -10185,20 +10423,28 @@ export default function HomePage() {
             >
               <div className="workspace-overview-status">
                 <span className="workspace-overview-icon">
-                  <HardDrive size={22} />
+                  {workspaceInitial}
                   <i />
                 </span>
                 <div>
-                  <span>工作区状态</span>
-                  <h2>
+                  <span>当前工作区</span>
+                  <h2>{workspaceProfile.name}</h2>
+                  <p>{workspaceProfile.description}</p>
+                  <small className="workspace-profile-storage">
+                    <HardDrive size={13} />
                     {settings.local ? "本机数据正常" : "当前为临时会话"}
-                  </h2>
-                  <p>
-                    {settings.local
-                      ? "任务、成果、审批和运行记录会自动保存在这台设备。"
-                      : "当前数据仍可使用，但关闭页面后不会自动恢复。"}
-                  </p>
+                  </small>
                 </div>
+                <button
+                  className="workspace-profile-edit"
+                  type="button"
+                  aria-label="编辑工作区资料"
+                  title="编辑工作区资料"
+                  onClick={openWorkspaceProfile}
+                >
+                  <Pencil size={15} />
+                  <span>编辑资料</span>
+                </button>
               </div>
               <div className="workspace-overview-metrics">
                 <span>
@@ -13016,6 +13262,156 @@ export default function HomePage() {
               </button>
             </div>
           </section>
+        </div>
+      )}
+
+      {workspaceProfileOpen && (
+        <div
+          className="clarity-dialog-backdrop"
+          onMouseDown={requestCloseWorkspaceProfile}
+        >
+          <form
+            className="workspace-profile-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="workspace-profile-title"
+            aria-describedby="workspace-profile-description"
+            onMouseDown={(event) => event.stopPropagation()}
+            onSubmit={saveWorkspaceProfile}
+          >
+            <button
+              className="workspace-profile-close"
+              type="button"
+              aria-label="关闭工作区资料"
+              onClick={requestCloseWorkspaceProfile}
+            >
+              <X size={17} />
+            </button>
+
+            <span className="workspace-profile-icon">
+              <Building2 size={21} />
+            </span>
+            <span className="workspace-profile-eyebrow">工作区资料</span>
+            <h2 id="workspace-profile-title">让团队看到一致的工作区身份</h2>
+            <p id="workspace-profile-description">
+              名称会显示在全局入口，说明用于帮助成员确认当前工作范围。
+            </p>
+
+            <div className="workspace-profile-preview" aria-label="工作区资料预览">
+              <span>{getWorkspaceInitial(workspaceNameDraft)}</span>
+              <span>
+                <small>Team 方案</small>
+                <strong>{workspaceNameDraft.trim() || "未命名工作区"}</strong>
+                <em>
+                  {workspaceDescriptionDraft.trim() || "尚未填写工作区说明"}
+                </em>
+              </span>
+              <ShieldCheck size={18} />
+            </div>
+
+            <label
+              className={`workspace-profile-field ${
+                workspaceProfileSubmitted && workspaceProfileFormErrors.name
+                  ? "has-error"
+                  : ""
+              }`}
+            >
+              <span>
+                <strong>工作区名称</strong>
+                <small>{workspaceNameDraft.length}/40</small>
+              </span>
+              <input
+                ref={workspaceNameRef}
+                data-overlay-initial-focus
+                required
+                maxLength={40}
+                aria-invalid={Boolean(
+                  workspaceProfileSubmitted && workspaceProfileFormErrors.name,
+                )}
+                aria-describedby={
+                  workspaceProfileSubmitted && workspaceProfileFormErrors.name
+                    ? "workspace-name-error"
+                    : undefined
+                }
+                value={workspaceNameDraft}
+                placeholder="例如：增长运营中心"
+                onChange={(event) => setWorkspaceNameDraft(event.target.value)}
+              />
+              {workspaceProfileSubmitted && workspaceProfileFormErrors.name && (
+                <small
+                  className="workspace-profile-error"
+                  id="workspace-name-error"
+                  role="alert"
+                >
+                  <AlertTriangle size={13} />
+                  {workspaceProfileFormErrors.name}
+                </small>
+              )}
+            </label>
+
+            <label
+              className={`workspace-profile-field ${
+                workspaceProfileSubmitted &&
+                workspaceProfileFormErrors.description
+                  ? "has-error"
+                  : ""
+              }`}
+            >
+              <span>
+                <strong>工作区说明</strong>
+                <small>{workspaceDescriptionDraft.length}/100</small>
+              </span>
+              <textarea
+                id="workspace-description-field"
+                required
+                maxLength={100}
+                aria-invalid={Boolean(
+                  workspaceProfileSubmitted &&
+                    workspaceProfileFormErrors.description,
+                )}
+                aria-describedby={
+                  workspaceProfileSubmitted &&
+                  workspaceProfileFormErrors.description
+                    ? "workspace-description-error"
+                    : undefined
+                }
+                value={workspaceDescriptionDraft}
+                placeholder="说明团队会在这里运行和审核哪些 AI 工作"
+                onChange={(event) =>
+                  setWorkspaceDescriptionDraft(event.target.value)
+                }
+              />
+              {workspaceProfileSubmitted &&
+                workspaceProfileFormErrors.description && (
+                  <small
+                    className="workspace-profile-error"
+                    id="workspace-description-error"
+                    role="alert"
+                  >
+                    <AlertTriangle size={13} />
+                    {workspaceProfileFormErrors.description}
+                  </small>
+                )}
+            </label>
+
+            <div className="workspace-profile-actions">
+              <span>
+                <HardDrive size={14} />
+                {settings.local ? "修改会自动保存在本机" : "当前为临时会话"}
+              </span>
+              <button type="button" onClick={requestCloseWorkspaceProfile}>
+                取消
+              </button>
+              <button
+                className="confirm"
+                type="submit"
+                disabled={!workspaceProfileDirty}
+              >
+                <Save size={15} />
+                保存资料
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

@@ -9125,9 +9125,10 @@ body {
 
 .workspace-overview-status {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
+  min-width: 0;
 }
 
 .workspace-overview-icon {
@@ -9140,6 +9141,9 @@ body {
   border-radius: 8px;
   background: #edf5ff;
   color: #2c68c9;
+  font-size: 17px;
+  font-weight: 880;
+  text-transform: uppercase;
 }
 
 .workspace-overview-icon > i {
@@ -9181,6 +9185,51 @@ body {
   color: #68778a;
   font-size: 11px;
   line-height: 1.55;
+}
+
+.workspace-profile-storage {
+  display: inline-flex;
+  margin-top: 8px;
+  align-items: center;
+  gap: 5px;
+  color: #688096;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.workspace-profile-storage svg {
+  color: #31866f;
+}
+
+.workspace-profile-edit {
+  display: inline-flex;
+  min-height: 38px;
+  padding: 0 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #c9d8e5;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #4a6075;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 780;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.workspace-profile-edit:hover {
+  border-color: #9dbeb4;
+  background: #f3faf7;
+  color: #126d55;
+}
+
+.workspace-profile-edit:active {
+  transform: translateY(1px);
 }
 
 .workspace-overview-metrics {
@@ -9874,7 +9923,7 @@ body {
   }
 
   .workspace-overview-status {
-    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-columns: 44px minmax(0, 1fr) 40px;
     gap: 12px;
   }
 
@@ -9885,6 +9934,16 @@ body {
 
   .workspace-overview-status h2 {
     font-size: 17px;
+  }
+
+  .workspace-profile-edit {
+    width: 40px;
+    min-height: 40px;
+    padding: 0;
+  }
+
+  .workspace-profile-edit > span {
+    display: none;
   }
 
   .workspace-overview-metrics {
@@ -15670,6 +15729,278 @@ body {
   opacity: 0.45;
 }
 
+.workspace-profile-dialog {
+  position: relative;
+  width: min(548px, calc(100vw - 32px));
+  max-height: min(760px, calc(100dvh - 32px));
+  padding: 27px 28px 24px;
+  overflow-y: auto;
+  border: 1px solid #d4dee6;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #253649;
+  box-shadow: 0 30px 85px rgba(31, 41, 55, 0.24);
+}
+
+.workspace-profile-close {
+  position: absolute;
+  top: 17px;
+  right: 17px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #dbe3e8;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #697887;
+  cursor: pointer;
+}
+
+.workspace-profile-close:hover {
+  border-color: #b8c9d5;
+  background: #f7fafb;
+  color: #2e465c;
+}
+
+.workspace-profile-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid #bcdcd2;
+  border-radius: 7px;
+  background: #eaf8f3;
+  color: #0d8062;
+}
+
+.workspace-profile-eyebrow {
+  display: block;
+  margin-top: 16px;
+  color: #17775e;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.workspace-profile-dialog h2 {
+  margin: 8px 42px 0 0;
+  color: #26384b;
+  font-size: 22px;
+  line-height: 1.35;
+}
+
+.workspace-profile-dialog > p {
+  margin: 8px 0 0;
+  color: #6d7b88;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.workspace-profile-preview {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  margin: 18px 0;
+  padding: 12px 14px;
+  border-top: 1px solid #dce7e3;
+  border-bottom: 1px solid #dce7e3;
+  background: #f5faf8;
+}
+
+.workspace-profile-preview > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid #b9d9cf;
+  border-radius: 7px;
+  background: #dff3ec;
+  color: #096d55;
+  font-size: 16px;
+  font-weight: 880;
+  text-transform: uppercase;
+}
+
+.workspace-profile-preview > span:nth-child(2),
+.workspace-profile-preview small,
+.workspace-profile-preview strong,
+.workspace-profile-preview em {
+  display: block;
+  min-width: 0;
+}
+
+.workspace-profile-preview small {
+  color: #668178;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.workspace-profile-preview strong {
+  margin-top: 4px;
+  overflow: hidden;
+  color: #23394b;
+  font-size: 14px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-profile-preview em {
+  margin-top: 4px;
+  overflow: hidden;
+  color: #71817e;
+  font-size: 11px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-profile-preview > svg {
+  color: #1a8b6c;
+}
+
+.workspace-profile-field {
+  display: block;
+  margin-top: 15px;
+}
+
+.workspace-profile-field > span:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workspace-profile-field > span:first-child strong {
+  color: #455668;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.workspace-profile-field > span:first-child small {
+  color: #85919c;
+  font-size: 11px;
+}
+
+.workspace-profile-field input,
+.workspace-profile-field textarea {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+  border: 1px solid #d7e0e7;
+  border-radius: 6px;
+  outline: none;
+  background: #ffffff;
+  color: #27394b;
+  font: inherit;
+  font-size: 13px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.workspace-profile-field input {
+  height: 44px;
+  padding: 0 12px;
+}
+
+.workspace-profile-field textarea {
+  min-height: 84px;
+  padding: 11px 12px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.workspace-profile-field input:focus,
+.workspace-profile-field textarea:focus {
+  border-color: #80b5a6;
+  box-shadow: 0 0 0 3px rgba(26, 139, 108, 0.1);
+}
+
+.workspace-profile-field.has-error input,
+.workspace-profile-field.has-error textarea {
+  border-color: #c86761;
+}
+
+.workspace-profile-error {
+  display: flex;
+  margin-top: 6px;
+  align-items: center;
+  gap: 5px;
+  color: #b94f49;
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.workspace-profile-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e4e9ed;
+}
+
+.workspace-profile-actions > span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: #708093;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.workspace-profile-actions > span svg {
+  flex: 0 0 auto;
+  color: #268167;
+}
+
+.workspace-profile-actions > button {
+  display: inline-flex;
+  min-height: 42px;
+  padding: 0 15px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #d7dfe5;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #596977;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.workspace-profile-actions > button.confirm {
+  border-color: #16785b;
+  background: #16785b;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(22, 120, 91, 0.16);
+}
+
+.workspace-profile-actions > button:hover {
+  border-color: #aebfc9;
+}
+
+.workspace-profile-actions > button.confirm:hover {
+  border-color: #0f674e;
+  background: #0f674e;
+}
+
+.workspace-profile-actions > button:disabled,
+.workspace-profile-actions > button:disabled:hover {
+  border-color: #dce4e8;
+  background: #eef2f3;
+  color: #95a2aa;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 @media (max-width: 1180px) {
   .settings-usage-layout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -15781,6 +16112,26 @@ body {
     padding: 23px 18px max(20px, env(safe-area-inset-bottom));
     border-bottom: 0;
     border-radius: 8px 8px 0 0;
+  }
+
+  .workspace-profile-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 12px);
+    padding: 23px 18px max(20px, env(safe-area-inset-bottom));
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .workspace-profile-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace-profile-actions > span {
+    grid-column: 1 / -1;
+  }
+
+  .workspace-profile-actions > button.confirm {
+    grid-column: 2;
   }
 
   .usage-budget-facts {
