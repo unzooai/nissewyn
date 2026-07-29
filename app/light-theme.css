@@ -901,7 +901,7 @@ input:focus-visible {
 .activity-row small {
   margin-top: 4px;
   color: #929d97;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .stage-board {
@@ -2034,7 +2034,7 @@ body {
 .canvas-toolbar > div > span,
 .capability-detail span {
   color: #999ca3;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 760;
 }
 
@@ -2079,7 +2079,7 @@ body {
 .palette-row small {
   margin-top: 3px;
   overflow: hidden;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2162,7 +2162,7 @@ body {
   padding: 4px 6px;
   background: #f0f1f3;
   color: #858990;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .brain-row.selected {
@@ -2213,7 +2213,7 @@ body {
 
 .run-hero-card span {
   color: #92959d;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .run-hero-card strong {
@@ -2246,7 +2246,7 @@ body {
   top: 3px;
   left: 0;
   color: #92959d;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   content: "任务进度";
 }
@@ -2312,7 +2312,7 @@ body {
 
 .step-number {
   color: #a0a3aa;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .step-icon {
@@ -2335,7 +2335,7 @@ body {
 
 .stage-step small {
   color: #92959d;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .stage-detail {
@@ -2352,7 +2352,7 @@ body {
 
 .detail-eyebrow {
   color: #8c9098;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .detail-icon {
@@ -2368,7 +2368,7 @@ body {
   border-radius: 5px;
   background: #f0f1f3 !important;
   color: #6f737b !important;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .stage-detail h3 {
@@ -2407,12 +2407,12 @@ body {
 
 .activity-heading > span {
   color: #858991;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .activity-heading > strong {
   color: #24775e;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .activity-row {
@@ -2442,7 +2442,7 @@ body {
 
 .activity-row small {
   color: #a0a3a9;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .evidence-strip {
@@ -2465,7 +2465,7 @@ body {
 
 .evidence-item span {
   color: #979aa1;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .evidence-item strong {
@@ -2524,7 +2524,7 @@ body {
 
 .risk-meter strong {
   color: #a45f1e;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .approval-buttons {
@@ -2573,7 +2573,7 @@ body {
 }
 
 .approval-row small {
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .audit-box {
@@ -2587,7 +2587,7 @@ body {
 .audit-box p {
   border-top-color: #e7e9ed;
   color: #747880;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .notification-popover,

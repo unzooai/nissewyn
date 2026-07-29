@@ -359,3 +359,18 @@ test("keeps commercial task interactions and accessibility in source", async () 
 
   await assert.rejects(access(new URL("app/_sites-preview", templateRoot)));
 });
+
+test("keeps imported interface text at least 10px", async () => {
+  const stylesheets = await Promise.all(
+    ["globals.css", "light-theme.css", "clarity.css"].map((filename) =>
+      readFile(new URL(`../app/${filename}`, import.meta.url), "utf8"),
+    ),
+  );
+
+  for (const stylesheet of stylesheets) {
+    const undersized = [...stylesheet.matchAll(/font-size:\s*([\d.]+)px/g)]
+      .map((match) => Number(match[1]))
+      .filter((size) => size < 10);
+    assert.deepEqual(undersized, []);
+  }
+});

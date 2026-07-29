@@ -7309,14 +7309,16 @@ body {
 
   .view-filter-tabs {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     overflow: visible;
   }
 
   .view-filter-tabs button {
-    gap: 3px;
-    padding: 0 5px;
+    gap: 4px;
+    min-height: 34px;
+    padding: 0 8px;
     font-size: 11px;
+    white-space: nowrap;
   }
 
   .view-filter-tabs button > em {
@@ -12070,14 +12072,19 @@ body {
   }
 
   .artifact-filter-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
     width: 100%;
     max-width: 100%;
-    overscroll-behavior-inline: contain;
-    scrollbar-width: none;
+    overflow: visible;
   }
 
-  .artifact-filter-tabs::-webkit-scrollbar {
-    display: none;
+  .artifact-filter-tabs button {
+    justify-content: center;
+    min-width: 0;
+    padding: 0 6px;
+    white-space: nowrap;
   }
 
   .approval-detail {
