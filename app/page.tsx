@@ -213,6 +213,18 @@ type TaskDraftRecovery = {
   draft: TaskDraftSnapshot;
   baseline: TaskDraftSnapshot;
 };
+type ArtifactDraftSnapshot = {
+  title: string;
+  filename: string;
+  content: string;
+};
+type ArtifactDraftRecovery = {
+  version: 1;
+  savedAt: string;
+  artifactId: string;
+  baseVersion: number;
+  draft: ArtifactDraftSnapshot;
+};
 type ArtifactFormErrors = Partial<
   Record<"title" | "filename" | "content", string>
 >;
@@ -332,6 +344,7 @@ type SearchResult = {
 const weekdays: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 const taskSchedules: TaskSchedule[] = ["仅运行一次", "每天", "每周"];
 const taskDraftRecoveryKey = "unzoo-one-task-draft-recovery";
+const artifactDraftRecoveryKey = "unzoo-one-artifact-draft-recovery";
 const taskDraftRecoveryMaxAge = 7 * 24 * 60 * 60 * 1000;
 const defaultSettings: SettingsState = {
   approval: true,
@@ -504,7 +517,44 @@ function parseTaskDraftRecovery(value: unknown): TaskDraftRecovery | null {
   return recovery as TaskDraftRecovery;
 }
 
-function formatTaskDraftSavedAt(savedAt: string) {
+function isArtifactDraftSnapshot(value: unknown): value is ArtifactDraftSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const draft = value as Partial<ArtifactDraftSnapshot>;
+  return (
+    typeof draft.title === "string" &&
+    draft.title.length <= 100 &&
+    typeof draft.filename === "string" &&
+    draft.filename.length <= 120 &&
+    typeof draft.content === "string" &&
+    draft.content.length <= 100000
+  );
+}
+
+function parseArtifactDraftRecovery(
+  value: unknown,
+): ArtifactDraftRecovery | null {
+  if (!value || typeof value !== "object") return null;
+  const recovery = value as Partial<ArtifactDraftRecovery>;
+  const savedAt = recovery.savedAt ? Date.parse(recovery.savedAt) : Number.NaN;
+  const age = Date.now() - savedAt;
+  if (
+    recovery.version !== 1 ||
+    Number.isNaN(savedAt) ||
+    age < -5 * 60 * 1000 ||
+    age > taskDraftRecoveryMaxAge ||
+    typeof recovery.artifactId !== "string" ||
+    recovery.artifactId.length > 160 ||
+    typeof recovery.baseVersion !== "number" ||
+    !Number.isInteger(recovery.baseVersion) ||
+    recovery.baseVersion < 1 ||
+    !isArtifactDraftSnapshot(recovery.draft)
+  ) {
+    return null;
+  }
+  return recovery as ArtifactDraftRecovery;
+}
+
+function formatDraftSavedAt(savedAt: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "numeric",
     day: "numeric",
@@ -537,12 +587,55 @@ function getWorkspaceToday() {
   };
 }
 
-function clearTaskDraftRecoveryStorage() {
+function clearDraftRecoveryStorage(key: string) {
   try {
-    window.sessionStorage.removeItem(taskDraftRecoveryKey);
+    window.sessionStorage.removeItem(key);
   } catch {
     // Browsers may disable session storage; the active form remains usable.
   }
+}
+
+function DraftRecoveryNotice({
+  id,
+  icon: Icon,
+  title,
+  description,
+  continueLabel,
+  onContinue,
+  onDiscard,
+}: {
+  id: string;
+  icon: typeof Save;
+  title: string;
+  description: string;
+  continueLabel: string;
+  onContinue: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <section
+      className="draft-recovery"
+      role="status"
+      aria-labelledby={`${id}-title`}
+    >
+      <span className="draft-recovery-icon">
+        <Icon size={19} />
+      </span>
+      <span className="draft-recovery-copy">
+        <strong id={`${id}-title`}>{title}</strong>
+        <small>{description}</small>
+      </span>
+      <span className="draft-recovery-actions">
+        <button className="continue" type="button" onClick={onContinue}>
+          <RotateCcw size={15} />
+          {continueLabel}
+        </button>
+        <button type="button" onClick={onDiscard}>
+          放弃草稿
+        </button>
+      </span>
+    </section>
+  );
 }
 
 function isUsageSettings(value: unknown): value is UsageSettings {
@@ -1583,6 +1676,15 @@ export default function HomePage() {
   const [artifactTitleDraft, setArtifactTitleDraft] = useState("");
   const [artifactFilenameDraft, setArtifactFilenameDraft] = useState("");
   const [artifactContentDraft, setArtifactContentDraft] = useState("");
+  const [pendingArtifactDraftRecovery, setPendingArtifactDraftRecovery] =
+    useState<ArtifactDraftRecovery | null>(null);
+  const [artifactDraftAutoSavedAt, setArtifactDraftAutoSavedAt] = useState<
+    string | null
+  >(null);
+  const [artifactDraftAutoSavedSignature, setArtifactDraftAutoSavedSignature] =
+    useState("");
+  const [artifactDraftSaveFailedSignature, setArtifactDraftSaveFailedSignature] =
+    useState("");
   const [artifactEditSubmitted, setArtifactEditSubmitted] = useState(false);
   const [artifactDiscardOpen, setArtifactDiscardOpen] = useState(false);
   const [artifactDeleteId, setArtifactDeleteId] = useState<string | null>(null);
@@ -1664,6 +1766,7 @@ export default function HomePage() {
   const artifactFilenameRef = useRef<HTMLInputElement>(null);
   const artifactContentRef = useRef<HTMLTextAreaElement>(null);
   const artifactSavingRef = useRef(false);
+  const artifactDraftRecoveryOwnedRef = useRef(false);
   const taskNameRef = useRef<HTMLInputElement>(null);
   const taskTargetRef = useRef<HTMLInputElement>(null);
   const taskDescriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -1936,6 +2039,18 @@ export default function HomePage() {
         artifactFilenameDraft !== editingArtifact.filename ||
         artifactContentDraft !== editingArtifact.content),
   );
+  const artifactDraftSignature = JSON.stringify([
+    editingArtifactId,
+    artifactTitleDraft,
+    artifactFilenameDraft,
+    artifactContentDraft,
+  ]);
+  const artifactDraftIsAutoSaved = Boolean(
+    artifactDraftAutoSavedAt &&
+      artifactDraftAutoSavedSignature === artifactDraftSignature,
+  );
+  const artifactDraftSaveFailed =
+    artifactDraftSaveFailedSignature === artifactDraftSignature;
   const artifactFormErrors = useMemo<ArtifactFormErrors>(() => {
     const errors: ArtifactFormErrors = {};
     const normalizedTitle = artifactTitleDraft.trim();
@@ -2130,12 +2245,33 @@ export default function HomePage() {
         if (!savedDraft) return;
         const recovery = parseTaskDraftRecovery(JSON.parse(savedDraft));
         if (!recovery) {
-          clearTaskDraftRecoveryStorage();
+          clearDraftRecoveryStorage(taskDraftRecoveryKey);
           return;
         }
         setPendingTaskDraftRecovery(recovery);
       } catch {
-        clearTaskDraftRecoveryStorage();
+        clearDraftRecoveryStorage(taskDraftRecoveryKey);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const savedDraft = window.sessionStorage.getItem(
+          artifactDraftRecoveryKey,
+        );
+        if (!savedDraft) return;
+        const recovery = parseArtifactDraftRecovery(JSON.parse(savedDraft));
+        if (!recovery) {
+          clearDraftRecoveryStorage(artifactDraftRecoveryKey);
+          return;
+        }
+        setPendingArtifactDraftRecovery(recovery);
+      } catch {
+        clearDraftRecoveryStorage(artifactDraftRecoveryKey);
       }
     }, 0);
 
@@ -2159,7 +2295,7 @@ export default function HomePage() {
 
     if (!taskComposerDirty) {
       if (taskDraftRecoveryOwnedRef.current) {
-        clearTaskDraftRecoveryStorage();
+        clearDraftRecoveryStorage(taskDraftRecoveryKey);
         taskDraftRecoveryOwnedRef.current = false;
         const resetTimer = window.setTimeout(() => {
           setPendingTaskDraftRecovery(null);
@@ -2219,6 +2355,64 @@ export default function HomePage() {
     taskScheduleTime,
     taskTarget,
     taskDraftSignature,
+  ]);
+
+  useEffect(() => {
+    if (!editingArtifact) return;
+
+    if (!artifactEditorDirty) {
+      if (artifactDraftRecoveryOwnedRef.current) {
+        clearDraftRecoveryStorage(artifactDraftRecoveryKey);
+        artifactDraftRecoveryOwnedRef.current = false;
+        const resetTimer = window.setTimeout(() => {
+          setPendingArtifactDraftRecovery(null);
+          setArtifactDraftAutoSavedAt(null);
+          setArtifactDraftAutoSavedSignature("");
+          setArtifactDraftSaveFailedSignature("");
+        }, 0);
+        return () => window.clearTimeout(resetTimer);
+      }
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const savedAt = new Date().toISOString();
+      const recovery: ArtifactDraftRecovery = {
+        version: 1,
+        savedAt,
+        artifactId: editingArtifact.id,
+        baseVersion: editingArtifactVersion,
+        draft: {
+          title: artifactTitleDraft,
+          filename: artifactFilenameDraft,
+          content: artifactContentDraft,
+        },
+      };
+
+      try {
+        window.sessionStorage.setItem(
+          artifactDraftRecoveryKey,
+          JSON.stringify(recovery),
+        );
+        artifactDraftRecoveryOwnedRef.current = true;
+        setPendingArtifactDraftRecovery(null);
+        setArtifactDraftAutoSavedAt(savedAt);
+        setArtifactDraftAutoSavedSignature(artifactDraftSignature);
+        setArtifactDraftSaveFailedSignature("");
+      } catch {
+        setArtifactDraftSaveFailedSignature(artifactDraftSignature);
+      }
+    }, 650);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    artifactContentDraft,
+    artifactDraftSignature,
+    artifactEditorDirty,
+    artifactFilenameDraft,
+    artifactTitleDraft,
+    editingArtifact,
+    editingArtifactVersion,
   ]);
 
   useEffect(() => {
@@ -2696,6 +2890,14 @@ export default function HomePage() {
         if (artifactEditorDirty) {
           setArtifactDiscardOpen(true);
         } else {
+          if (artifactDraftRecoveryOwnedRef.current) {
+            clearDraftRecoveryStorage(artifactDraftRecoveryKey);
+            artifactDraftRecoveryOwnedRef.current = false;
+            setPendingArtifactDraftRecovery(null);
+            setArtifactDraftAutoSavedAt(null);
+            setArtifactDraftAutoSavedSignature("");
+            setArtifactDraftSaveFailedSignature("");
+          }
           setEditingArtifactId(null);
           setArtifactTitleDraft("");
           setArtifactFilenameDraft("");
@@ -2727,6 +2929,14 @@ export default function HomePage() {
         if (taskComposerDirty) {
           setTaskDiscardOpen(true);
         } else {
+          if (taskDraftRecoveryOwnedRef.current) {
+            clearDraftRecoveryStorage(taskDraftRecoveryKey);
+            taskDraftRecoveryOwnedRef.current = false;
+            setPendingTaskDraftRecovery(null);
+            setTaskDraftAutoSavedAt(null);
+            setTaskDraftAutoSavedSignature("");
+            setTaskDraftSaveFailedSignature("");
+          }
           setComposerOpen(false);
           setEditingTaskId(null);
           setTaskDraftBaseline(null);
@@ -3510,12 +3720,28 @@ export default function HomePage() {
     setArtifactTitleDraft(artifact.title);
     setArtifactFilenameDraft(artifact.filename);
     setArtifactContentDraft(artifact.content);
+    artifactDraftRecoveryOwnedRef.current = false;
+    setArtifactDraftAutoSavedAt(null);
+    setArtifactDraftAutoSavedSignature("");
+    setArtifactDraftSaveFailedSignature("");
     setArtifactEditSubmitted(false);
     setArtifactDiscardOpen(false);
     setIsSavingArtifact(false);
   }
 
-  function closeArtifactEditor() {
+  function clearArtifactDraftRecovery() {
+    clearDraftRecoveryStorage(artifactDraftRecoveryKey);
+    artifactDraftRecoveryOwnedRef.current = false;
+    setPendingArtifactDraftRecovery(null);
+    setArtifactDraftAutoSavedAt(null);
+    setArtifactDraftAutoSavedSignature("");
+    setArtifactDraftSaveFailedSignature("");
+  }
+
+  function closeArtifactEditor(options: { clearRecovery?: boolean } = {}) {
+    if (options.clearRecovery || artifactDraftRecoveryOwnedRef.current) {
+      clearArtifactDraftRecovery();
+    }
     artifactSavingRef.current = false;
     setEditingArtifactId(null);
     setArtifactTitleDraft("");
@@ -3533,6 +3759,59 @@ export default function HomePage() {
       return;
     }
     closeArtifactEditor();
+  }
+
+  function confirmDiscardArtifactDraft() {
+    closeArtifactEditor();
+    setNotice("未保存的成果修订已放弃");
+  }
+
+  function restoreRecoveredArtifactDraft() {
+    if (!pendingArtifactDraftRecovery || !tasksReady) return;
+    const recovery = pendingArtifactDraftRecovery;
+    const artifact =
+      artifacts.find((item) => item.id === recovery.artifactId) ?? null;
+    if (!artifact || !artifactCanBeEdited(artifact)) {
+      clearArtifactDraftRecovery();
+      setNotice("原成果已不存在或不可编辑，恢复草稿已安全移除");
+      return;
+    }
+
+    const recoveredSignature = JSON.stringify([
+      artifact.id,
+      recovery.draft.title,
+      recovery.draft.filename,
+      recovery.draft.content,
+    ]);
+    setActiveView("artifacts");
+    setSelectedArtifactId(artifact.id);
+    writeWorkspaceRoute(
+      { view: "artifacts", taskId: null, runId: null },
+      "push",
+    );
+    setEditingArtifactId(artifact.id);
+    setArtifactTitleDraft(recovery.draft.title);
+    setArtifactFilenameDraft(recovery.draft.filename);
+    setArtifactContentDraft(recovery.draft.content);
+    setArtifactEditSubmitted(false);
+    setArtifactDiscardOpen(false);
+    setIsSavingArtifact(false);
+    artifactDraftRecoveryOwnedRef.current = true;
+    setPendingArtifactDraftRecovery(null);
+    setArtifactDraftAutoSavedAt(recovery.savedAt);
+    setArtifactDraftAutoSavedSignature(recoveredSignature);
+    setArtifactDraftSaveFailedSignature("");
+
+    if (recovery.baseVersion !== (artifact.version ?? 1)) {
+      setNotice(
+        `草稿基于 v${recovery.baseVersion}，当前为 v${artifact.version ?? 1}；保存时会保留两个版本`,
+      );
+    }
+  }
+
+  function discardRecoveredArtifactDraft() {
+    clearArtifactDraftRecovery();
+    setNotice("未完成的成果修订草稿已放弃");
   }
 
   function loadArtifactRevision(revision: ArtifactRevision) {
@@ -3624,7 +3903,7 @@ export default function HomePage() {
     artifactSavingRef.current = false;
     setIsSavingArtifact(false);
     setNotice(`已保存 v${nextVersion}，上一版本可随时恢复`);
-    closeArtifactEditor();
+    closeArtifactEditor({ clearRecovery: true });
   }
 
   async function importWorkspace(event: React.ChangeEvent<HTMLInputElement>) {
@@ -3661,7 +3940,8 @@ export default function HomePage() {
 
     setTasks(backup.tasks);
     setArtifacts(restoredArtifacts);
-    closeArtifactEditor();
+    closeArtifactEditor({ clearRecovery: true });
+    closeComposer({ clearRecovery: true });
     setArtifactTaskId(null);
     setArtifactFilter("全部");
     setArtifactListQuery("");
@@ -3728,7 +4008,8 @@ export default function HomePage() {
   function resetWorkspace() {
     setTasks(initialTasks.map((task) => ({ ...task })));
     setArtifacts(initialArtifacts.map((artifact) => ({ ...artifact })));
-    closeArtifactEditor();
+    closeArtifactEditor({ clearRecovery: true });
+    closeComposer({ clearRecovery: true });
     setArtifactTaskId(null);
     setArtifactFilter("全部");
     setArtifactListQuery("");
@@ -4373,7 +4654,7 @@ export default function HomePage() {
   }
 
   function clearTaskDraftRecovery() {
-    clearTaskDraftRecoveryStorage();
+    clearDraftRecoveryStorage(taskDraftRecoveryKey);
     taskDraftRecoveryOwnedRef.current = false;
     setPendingTaskDraftRecovery(null);
     setTaskDraftAutoSavedAt(null);
@@ -6394,42 +6675,35 @@ export default function HomePage() {
         )}
 
         {tasksReady && pendingTaskDraftRecovery && !composerOpen && (
-          <section
-            className="task-draft-recovery"
-            role="status"
-            aria-labelledby="task-draft-recovery-title"
-          >
-            <span className="task-draft-recovery-icon">
-              <Save size={19} />
-            </span>
-            <span className="task-draft-recovery-copy">
-              <strong id="task-draft-recovery-title">
-                发现未完成的任务草稿
-              </strong>
-              <small>
-                {pendingTaskDraftRecovery.editingTaskId
-                  ? "任务修改"
-                  : "新任务"}
-                ：
-                {pendingTaskDraftRecovery.draft.name.trim() || "未命名任务"}
-                <i aria-hidden="true">·</i>
-                保存于 {formatTaskDraftSavedAt(pendingTaskDraftRecovery.savedAt)}
-              </small>
-            </span>
-            <span className="task-draft-recovery-actions">
-              <button
-                className="continue"
-                type="button"
-                onClick={restoreRecoveredTaskDraft}
-              >
-                <RotateCcw size={15} />
-                继续编辑
-              </button>
-              <button type="button" onClick={discardRecoveredTaskDraft}>
-                放弃草稿
-              </button>
-            </span>
-          </section>
+          <DraftRecoveryNotice
+            id="task-draft-recovery"
+            icon={Save}
+            title="发现未完成的任务草稿"
+            description={`${
+              pendingTaskDraftRecovery.editingTaskId ? "任务修改" : "新任务"
+            }：${
+              pendingTaskDraftRecovery.draft.name.trim() || "未命名任务"
+            } · 保存于 ${formatDraftSavedAt(pendingTaskDraftRecovery.savedAt)}`}
+            continueLabel="继续编辑"
+            onContinue={restoreRecoveredTaskDraft}
+            onDiscard={discardRecoveredTaskDraft}
+          />
+        )}
+
+        {tasksReady && pendingArtifactDraftRecovery && !editingArtifact && (
+          <DraftRecoveryNotice
+            id="artifact-draft-recovery"
+            icon={FileText}
+            title="发现未完成的成果修订"
+            description={`成果修订：${
+              pendingArtifactDraftRecovery.draft.title.trim() || "未命名成果"
+            } · 保存于 ${formatDraftSavedAt(
+              pendingArtifactDraftRecovery.savedAt,
+            )}`}
+            continueLabel="继续修订"
+            onContinue={restoreRecoveredArtifactDraft}
+            onDiscard={discardRecoveredArtifactDraft}
+          />
         )}
 
         {activeView === "home" && (
@@ -10620,9 +10894,26 @@ export default function HomePage() {
             </div>
 
             <footer className="artifact-editor-actions">
-              <span className={artifactEditorDirty ? "is-dirty" : ""}>
+              <span
+                className={`artifact-editor-save-state ${
+                  artifactEditorDirty
+                    ? artifactDraftSaveFailed
+                      ? "is-dirty failed"
+                      : artifactDraftIsAutoSaved
+                        ? "is-dirty saved"
+                        : "is-dirty saving"
+                    : ""
+                }`}
+                aria-live="polite"
+              >
                 <i />
-                {artifactEditorDirty ? "有未保存修改" : "当前内容未修改"}
+                {artifactEditorDirty
+                  ? artifactDraftSaveFailed
+                    ? "草稿保存失败，请立即保存版本"
+                    : artifactDraftIsAutoSaved
+                      ? "草稿已自动保存，仍需保存版本"
+                      : "正在保护你的修改"
+                  : "当前内容未修改"}
                 <kbd>Ctrl S</kbd>
               </span>
               {artifactEditSubmitted && artifactFormHasErrors && (
@@ -10696,7 +10987,7 @@ export default function HomePage() {
               <button
                 className="danger"
                 type="button"
-                onClick={closeArtifactEditor}
+                onClick={confirmDiscardArtifactDraft}
               >
                 放弃修改
               </button>
