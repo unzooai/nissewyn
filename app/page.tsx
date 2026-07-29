@@ -92,6 +92,24 @@ type ActivityIconKey =
   | "sparkles"
   | "trash";
 type SearchResultKind = "task" | "artifact" | "view" | "action";
+type SearchResultSection = {
+  id: string;
+  label: string;
+  results: SearchResult[];
+  canClear?: boolean;
+};
+type NotificationFilter = "全部" | "未读";
+type NotificationTarget = "approvals" | "activity" | "artifact";
+type NotificationItem = {
+  id: string;
+  title: string;
+  detail: string;
+  meta: string;
+  target: NotificationTarget;
+  targetId?: string;
+  icon: typeof Bell;
+  tone: "amber" | "blue" | "green";
+};
 
 type ActivityItem = {
   id: string;
@@ -787,6 +805,7 @@ export default function HomePage() {
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
+  const [recentSearchKeys, setRecentSearchKeys] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(true);
   const [selectedStep, setSelectedStep] = useState("analyze");
   const [approvals, setApprovals] = useState(initialApprovals);
@@ -800,6 +819,9 @@ export default function HomePage() {
     initialActivityItems[0].id,
   );
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationFilter, setNotificationFilter] =
+    useState<NotificationFilter>("全部");
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
@@ -835,6 +857,7 @@ export default function HomePage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const notificationWrapRef = useRef<HTMLDivElement>(null);
   const notificationButtonRef = useRef<HTMLButtonElement>(null);
+  const notificationPanelRef = useRef<HTMLDivElement>(null);
   const overlayTriggerRef = useRef<HTMLElement | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const approvalDetailRef = useRef<HTMLDivElement>(null);
@@ -880,6 +903,12 @@ export default function HomePage() {
         );
         const savedActivity = window.localStorage.getItem("unzoo-one-activity");
         const savedArtifacts = window.localStorage.getItem("unzoo-one-artifacts");
+        const savedRecentSearches = window.localStorage.getItem(
+          "unzoo-one-recent-searches",
+        );
+        const savedReadNotifications = window.localStorage.getItem(
+          "unzoo-one-read-notifications",
+        );
         const schemaVersion = Number(
           window.localStorage.getItem("unzoo-one-schema-version") ?? "1",
         );
@@ -969,6 +998,24 @@ export default function HomePage() {
             setSelectedArtifactId(validArtifacts[0]?.id ?? "");
           }
         }
+        if (savedRecentSearches) {
+          const parsedRecentSearches = JSON.parse(savedRecentSearches);
+          if (
+            Array.isArray(parsedRecentSearches) &&
+            parsedRecentSearches.every((key) => typeof key === "string")
+          ) {
+            setRecentSearchKeys(parsedRecentSearches.slice(0, 4));
+          }
+        }
+        if (savedReadNotifications) {
+          const parsedReadNotifications = JSON.parse(savedReadNotifications);
+          if (
+            Array.isArray(parsedReadNotifications) &&
+            parsedReadNotifications.every((id) => typeof id === "string")
+          ) {
+            setReadNotificationIds(parsedReadNotifications.slice(0, 30));
+          }
+        }
         window.localStorage.setItem("unzoo-one-schema-version", "4");
       } catch {
         window.localStorage.removeItem("unzoo-one-tasks");
@@ -976,6 +1023,8 @@ export default function HomePage() {
         window.localStorage.removeItem("unzoo-one-pending-approvals");
         window.localStorage.removeItem("unzoo-one-activity");
         window.localStorage.removeItem("unzoo-one-artifacts");
+        window.localStorage.removeItem("unzoo-one-recent-searches");
+        window.localStorage.removeItem("unzoo-one-read-notifications");
       } finally {
         setTasksReady(true);
       }
@@ -1001,14 +1050,33 @@ export default function HomePage() {
         "unzoo-one-artifacts",
         JSON.stringify(artifacts.slice(0, 100)),
       );
+      window.localStorage.setItem(
+        "unzoo-one-recent-searches",
+        JSON.stringify(recentSearchKeys.slice(0, 4)),
+      );
+      window.localStorage.setItem(
+        "unzoo-one-read-notifications",
+        JSON.stringify(readNotificationIds.slice(0, 30)),
+      );
     } else {
       window.localStorage.removeItem("unzoo-one-tasks");
       window.localStorage.removeItem("unzoo-one-settings");
       window.localStorage.removeItem("unzoo-one-pending-approvals");
       window.localStorage.removeItem("unzoo-one-activity");
       window.localStorage.removeItem("unzoo-one-artifacts");
+      window.localStorage.removeItem("unzoo-one-recent-searches");
+      window.localStorage.removeItem("unzoo-one-read-notifications");
     }
-  }, [activityLog, approvals, artifacts, settings, tasks, tasksReady]);
+  }, [
+    activityLog,
+    approvals,
+    artifacts,
+    readNotificationIds,
+    recentSearchKeys,
+    settings,
+    tasks,
+    tasksReady,
+  ]);
 
   useEffect(() => {
     if (!notice) return;
@@ -1328,23 +1396,84 @@ export default function HomePage() {
         icon: Files,
       },
     ];
+    const searchCatalog = [
+      ...taskResults,
+      ...artifactResults,
+      ...viewResults,
+      ...actionResults,
+    ];
 
     if (!keyword) {
+      const recentResults = recentSearchKeys
+        .map((key) => searchCatalog.find((result) => result.key === key))
+        .filter((result): result is SearchResult => Boolean(result));
+      const recentResultKeys = new Set(
+        recentResults.map((result) => result.key),
+      );
       return [
-        ...actionResults,
-        ...taskResults.slice(0, 3),
-        ...artifactResults.slice(0, 1),
-      ];
+        ...recentResults,
+        ...actionResults.filter((result) => !recentResultKeys.has(result.key)),
+        ...taskResults
+          .filter((result) => !recentResultKeys.has(result.key))
+          .slice(0, 2),
+        ...artifactResults
+          .filter((result) => !recentResultKeys.has(result.key))
+          .slice(0, 1),
+      ].slice(0, 9);
     }
 
-    return [...taskResults, ...artifactResults, ...viewResults, ...actionResults]
+    return searchCatalog
       .filter((result) =>
         `${result.title} ${result.description} ${result.meta}`
           .toLowerCase()
           .includes(keyword),
       )
       .slice(0, 8);
-  }, [approvals.length, artifacts, query, tasks]);
+  }, [approvals.length, artifacts, query, recentSearchKeys, tasks]);
+
+  const searchResultSections = useMemo<SearchResultSection[]>(() => {
+    if (!query.trim()) {
+      const recentKeySet = new Set(recentSearchKeys);
+      const recentResults = searchResults.filter((result) =>
+        recentKeySet.has(result.key),
+      );
+      const otherResults = searchResults.filter(
+        (result) => !recentKeySet.has(result.key),
+      );
+      return [
+        {
+          id: "recent",
+          label: "最近访问",
+          results: recentResults,
+          canClear: true,
+        },
+        {
+          id: "actions",
+          label: "快捷操作",
+          results: otherResults.filter((result) => result.kind === "action"),
+        },
+        {
+          id: "suggested",
+          label: "继续工作",
+          results: otherResults.filter((result) => result.kind !== "action"),
+        },
+      ].filter((section) => section.results.length > 0);
+    }
+
+    const sectionLabels: Record<SearchResultKind, string> = {
+      task: "任务",
+      artifact: "成果",
+      view: "页面",
+      action: "操作",
+    };
+    return (["task", "artifact", "view", "action"] as SearchResultKind[])
+      .map((kind) => ({
+        id: kind,
+        label: sectionLabels[kind],
+        results: searchResults.filter((result) => result.kind === kind),
+      }))
+      .filter((section) => section.results.length > 0);
+  }, [query, recentSearchKeys, searchResults]);
 
   const taskFilterCounts = useMemo<Record<TaskFilter, number>>(
     () => ({
@@ -1455,7 +1584,53 @@ export default function HomePage() {
     return Math.max(1, Math.ceil(serialized.length / 1024));
   }, [activityLog, approvals, artifacts, settings, tasks]);
   const latestActivity = activityLog[0] ?? initialActivityItems[0];
-  const LatestActivityIcon = activityIconMap[latestActivity.icon] ?? Activity;
+  const latestArtifact = artifacts[0] ?? null;
+  const notificationItems = useMemo<NotificationItem[]>(() => {
+    const items: NotificationItem[] = [];
+    if (approvals.length > 0) {
+      items.push({
+        id: `approvals-${approvals.map((item) => item.id).join("-")}`,
+        title: `${approvals.length} 项操作等你确认`,
+        detail: "涉及外部访问或发送，任务已在执行前暂停。",
+        meta: "需要处理",
+        target: "approvals",
+        icon: ShieldCheck,
+        tone: "amber",
+      });
+    }
+    items.push({
+      id: `activity-${latestActivity.id}`,
+      title: latestActivity.title,
+      detail: latestActivity.detail,
+      meta: latestActivity.time,
+      target: "activity",
+      targetId: latestActivity.id,
+      icon: activityIconMap[latestActivity.icon] ?? Activity,
+      tone: "blue",
+    });
+    if (latestArtifact) {
+      items.push({
+        id: `artifact-${latestArtifact.id}`,
+        title: `成果已保存：${latestArtifact.title}`,
+        detail: `${latestArtifact.filename} · ${latestArtifact.sizeKb.toFixed(1)} KB`,
+        meta: latestArtifact.updated,
+        target: "artifact",
+        targetId: latestArtifact.id,
+        icon: artifactIconMap[latestArtifact.type],
+        tone: "green",
+      });
+    }
+    return items;
+  }, [approvals, latestActivity, latestArtifact]);
+  const unreadNotificationCount = notificationItems.filter(
+    (item) => !readNotificationIds.includes(item.id),
+  ).length;
+  const visibleNotificationItems =
+    notificationFilter === "未读"
+      ? notificationItems.filter(
+          (item) => !readNotificationIds.includes(item.id),
+        )
+      : notificationItems;
 
   function recordActivity(
     item: Omit<ActivityItem, "id" | "time" | "createdAt">,
@@ -1715,6 +1890,9 @@ export default function HomePage() {
     setActivityListQuery("");
     setActivitySort("最新优先");
     setSelectedActivityId(initialActivityItems[0].id);
+    setRecentSearchKeys([]);
+    setReadNotificationIds([]);
+    setNotificationFilter("全部");
     setSelectedTaskId(null);
     setDeleteTaskId(null);
     setRejectApprovalId(null);
@@ -2208,6 +2386,10 @@ export default function HomePage() {
     setSearchOpen(false);
     setQuery("");
     setActiveSearchIndex(0);
+    setRecentSearchKeys((keys) => [
+      result.key,
+      ...keys.filter((key) => key !== result.key),
+    ].slice(0, 4));
 
     if (result.kind === "task") {
       setActiveView("tasks");
@@ -2228,6 +2410,44 @@ export default function HomePage() {
     }
 
     window.requestAnimationFrame(() => searchInputRef.current?.blur());
+  }
+
+  function clearRecentSearches() {
+    setRecentSearchKeys([]);
+    setActiveSearchIndex(0);
+    window.requestAnimationFrame(() => searchInputRef.current?.focus());
+  }
+
+  function markNotificationRead(notificationId: string) {
+    setReadNotificationIds((ids) =>
+      ids.includes(notificationId)
+        ? ids
+        : [notificationId, ...ids].slice(0, 30),
+    );
+  }
+
+  function markAllNotificationsRead() {
+    setReadNotificationIds((ids) =>
+      Array.from(
+        new Set([...notificationItems.map((item) => item.id), ...ids]),
+      ).slice(0, 30),
+    );
+    setNotice("全部通知已标记为已读");
+  }
+
+  function openNotification(item: NotificationItem) {
+    markNotificationRead(item.id);
+    setNotificationsOpen(false);
+
+    if (item.target === "approvals") {
+      openView("approvals");
+    } else if (item.target === "activity") {
+      openView("activity");
+      if (item.targetId) setSelectedActivityId(item.targetId);
+    } else {
+      openView("artifacts");
+      if (item.targetId) setSelectedArtifactId(item.targetId);
+    }
   }
 
   function clearSearch() {
@@ -2442,7 +2662,7 @@ export default function HomePage() {
                       : undefined
                   }
                   autoComplete="off"
-                  placeholder="搜索任务、页面和操作"
+                  placeholder="搜索任务、成果、页面和操作"
                   value={query}
                   onFocus={() => {
                     setNotificationsOpen(false);
@@ -2480,33 +2700,63 @@ export default function HomePage() {
                   </div>
 
                   {searchResults.length > 0 ? (
-                    <div className="clarity-search-results">
-                      {searchResults.map((result, index) => (
-                        <button
-                          id={`search-result-${index}`}
-                          className={index === activeSearchIndex ? "active" : ""}
-                          key={result.key}
-                          type="button"
-                          role="option"
-                          aria-selected={index === activeSearchIndex}
-                          onMouseEnter={() => setActiveSearchIndex(index)}
-                          onClick={() => chooseSearchResult(result)}
+                    <div className="clarity-search-sections">
+                      {searchResultSections.map((section) => (
+                        <section
+                          className="clarity-search-section"
+                          key={section.id}
+                          role="group"
+                          aria-label={section.label}
                         >
-                          <span
-                            className="clarity-search-result-icon"
-                            data-kind={result.kind}
-                          >
-                            <result.icon size={17} />
-                          </span>
-                          <span className="clarity-search-result-copy">
-                            <strong>{result.title}</strong>
-                            <small>{result.description}</small>
-                          </span>
-                          <span className="clarity-search-result-meta">
-                            {result.meta}
-                            <ChevronRight size={14} />
-                          </span>
-                        </button>
+                          <div className="clarity-search-section-heading">
+                            <span>{section.label}</span>
+                            <em>{section.results.length}</em>
+                            {section.canClear && (
+                              <button
+                                type="button"
+                                onClick={clearRecentSearches}
+                              >
+                                清除
+                              </button>
+                            )}
+                          </div>
+                          <div className="clarity-search-results">
+                            {section.results.map((result) => {
+                              const index = searchResults.findIndex(
+                                (item) => item.key === result.key,
+                              );
+                              return (
+                                <button
+                                  id={`search-result-${index}`}
+                                  className={
+                                    index === activeSearchIndex ? "active" : ""
+                                  }
+                                  key={result.key}
+                                  type="button"
+                                  role="option"
+                                  aria-selected={index === activeSearchIndex}
+                                  onMouseEnter={() => setActiveSearchIndex(index)}
+                                  onClick={() => chooseSearchResult(result)}
+                                >
+                                  <span
+                                    className="clarity-search-result-icon"
+                                    data-kind={result.kind}
+                                  >
+                                    <result.icon size={17} />
+                                  </span>
+                                  <span className="clarity-search-result-copy">
+                                    <strong>{result.title}</strong>
+                                    <small>{result.description}</small>
+                                  </span>
+                                  <span className="clarity-search-result-meta">
+                                    {result.meta}
+                                    <ChevronRight size={14} />
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </section>
                       ))}
                     </div>
                   ) : (
@@ -2525,17 +2775,45 @@ export default function HomePage() {
                 ref={notificationButtonRef}
                 className="clarity-icon-button"
                 type="button"
-                aria-label="通知"
+                aria-label={
+                  unreadNotificationCount
+                    ? `通知，${unreadNotificationCount} 条未读`
+                    : "通知，无未读消息"
+                }
                 aria-controls="global-notifications"
                 aria-expanded={notificationsOpen}
                 aria-haspopup="dialog"
                 onClick={() => {
                   setSearchOpen(false);
-                  setNotificationsOpen((open) => !open);
+                  setNotificationsOpen((open) => {
+                    const nextOpen = !open;
+                    if (nextOpen) {
+                      setNotificationFilter("全部");
+                      window.requestAnimationFrame(() =>
+                        window.requestAnimationFrame(() =>
+                          notificationPanelRef.current
+                            ?.querySelector<HTMLButtonElement>(
+                              ".notification-item",
+                            )
+                            ?.focus(),
+                        ),
+                      );
+                    }
+                    return nextOpen;
+                  });
                 }}
               >
                 <Bell size={18} />
-                {approvals.length > 0 && <i />}
+                {unreadNotificationCount > 0 && (
+                  <span
+                    className="clarity-notification-badge"
+                    aria-hidden="true"
+                  >
+                    {unreadNotificationCount > 9
+                      ? "9+"
+                      : unreadNotificationCount}
+                  </span>
+                )}
               </button>
               {notificationsOpen && (
                 <div
@@ -2543,45 +2821,127 @@ export default function HomePage() {
                   id="global-notifications"
                   role="dialog"
                   aria-label="通知"
+                  ref={notificationPanelRef}
                 >
-                  <div>
-                    <strong>通知</strong>
-                    <button
-                      type="button"
-                      aria-label="关闭通知"
-                      onClick={() => {
-                        setNotificationsOpen(false);
-                        window.requestAnimationFrame(() =>
+                  <header className="notification-heading">
+                    <div>
+                      <strong>通知中心</strong>
+                      <span>
+                        {unreadNotificationCount
+                          ? `${unreadNotificationCount} 条未读`
+                          : "全部已读"}
+                      </span>
+                    </div>
+                    <div>
+                      <button
+                        className="notification-mark-all"
+                        type="button"
+                        disabled={unreadNotificationCount === 0}
+                        onClick={markAllNotificationsRead}
+                      >
+                        <CheckCircle2 size={14} />
+                        全部已读
+                      </button>
+                      <button
+                        className="notification-close"
+                        type="button"
+                        aria-label="关闭通知"
+                        onClick={() => {
+                          setNotificationsOpen(false);
                           window.requestAnimationFrame(() =>
-                            notificationButtonRef.current?.focus(),
-                          ),
-                        );
-                      }}
-                    >
-                      <X size={16} />
-                    </button>
+                            window.requestAnimationFrame(() =>
+                              notificationButtonRef.current?.focus(),
+                            ),
+                          );
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </header>
+
+                  <div
+                    className="notification-filters"
+                    role="tablist"
+                    aria-label="通知筛选"
+                  >
+                    {(["全部", "未读"] as NotificationFilter[]).map(
+                      (filter) => (
+                        <button
+                          className={
+                            notificationFilter === filter ? "active" : ""
+                          }
+                          key={filter}
+                          type="button"
+                          role="tab"
+                          aria-selected={notificationFilter === filter}
+                          onClick={() => setNotificationFilter(filter)}
+                        >
+                          {filter}
+                          <span>
+                            {filter === "全部"
+                              ? notificationItems.length
+                              : unreadNotificationCount}
+                          </span>
+                        </button>
+                      ),
+                    )}
                   </div>
-                  <button type="button" onClick={() => openView("approvals")}>
-                    <ShieldCheck size={17} />
-                    <span>
-                      <strong>
-                        {approvals.length
-                          ? `${approvals.length} 项操作等你确认`
-                          : "暂无待确认操作"}
-                      </strong>
-                      <small>
-                        {approvals.length
-                          ? "外部发送前任务已经暂停"
-                          : "所有敏感操作都已处理"}
-                      </small>
-                    </span>
-                  </button>
-                  <button type="button" onClick={() => openView("activity")}>
-                    <LatestActivityIcon size={17} />
-                    <span>
-                      <strong>{latestActivity.title}</strong>
-                      <small>{latestActivity.detail}</small>
-                    </span>
+
+                  {visibleNotificationItems.length > 0 ? (
+                    <div className="notification-list">
+                      {visibleNotificationItems.map((item) => {
+                        const isUnread = !readNotificationIds.includes(item.id);
+                        return (
+                          <button
+                            className={`notification-item ${
+                              isUnread ? "unread" : ""
+                            }`}
+                            key={item.id}
+                            type="button"
+                            onClick={() => openNotification(item)}
+                          >
+                            <span
+                              className={`notification-item-icon tone-${item.tone}`}
+                            >
+                              <item.icon size={17} />
+                            </span>
+                            <span className="notification-item-copy">
+                              <strong>{item.title}</strong>
+                              <small>{item.detail}</small>
+                            </span>
+                            <span className="notification-item-meta">
+                              <em>{item.meta}</em>
+                              {isUnread && <i />}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="notification-empty">
+                      <CheckCircle2 size={22} />
+                      <strong>没有未读通知</strong>
+                      <small>需要处理的新消息会出现在这里。</small>
+                      <button
+                        type="button"
+                        onClick={() => setNotificationFilter("全部")}
+                      >
+                        查看全部
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    className="notification-footer"
+                    type="button"
+                    onClick={() => {
+                      setNotificationsOpen(false);
+                      openView("activity");
+                    }}
+                  >
+                    查看全部运行记录
+                    <ChevronRight size={14} />
                   </button>
                 </div>
               )}
