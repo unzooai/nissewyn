@@ -6659,7 +6659,7 @@ export default function HomePage() {
           </span>
           <div>
             <strong>
-              Unzoo <span>One</span>
+              unzoo <span>one</span>
             </strong>
             <small>可信 AI 执行</small>
           </div>
@@ -6706,7 +6706,9 @@ export default function HomePage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/unzoo-one-mark.svg" alt="" />
             <span>
-              <strong>Unzoo One</strong>
+              <strong>
+                unzoo <span>one</span>
+              </strong>
               <small>
                 <i className={systemStatusTone} />
                 {systemStatusLabel}

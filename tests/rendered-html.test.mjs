@@ -43,13 +43,18 @@ test("server-renders the Unzoo One task console", async () => {
 });
 
 test("keeps commercial task interactions and accessibility in source", async () => {
-  const [page, css, layout, packageJson] = await Promise.all([
+  const [page, css, layout, packageJson, brandMark] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/clarity.css", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../public/unzoo-one-mark.svg", import.meta.url), "utf8"),
   ]);
 
+  assert.match(page, /unzoo <span>one<\/span>/);
+  assert.match(brandMark, /viewBox="0 0 64 64"/);
+  assert.match(brandMark, /id="unzoo-accent"/);
+  assert.match(brandMark, /stroke-width="10"/);
   assert.match(page, /const taskFilters: TaskFilter\[\]/);
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-tasks"/);
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-settings"/);

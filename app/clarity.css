@@ -11912,61 +11912,81 @@ body {
   }
 }
 
-/* Unzoo One brand mark: many capabilities, one controlled execution path. */
+/* Unzoo One brand system: a Z-shaped execution path resolving into one outcome. */
 .clarity-brand {
-  grid-template-columns: 43px minmax(0, 1fr);
-  gap: 9px;
-  padding-left: 3px;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 10px;
+  padding-left: 2px;
 }
 
 .clarity-brand > span {
-  width: 43px;
-  height: 43px;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  position: relative;
+  width: 46px;
+  height: 46px;
+  overflow: hidden;
+  border: 1px solid rgba(17, 51, 59, 0.08);
+  border-radius: 11px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(238, 249, 247, 0.92));
+  box-shadow:
+    0 10px 24px rgba(18, 58, 61, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+  isolation: isolate;
+}
+
+.clarity-brand > span::before {
+  position: absolute;
+  inset: -45% 48% -45% -35%;
+  z-index: -1;
+  border-radius: 50%;
+  background: rgba(22, 201, 149, 0.1);
+  content: "";
+  filter: blur(8px);
+  transform: rotate(18deg);
 }
 
 .clarity-brand-mark img {
-  width: 39px;
-  height: 39px;
-  filter: drop-shadow(0 7px 7px rgba(19, 50, 43, 0.12));
+  width: 38px;
+  height: 38px;
+  filter: drop-shadow(0 5px 5px rgba(19, 50, 43, 0.13));
   transform-origin: 50% 52%;
 }
 
 .clarity-brand:hover > span {
-  border-color: transparent;
-  box-shadow: none;
+  border-color: rgba(22, 201, 149, 0.24);
+  box-shadow:
+    0 13px 28px rgba(18, 58, 61, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.9);
 }
 
 .clarity-brand:hover .clarity-brand-mark img {
-  transform: translateY(-1px) scale(1.035);
+  transform: translateY(-1px) scale(1.045);
 }
 
 .clarity-brand strong {
-  font-size: 15px;
-  font-weight: 820;
-  line-height: 1.05;
+  color: #101820;
+  font-size: 16px;
+  font-weight: 840;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .clarity-brand strong span {
-  color: #078361;
-  font-weight: 760;
+  color: #078b68;
+  font-weight: 690;
 }
 
 .clarity-brand small {
-  margin-top: 4px;
-  color: #748079;
+  margin-top: 5px;
+  color: #6d7b78;
   font-size: 11px;
-  font-weight: 590;
-  line-height: 1.2;
+  font-weight: 610;
+  line-height: 1;
 }
 
 @media (max-width: 1180px) {
   .clarity-brand {
-    grid-template-columns: 43px;
+    grid-template-columns: 46px;
     padding-left: 0;
   }
 }
@@ -12106,7 +12126,7 @@ body {
 
   .clarity-mobile-brand {
     display: grid;
-    grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-columns: 38px minmax(0, 1fr);
     align-items: center;
     gap: 8px;
     min-width: 0;
@@ -12120,9 +12140,13 @@ body {
 
   .clarity-mobile-brand > img {
     display: block;
-    width: 31px;
-    height: 31px;
-    filter: drop-shadow(0 5px 6px rgba(19, 50, 43, 0.11));
+    width: 36px;
+    height: 36px;
+    padding: 4px;
+    border: 1px solid rgba(17, 51, 59, 0.08);
+    border-radius: 9px;
+    background: linear-gradient(145deg, #ffffff, #edf9f6);
+    box-shadow: 0 6px 16px rgba(18, 58, 61, 0.1);
   }
 
   .clarity-mobile-brand > span,
@@ -12133,9 +12157,15 @@ body {
   }
 
   .clarity-mobile-brand strong {
-    font-size: 13px;
-    font-weight: 820;
+    color: #101820;
+    font-size: 14px;
+    font-weight: 840;
     line-height: 1.1;
+  }
+
+  .clarity-mobile-brand strong > span {
+    color: #078b68;
+    font-weight: 690;
   }
 
   .clarity-mobile-brand small {
