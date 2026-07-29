@@ -775,6 +775,7 @@ export default function HomePage() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [rejectApprovalId, setRejectApprovalId] = useState<string | null>(null);
+  const [temporaryModeOpen, setTemporaryModeOpen] = useState(false);
   const [workspaceResetOpen, setWorkspaceResetOpen] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
   const [artifacts, setArtifacts] = useState<ArtifactItem[]>(initialArtifacts);
@@ -982,6 +983,7 @@ export default function HomePage() {
         !selectedTask &&
         !deletingTask &&
         !rejectedApproval &&
+        !temporaryModeOpen &&
         !workspaceResetOpen
       ) {
         event.preventDefault();
@@ -1008,6 +1010,7 @@ export default function HomePage() {
     rejectedApproval,
     searchOpen,
     selectedTask,
+    temporaryModeOpen,
     workspaceResetOpen,
   ]);
 
@@ -1017,6 +1020,7 @@ export default function HomePage() {
       !selectedTask &&
       !deletingTask &&
       !rejectedApproval &&
+      !temporaryModeOpen &&
       !workspaceResetOpen
     ) {
       return;
@@ -1031,6 +1035,7 @@ export default function HomePage() {
       setComposerOpen(false);
       setEditingTaskId(null);
       setSelectedTaskId(null);
+      setTemporaryModeOpen(false);
       setWorkspaceResetOpen(false);
     }
 
@@ -1044,6 +1049,7 @@ export default function HomePage() {
     deletingTask,
     rejectedApproval,
     selectedTask,
+    temporaryModeOpen,
     workspaceResetOpen,
   ]);
 
@@ -1397,6 +1403,7 @@ export default function HomePage() {
       setActivityTaskId(null);
       setSelectedTaskId(null);
       setRejectApprovalId(null);
+      setTemporaryModeOpen(false);
       setNotificationsOpen(false);
       recordActivity({
         title: "工作区备份已恢复",
@@ -1431,6 +1438,7 @@ export default function HomePage() {
     setSelectedTaskId(null);
     setDeleteTaskId(null);
     setRejectApprovalId(null);
+    setTemporaryModeOpen(false);
     setNotificationsOpen(false);
     setWorkspaceResetOpen(false);
     recordActivity({
@@ -1753,6 +1761,35 @@ export default function HomePage() {
     setNotice(`${label}已${nextValue ? "开启" : "关闭"}`);
   }
 
+  function requestToggleLocalPersistence() {
+    if (settings.local) {
+      setTemporaryModeOpen(true);
+      return;
+    }
+    setSettings((current) => ({ ...current, local: true }));
+    recordActivity({
+      title: "本机持久保存已开启",
+      detail: "当前任务、成果、审批和运行记录会继续保存在这台设备。",
+      icon: "settings",
+      tone: "green",
+      kind: "系统",
+    });
+    setNotice("已开启本机持久保存，当前工作区会在下次打开时恢复");
+  }
+
+  function confirmTemporaryMode() {
+    setSettings((current) => ({ ...current, local: false }));
+    setTemporaryModeOpen(false);
+    recordActivity({
+      title: "已切换到临时会话",
+      detail: "当前页面关闭后，本次工作区不会从本机恢复；本次会话中的数据仍可继续使用或导出。",
+      icon: "settings",
+      tone: "amber",
+      kind: "系统",
+    });
+    setNotice("已进入临时会话，关闭页面前可以随时重新开启保存");
+  }
+
   function openView(view: ViewId) {
     setActiveView(view);
     if (view === "activity") {
@@ -1977,7 +2014,9 @@ export default function HomePage() {
           <i className={isRunning ? "online" : ""} />
           <div>
             <strong>{isRunning ? "系统运行正常" : "任务已暂停"}</strong>
-            <small>数据保存在本机</small>
+            <small>
+              {settings.local ? "数据保存在本机" : "临时会话 · 关闭后清空"}
+            </small>
           </div>
         </div>
       </aside>
@@ -3107,8 +3146,8 @@ export default function HomePage() {
                   </h2>
                   <p>
                     {settings.local
-                      ? "任务、审批和运行记录会自动保存在这台设备。"
-                      : "关闭页面后，本次任务和运行记录不会保留。"}
+                      ? "任务、成果、审批和运行记录会自动保存在这台设备。"
+                      : "当前数据仍可使用，但关闭页面后不会自动恢复。"}
                   </p>
                 </div>
               </div>
@@ -3154,15 +3193,18 @@ export default function HomePage() {
               </label>
               <label className="setting-row">
                 <span>
-                  <strong>数据只保存在本机</strong>
-                  <small>任务记录、截图和生成文件默认不上传到外部服务。</small>
+                  <strong>关闭页面后保留工作区</strong>
+                  <small>
+                    开启后，任务、成果和运行记录会在下次打开时自动恢复。
+                  </small>
                 </span>
                 <button
                   className={`switch-control ${settings.local ? "on" : ""}`}
                   type="button"
                   role="switch"
                   aria-checked={settings.local}
-                  onClick={() => toggleSetting("local", "本机数据保存")}
+                  aria-label="关闭页面后保留工作区"
+                  onClick={requestToggleLocalPersistence}
                 >
                   <i />
                 </button>
@@ -3189,13 +3231,25 @@ export default function HomePage() {
                 <span>数据与恢复</span>
                 <h2>备份或迁移工作区</h2>
               </div>
-              <div className="workspace-data-summary">
+              <div
+                className={`workspace-data-summary ${
+                  settings.local ? "" : "is-temporary"
+                }`}
+              >
                 <span>
-                  <HardDrive size={18} />
+                  {settings.local ? <HardDrive size={18} /> : <Timer size={18} />}
                 </span>
                 <div>
-                  <strong>约 {workspaceDataSize} KB 本机数据</strong>
-                  <small>备份包含任务、成果、审批状态、运行记录和全部设置。</small>
+                  <strong>
+                    {settings.local
+                      ? `约 ${workspaceDataSize} KB 本机数据`
+                      : "当前更改仅保留在本次会话"}
+                  </strong>
+                  <small>
+                    {settings.local
+                      ? "备份包含任务、成果、审批状态、运行记录和全部设置。"
+                      : "关闭页面前可以导出备份，或重新开启本机持久保存。"}
+                  </small>
                 </div>
               </div>
               <div className="workspace-data-actions">
@@ -3782,6 +3836,80 @@ export default function HomePage() {
               >
                 <Ban size={15} />
                 确认拒绝
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {temporaryModeOpen && (
+        <div
+          className="clarity-dialog-backdrop"
+          onMouseDown={() => setTemporaryModeOpen(false)}
+        >
+          <section
+            className="temporary-session-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="temporary-session-title"
+            aria-describedby="temporary-session-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="temporary-session-close"
+              type="button"
+              aria-label="关闭临时会话确认"
+              onClick={() => setTemporaryModeOpen(false)}
+            >
+              <X size={17} />
+            </button>
+            <span className="temporary-session-icon">
+              <Timer size={21} />
+            </span>
+            <span className="temporary-session-eyebrow">数据保存方式</span>
+            <h2 id="temporary-session-title">切换到临时会话？</h2>
+            <p id="temporary-session-description">
+              当前页面仍可继续使用，但刷新或关闭页面后，不会自动恢复这次工作区。
+            </p>
+            <div className="temporary-session-facts">
+              <span>
+                <small>当前任务</small>
+                <strong>{tasks.length} 个</strong>
+              </span>
+              <span>
+                <small>任务成果</small>
+                <strong>{artifacts.length} 项</strong>
+              </span>
+              <span>
+                <small>运行记录</small>
+                <strong>{activityLog.length} 条</strong>
+              </span>
+            </div>
+            <div className="temporary-session-note">
+              <ShieldCheck size={16} />
+              <span>
+                这不会上传或立即删除当前页面中的数据。离开前重新开启保存即可保留。
+              </span>
+            </div>
+            <button
+              className="temporary-session-backup"
+              type="button"
+              onClick={exportWorkspace}
+            >
+              <Download size={16} />
+              先导出工作区备份
+            </button>
+            <div className="temporary-session-actions">
+              <button type="button" onClick={() => setTemporaryModeOpen(false)}>
+                保持本机保存
+              </button>
+              <button
+                className="warning"
+                type="button"
+                onClick={confirmTemporaryMode}
+              >
+                <Timer size={15} />
+                使用临时会话
               </button>
             </div>
           </section>
