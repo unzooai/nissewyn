@@ -61,6 +61,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /desktopNotificationTrackingReadyRef/);
   assert.match(page, /aria-label="需要确认时发送桌面通知"/);
   assert.match(page, /页面内通知仍会保留/);
+  assert.match(page, /className="notification-backdrop"/);
+  assert.match(page, /function closeNotifications/);
+  assert.match(page, /keepFocusInNotificationPanel/);
   assert.match(page, /"unzoo-one-connectors"/);
   assert.match(page, /"unzoo-one-team"/);
   assert.match(page, /"unzoo-one-usage"/);
@@ -279,6 +282,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.settings-trust-center/);
   assert.match(css, /\.switch-control:disabled/);
   assert.match(css, /\.settings-policy-row > button:disabled/);
+  assert.match(css, /@keyframes notification-sheet-in/);
+  assert.match(css, /\.notification-backdrop/);
   assert.match(css, /\.settings-connectors-center/);
   assert.match(css, /\.settings-connector-grid/);
   assert.match(css, /\.connector-detail-dialog/);

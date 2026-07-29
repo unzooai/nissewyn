@@ -2864,10 +2864,7 @@ export default function HomePage() {
         searchInputRef.current?.blur();
       } else if (event.key === "Escape" && notificationsOpen) {
         event.preventDefault();
-        setNotificationsOpen(false);
-        window.requestAnimationFrame(() =>
-          window.requestAnimationFrame(() => notificationButtonRef.current?.focus()),
-        );
+        closeNotifications();
       } else if (event.key === "Escape" && workspaceMenuOpen) {
         event.preventDefault();
         setWorkspaceMenuOpen(false);
@@ -2903,6 +2900,47 @@ export default function HomePage() {
     workspaceMenuOpen,
     workspaceResetOpen,
   ]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    const panel = notificationPanelRef.current;
+    if (!panel) return;
+
+    const isMobileSheet = window.matchMedia("(max-width: 680px)").matches;
+    const previousOverflow = document.body.style.overflow;
+    if (isMobileSheet) {
+      document.body.style.overflow = "hidden";
+    }
+
+    function keepFocusInNotificationPanel(event: KeyboardEvent) {
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("hidden"));
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    panel.addEventListener("keydown", keepFocusInNotificationPanel);
+    return () => {
+      panel.removeEventListener("keydown", keepFocusInNotificationPanel);
+      if (isMobileSheet) {
+        document.body.style.overflow = previousOverflow;
+      }
+    };
+  }, [notificationsOpen]);
 
   useEffect(() => {
     if (!overlayOpen) return;
@@ -6149,6 +6187,13 @@ export default function HomePage() {
     setNotice("全部通知已标记为已读");
   }
 
+  function closeNotifications() {
+    setNotificationsOpen(false);
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => notificationButtonRef.current?.focus()),
+    );
+  }
+
   function openNotification(item: NotificationItem) {
     markNotificationRead(item.id);
     setNotificationsOpen(false);
@@ -6617,13 +6662,22 @@ export default function HomePage() {
                 )}
               </button>
               {notificationsOpen && (
-                <div
-                  className="clarity-notifications"
-                  id="global-notifications"
-                  role="dialog"
-                  aria-label="通知"
-                  ref={notificationPanelRef}
-                >
+                <>
+                  <button
+                    className="notification-backdrop"
+                    type="button"
+                    tabIndex={-1}
+                    aria-label="关闭通知中心"
+                    onClick={closeNotifications}
+                  />
+                  <div
+                    className="clarity-notifications"
+                    id="global-notifications"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="通知"
+                    ref={notificationPanelRef}
+                  >
                   <header className="notification-heading">
                     <div>
                       <strong>通知中心</strong>
@@ -6647,14 +6701,7 @@ export default function HomePage() {
                         className="notification-close"
                         type="button"
                         aria-label="关闭通知"
-                        onClick={() => {
-                          setNotificationsOpen(false);
-                          window.requestAnimationFrame(() =>
-                            window.requestAnimationFrame(() =>
-                              notificationButtonRef.current?.focus(),
-                            ),
-                          );
-                        }}
+                        onClick={closeNotifications}
                       >
                         <X size={16} />
                       </button>
@@ -6744,7 +6791,8 @@ export default function HomePage() {
                     查看全部运行记录
                     <ChevronRight size={14} />
                   </button>
-                </div>
+                  </div>
+                </>
               )}
             </div>
 
