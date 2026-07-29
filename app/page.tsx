@@ -291,6 +291,12 @@ const defaultConnectorStates: ConnectorState = {
   mail: true,
   calendar: false,
 };
+const connectorErrorCodes: Record<ConnectorId, string[]> = {
+  browser: ["BROWSER_AUTH_EXPIRED"],
+  workspace: ["WORKSPACE_PERMISSION_REVOKED"],
+  mail: ["MAIL_AUTH_EXPIRED"],
+  calendar: ["CALENDAR_AUTH_EXPIRED"],
+};
 const connectorCatalog: ConnectorDefinition[] = [
   {
     id: "browser",
@@ -1416,6 +1422,8 @@ export default function HomePage() {
   };
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
   const selectedTaskRuns = selectedTask?.runs ?? [];
+  const selectedTaskRecoveryReady =
+    selectedTask?.errorCode === "RECOVERY_READY";
   const selectedTaskFinishedRuns = selectedTaskRuns.filter((run) =>
     ["成功", "失败"].includes(run.status),
   );
@@ -1437,9 +1445,27 @@ export default function HomePage() {
           selectedTaskRunDurations.length,
       )
     : undefined;
+  const connectorIssueTasks: Record<ConnectorId, TaskItem[]> = {
+    browser: tasks.filter((task) =>
+      connectorErrorCodes.browser.includes(task.errorCode ?? ""),
+    ),
+    workspace: tasks.filter((task) =>
+      connectorErrorCodes.workspace.includes(task.errorCode ?? ""),
+    ),
+    mail: tasks.filter((task) =>
+      connectorErrorCodes.mail.includes(task.errorCode ?? ""),
+    ),
+    calendar: tasks.filter((task) =>
+      connectorErrorCodes.calendar.includes(task.errorCode ?? ""),
+    ),
+  };
   const selectedConnector =
     connectorCatalog.find((connector) => connector.id === selectedConnectorId) ??
     null;
+  const selectedConnectorIssueTasks = selectedConnector
+    ? connectorIssueTasks[selectedConnector.id]
+    : [];
+  const selectedConnectorHasIssue = selectedConnectorIssueTasks.length > 0;
   const selectedTeamMember =
     teamMembers.find((member) => member.id === selectedTeamMemberId) ?? null;
   const approverMemberCount = teamMembers.filter((member) =>
@@ -1451,6 +1477,14 @@ export default function HomePage() {
   const SelectedConnectorIcon = selectedConnector?.icon ?? Link2;
   const connectedConnectorCount = connectorCatalog.filter(
     (connector) => connectorStates[connector.id],
+  ).length;
+  const healthyConnectorCount = connectorCatalog.filter(
+    (connector) =>
+      connectorStates[connector.id] &&
+      connectorIssueTasks[connector.id].length === 0,
+  ).length;
+  const connectorIssueCount = connectorCatalog.filter(
+    (connector) => connectorIssueTasks[connector.id].length > 0,
   ).length;
   const connectorUsageCounts: Record<ConnectorId, number> = {
     browser: tasks.filter((task) => /^https?:\/\//i.test(task.target)).length,
@@ -4047,6 +4081,47 @@ export default function HomePage() {
     }, 850);
   }
 
+  function reauthorizeConnector(connectorId: ConnectorId) {
+    const connector = connectorCatalog.find((item) => item.id === connectorId);
+    const impactedTasks = connectorIssueTasks[connectorId];
+    if (!connector || impactedTasks.length === 0 || connectorTestingId) return;
+
+    const impactedTaskIds = new Set(impactedTasks.map((task) => task.id));
+    setConnectorTestingId(connectorId);
+    window.setTimeout(() => {
+      setConnectorStates((current) => ({ ...current, [connectorId]: true }));
+      setTasks((items) =>
+        items.map((task) =>
+          impactedTaskIds.has(task.id)
+            ? {
+                ...task,
+                errorCode: "RECOVERY_READY",
+                lastError: `${connector.name}已重新授权，任务可以从安全检查点继续。`,
+                updated: "刚刚恢复授权",
+              }
+            : task,
+        ),
+      );
+      setConnectorTestingId(null);
+      recordActivity({
+        title: `连接器已重新授权：${connector.name}`,
+        detail: `授权验证通过，${impactedTasks.length} 个受影响任务已准备好重新运行；系统仍会保留原始失败记录。`,
+        icon: "shield",
+        tone: "green",
+        kind: "系统",
+        taskId: impactedTasks.length === 1 ? impactedTasks[0].id : undefined,
+      });
+      setNotice(`${connector.name}已恢复，受影响任务可以重新运行`);
+    }, 950);
+  }
+
+  function openConnectorAffectedTask(taskId: string) {
+    setSelectedConnectorId(null);
+    setConnectorDisconnectConfirm(false);
+    setActiveView("tasks");
+    setSelectedTaskId(taskId);
+  }
+
   function confirmDisconnectConnector() {
     if (!selectedConnector) return;
     setConnectorStates((current) => ({
@@ -5492,8 +5567,16 @@ export default function HomePage() {
                     </span>
                     <small>{task.description}</small>
                     {task.status === "失败" && task.lastError && (
-                      <small className="task-table-error">
-                        <AlertTriangle size={12} />
+                      <small
+                        className={`task-table-error ${
+                          task.errorCode === "RECOVERY_READY" ? "is-ready" : ""
+                        }`}
+                      >
+                        {task.errorCode === "RECOVERY_READY" ? (
+                          <CheckCircle2 size={12} />
+                        ) : (
+                          <AlertTriangle size={12} />
+                        )}
                         {task.lastError}
                       </small>
                     )}
@@ -7024,9 +7107,19 @@ export default function HomePage() {
                   <h2>AI 当前可以使用这些工具</h2>
                   <p>查看每项能力的授权范围、使用状态，并随时测试或断开连接。</p>
                 </div>
-                <span className="settings-connectors-state">
-                  <Link2 size={16} />
-                  {connectedConnectorCount} / {connectorCatalog.length} 项可用
+                <span
+                  className={`settings-connectors-state ${
+                    connectorIssueCount > 0 ? "is-attention" : ""
+                  }`}
+                >
+                  {connectorIssueCount > 0 ? (
+                    <AlertTriangle size={16} />
+                  ) : (
+                    <Link2 size={16} />
+                  )}
+                  {connectorIssueCount > 0
+                    ? `${connectorIssueCount} 项需要处理 · ${healthyConnectorCount} / ${connectorCatalog.length} 可用`
+                    : `${healthyConnectorCount} / ${connectorCatalog.length} 项可用`}
                 </span>
               </header>
 
@@ -7035,10 +7128,16 @@ export default function HomePage() {
                   const ConnectorIcon = connector.icon;
                   const connected = connectorStates[connector.id];
                   const usageCount = connectorUsageCounts[connector.id];
+                  const issueTasks = connectorIssueTasks[connector.id];
+                  const hasIssue = issueTasks.length > 0;
                   return (
                     <article
                       className={`settings-connector-card tone-${connector.tone} ${
-                        connected ? "is-connected" : "is-disconnected"
+                        hasIssue
+                          ? "is-attention"
+                          : connected
+                            ? "is-connected"
+                            : "is-disconnected"
                       }`}
                       key={connector.id}
                     >
@@ -7046,9 +7145,17 @@ export default function HomePage() {
                         <span className="settings-connector-icon">
                           <ConnectorIcon size={20} />
                         </span>
-                        <span className="settings-connector-status">
+                        <span
+                          className={`settings-connector-status ${
+                            hasIssue ? "is-attention" : ""
+                          }`}
+                        >
                           <i />
-                          {connected ? "已连接" : "未连接"}
+                          {hasIssue
+                            ? "需要重新授权"
+                            : connected
+                              ? "已连接"
+                              : "未连接"}
                         </span>
                       </div>
                       <div className="settings-connector-copy">
@@ -7058,7 +7165,13 @@ export default function HomePage() {
                       <div className="settings-connector-facts">
                         <span>
                           <small>授权范围</small>
-                          <strong>{connected ? connector.scope : "尚未授权"}</strong>
+                          <strong>
+                            {hasIssue
+                              ? "授权已失效"
+                              : connected
+                                ? connector.scope
+                                : "尚未授权"}
+                          </strong>
                         </span>
                         <span>
                           <small>关联任务</small>
@@ -7067,13 +7180,17 @@ export default function HomePage() {
                       </div>
                       <div className="settings-connector-footer">
                         <small>
-                          {connected ? connector.lastUsed : "连接后才会用于任务"}
+                          {hasIssue
+                            ? `${issueTasks[0].title} 已安全停止`
+                            : connected
+                              ? connector.lastUsed
+                              : "连接后才会用于任务"}
                         </small>
                         <button
                           type="button"
                           onClick={() => openConnector(connector.id)}
                         >
-                          {connected ? "管理" : "连接"}
+                          {hasIssue ? "修复" : connected ? "管理" : "连接"}
                           <ChevronRight size={15} />
                         </button>
                       </div>
@@ -7594,7 +7711,9 @@ export default function HomePage() {
           }}
         >
           <section
-            className={`connector-detail-dialog tone-${selectedConnector.tone}`}
+            className={`connector-detail-dialog tone-${selectedConnector.tone} ${
+              selectedConnectorHasIssue ? "is-attention" : ""
+            }`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="connector-detail-title"
@@ -7605,6 +7724,9 @@ export default function HomePage() {
               className="connector-detail-close"
               type="button"
               aria-label="关闭连接器管理"
+              data-overlay-initial-focus={
+                selectedConnectorHasIssue ? true : undefined
+              }
               onClick={() => {
                 setSelectedConnectorId(null);
                 setConnectorDisconnectConfirm(false);
@@ -7626,11 +7748,19 @@ export default function HomePage() {
               </div>
               <span
                 className={`connector-detail-status ${
-                  connectorStates[selectedConnector.id] ? "is-connected" : ""
+                  selectedConnectorHasIssue
+                    ? "is-attention"
+                    : connectorStates[selectedConnector.id]
+                      ? "is-connected"
+                      : ""
                 }`}
               >
                 <i />
-                {connectorStates[selectedConnector.id] ? "连接正常" : "尚未连接"}
+                {selectedConnectorHasIssue
+                  ? "需要重新授权"
+                  : connectorStates[selectedConnector.id]
+                    ? "连接正常"
+                    : "尚未连接"}
               </span>
             </header>
 
@@ -7638,24 +7768,72 @@ export default function HomePage() {
               <span>
                 <small>授权范围</small>
                 <strong>
-                  {connectorStates[selectedConnector.id]
+                  {selectedConnectorHasIssue
+                    ? "授权已过期，暂不可用"
+                    : connectorStates[selectedConnector.id]
                     ? selectedConnector.scope
                     : "未授予任何权限"}
                 </strong>
               </span>
               <span>
-                <small>关联任务</small>
-                <strong>{connectorUsageCounts[selectedConnector.id]} 个</strong>
+                <small>
+                  {selectedConnectorHasIssue ? "受影响任务" : "关联任务"}
+                </small>
+                <strong>
+                  {selectedConnectorHasIssue
+                    ? selectedConnectorIssueTasks.length
+                    : connectorUsageCounts[selectedConnector.id]}{" "}
+                  个
+                </strong>
               </span>
               <span>
                 <small>最近使用</small>
                 <strong>
-                  {connectorStates[selectedConnector.id]
+                  {selectedConnectorHasIssue
+                    ? selectedConnectorIssueTasks[0]?.updated
+                    : connectorStates[selectedConnector.id]
                     ? selectedConnector.lastUsed
                     : "尚未使用"}
                 </strong>
               </span>
             </div>
+
+            {selectedConnectorHasIssue && (
+              <section className="connector-issue-panel" role="alert">
+                <div className="connector-issue-heading">
+                  <span>
+                    <AlertTriangle size={17} />
+                  </span>
+                  <div>
+                    <em>授权异常</em>
+                    <strong>连接仍然存在，但当前凭证已不可用</strong>
+                  </div>
+                  <code>
+                    {selectedConnectorIssueTasks[0]?.errorCode ??
+                      "AUTH_EXPIRED"}
+                  </code>
+                </div>
+                <p>
+                  为避免未经确认的外部操作，系统已停止受影响任务。重新授权不会自动发送内容，也不会删除原始失败记录。
+                </p>
+                <div className="connector-issue-tasks">
+                  <span>受影响任务</span>
+                  {selectedConnectorIssueTasks.map((task) => (
+                    <button
+                      key={task.id}
+                      type="button"
+                      onClick={() => openConnectorAffectedTask(task.id)}
+                    >
+                      <span>
+                        <strong>{task.title}</strong>
+                        <small>{task.lastError}</small>
+                      </span>
+                      <ChevronRight size={15} />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
             <div className="connector-permission-section">
               <div>
@@ -7711,7 +7889,37 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="connector-detail-actions">
-                {connectorStates[selectedConnector.id] ? (
+                {selectedConnectorHasIssue ? (
+                  <>
+                    <button
+                      className="disconnect"
+                      type="button"
+                      onClick={() => setConnectorDisconnectConfirm(true)}
+                    >
+                      断开连接
+                    </button>
+                    <button
+                      className="primary reauthorize"
+                      type="button"
+                      disabled={connectorTestingId !== null}
+                      aria-busy={
+                        connectorTestingId === selectedConnector.id
+                      }
+                      onClick={() =>
+                        reauthorizeConnector(selectedConnector.id)
+                      }
+                    >
+                      {connectorTestingId === selectedConnector.id ? (
+                        <LoaderCircle className="is-spinning" size={16} />
+                      ) : (
+                        <RotateCcw size={16} />
+                      )}
+                      {connectorTestingId === selectedConnector.id
+                        ? "正在重新授权"
+                        : "重新授权"}
+                    </button>
+                  </>
+                ) : connectorStates[selectedConnector.id] ? (
                   <>
                     <button
                       className="disconnect"
@@ -7828,14 +8036,31 @@ export default function HomePage() {
             </div>
 
             {selectedTask.status === "失败" && (
-              <section className="task-failure-diagnostic" role="alert">
+              <section
+                className={`task-failure-diagnostic ${
+                  selectedTaskRecoveryReady ? "is-ready" : ""
+                }`}
+                role="alert"
+              >
                 <div className="task-failure-heading">
                   <span>
-                    <AlertTriangle size={18} />
+                    {selectedTaskRecoveryReady ? (
+                      <CheckCircle2 size={18} />
+                    ) : (
+                      <AlertTriangle size={18} />
+                    )}
                   </span>
                   <div>
-                    <em>已安全停止</em>
-                    <h3>任务未完成，但没有执行外部发送</h3>
+                    <em>
+                      {selectedTaskRecoveryReady
+                        ? "已准备恢复"
+                        : "已安全停止"}
+                    </em>
+                    <h3>
+                      {selectedTaskRecoveryReady
+                        ? "连接器已修复，可以从安全检查点继续"
+                        : "任务未完成，但没有执行外部发送"}
+                    </h3>
                   </div>
                   <code>{selectedTask.errorCode ?? "TASK_FAILED"}</code>
                 </div>
@@ -7855,8 +8080,12 @@ export default function HomePage() {
                 </div>
                 <div className="task-failure-actions">
                   <button type="button" onClick={() => retryTask(selectedTask)}>
-                    <RotateCcw size={15} />
-                    立即重试
+                    {selectedTaskRecoveryReady ? (
+                      <Play size={15} />
+                    ) : (
+                      <RotateCcw size={15} />
+                    )}
+                    {selectedTaskRecoveryReady ? "继续运行" : "立即重试"}
                   </button>
                   <button type="button" onClick={openTaskRecoverySettings}>
                     <Link2 size={15} />
@@ -7868,7 +8097,11 @@ export default function HomePage() {
 
             <section
               className={`task-detail-progress ${
-                selectedTask.status === "失败" ? "is-failed" : ""
+                selectedTaskRecoveryReady
+                  ? "is-ready"
+                  : selectedTask.status === "失败"
+                    ? "is-failed"
+                    : ""
               }`}
               aria-label="任务进度"
             >
@@ -7929,15 +8162,19 @@ export default function HomePage() {
                 </span>
                 <em
                   className={
-                    selectedTask.status === "失败"
+                    selectedTaskRecoveryReady
+                      ? "is-ready"
+                      : selectedTask.status === "失败"
                       ? "is-attention"
                       : selectedTask.status === "运行中"
                         ? "is-live"
                         : "is-healthy"
                   }
                 >
-                  {selectedTask.status === "失败"
-                    ? "需要处理"
+                  {selectedTaskRecoveryReady
+                    ? "可以恢复"
+                    : selectedTask.status === "失败"
+                      ? "需要处理"
                     : selectedTask.status === "运行中"
                       ? "正在运行"
                       : "运行正常"}
@@ -8101,13 +8338,19 @@ export default function HomePage() {
               >
                 {selectedTask.status === "运行中" && <Pause size={16} />}
                 {selectedTask.status === "待确认" && <ShieldCheck size={16} />}
-                {selectedTask.status === "失败" && <RotateCcw size={16} />}
+                {selectedTask.status === "失败" &&
+                  (selectedTaskRecoveryReady ? (
+                    <Play size={16} />
+                  ) : (
+                    <RotateCcw size={16} />
+                  ))}
                 {(selectedTask.status === "已暂停" || selectedTask.status === "已完成") && (
                   <Play size={16} />
                 )}
                 {selectedTask.status === "运行中" && "暂停任务"}
                 {selectedTask.status === "待确认" && "处理确认"}
-                {selectedTask.status === "失败" && "重试任务"}
+                {selectedTask.status === "失败" &&
+                  (selectedTaskRecoveryReady ? "继续运行" : "重试任务")}
                 {selectedTask.status === "已暂停" && "继续任务"}
                 {selectedTask.status === "已完成" && "再次运行"}
               </button>

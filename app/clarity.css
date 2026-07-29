@@ -1170,6 +1170,11 @@
   color: #285aaf;
 }
 
+.task-run-health-heading > em.is-ready {
+  background: #e7f5ef;
+  color: #24755c;
+}
+
 .task-run-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -16279,5 +16284,272 @@ body {
 
   .home-summary > span:nth-child(-n + 2) {
     border-bottom: 1px solid rgba(132, 150, 175, 0.18);
+  }
+}
+
+/* Connector health and authorization recovery */
+.settings-connectors-state.is-attention {
+  border-color: #edc7c3;
+  background: #fff2f0;
+  color: #a9443e;
+}
+
+.settings-connector-card.is-attention {
+  background: linear-gradient(135deg, #fff9f8 0, #ffffff 72%);
+  box-shadow: inset 0 0 0 1px #efd2ce;
+}
+
+.settings-connector-card.is-attention::before {
+  width: 64px;
+  background: #c94e47;
+}
+
+.settings-connector-card.is-attention .settings-connector-icon {
+  border-color: #efcfcb;
+  background: #fff0ee;
+  color: #b9443e;
+}
+
+.settings-connector-status.is-attention,
+.connector-detail-status.is-attention {
+  border: 1px solid #efccc8;
+  background: #fff0ee;
+  color: #a9403a;
+}
+
+.settings-connector-status.is-attention > i,
+.connector-detail-status.is-attention > i {
+  background: #c64a44;
+  box-shadow: 0 0 0 3px rgba(198, 74, 68, 0.12);
+}
+
+.settings-connector-card.is-attention .settings-connector-footer > small {
+  color: #a4504a;
+  font-weight: 700;
+}
+
+.settings-connector-card.is-attention .settings-connector-footer > button {
+  border-color: #e2b9b5;
+  background: #fff8f7;
+  color: #a33f39;
+}
+
+.connector-detail-dialog.is-attention::before {
+  background: #c94e47;
+}
+
+.connector-detail-dialog.is-attention {
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+
+.connector-detail-dialog.is-attention .connector-detail-icon {
+  border-color: #efcfcb;
+  background: #fff0ee;
+  color: #b9443e;
+}
+
+.connector-issue-panel {
+  margin: 18px 22px 0;
+  padding: 16px;
+  border: 1px solid #efcfcb;
+  border-left: 4px solid #c64a44;
+  border-radius: 7px;
+  background: #fff8f7;
+}
+
+.connector-issue-heading {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.connector-issue-heading > span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: #fbe4e1;
+  color: #b43f39;
+}
+
+.connector-issue-heading em,
+.connector-issue-heading strong {
+  display: block;
+}
+
+.connector-issue-heading em {
+  color: #a44741;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.connector-issue-heading strong {
+  margin-top: 3px;
+  color: #463332;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.connector-issue-heading code {
+  padding: 4px 6px;
+  border: 1px solid #ead0cd;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #8f4843;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+}
+
+.connector-issue-panel > p {
+  margin: 11px 0 0 42px;
+  color: #795e5b;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.connector-issue-tasks {
+  margin: 13px 0 0 42px;
+  padding-top: 12px;
+  border-top: 1px solid #efdad7;
+}
+
+.connector-issue-tasks > span {
+  color: #9b5a55;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.connector-issue-tasks > button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 11px 12px;
+  border: 1px solid #ead8d5;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #9a504b;
+  text-align: left;
+  cursor: pointer;
+}
+
+.connector-issue-tasks > button:hover {
+  border-color: #deb9b5;
+  background: #fffdfc;
+}
+
+.connector-issue-tasks strong,
+.connector-issue-tasks small {
+  display: block;
+}
+
+.connector-issue-tasks strong {
+  color: #4a3837;
+  font-size: 11px;
+}
+
+.connector-issue-tasks small {
+  margin-top: 4px;
+  color: #886965;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.connector-detail-actions > .primary.reauthorize {
+  border-color: #b9423b;
+  background: #b9423b;
+  box-shadow: 0 8px 20px rgba(185, 66, 59, 0.16);
+}
+
+.connector-detail-dialog.is-attention .connector-detail-actions {
+  position: sticky;
+  z-index: 3;
+  bottom: 0;
+  border-top: 1px solid #e2e8ef;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(14px);
+}
+
+.task-table-error.is-ready {
+  color: #24755c;
+}
+
+.task-failure-diagnostic.is-ready {
+  border-color: #c9e2d8;
+  border-left-color: #278168;
+  background: #f5fbf8;
+  box-shadow: 0 12px 30px rgba(39, 129, 104, 0.07);
+}
+
+.task-failure-diagnostic.is-ready .task-failure-heading > span {
+  background: #e4f4ed;
+  color: #1f7a60;
+}
+
+.task-failure-diagnostic.is-ready .task-failure-heading em {
+  color: #26745d;
+}
+
+.task-failure-diagnostic.is-ready .task-failure-heading h3 {
+  color: #2e443d;
+}
+
+.task-failure-diagnostic.is-ready .task-failure-heading code {
+  border-color: #cfe2da;
+  color: #2e6e5b;
+}
+
+.task-failure-diagnostic.is-ready > p {
+  color: #587068;
+}
+
+.task-failure-diagnostic.is-ready .task-failure-impact {
+  border-top-color: #d9e9e2;
+}
+
+.task-failure-diagnostic.is-ready .task-failure-actions button:first-child {
+  border-color: #20765d;
+  background: #20765d;
+  box-shadow: 0 8px 18px rgba(32, 118, 93, 0.16);
+}
+
+.task-detail-progress.is-ready > div > strong {
+  color: #24775f;
+}
+
+.task-detail-progress.is-ready > span > i {
+  background: linear-gradient(90deg, #278168, #3da9a0);
+  box-shadow: 0 0 12px rgba(39, 129, 104, 0.16);
+}
+
+@media (max-width: 760px) {
+  .connector-issue-panel {
+    margin: 14px 17px 0;
+    padding: 14px;
+  }
+
+  .connector-issue-heading {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .connector-issue-heading > span {
+    width: 30px;
+    height: 30px;
+  }
+
+  .connector-issue-heading code {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .connector-issue-panel > p,
+  .connector-issue-tasks {
+    margin-left: 40px;
   }
 }

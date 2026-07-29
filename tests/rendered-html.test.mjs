@@ -90,6 +90,12 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function isConnectorState/);
   assert.match(page, /function connectConnector/);
   assert.match(page, /function testConnector/);
+  assert.match(page, /const connectorErrorCodes:/);
+  assert.match(page, /const connectorIssueTasks:/);
+  assert.match(page, /function reauthorizeConnector/);
+  assert.match(page, /function openConnectorAffectedTask/);
+  assert.match(page, /errorCode: "RECOVERY_READY"/);
+  assert.match(page, /连接仍然存在，但当前凭证已不可用/);
   assert.match(page, /function confirmDisconnectConnector/);
   assert.match(page, /connectors: connectorStates/);
   assert.match(page, /selectedConnectorId/);
@@ -211,6 +217,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.settings-connectors-center/);
   assert.match(css, /\.settings-connector-grid/);
   assert.match(css, /\.connector-detail-dialog/);
+  assert.match(css, /\.connector-issue-panel/);
+  assert.match(css, /\.settings-connector-card\.is-attention/);
+  assert.match(css, /\.task-failure-diagnostic\.is-ready/);
   assert.match(css, /\.connector-disconnect-confirm/);
   assert.match(css, /\.settings-team-center/);
   assert.match(css, /\.settings-team-row/);
