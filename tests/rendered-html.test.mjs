@@ -55,6 +55,11 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-settings"/);
   assert.match(page, /type DesktopNotificationPermission =/);
   assert.match(page, /notifications: false/);
+  assert.match(page, /useSyncExternalStore/);
+  assert.match(page, /function subscribeToNetworkStatus/);
+  assert.match(page, /window\.addEventListener\("offline"/);
+  assert.match(page, /function checkNetworkConnection/);
+  assert.match(page, /className="network-status-banner"/);
   assert.match(page, /function toggleDesktopNotifications/);
   assert.match(page, /window\.Notification\.requestPermission/);
   assert.match(page, /new window\.Notification/);
@@ -282,6 +287,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.settings-trust-center/);
   assert.match(css, /\.switch-control:disabled/);
   assert.match(css, /\.settings-policy-row > button:disabled/);
+  assert.match(css, /\.network-status-banner/);
+  assert.match(css, /\.clarity-sidebar-status > i\.offline/);
   assert.match(css, /@keyframes notification-sheet-in/);
   assert.match(css, /\.notification-backdrop/);
   assert.match(css, /\.settings-connectors-center/);

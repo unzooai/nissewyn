@@ -18559,3 +18559,120 @@ body {
     transform: none;
   }
 }
+
+/* Live connection state */
+.clarity-sidebar-status > i.offline,
+.clarity-mobile-brand small > i.offline {
+  background: #e49a2f;
+  box-shadow: 0 0 0 3px rgba(228, 154, 47, 0.15);
+}
+
+.network-status-banner {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 68px;
+  margin: -7px 0 20px;
+  padding: 12px 14px;
+  border: 1px solid #edd3aa;
+  border-left: 3px solid #dd8c27;
+  border-radius: 8px;
+  background: #fffbf3;
+  color: #5f4a2f;
+  box-shadow: 0 10px 26px rgba(86, 65, 35, 0.06);
+  animation: clarity-view-in 180ms ease-out both;
+}
+
+.network-status-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #efd5ad;
+  border-radius: 7px;
+  background: #fff3df;
+  color: #b56d17;
+}
+
+.network-status-banner > div {
+  min-width: 0;
+}
+
+.network-status-banner strong,
+.network-status-banner p {
+  display: block;
+  margin: 0;
+}
+
+.network-status-banner strong {
+  color: #503d26;
+  font-size: 13px;
+  font-weight: 820;
+  line-height: 1.3;
+}
+
+.network-status-banner p {
+  margin-top: 4px;
+  color: #78674f;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.network-status-banner > button {
+  display: inline-flex;
+  min-height: 38px;
+  padding: 0 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #d9b77f;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #80551f;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.network-status-banner > button:hover:not(:disabled) {
+  border-color: #c89345;
+  background: #fff7e9;
+  transform: translateY(-1px);
+}
+
+.network-status-banner > button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.network-status-banner .spinning {
+  animation: clarity-spin 800ms linear infinite;
+}
+
+@media (max-width: 680px) {
+  .network-status-banner {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 10px;
+    min-height: 0;
+    margin: -2px 0 14px;
+    padding: 11px 12px;
+  }
+
+  .network-status-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .network-status-banner > button {
+    grid-column: 2;
+    justify-self: start;
+    min-height: 36px;
+    margin-top: 1px;
+  }
+}

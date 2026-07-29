@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   Activity,
   AlertTriangle,
@@ -1639,6 +1645,23 @@ const taskTemplates: Array<{
   },
 ];
 
+function subscribeToNetworkStatus(onStoreChange: () => void) {
+  window.addEventListener("online", onStoreChange);
+  window.addEventListener("offline", onStoreChange);
+  return () => {
+    window.removeEventListener("online", onStoreChange);
+    window.removeEventListener("offline", onStoreChange);
+  };
+}
+
+function getNetworkStatusSnapshot() {
+  return window.navigator.onLine;
+}
+
+function getServerNetworkStatusSnapshot() {
+  return true;
+}
+
 export default function HomePage() {
   const [activeView, setActiveView] = useState<ViewId>("home");
   const [query, setQuery] = useState("");
@@ -1646,6 +1669,12 @@ export default function HomePage() {
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [recentSearchKeys, setRecentSearchKeys] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(true);
+  const isOnline = useSyncExternalStore(
+    subscribeToNetworkStatus,
+    getNetworkStatusSnapshot,
+    getServerNetworkStatusSnapshot,
+  );
+  const [isCheckingNetwork, setIsCheckingNetwork] = useState(false);
   const [selectedStep, setSelectedStep] = useState("analyze");
   const [approvals, setApprovals] = useState(initialApprovals);
   const [selectedApprovalId, setSelectedApprovalId] = useState(initialApprovals[0].id);
@@ -1818,6 +1847,21 @@ export default function HomePage() {
   const failedTaskCount = tasks.filter((task) => task.status === "失败").length;
   const attentionCount = approvals.length + failedTaskCount;
   const workspaceToday = getWorkspaceToday();
+  const systemStatusTone = !isOnline
+    ? "offline"
+    : isRunning
+      ? "online"
+      : "paused";
+  const systemStatusLabel = !isOnline
+    ? "设备当前离线"
+    : isRunning
+      ? "系统运行正常"
+      : "自动运行已暂停";
+  const systemStatusDetail = !isOnline
+    ? "本机数据可用 · 在线能力暂停"
+    : settings.local
+      ? "数据保存在本机"
+      : "临时会话 · 关闭后清空";
   const pageTitle =
     activeView === "home"
       ? {
@@ -2284,7 +2328,8 @@ export default function HomePage() {
   }, [inviteEmail, inviteName, teamMembers]);
   const teamInviteFormHasErrors =
     Object.keys(teamInviteFormErrors).length > 0;
-  const noticeIsCaution = /失败|不能|请先|无效|损坏|已拒绝/.test(notice);
+  const noticeIsCaution =
+    /失败|不能|请先|无效|损坏|已拒绝|离线|无法连接/.test(notice);
   const artifactUndoAvailable = Boolean(
     artifactDeleteSnapshot &&
       notice === `已删除成果“${artifactDeleteSnapshot.artifact.title}”`,
@@ -2305,6 +2350,23 @@ export default function HomePage() {
       );
     }, 0);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    function handleOffline() {
+      setNotice("设备已离线，本机任务、成果和审计记录仍可查看");
+    }
+
+    function handleOnline() {
+      setNotice("网络连接已恢复，在线能力可以继续使用");
+    }
+
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
   }, []);
 
   useEffect(() => {
@@ -6239,6 +6301,30 @@ export default function HomePage() {
     );
   }
 
+  async function checkNetworkConnection() {
+    if (isCheckingNetwork) return;
+    setIsCheckingNetwork(true);
+    try {
+      if (!window.navigator.onLine) {
+        setNotice("设备仍处于离线状态，本机数据不会受到影响");
+        return;
+      }
+
+      const response = await window.fetch(
+        `/unzoo-one-mark.svg?network-check=${Date.now()}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        throw new Error("Network check failed");
+      }
+      setNotice("网络连接正常，在线能力可以继续使用");
+    } catch {
+      setNotice("暂时无法连接在线服务，本机数据仍可正常查看");
+    } finally {
+      setIsCheckingNetwork(false);
+    }
+  }
+
   function openNotification(item: NotificationItem) {
     markNotificationRead(item.id);
     setNotificationsOpen(false);
@@ -6488,12 +6574,10 @@ export default function HomePage() {
         </nav>
 
         <div className="clarity-sidebar-status">
-          <i className={isRunning ? "online" : ""} />
+          <i className={systemStatusTone} />
           <div>
-            <strong>{isRunning ? "系统运行正常" : "任务已暂停"}</strong>
-            <small>
-              {settings.local ? "数据保存在本机" : "临时会话 · 关闭后清空"}
-            </small>
+            <strong>{systemStatusLabel}</strong>
+            <small>{systemStatusDetail}</small>
           </div>
         </div>
       </aside>
@@ -6511,8 +6595,8 @@ export default function HomePage() {
             <span>
               <strong>Unzoo One</strong>
               <small>
-                <i className={isRunning ? "online" : ""} />
-                {isRunning ? "系统运行正常" : "任务已暂停"}
+                <i className={systemStatusTone} />
+                {systemStatusLabel}
               </small>
             </span>
           </button>
@@ -6908,7 +6992,11 @@ export default function HomePage() {
                       <span>当前工作区</span>
                       <strong>MVP 工作区</strong>
                       <small>
-                        {settings.local ? "数据保存在本机" : "当前为临时会话"}
+                        {!isOnline
+                          ? "设备离线 · 本机数据可用"
+                          : settings.local
+                            ? "数据保存在本机"
+                            : "当前为临时会话"}
                       </small>
                     </div>
                     <button
@@ -6925,10 +7013,12 @@ export default function HomePage() {
                       <small>成员</small>
                       <strong>{teamMembers.length}</strong>
                     </span>
-                    <span>
-                      <small>可用连接</small>
+                    <span className={!isOnline ? "is-alert" : ""}>
+                      <small>{isOnline ? "可用连接" : "网络状态"}</small>
                       <strong>
-                        {healthyConnectorCount}/{connectorCatalog.length}
+                        {isOnline
+                          ? `${healthyConnectorCount}/${connectorCatalog.length}`
+                          : "离线"}
                       </strong>
                     </span>
                     <span className={budgetAlertReached ? "is-alert" : ""}>
@@ -7036,6 +7126,36 @@ export default function HomePage() {
             </button>
           </div>
         </header>
+
+        {!isOnline && (
+          <section
+            className="network-status-banner"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="network-status-icon" aria-hidden="true">
+              <Globe2 size={18} />
+            </span>
+            <div>
+              <strong>当前设备已离线</strong>
+              <p>
+                本机任务、成果和审计记录仍可查看；网页、邮件和日历能力会在网络恢复后继续。
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={isCheckingNetwork}
+              onClick={checkNetworkConnection}
+            >
+              {isCheckingNetwork ? (
+                <LoaderCircle className="spinning" size={15} />
+              ) : (
+                <RotateCcw size={15} />
+              )}
+              {isCheckingNetwork ? "正在检查" : "检查连接"}
+            </button>
+          </section>
+        )}
 
         <input
           ref={importInputRef}
