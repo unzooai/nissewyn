@@ -106,6 +106,17 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /searchParams\.set\("auditTask", route\.activityTaskId\)/);
   assert.match(page, /searchParams\.get\("kind"\)/);
   assert.match(page, /searchParams\.set\("kind", route\.activityFilter\)/);
+  assert.match(page, /type SettingsSectionId =/);
+  assert.match(page, /searchParams\.get\("section"\)/);
+  assert.match(page, /searchParams\.set\("section", route\.settingsSection\)/);
+  assert.match(page, /function scrollSettingsSectionIntoView/);
+  assert.match(page, /function openSettingsSection/);
+  assert.match(page, /function copySettingsSectionLink/);
+  assert.match(page, /className="settings-section-nav"/);
+  assert.match(page, /id="settings-security"/);
+  assert.match(css, /\.settings-section-nav \{/);
+  assert.match(css, /\.settings-section-links \{/);
+  assert.match(css, /\.settings-section-copy \{/);
   assert.match(page, /function openArtifact/);
   assert.match(page, /function selectArtifact/);
   assert.match(page, /function openActivityEvent/);

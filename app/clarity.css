@@ -20372,3 +20372,305 @@ body {
     gap: 20px;
   }
 }
+
+/* Settings workspace navigation */
+.settings-section-nav {
+  position: sticky;
+  z-index: 24;
+  top: 12px;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 66px;
+  padding: 8px 9px 8px 13px;
+  overflow: hidden;
+  border: 1px solid rgba(194, 207, 221, 0.88);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    0 18px 46px rgba(34, 52, 76, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px) saturate(1.2);
+}
+
+.settings-section-nav::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #13a47b 0%, #3478e5 52%, #d99b45 100%);
+  content: "";
+}
+
+.settings-section-nav-title {
+  display: grid;
+  grid-template-columns: 34px auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 132px;
+  padding-right: 12px;
+  border-right: 1px solid #e1e7ed;
+}
+
+.settings-section-nav-title > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #cce8df;
+  border-radius: 7px;
+  background: #ecf9f5;
+  color: #0b8e69;
+}
+
+.settings-section-nav-title > span:last-child,
+.settings-section-nav-title small,
+.settings-section-nav-title strong {
+  display: block;
+  min-width: 0;
+}
+
+.settings-section-nav-title small {
+  color: #7d8995;
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1;
+}
+
+.settings-section-nav-title strong {
+  margin-top: 5px;
+  color: #172435;
+  font-size: 12px;
+  font-weight: 820;
+  line-height: 1;
+}
+
+.settings-section-links {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(70px, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+
+.settings-section-links > button {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #667383;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.settings-section-links > button:hover {
+  border-color: #d8e2ea;
+  background: #f4f7f9;
+  color: #26394e;
+  transform: translateY(-1px);
+}
+
+.settings-section-links > button.active {
+  border-color: #152a2a;
+  background: #142622;
+  color: #ffffff;
+  box-shadow:
+    0 8px 18px rgba(16, 42, 37, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.settings-section-links > button > svg {
+  flex: 0 0 auto;
+  color: #6e8092;
+}
+
+.settings-section-links > button.active > svg {
+  color: #67e0b8;
+}
+
+.settings-section-links > button > span,
+.settings-section-links > button strong,
+.settings-section-links > button small {
+  display: block;
+  min-width: 0;
+}
+
+.settings-section-links > button strong {
+  overflow: hidden;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 790;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-section-links > button small {
+  margin-top: 4px;
+  overflow: hidden;
+  color: #929ca7;
+  font-size: 11px;
+  font-weight: 610;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-section-links > button.active small {
+  color: #b8cbc5;
+}
+
+.settings-section-copy {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #d7e0e8;
+  border-radius: 7px;
+  background: #f7f9fb;
+  color: #4d6278;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.settings-section-copy:hover {
+  border-color: #aad8ca;
+  background: #eef9f5;
+  color: #08795d;
+  transform: translateY(-1px);
+}
+
+.settings-section-links > button:focus-visible,
+.settings-section-copy:focus-visible {
+  outline: 3px solid rgba(48, 119, 226, 0.2);
+  outline-offset: 2px;
+}
+
+#settings-overview,
+#settings-usage,
+#settings-team,
+#settings-preferences,
+#settings-data,
+#settings-connectors,
+#settings-security {
+  scroll-margin-top: 92px;
+}
+
+@media (max-width: 1100px) {
+  .settings-section-nav {
+    gap: 8px;
+  }
+
+  .settings-section-nav-title {
+    min-width: 118px;
+    padding-right: 8px;
+  }
+
+  .settings-section-links > button {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 3px;
+    padding-inline: 5px;
+    text-align: center;
+  }
+
+  .settings-section-links > button small {
+    display: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .settings-section-nav {
+    top: 66px;
+    grid-template-columns: minmax(0, 1fr) 40px;
+    gap: 7px;
+    min-height: 58px;
+    margin-inline: -1px;
+    padding: 7px;
+    overflow: visible;
+    box-shadow:
+      0 13px 34px rgba(34, 52, 76, 0.13),
+      inset 0 1px 0 rgba(255, 255, 255, 0.98);
+  }
+
+  .settings-section-nav-title {
+    display: none;
+  }
+
+  .settings-section-links {
+    display: flex;
+    gap: 4px;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+  }
+
+  .settings-section-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-section-links > button {
+    grid-template-columns: 15px auto;
+    justify-items: initial;
+    flex: 0 0 auto;
+    gap: 6px;
+    min-width: 72px;
+    min-height: 42px;
+    padding: 0 9px;
+    text-align: left;
+    scroll-snap-align: start;
+  }
+
+  .settings-section-links > button strong {
+    font-size: 11px;
+  }
+
+  .settings-section-copy {
+    width: 40px;
+    height: 42px;
+  }
+
+  #settings-overview,
+  #settings-usage,
+  #settings-team,
+  #settings-preferences,
+  #settings-data,
+  #settings-connectors,
+  #settings-security {
+    scroll-margin-top: 134px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-section-links > button,
+  .settings-section-copy {
+    transition: none;
+  }
+
+  .settings-section-links > button:hover,
+  .settings-section-copy:hover {
+    transform: none;
+  }
+}

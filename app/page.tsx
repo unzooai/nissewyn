@@ -63,6 +63,14 @@ type ViewId =
   | "artifacts"
   | "activity"
   | "settings";
+type SettingsSectionId =
+  | "overview"
+  | "usage"
+  | "team"
+  | "preferences"
+  | "data"
+  | "connectors"
+  | "security";
 type WorkspaceRoute = {
   view: ViewId;
   taskId: string | null;
@@ -74,6 +82,7 @@ type WorkspaceRoute = {
   taskFilter?: TaskFilter | null;
   approvalFilter?: ApprovalRiskFilter | null;
   activityFilter?: ActivityFilter | null;
+  settingsSection?: SettingsSectionId | null;
 };
 type WorkspaceHistoryState = {
   unzooOne: true;
@@ -1364,6 +1373,60 @@ const navItems: Array<{
   { id: "settings", label: "设置", mobileLabel: "设置", icon: Settings2 },
 ];
 
+const settingsSections: Array<{
+  id: SettingsSectionId;
+  label: string;
+  description: string;
+  icon: typeof Home;
+}> = [
+  {
+    id: "overview",
+    label: "概览",
+    description: "工作区状态",
+    icon: Building2,
+  },
+  {
+    id: "usage",
+    label: "用量",
+    description: "预算与保护",
+    icon: Sparkles,
+  },
+  {
+    id: "team",
+    label: "团队",
+    description: "成员与权限",
+    icon: Users,
+  },
+  {
+    id: "preferences",
+    label: "偏好",
+    description: "运行与通知",
+    icon: Settings2,
+  },
+  {
+    id: "data",
+    label: "数据",
+    description: "备份与恢复",
+    icon: HardDrive,
+  },
+  {
+    id: "connectors",
+    label: "连接",
+    description: "工具与授权",
+    icon: Link2,
+  },
+  {
+    id: "security",
+    label: "安全",
+    description: "边界与审计",
+    icon: ShieldCheck,
+  },
+];
+
+function getSettingsSectionElementId(section: SettingsSectionId) {
+  return `settings-${section}`;
+}
+
 function readWorkspaceRoute(): WorkspaceRoute {
   const url = new URL(window.location.href);
   const requestedView = url.searchParams.get("view");
@@ -1418,17 +1481,28 @@ function readWorkspaceRoute(): WorkspaceRoute {
     activityFilters.includes(requestedActivityFilter as ActivityFilter)
       ? (requestedActivityFilter as ActivityFilter)
       : null;
+  const requestedSettingsSection = url.searchParams.get("section");
+  const settingsSection =
+    requestedSettingsSection &&
+    settingsSections.some((section) => section.id === requestedSettingsSection)
+      ? (requestedSettingsSection as SettingsSectionId)
+      : null;
+  const hasObjectRoute = Boolean(
+    taskId || artifactId || approvalId || activityId || activityTaskId,
+  );
+  const finalView = !hasObjectRoute && settingsSection ? "settings" : resolvedView;
   return {
-    view: resolvedView,
+    view: finalView,
     taskId,
     runId,
-    artifactId: resolvedView === "artifacts" ? artifactId : null,
-    approvalId: resolvedView === "approvals" ? approvalId : null,
-    activityId: resolvedView === "activity" ? activityId : null,
-    activityTaskId: resolvedView === "activity" ? activityTaskId : null,
-    taskFilter: resolvedView === "tasks" ? taskFilter : null,
-    approvalFilter: resolvedView === "approvals" ? approvalFilter : null,
-    activityFilter: resolvedView === "activity" ? activityFilter : null,
+    artifactId: finalView === "artifacts" ? artifactId : null,
+    approvalId: finalView === "approvals" ? approvalId : null,
+    activityId: finalView === "activity" ? activityId : null,
+    activityTaskId: finalView === "activity" ? activityTaskId : null,
+    taskFilter: finalView === "tasks" ? taskFilter : null,
+    approvalFilter: finalView === "approvals" ? approvalFilter : null,
+    activityFilter: finalView === "activity" ? activityFilter : null,
+    settingsSection: finalView === "settings" ? settingsSection : null,
   };
 }
 
@@ -1499,6 +1573,15 @@ function writeWorkspaceRoute(
     url.searchParams.set("kind", route.activityFilter);
   } else {
     url.searchParams.delete("kind");
+  }
+  if (
+    route.view === "settings" &&
+    route.settingsSection &&
+    route.settingsSection !== "overview"
+  ) {
+    url.searchParams.set("section", route.settingsSection);
+  } else {
+    url.searchParams.delete("section");
   }
 
   const nextLocation = `${url.pathname}${url.search}${url.hash}`;
@@ -2150,6 +2233,8 @@ function getServerNetworkStatusSnapshot() {
 
 export default function HomePage() {
   const [activeView, setActiveView] = useState<ViewId>("home");
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSectionId>("overview");
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
@@ -2341,6 +2426,9 @@ export default function HomePage() {
   const workspaceNameRef = useRef<HTMLInputElement>(null);
   const overlayTriggerRef = useRef<HTMLElement | null>(null);
   const routeReadyRef = useRef(false);
+  const settingsSectionRef = useRef<SettingsSectionId>("overview");
+  const settingsSectionScrollTargetRef = useRef<SettingsSectionId | null>(null);
+  const settingsSectionScrollTimerRef = useRef<number | null>(null);
   const workspaceTabIdRef = useRef(
     `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
@@ -3689,6 +3777,10 @@ export default function HomePage() {
           requestedRoute.view === "activity"
             ? resolvedActivityFilter
             : null,
+        settingsSection:
+          requestedRoute.view === "settings"
+            ? (requestedRoute.settingsSection ?? "overview")
+            : null,
       };
       const currentHistoryState = window.history.state as
         | WorkspaceHistoryState
@@ -3744,6 +3836,12 @@ export default function HomePage() {
           ? (resolvedRoute.artifactId ?? "")
           : (artifacts[0]?.id ?? ""),
       );
+      const nextSettingsSection =
+        resolvedRoute.view === "settings"
+          ? (resolvedRoute.settingsSection ?? "overview")
+          : "overview";
+      settingsSectionRef.current = nextSettingsSection;
+      setSettingsSection(nextSettingsSection);
       setNotificationsOpen(false);
       setSearchOpen(false);
       if (
@@ -3790,6 +3888,9 @@ export default function HomePage() {
         "replace",
         Boolean(currentHistoryState?.unzooOne && currentHistoryState.canPop),
       );
+      if (resolvedRoute.view === "settings") {
+        scrollSettingsSectionIntoView(nextSettingsSection, "auto");
+      }
     }
 
     if (!routeReadyRef.current) {
@@ -3808,6 +3909,113 @@ export default function HomePage() {
     tasks,
     tasksReady,
   ]);
+
+  useEffect(() => {
+    if (!tasksReady || activeView !== "settings") return;
+    let frame: number | null = null;
+
+    function updateVisibleSettingsSection() {
+      frame = null;
+      if (settingsSectionScrollTargetRef.current) return;
+      const settingsNavBottom =
+        document
+          .querySelector(".settings-section-nav")
+          ?.getBoundingClientRect().bottom ?? (window.innerWidth <= 680 ? 124 : 78);
+      const anchor = settingsNavBottom + 16;
+      const currentElement = document.getElementById(
+        getSettingsSectionElementId(settingsSectionRef.current),
+      );
+      const currentRect = currentElement?.getBoundingClientRect();
+      let nextSection: SettingsSectionId | null =
+        currentRect &&
+        currentRect.top <= anchor &&
+        currentRect.bottom > anchor
+          ? settingsSectionRef.current
+          : null;
+
+      if (!nextSection) {
+        let closestTop = Number.NEGATIVE_INFINITY;
+        settingsSections.forEach((section) => {
+          const element = document.getElementById(
+            getSettingsSectionElementId(section.id),
+          );
+          const top = element?.getBoundingClientRect().top;
+          if (top !== undefined && top <= anchor && top > closestTop) {
+            closestTop = top;
+            nextSection = section.id;
+          }
+        });
+      }
+
+      if (
+        window.scrollY + window.innerHeight >=
+        document.documentElement.scrollHeight - 8
+      ) {
+        nextSection = settingsSections.at(-1)?.id ?? "security";
+      }
+      if (!nextSection || nextSection === settingsSectionRef.current) return;
+
+      settingsSectionRef.current = nextSection;
+      setSettingsSection(nextSection);
+      writeWorkspaceRoute(
+        {
+          view: "settings",
+          taskId: null,
+          runId: null,
+          settingsSection: nextSection,
+        },
+        "replace",
+        canReturnToWorkspaceParent(),
+      );
+    }
+
+    function queueSettingsSectionUpdate() {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(updateVisibleSettingsSection);
+    }
+
+    window.addEventListener("scroll", queueSettingsSectionUpdate, {
+      passive: true,
+    });
+    window.addEventListener("resize", queueSettingsSectionUpdate);
+    queueSettingsSectionUpdate();
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", queueSettingsSectionUpdate);
+      window.removeEventListener("resize", queueSettingsSectionUpdate);
+    };
+  }, [activeView, tasksReady]);
+
+  useEffect(() => {
+    if (activeView !== "settings" || window.innerWidth > 680) return;
+    const frame = window.requestAnimationFrame(() => {
+      const container = document.querySelector<HTMLElement>(
+        ".settings-section-links",
+      );
+      const activeButton = container?.querySelector<HTMLElement>(
+        `[data-settings-section="${settingsSection}"]`,
+      );
+      if (!container || !activeButton) return;
+      const containerRect = container.getBoundingClientRect();
+      const buttonRect = activeButton.getBoundingClientRect();
+      const isFullyVisible =
+        buttonRect.left >= containerRect.left &&
+        buttonRect.right <= containerRect.right;
+      if (isFullyVisible) return;
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      container.scrollTo({
+        left:
+          container.scrollLeft +
+          buttonRect.left -
+          containerRect.left -
+          (container.clientWidth - buttonRect.width) / 2,
+        behavior: reduceMotion ? "auto" : "smooth",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeView, settingsSection]);
 
   useEffect(() => {
     if (!tasksReady) return;
@@ -7834,6 +8042,39 @@ export default function HomePage() {
     });
   }
 
+  function scrollSettingsSectionIntoView(
+    section: SettingsSectionId,
+    behavior: ScrollBehavior = "smooth",
+  ) {
+    if (settingsSectionScrollTimerRef.current !== null) {
+      window.clearTimeout(settingsSectionScrollTimerRef.current);
+    }
+    settingsSectionScrollTargetRef.current = section;
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => {
+        const reduceMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        const resolvedBehavior = reduceMotion ? "auto" : behavior;
+        if (section === "overview") {
+          window.scrollTo({ top: 0, behavior: resolvedBehavior });
+        } else {
+          document
+            .getElementById(getSettingsSectionElementId(section))
+            ?.scrollIntoView({
+              behavior: resolvedBehavior,
+              block: "start",
+            });
+        }
+        settingsSectionScrollTimerRef.current = window.setTimeout(() => {
+          settingsSectionScrollTargetRef.current = null;
+          settingsSectionScrollTimerRef.current = null;
+          window.dispatchEvent(new Event("scroll"));
+        }, resolvedBehavior === "smooth" ? 650 : 0);
+      }),
+    );
+  }
+
   function openView(
     view: ViewId,
     options: {
@@ -7844,6 +8085,7 @@ export default function HomePage() {
       artifactId?: string;
       activityId?: string;
       activityFilter?: ActivityFilter;
+      settingsSection?: SettingsSectionId;
     } = {},
   ) {
     const nextTaskFilter =
@@ -7892,7 +8134,13 @@ export default function HomePage() {
           artifacts[0] ??
           null)
         : null;
+    const nextSettingsSection =
+      view === "settings" ? (options.settingsSection ?? "overview") : "overview";
     setActiveView(view);
+    if (view === "settings") {
+      settingsSectionRef.current = nextSettingsSection;
+      setSettingsSection(nextSettingsSection);
+    }
     if (view === "tasks") {
       setTaskFilter(nextTaskFilter);
       setTaskListQuery("");
@@ -7943,10 +8191,14 @@ export default function HomePage() {
           view === "approvals" ? nextApprovalFilter : null,
         activityFilter:
           view === "activity" ? nextActivityFilter : null,
+        settingsSection:
+          view === "settings" ? nextSettingsSection : null,
       },
       "push",
     );
-    if (options.scrollToTop !== false) {
+    if (view === "settings") {
+      scrollSettingsSectionIntoView(nextSettingsSection);
+    } else if (options.scrollToTop !== false) {
       scrollWorkspaceTop();
     }
   }
@@ -8041,25 +8293,48 @@ export default function HomePage() {
     await copyCurrentViewLink("审批链接");
   }
 
-  function openWorkspaceSection(sectionId: string) {
-    openView("settings", { scrollToTop: false });
-    window.requestAnimationFrame(() =>
-      window.requestAnimationFrame(() =>
-        document.getElementById(sectionId)?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        }),
-      ),
+  function openSettingsSection(section: SettingsSectionId) {
+    openView("settings", {
+      scrollToTop: false,
+      settingsSection: section,
+    });
+  }
+
+  async function copySettingsSectionLink() {
+    writeWorkspaceRoute(
+      {
+        view: "settings",
+        taskId: null,
+        runId: null,
+        settingsSection,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
     );
+    const sectionLabel =
+      settingsSections.find((section) => section.id === settingsSection)
+        ?.label ?? "当前";
+    await copyCurrentViewLink(`${sectionLabel}设置链接`);
+  }
+
+  function openWorkspaceSection(section: SettingsSectionId) {
+    setWorkspaceMenuOpen(false);
+    openSettingsSection(section);
   }
 
   function openWorkspaceBudget() {
-    openView("settings");
+    openView("settings", {
+      scrollToTop: false,
+      settingsSection: "usage",
+    });
     openUsageBudget();
   }
 
   function openWorkspaceInvite() {
-    openView("settings");
+    openView("settings", {
+      scrollToTop: false,
+      settingsSection: "team",
+    });
     openTeamInvite();
   }
 
@@ -9211,7 +9486,7 @@ export default function HomePage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => openWorkspaceSection("settings-team")}
+                      onClick={() => openWorkspaceSection("team")}
                     >
                       <span className="tone-blue">
                         <Users size={17} />
@@ -9238,9 +9513,7 @@ export default function HomePage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
-                        openWorkspaceSection("settings-connectors")
-                      }
+                      onClick={() => openWorkspaceSection("connectors")}
                     >
                       <span
                         className={
@@ -11424,7 +11697,55 @@ export default function HomePage() {
 
         {activeView === "settings" && (
           <section className="settings-view">
+            <nav className="settings-section-nav" aria-label="设置分区">
+              <div className="settings-section-nav-title">
+                <span>
+                  <Settings2 size={17} />
+                </span>
+                <span>
+                  <small>设置中心</small>
+                  <strong>
+                    {settingsSections.find(
+                      (section) => section.id === settingsSection,
+                    )?.label ?? "概览"}
+                  </strong>
+                </span>
+              </div>
+              <div className="settings-section-links">
+                {settingsSections.map((section) => {
+                  const SectionIcon = section.icon;
+                  const isActive = settingsSection === section.id;
+                  return (
+                    <button
+                      className={isActive ? "active" : ""}
+                      type="button"
+                      key={section.id}
+                      data-settings-section={section.id}
+                      aria-current={isActive ? "location" : undefined}
+                      onClick={() => openSettingsSection(section.id)}
+                    >
+                      <SectionIcon size={15} />
+                      <span>
+                        <strong>{section.label}</strong>
+                        <small>{section.description}</small>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                className="settings-section-copy"
+                type="button"
+                aria-label="复制当前设置分区链接"
+                title="复制当前设置分区链接"
+                onClick={copySettingsSectionLink}
+              >
+                <Link2 size={16} />
+              </button>
+            </nav>
+
             <div
+              id="settings-overview"
               className={`workspace-overview ${settings.local ? "" : "is-temporary"}`}
             >
               <div className="workspace-overview-status">
@@ -11759,7 +12080,10 @@ export default function HomePage() {
               </footer>
             </section>
 
-            <div className="settings-group settings-preferences-group">
+            <div
+              className="settings-group settings-preferences-group"
+              id="settings-preferences"
+            >
               <div>
                 <span>运行偏好</span>
                 <h2>安全、保存与通知</h2>
@@ -11993,7 +12317,7 @@ export default function HomePage() {
               </div>
             </section>
 
-            <section className="settings-trust-center">
+            <section className="settings-trust-center" id="settings-security">
               <header className="settings-trust-heading">
                 <div>
                   <span>执行边界与审计</span>
