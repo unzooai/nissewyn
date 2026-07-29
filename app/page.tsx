@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   Bell,
@@ -54,6 +54,7 @@ type ActivityIconKey =
   | "shield"
   | "sparkles"
   | "trash";
+type SearchResultKind = "task" | "view" | "action";
 
 type ActivityItem = {
   id: string;
@@ -80,6 +81,16 @@ type TaskItem = {
   scheduleDay?: Weekday;
   requiresApproval?: boolean;
   pinned?: boolean;
+};
+
+type SearchResult = {
+  key: string;
+  kind: SearchResultKind;
+  id: string;
+  title: string;
+  description: string;
+  meta: string;
+  icon: typeof Search;
 };
 
 const weekdays: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
@@ -369,6 +380,8 @@ const taskTemplates: Array<{
 export default function HomePage() {
   const [activeView, setActiveView] = useState<ViewId>("home");
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [isRunning, setIsRunning] = useState(true);
   const [selectedStep, setSelectedStep] = useState("analyze");
   const [approvals, setApprovals] = useState(initialApprovals);
@@ -398,6 +411,8 @@ export default function HomePage() {
     local: true,
     notifications: true,
   });
+  const searchWrapRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const pageTitle = viewTitles[activeView];
   const selectedApproval =
@@ -536,6 +551,44 @@ export default function HomePage() {
   }, [notice]);
 
   useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (
+        searchWrapRef.current &&
+        !searchWrapRef.current.contains(event.target as Node)
+      ) {
+        setSearchOpen(false);
+      }
+    }
+
+    function handleSearchShortcut(event: KeyboardEvent) {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "k" &&
+        !composerOpen &&
+        !selectedTask &&
+        !deletingTask
+      ) {
+        event.preventDefault();
+        setNotificationsOpen(false);
+        setSearchOpen(true);
+        window.requestAnimationFrame(() => searchInputRef.current?.focus());
+      }
+
+      if (event.key === "Escape" && searchOpen) {
+        setSearchOpen(false);
+        searchInputRef.current?.blur();
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleSearchShortcut);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleSearchShortcut);
+    };
+  }, [composerOpen, deletingTask, searchOpen, selectedTask]);
+
+  useEffect(() => {
     if (!composerOpen && !selectedTask && !deletingTask) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -564,6 +617,65 @@ export default function HomePage() {
         .includes(keyword),
     );
   }, [query, tasks]);
+
+  const searchResults = useMemo<SearchResult[]>(() => {
+    const keyword = query.trim().toLowerCase();
+    const taskResults: SearchResult[] = tasks.map((task) => ({
+      key: `task-${task.id}`,
+      kind: "task",
+      id: task.id,
+      title: task.title,
+      description: `${formatTaskSchedule(task)} · ${task.description}`,
+      meta: task.status,
+      icon: ListChecks,
+    }));
+    const viewResults: SearchResult[] = navItems.map((item) => ({
+      key: `view-${item.id}`,
+      kind: "view",
+      id: item.id,
+      title: item.label,
+      description: viewTitles[item.id].description,
+      meta: "页面",
+      icon: item.icon,
+    }));
+    const actionResults: SearchResult[] = [
+      {
+        key: "action-new-task",
+        kind: "action",
+        id: "new-task",
+        title: "新建任务",
+        description: "配置目标、运行频率和发送前确认规则。",
+        meta: "快捷操作",
+        icon: Plus,
+      },
+      {
+        key: "action-approvals",
+        kind: "action",
+        id: "approvals",
+        title: "处理待确认操作",
+        description: approvals.length
+          ? `${approvals.length} 项敏感操作正在等待你的决定。`
+          : "当前没有等待确认的敏感操作。",
+        meta: approvals.length ? `${approvals.length} 项` : "已清空",
+        icon: ShieldCheck,
+      },
+    ];
+
+    if (!keyword) {
+      return [
+        ...actionResults,
+        ...taskResults.slice(0, 4),
+      ];
+    }
+
+    return [...taskResults, ...viewResults, ...actionResults]
+      .filter((result) =>
+        `${result.title} ${result.description} ${result.meta}`
+          .toLowerCase()
+          .includes(keyword),
+      )
+      .slice(0, 8);
+  }, [approvals.length, query, tasks]);
 
   const filteredTasks = useMemo(() => {
     if (taskFilter === "全部") return searchedTasks;
@@ -871,6 +983,63 @@ export default function HomePage() {
     setNotificationsOpen(false);
   }
 
+  function chooseSearchResult(result: SearchResult) {
+    setSearchOpen(false);
+    setQuery("");
+    setActiveSearchIndex(0);
+
+    if (result.kind === "task") {
+      setActiveView("tasks");
+      openTask(result.id);
+    } else if (result.kind === "view") {
+      openView(result.id as ViewId);
+    } else if (result.id === "new-task") {
+      beginCreateTask();
+    } else {
+      openView("approvals");
+    }
+
+    window.requestAnimationFrame(() => searchInputRef.current?.blur());
+  }
+
+  function clearSearch() {
+    setQuery("");
+    setActiveSearchIndex(0);
+    setSearchOpen(true);
+    window.requestAnimationFrame(() => searchInputRef.current?.focus());
+  }
+
+  function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (!searchOpen) setSearchOpen(true);
+      setActiveSearchIndex((current) =>
+        searchResults.length ? (current + 1) % searchResults.length : 0,
+      );
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!searchOpen) setSearchOpen(true);
+      setActiveSearchIndex((current) =>
+        searchResults.length
+          ? (current - 1 + searchResults.length) % searchResults.length
+          : 0,
+      );
+    }
+
+    if (event.key === "Enter" && searchOpen && searchResults[activeSearchIndex]) {
+      event.preventDefault();
+      chooseSearchResult(searchResults[activeSearchIndex]);
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setSearchOpen(false);
+      searchInputRef.current?.blur();
+    }
+  }
+
   function updateTaskStatus(task: TaskItem) {
     if (task.status === "待确认") {
       setSelectedTaskId(null);
@@ -997,15 +1166,99 @@ export default function HomePage() {
           </div>
 
           <div className="clarity-header-actions">
-            <label className="clarity-search">
-              <Search size={16} />
-              <input
-                aria-label="搜索任务"
-                placeholder="搜索任务"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
+            <div className="clarity-search-wrap" ref={searchWrapRef}>
+              <div className={`clarity-search ${searchOpen ? "open" : ""}`}>
+                <Search size={16} />
+                <input
+                  ref={searchInputRef}
+                  role="combobox"
+                  aria-label="全局搜索"
+                  aria-autocomplete="list"
+                  aria-controls="global-search-results"
+                  aria-expanded={searchOpen}
+                  aria-activedescendant={
+                    searchOpen && searchResults[activeSearchIndex]
+                      ? `search-result-${activeSearchIndex}`
+                      : undefined
+                  }
+                  autoComplete="off"
+                  placeholder="搜索任务、页面和操作"
+                  value={query}
+                  onFocus={() => {
+                    setNotificationsOpen(false);
+                    setSearchOpen(true);
+                  }}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setActiveSearchIndex(0);
+                    setSearchOpen(true);
+                  }}
+                  onKeyDown={handleSearchKeyDown}
+                />
+                {query && (
+                  <button
+                    className="clarity-search-clear"
+                    type="button"
+                    aria-label="清除搜索"
+                    onClick={clearSearch}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {searchOpen && (
+                <div
+                  className="clarity-search-panel"
+                  id="global-search-results"
+                  role="listbox"
+                  aria-label="全局搜索结果"
+                >
+                  <div className="clarity-search-panel-heading">
+                    <strong>{query ? "搜索结果" : "快速访问"}</strong>
+                    <span>{searchResults.length} 项</span>
+                  </div>
+
+                  {searchResults.length > 0 ? (
+                    <div className="clarity-search-results">
+                      {searchResults.map((result, index) => (
+                        <button
+                          id={`search-result-${index}`}
+                          className={index === activeSearchIndex ? "active" : ""}
+                          key={result.key}
+                          type="button"
+                          role="option"
+                          aria-selected={index === activeSearchIndex}
+                          onMouseEnter={() => setActiveSearchIndex(index)}
+                          onClick={() => chooseSearchResult(result)}
+                        >
+                          <span
+                            className="clarity-search-result-icon"
+                            data-kind={result.kind}
+                          >
+                            <result.icon size={17} />
+                          </span>
+                          <span className="clarity-search-result-copy">
+                            <strong>{result.title}</strong>
+                            <small>{result.description}</small>
+                          </span>
+                          <span className="clarity-search-result-meta">
+                            {result.meta}
+                            <ChevronRight size={14} />
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="clarity-search-empty">
+                      <Search size={18} />
+                      <strong>没有找到匹配内容</strong>
+                      <span>换一个任务名称、页面或操作试试。</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="clarity-notification-wrap">
               <button

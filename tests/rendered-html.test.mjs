@@ -75,6 +75,13 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /<select/);
   assert.match(page, /type="time"/);
   assert.match(page, /function updateTaskStatus/);
+  assert.match(page, /useRef<HTMLInputElement>/);
+  assert.match(page, /function chooseSearchResult/);
+  assert.match(page, /function handleSearchKeyDown/);
+  assert.match(page, /aria-controls="global-search-results"/);
+  assert.match(page, /role="listbox"/);
+  assert.match(page, /role="option"/);
+  assert.match(page, /event\.metaKey \|\| event\.ctrlKey/);
   assert.match(page, /role="dialog"/);
   assert.match(page, /role="alertdialog"/);
   assert.match(page, /aria-modal="true"/);
@@ -90,6 +97,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.activity-filter-tabs/);
   assert.match(css, /\.activity-export/);
   assert.match(css, /\.timeline-kind/);
+  assert.match(css, /\.clarity-search-panel/);
+  assert.match(css, /\.clarity-search-results/);
+  assert.match(css, /\.clarity-search-result-icon/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   const pixelFontSizes = [...css.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)].map(
     (match) => Number(match[1]),
