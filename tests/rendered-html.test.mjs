@@ -112,11 +112,19 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function scrollSettingsSectionIntoView/);
   assert.match(page, /function openSettingsSection/);
   assert.match(page, /function copySettingsSectionLink/);
+  assert.match(page, /function revealActiveMobileFilter/);
+  assert.match(page, /"\.approval-risk-filters"/);
+  assert.match(page, /"\.artifact-filter-tabs"/);
   assert.match(page, /className="settings-section-nav"/);
   assert.match(page, /id="settings-security"/);
   assert.match(css, /\.settings-section-nav \{/);
   assert.match(css, /\.settings-section-links \{/);
   assert.match(css, /\.settings-section-copy \{/);
+  assert.match(css, /Mobile workspaces: keep real work visible above the fold/);
+  assert.match(
+    css,
+    /\.view-filter-tabs,\s+\.approval-risk-filters,\s+\.artifact-filter-tabs \{/,
+  );
   assert.match(page, /function openArtifact/);
   assert.match(page, /function selectArtifact/);
   assert.match(page, /function openActivityEvent/);

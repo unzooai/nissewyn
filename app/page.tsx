@@ -4018,6 +4018,58 @@ export default function HomePage() {
   }, [activeView, settingsSection]);
 
   useEffect(() => {
+    const containerSelector =
+      activeView === "tasks"
+        ? ".view-filter-tabs"
+        : activeView === "approvals"
+          ? ".approval-risk-filters"
+          : activeView === "artifacts"
+            ? ".artifact-filter-tabs"
+            : null;
+    if (!containerSelector) return;
+    let frame: number | null = null;
+
+    function revealActiveMobileFilter() {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        if (window.innerWidth > 680) return;
+        const container =
+          document.querySelector<HTMLElement>(containerSelector);
+        const activeButton =
+          container?.querySelector<HTMLElement>("button.active");
+        if (!container || !activeButton) return;
+        const containerRect = container.getBoundingClientRect();
+        const buttonRect = activeButton.getBoundingClientRect();
+        if (
+          buttonRect.left >= containerRect.left &&
+          buttonRect.right <= containerRect.right
+        ) {
+          return;
+        }
+        const reduceMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        container.scrollTo({
+          left:
+            container.scrollLeft +
+            buttonRect.left -
+            containerRect.left -
+            (container.clientWidth - buttonRect.width) / 2,
+          behavior: reduceMotion ? "auto" : "smooth",
+        });
+      });
+    }
+
+    revealActiveMobileFilter();
+    window.addEventListener("resize", revealActiveMobileFilter);
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", revealActiveMobileFilter);
+    };
+  }, [activeView, approvalRiskFilter, artifactFilter, taskFilter]);
+
+  useEffect(() => {
     if (!tasksReady) return;
     if (pendingWorkspaceSyncRef.current) return;
     const workspaceData: WorkspaceSyncData = {
