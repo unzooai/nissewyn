@@ -806,6 +806,7 @@ export default function HomePage() {
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const approvalDetailRef = useRef<HTMLDivElement>(null);
 
   const pageTitle = viewTitles[activeView];
   const selectedApproval =
@@ -1468,15 +1469,34 @@ export default function HomePage() {
     setNotice(item.detail);
   }
 
+  function scrollApprovalIntoView() {
+    window.requestAnimationFrame(() => {
+      if (!window.matchMedia("(max-width: 1080px)").matches) return;
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      approvalDetailRef.current?.scrollIntoView({
+        block: "start",
+        behavior: reduceMotion ? "auto" : "smooth",
+      });
+    });
+  }
+
+  function chooseApproval(approvalId: string) {
+    setSelectedApprovalId(approvalId);
+    scrollApprovalIntoView();
+  }
+
   function approveCurrent() {
     if (!selectedApproval) return;
     const approved = selectedApproval;
     const relatedTask = tasks.find((task) => task.id === approved.taskId);
     const shouldResume = relatedTask?.status === "待确认";
-    setApprovals((items) => items.filter((item) => item.id !== selectedApproval.id));
-    setSelectedApprovalId(
-      approvals.find((item) => item.id !== selectedApproval.id)?.id ?? "",
+    const nextApproval = approvals.find(
+      (item) => item.id !== selectedApproval.id,
     );
+    setApprovals((items) => items.filter((item) => item.id !== selectedApproval.id));
+    setSelectedApprovalId(nextApproval?.id ?? "");
     setTasks((items) =>
       items.map((task) =>
         task.id === approved.taskId
@@ -1505,6 +1525,11 @@ export default function HomePage() {
         ? `已允许操作，任务“${relatedTask?.title}”继续运行`
         : `已允许：${approved.title}`,
     );
+    if (nextApproval) {
+      scrollApprovalIntoView();
+    } else {
+      scrollWorkspaceTop();
+    }
   }
 
   function holdCurrent() {
@@ -1533,6 +1558,9 @@ export default function HomePage() {
         ? "已移到队尾，正在查看下一项待确认操作"
         : "这项操作会继续留在待确认列表中",
     );
+    if (nextApproval) {
+      scrollApprovalIntoView();
+    }
   }
 
   function requestRejectApproval() {
@@ -1544,10 +1572,9 @@ export default function HomePage() {
     if (!rejectedApproval) return;
     const rejected = rejectedApproval;
     const relatedTask = tasks.find((task) => task.id === rejected.taskId);
+    const nextApproval = approvals.find((item) => item.id !== rejected.id);
     setApprovals((items) => items.filter((item) => item.id !== rejected.id));
-    setSelectedApprovalId(
-      approvals.find((item) => item.id !== rejected.id)?.id ?? "",
-    );
+    setSelectedApprovalId(nextApproval?.id ?? "");
     setTasks((items) =>
       items.map((task) =>
         task.id === rejected.taskId
@@ -1572,6 +1599,11 @@ export default function HomePage() {
       taskId: rejected.taskId,
     });
     setNotice(`已拒绝操作，任务“${relatedTask?.title ?? rejected.taskId}”已暂停`);
+    if (nextApproval) {
+      scrollApprovalIntoView();
+    } else {
+      scrollWorkspaceTop();
+    }
   }
 
   function createTask(event: React.FormEvent<HTMLFormElement>) {
@@ -2627,7 +2659,8 @@ export default function HomePage() {
                       className={selectedApproval?.id === item.id ? "selected" : ""}
                       key={item.id}
                       type="button"
-                      onClick={() => setSelectedApprovalId(item.id)}
+                      aria-pressed={selectedApproval?.id === item.id}
+                      onClick={() => chooseApproval(item.id)}
                     >
                       <item.icon size={17} />
                       <span className="approval-queue-copy">
@@ -2645,7 +2678,7 @@ export default function HomePage() {
                 </div>
 
                 {selectedApproval && (
-                  <div className="approval-detail">
+                  <div className="approval-detail" ref={approvalDetailRef}>
                     <div className="approval-review-heading">
                       <div>
                         <span className="approval-kicker">

@@ -80,6 +80,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /aria-current=/);
   assert.match(page, /function requestRejectApproval/);
   assert.match(page, /function confirmRejectApproval/);
+  assert.match(page, /function chooseApproval/);
+  assert.match(page, /function scrollApprovalIntoView/);
+  assert.match(page, /approvalDetailRef/);
   assert.match(page, /rejectedApproval/);
   assert.match(page, /拒绝后自动暂停任务/);
   assert.match(page, /function exportActivity/);
@@ -128,6 +131,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.approval-context-grid/);
   assert.match(css, /\.approval-policy-review/);
   assert.match(css, /\.approval-reject-dialog/);
+  assert.match(css, /bottom:\s*calc\(68px \+ env\(safe-area-inset-bottom\)\)/);
   assert.match(css, /\.artifact-overview/);
   assert.match(css, /\.artifact-workspace/);
   assert.match(css, /\.artifact-content-preview/);

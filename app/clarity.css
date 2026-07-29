@@ -8433,4 +8433,36 @@ body {
   .artifact-filter-tabs::-webkit-scrollbar {
     display: none;
   }
+
+  .approval-detail {
+    overflow: visible;
+    scroll-margin-top: 72px;
+  }
+
+  .approval-detail-actions {
+    position: sticky;
+    z-index: 30;
+    bottom: calc(68px + env(safe-area-inset-bottom));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 20px 0 0;
+    padding: 10px 17px 12px;
+    border-top: 1px solid rgba(126, 146, 169, 0.22);
+    border-radius: 0 0 8px 8px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 -14px 30px rgba(37, 53, 76, 0.09);
+    backdrop-filter: blur(18px);
+  }
+
+  .approval-detail-actions .confirm {
+    grid-column: 1 / -1;
+    min-height: 46px;
+  }
+
+  .approval-detail-actions button:not(.confirm) {
+    min-width: 0;
+    min-height: 42px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
 }
