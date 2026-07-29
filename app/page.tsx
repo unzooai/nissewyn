@@ -181,6 +181,8 @@ const runSteps = [
   },
 ];
 
+const signalBars = [30, 44, 34, 58, 48, 72, 42, 64, 82, 52, 68, 46, 76, 60, 88, 62, 78, 96];
+
 export default function HomePage() {
   const [activeView, setActiveView] = useState<ViewId>("home");
   const [query, setQuery] = useState("");
@@ -350,17 +352,26 @@ export default function HomePage() {
         {activeView === "home" && (
           <section className="home-view">
             <div className="home-summary" aria-label="今日概览">
-              <span>
-                <i className="running" />
-                正在运行 <strong>{4 + queuedTasks}</strong>
+              <span className="summary-running">
+                <i><Play size={14} /></i>
+                <span>
+                  <small>正在运行</small>
+                  <strong>{4 + queuedTasks}</strong>
+                </span>
               </span>
-              <span>
-                <i className="waiting" />
-                等待确认 <strong>{approvals.length}</strong>
+              <span className="summary-waiting">
+                <i><ShieldCheck size={14} /></i>
+                <span>
+                  <small>等待确认</small>
+                  <strong>{approvals.length}</strong>
+                </span>
               </span>
-              <span>
-                <i className="done" />
-                今天已完成 <strong>12</strong>
+              <span className="summary-done">
+                <i><CheckCircle2 size={14} /></i>
+                <span>
+                  <small>今天已完成</small>
+                  <strong>12</strong>
+                </span>
               </span>
             </div>
 
@@ -380,6 +391,30 @@ export default function HomePage() {
                 <p className="task-purpose">
                   每天检查 3 个竞品页面。有变化时，系统会整理成一份可以直接阅读的摘要。
                 </p>
+
+                <div className="task-signal-band" aria-label="今日任务信号">
+                  <div className="signal-metric">
+                    <span>今天发现</span>
+                    <strong>4</strong>
+                    <small>处页面变化</small>
+                  </div>
+                  <div className="signal-chart" aria-hidden="true">
+                    <div>
+                      {signalBars.map((height, index) => (
+                        <i key={`${height}-${index}`} style={{ height: `${height}%` }} />
+                      ))}
+                    </div>
+                    <span>
+                      <small>09:00</small>
+                      <small>现在</small>
+                    </span>
+                  </div>
+                  <div className="signal-metric">
+                    <span>保存证据</span>
+                    <strong>12</strong>
+                    <small>张页面截图</small>
+                  </div>
+                </div>
 
                 <div className="simple-progress">
                   <div>
@@ -463,6 +498,20 @@ export default function HomePage() {
                     </div>
                     <h2>{selectedApproval.title}</h2>
                     <p>{selectedApproval.reason}</p>
+
+                    {selectedApproval.id === "send-summary" && (
+                      <div className="recipient-preview">
+                        <div>
+                          <span>刘</span>
+                          <span>王</span>
+                          <span>陈</span>
+                        </div>
+                        <p>
+                          <strong>领导沟通群</strong>
+                          <small>3 位成员将看到这份摘要</small>
+                        </p>
+                      </div>
+                    )}
 
                     <div className="plain-impact">
                       <ShieldCheck size={17} />
