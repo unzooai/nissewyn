@@ -20856,3 +20856,578 @@ body {
     scroll-behavior: auto;
   }
 }
+
+/* Guided task composer */
+.task-composer-backdrop {
+  padding: 20px;
+}
+
+.task-composer-backdrop .clarity-dialog {
+  width: min(100%, 920px);
+  max-height: min(900px, calc(100dvh - 40px));
+  border: 1px solid #d6e0eb;
+  box-shadow:
+    0 34px 100px rgba(28, 43, 64, 0.24),
+    0 4px 14px rgba(28, 43, 64, 0.08);
+  scroll-padding-block: 122px 96px;
+}
+
+.task-composer-backdrop .clarity-dialog-heading {
+  padding: 23px 28px 20px;
+}
+
+.task-composer-backdrop .clarity-dialog-heading > div {
+  min-width: 0;
+}
+
+.task-composer-backdrop .clarity-dialog-heading h2 {
+  font-size: 24px;
+}
+
+.task-composer-progress {
+  position: relative;
+  padding: 13px 28px 14px;
+  border-bottom: 1px solid #dfe6ef;
+  background: #f8fafc;
+}
+
+.task-composer-progress-meta {
+  position: absolute;
+  top: -36px;
+  right: 76px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: #68778b;
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.task-composer-progress-meta strong {
+  color: #1e6f5c;
+  font-size: 12px;
+}
+
+.task-composer-progress > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.task-composer-progress button {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 18px;
+  border: 0;
+  border-right: 1px solid #dfe6ee;
+  background: transparent;
+  color: #69788b;
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-composer-progress button:first-child {
+  padding-left: 0;
+}
+
+.task-composer-progress button:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.task-composer-progress button > i {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #6c7a8c;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 820;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.task-composer-progress button > span,
+.task-composer-progress button strong,
+.task-composer-progress button small {
+  display: block;
+  min-width: 0;
+}
+
+.task-composer-progress button strong {
+  color: #344154;
+  font-size: 12px;
+}
+
+.task-composer-progress button small {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #8190a2;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-composer-progress button.is-ready > i {
+  border-color: #b9dacd;
+  background: #e8f5f0;
+  color: #17745a;
+}
+
+.task-composer-progress button:hover > i {
+  transform: translateY(-1px);
+}
+
+.task-composer-progress button:focus-visible {
+  outline: 0;
+}
+
+.task-composer-progress button:focus-visible > i {
+  box-shadow: 0 0 0 3px rgba(45, 102, 195, 0.16);
+}
+
+.task-composer-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: stretch;
+}
+
+.task-composer-section {
+  scroll-margin-top: 112px;
+}
+
+.task-composer-definition {
+  padding: 24px 28px 26px;
+}
+
+.task-composer-side {
+  border-left: 1px solid #dfe6ee;
+  background: #f8fafc;
+}
+
+.task-composer-schedule-section,
+.task-composer-policy-section {
+  padding: 24px;
+}
+
+.task-composer-policy-section {
+  border-top: 1px solid #dfe6ee;
+}
+
+.task-composer-section-heading {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.task-composer-section-heading > span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #d8e1eb;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #68788d;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.task-composer-section-heading h3 {
+  margin: 0;
+  color: #1d2939;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.task-composer-section-heading p {
+  margin: 4px 0 0;
+  color: #758397;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.task-composer-section-heading > strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid #ead2b5;
+  border-radius: 6px;
+  background: #fff8ef;
+  color: #a66320;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.task-composer-section-heading > strong.is-ready {
+  border-color: #c6e1d7;
+  background: #eef8f4;
+  color: #1a745b;
+}
+
+.task-composer-definition .task-template-picker {
+  padding: 20px 0 0;
+}
+
+.task-composer-definition .task-template-picker > span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 9px;
+}
+
+.task-composer-definition .task-template-picker > span strong,
+.task-composer-definition .task-template-picker > span small {
+  display: block;
+}
+
+.task-composer-definition .task-template-picker > span strong {
+  color: #4d5c70;
+  font-size: 11px;
+}
+
+.task-composer-definition .task-template-picker > span small {
+  color: #8794a5;
+  font-size: 11px;
+  font-weight: 560;
+}
+
+.task-composer-definition .task-template-picker button {
+  position: relative;
+  justify-content: flex-start;
+  min-height: 44px;
+  padding: 0 12px;
+  background: #ffffff;
+  font-size: 11px;
+}
+
+.task-composer-definition .task-template-picker button > svg:last-child {
+  margin-left: auto;
+}
+
+.task-composer-definition .task-template-picker button.active {
+  border-color: #79a3df;
+  background: #f0f6ff;
+  color: #245cae;
+  box-shadow: 0 0 0 2px rgba(45, 102, 195, 0.08);
+}
+
+.task-composer-definition .composer-field-grid {
+  padding: 20px 0 0;
+}
+
+.task-composer-backdrop .composer-field-grid label > span,
+.task-composer-backdrop .composer-instruction > span,
+.task-composer-backdrop .composer-schedule > span {
+  color: #48576b;
+  font-size: 12px;
+}
+
+.task-composer-backdrop .clarity-dialog .composer-field-grid input,
+.task-composer-backdrop .clarity-dialog .composer-instruction textarea,
+.task-composer-backdrop .composer-schedule-detail input,
+.task-composer-backdrop .composer-schedule-detail select {
+  font-size: 13px;
+}
+
+.task-composer-definition .clarity-dialog .composer-field-grid input,
+.task-composer-definition .composer-field-grid input {
+  height: 46px;
+}
+
+.task-composer-backdrop .clarity-dialog .composer-instruction {
+  margin: 18px 0 0;
+}
+
+.task-composer-backdrop .clarity-dialog .composer-instruction textarea {
+  min-height: 118px;
+}
+
+.task-composer-launch-preview {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: start;
+  gap: 11px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.task-composer-launch-preview > span {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #cbdcf2;
+  border-radius: 7px;
+  background: #edf4ff;
+  color: #2b63b6;
+}
+
+.task-composer-launch-preview strong {
+  display: block;
+  color: #334155;
+  font-size: 12px;
+}
+
+.task-composer-launch-preview p {
+  margin: 5px 0 0;
+  color: #708095;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.task-composer-launch-preview b {
+  color: #365c91;
+  font-weight: 760;
+  overflow-wrap: anywhere;
+}
+
+.task-composer-schedule-section .composer-schedule {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 20px 0 0;
+}
+
+.task-composer-schedule-section .composer-schedule > div {
+  gap: 4px;
+}
+
+.task-composer-schedule-section .composer-schedule button {
+  min-height: 38px;
+  font-size: 11px;
+}
+
+.task-composer-schedule-section .composer-schedule-detail {
+  align-items: stretch;
+  flex-wrap: wrap;
+  min-height: 0;
+  margin: 10px 0 0;
+  padding: 11px;
+  background: #ffffff;
+}
+
+.task-composer-schedule-section .composer-schedule-detail > label {
+  min-width: 120px;
+}
+
+.task-composer-schedule-section .schedule-timezone {
+  min-height: 36px;
+  padding: 0 3px;
+}
+
+.task-composer-policy-section .composer-policy {
+  margin: 18px 0 0;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.task-composer-policy-section .clarity-dialog-note {
+  margin: 10px 0 0;
+  background: #eef5ff;
+}
+
+.task-composer-backdrop .clarity-dialog-actions {
+  margin-top: 0;
+  padding: 15px 28px 18px;
+}
+
+.task-composer-backdrop .clarity-dialog-actions .confirm {
+  min-width: 150px;
+  background: #18243a;
+  box-shadow: 0 8px 22px rgba(24, 36, 58, 0.18);
+}
+
+.task-composer-backdrop .clarity-dialog-actions .confirm:hover {
+  background: #245eaf;
+}
+
+@media (max-width: 760px) {
+  .task-composer-backdrop {
+    align-items: end;
+    padding: 8px 8px 0;
+  }
+
+  .task-composer-backdrop .clarity-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 8px);
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    scroll-padding-block: 102px 112px;
+  }
+
+  .task-composer-backdrop .clarity-dialog-heading {
+    padding: 17px 18px 15px;
+  }
+
+  .task-composer-backdrop .clarity-dialog-heading h2 {
+    font-size: 20px;
+  }
+
+  .task-composer-backdrop .clarity-dialog-heading p {
+    margin-top: 5px;
+  }
+
+  .task-composer-progress {
+    padding: 9px 18px 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .task-composer-progress::-webkit-scrollbar {
+    display: none;
+  }
+
+  .task-composer-progress-meta {
+    display: none;
+  }
+
+  .task-composer-progress > div {
+    min-width: 420px;
+  }
+
+  .task-composer-progress button {
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 7px;
+    min-height: 42px;
+    padding: 0 10px;
+  }
+
+  .task-composer-progress button > i {
+    width: 26px;
+    height: 26px;
+  }
+
+  .task-composer-progress button strong {
+    font-size: 11px;
+  }
+
+  .task-composer-progress button small {
+    display: none;
+  }
+
+  .task-composer-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    padding-bottom: 78px;
+  }
+
+  .task-composer-definition {
+    padding: 19px 18px 22px;
+  }
+
+  .task-composer-side {
+    border-top: 1px solid #dfe6ee;
+    border-left: 0;
+  }
+
+  .task-composer-schedule-section,
+  .task-composer-policy-section {
+    padding: 20px 18px;
+  }
+
+  .task-composer-section-heading {
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+  }
+
+  .task-composer-section-heading > strong {
+    grid-column: auto;
+    justify-self: end;
+    min-height: 24px;
+    margin-top: 0;
+  }
+
+  .task-composer-definition .task-template-picker {
+    padding-top: 17px;
+  }
+
+  .task-composer-definition .task-template-picker > span {
+    display: block;
+  }
+
+  .task-composer-definition .task-template-picker > span small {
+    display: none;
+  }
+
+  .task-composer-definition .task-template-picker > div {
+    display: flex;
+    gap: 8px;
+    padding: 2px 2px 4px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .task-composer-definition .task-template-picker > div::-webkit-scrollbar {
+    display: none;
+  }
+
+  .task-composer-definition .task-template-picker button {
+    flex: 0 0 138px;
+    scroll-snap-align: start;
+  }
+
+  .task-composer-definition .composer-field-grid {
+    padding: 17px 0 0;
+  }
+
+  .task-composer-backdrop .clarity-dialog .composer-instruction {
+    margin-right: 0;
+    margin-left: 0;
+  }
+
+  .task-composer-backdrop .clarity-dialog .composer-instruction textarea {
+    min-height: 104px;
+  }
+
+  .task-composer-launch-preview {
+    margin-top: 17px;
+    padding-top: 16px;
+  }
+
+  .task-composer-schedule-section .composer-schedule,
+  .task-composer-schedule-section .composer-schedule-detail,
+  .task-composer-policy-section .composer-policy,
+  .task-composer-policy-section .clarity-dialog-note {
+    margin-right: 0;
+    margin-left: 0;
+  }
+
+  .task-composer-backdrop .clarity-dialog-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.35fr);
+    gap: 8px;
+    padding: 11px 18px max(11px, env(safe-area-inset-bottom));
+  }
+
+  .task-composer-backdrop .clarity-dialog-actions button,
+  .task-composer-backdrop .clarity-dialog-actions .confirm {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-composer-progress button > i {
+    transition: none;
+  }
+
+  .task-composer-progress button:hover > i {
+    transform: none;
+  }
+}

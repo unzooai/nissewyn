@@ -304,6 +304,13 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /selectedTaskActivity\.map/);
   assert.match(page, /activityTaskId/);
   assert.match(page, /const taskTemplates:/);
+  assert.match(page, /const activeTaskTemplateId = editingTaskId/);
+  assert.match(page, /const taskComposerReadyCount =/);
+  assert.match(page, /function focusTaskComposerSection/);
+  assert.match(page, /className="task-composer-progress"/);
+  assert.match(page, /className="task-composer-workspace"/);
+  assert.match(page, /className="task-composer-launch-preview"/);
+  assert.match(page, /!editingTaskId && \(/);
   assert.match(page, /type TaskSchedule =/);
   assert.match(page, /type Weekday =/);
   assert.match(page, /function formatTaskSchedule/);
@@ -404,6 +411,10 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.workspace-sync-banner\.has-conflict/);
   assert.match(css, /\.workspace-sync-banner\.has-conflict \{[\s\S]*position: fixed;/);
   assert.match(css, /\.task-composer-backdrop/);
+  assert.match(css, /\.task-composer-progress/);
+  assert.match(css, /\.task-composer-workspace/);
+  assert.match(css, /\.task-composer-launch-preview/);
+  assert.match(css, /\.task-composer-definition \.task-template-picker button\.active/);
   assert.match(css, /\.workspace-sync-actions/);
   assert.match(css, /\.workspace-sync-dismiss/);
   assert.match(css, /\.clarity-sidebar-status > i\.offline/);

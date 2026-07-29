@@ -2361,8 +2361,8 @@ export default function HomePage() {
     string | null
   >(null);
   const [workspaceSaveRetryToken, setWorkspaceSaveRetryToken] = useState(0);
-  const [taskName, setTaskName] = useState("跟踪一个新网页");
-  const [taskTarget, setTaskTarget] = useState("https://example.com");
+  const [taskName, setTaskName] = useState("跟踪产品页面变化");
+  const [taskTarget, setTaskTarget] = useState("https://example.com/product");
   const [taskDescription, setTaskDescription] = useState(
     "检查页面内容变化，只保留有意义的更新并生成摘要。",
   );
@@ -3016,6 +3016,28 @@ export default function HomePage() {
     return errors;
   }, [taskDescription, taskName, taskSchedule, taskScheduleTime, taskTarget]);
   const taskFormHasErrors = Object.keys(taskFormErrors).length > 0;
+  const taskDefinitionReady = Boolean(
+    taskName.trim() &&
+      taskTarget.trim() &&
+      taskDescription.trim() &&
+      !taskFormErrors.name &&
+      !taskFormErrors.target &&
+      !taskFormErrors.description,
+  );
+  const taskScheduleReady = !taskFormErrors.scheduleTime;
+  const taskComposerReadyCount =
+    Number(taskDefinitionReady) + Number(taskScheduleReady) + 1;
+  const activeTaskTemplateId = editingTaskId
+    ? null
+    : taskTemplates.find(
+        (template) =>
+          template.title === taskName &&
+          template.target === taskTarget &&
+          template.description === taskDescription &&
+          template.schedule === taskSchedule &&
+          template.scheduleTime === taskScheduleTime &&
+          template.scheduleDay === taskScheduleDay,
+      )?.id ?? null;
   const taskComposerDirty = Boolean(
     composerOpen &&
       taskDraftBaseline &&
@@ -6789,8 +6811,8 @@ export default function HomePage() {
 
   function beginCreateTask() {
     const draft: TaskDraftSnapshot = {
-      name: "跟踪一个新网页",
-      target: "https://example.com",
+      name: "跟踪产品页面变化",
+      target: "https://example.com/product",
       description: "检查页面内容变化，只保留有意义的更新并生成摘要。",
       schedule: "每天",
       scheduleTime: "09:00",
@@ -6953,6 +6975,20 @@ export default function HomePage() {
     setTaskScheduleTime(template.scheduleTime);
     setTaskScheduleDay(template.scheduleDay);
     setTaskFormSubmitted(false);
+  }
+
+  function focusTaskComposerSection(
+    section: "definition" | "schedule" | "policy",
+  ) {
+    const sectionElement = document.getElementById(
+      `task-composer-${section}`,
+    );
+    sectionElement?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (section === "definition") {
+      window.setTimeout(() => taskNameRef.current?.focus(), 180);
+    } else if (section === "schedule" && taskSchedule !== "仅运行一次") {
+      window.setTimeout(() => taskScheduleTimeRef.current?.focus(), 180);
+    }
   }
 
   function restoreWorkspaceFromWarning() {
@@ -13856,222 +13892,328 @@ export default function HomePage() {
               </div>
             )}
 
-            <section className="task-template-picker" aria-label="快速模板">
-              <span>快速开始</span>
-              <div>
-                {taskTemplates.map((template) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() => applyTaskTemplate(template)}
-                  >
-                    <template.icon size={16} />
-                    {template.label}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <div className="composer-field-grid">
-              <label className={taskFormSubmitted && taskFormErrors.name ? "has-error" : ""}>
-                <span>任务名称</span>
-                <input
-                  ref={taskNameRef}
-                  autoFocus
-                  data-overlay-initial-focus
-                  required
-                  maxLength={80}
-                  aria-invalid={Boolean(taskFormSubmitted && taskFormErrors.name)}
-                  aria-describedby={
-                    taskFormSubmitted && taskFormErrors.name
-                      ? "task-name-error"
-                      : undefined
-                  }
-                  value={taskName}
-                  placeholder="例如：每天跟踪竞品更新"
-                  onChange={(event) => setTaskName(event.target.value)}
-                />
-                {taskFormSubmitted && taskFormErrors.name && (
-                  <small className="composer-field-error" id="task-name-error">
-                    <AlertTriangle size={13} />
-                    {taskFormErrors.name}
-                  </small>
-                )}
-              </label>
-
-              <label className={taskFormSubmitted && taskFormErrors.target ? "has-error" : ""}>
-                <span>数据来源或网址</span>
-                <input
-                  ref={taskTargetRef}
-                  required
-                  maxLength={240}
-                  aria-invalid={Boolean(taskFormSubmitted && taskFormErrors.target)}
-                  aria-describedby={
-                    taskFormSubmitted && taskFormErrors.target
-                      ? "task-target-error"
-                      : undefined
-                  }
-                  value={taskTarget}
-                  placeholder="网页、文件夹或资料库"
-                  onChange={(event) => setTaskTarget(event.target.value)}
-                />
-                {taskFormSubmitted && taskFormErrors.target && (
-                  <small className="composer-field-error" id="task-target-error">
-                    <AlertTriangle size={13} />
-                    {taskFormErrors.target}
-                  </small>
-                )}
-              </label>
-            </div>
-
-            <label
-              className={`composer-instruction ${
-                taskFormSubmitted && taskFormErrors.description ? "has-error" : ""
-              }`}
-            >
-              <span>希望得到什么结果</span>
-              <textarea
-                ref={taskDescriptionRef}
-                required
-                maxLength={500}
-                aria-invalid={Boolean(
-                  taskFormSubmitted && taskFormErrors.description,
-                )}
-                aria-describedby={
-                  taskFormSubmitted && taskFormErrors.description
-                    ? "task-description-error"
-                    : undefined
-                }
-                value={taskDescription}
-                placeholder="说清楚要做什么、保留哪些证据，以及最终交付什么结果。"
-                onChange={(event) => setTaskDescription(event.target.value)}
-              />
-              <span className="composer-field-meta">
-                {taskFormSubmitted && taskFormErrors.description ? (
-                  <small className="composer-field-error" id="task-description-error">
-                    <AlertTriangle size={13} />
-                    {taskFormErrors.description}
-                  </small>
-                ) : (
-                  <small>描述交付结果，AI 会自行规划执行步骤</small>
-                )}
-                <small>{taskDescription.length}/500</small>
+            <nav className="task-composer-progress" aria-label="任务配置步骤">
+              <span className="task-composer-progress-meta">
+                <strong>{taskComposerReadyCount}/3</strong>
+                项配置就绪
               </span>
-            </label>
-
-            <section className="composer-schedule" aria-label="运行频率">
-              <span>运行频率</span>
-              <div role="radiogroup" aria-label="选择运行频率">
-                {(["仅运行一次", "每天", "每周"] as TaskSchedule[]).map((schedule) => (
-                  <button
-                    className={taskSchedule === schedule ? "active" : ""}
-                    key={schedule}
-                    type="button"
-                    role="radio"
-                    aria-checked={taskSchedule === schedule}
-                    onClick={() => setTaskSchedule(schedule)}
-                  >
-                    {schedule}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <div className="composer-schedule-detail">
-              {taskSchedule === "仅运行一次" ? (
-                <div className="schedule-once-note">
-                  <Play size={16} />
+              <div>
+                <button
+                  className={taskDefinitionReady ? "is-ready" : ""}
+                  type="button"
+                  onClick={() => focusTaskComposerSection("definition")}
+                >
+                  <i>{taskDefinitionReady ? <Check size={15} /> : "1"}</i>
                   <span>
-                    <strong>创建后立即开始</strong>
-                    <small>只运行一次，完成后保留结果和审计记录。</small>
+                    <strong>定义任务</strong>
+                    <small>来源与交付结果</small>
                   </span>
-                </div>
-              ) : (
-                <>
-                  {taskSchedule === "每周" && (
-                    <label>
-                      <span>星期</span>
-                      <select
-                        aria-label="选择每周运行日期"
-                        value={taskScheduleDay}
-                        onChange={(event) =>
-                          setTaskScheduleDay(event.target.value as Weekday)
-                        }
-                      >
-                        {weekdays.map((day) => (
-                          <option key={day} value={day}>{day}</option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  <label>
-                    <span>运行时间</span>
+                </button>
+                <button
+                  className={taskScheduleReady ? "is-ready" : ""}
+                  type="button"
+                  onClick={() => focusTaskComposerSection("schedule")}
+                >
+                  <i>{taskScheduleReady ? <Check size={15} /> : "2"}</i>
+                  <span>
+                    <strong>运行计划</strong>
+                    <small>{formatSchedule(taskSchedule, taskScheduleTime, taskScheduleDay)}</small>
+                  </span>
+                </button>
+                <button
+                  className="is-ready"
+                  type="button"
+                  onClick={() => focusTaskComposerSection("policy")}
+                >
+                  <i><Check size={15} /></i>
+                  <span>
+                    <strong>安全确认</strong>
+                    <small>{taskApproval ? "敏感操作先确认" : "按范围自动执行"}</small>
+                  </span>
+                </button>
+              </div>
+            </nav>
+
+            <div className="task-composer-workspace">
+              <section
+                className="task-composer-section task-composer-definition"
+                id="task-composer-definition"
+              >
+                <header className="task-composer-section-heading">
+                  <span>01</span>
+                  <div>
+                    <h3>定义任务</h3>
+                    <p>告诉 AI 去哪里工作，以及最终要交付什么。</p>
+                  </div>
+                  <strong className={taskDefinitionReady ? "is-ready" : ""}>
+                    {taskDefinitionReady ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+                    {taskDefinitionReady ? "已完整" : "待完善"}
+                  </strong>
+                </header>
+
+                {!editingTaskId && (
+                  <section className="task-template-picker" aria-label="快速模板">
+                    <span>
+                      <strong>选择一个起点</strong>
+                      <small>点击模板会填入一套可继续修改的配置</small>
+                    </span>
+                    <div>
+                      {taskTemplates.map((template) => (
+                        <button
+                          className={
+                            activeTaskTemplateId === template.id ? "active" : ""
+                          }
+                          key={template.id}
+                          type="button"
+                          aria-pressed={activeTaskTemplateId === template.id}
+                          onClick={() => applyTaskTemplate(template)}
+                        >
+                          <template.icon size={16} />
+                          {template.label}
+                          {activeTaskTemplateId === template.id && <Check size={14} />}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                <div className="composer-field-grid">
+                  <label className={taskFormSubmitted && taskFormErrors.name ? "has-error" : ""}>
+                    <span>任务名称</span>
                     <input
-                      ref={taskScheduleTimeRef}
-                      aria-label="选择运行时间"
-                      type="time"
+                      ref={taskNameRef}
+                      autoFocus
+                      data-overlay-initial-focus
                       required
-                      aria-invalid={Boolean(
-                        taskFormSubmitted && taskFormErrors.scheduleTime,
-                      )}
+                      maxLength={80}
+                      aria-invalid={Boolean(taskFormSubmitted && taskFormErrors.name)}
                       aria-describedby={
-                        taskFormSubmitted && taskFormErrors.scheduleTime
-                          ? "task-schedule-error"
+                        taskFormSubmitted && taskFormErrors.name
+                          ? "task-name-error"
                           : undefined
                       }
-                      value={taskScheduleTime}
-                      onInput={(event) =>
-                        setTaskScheduleTime((event.target as HTMLInputElement).value)
-                      }
+                      value={taskName}
+                      placeholder="例如：每天跟踪竞品更新"
+                      onChange={(event) => setTaskName(event.target.value)}
                     />
-                    {taskFormSubmitted && taskFormErrors.scheduleTime && (
-                      <small
-                        className="composer-field-error"
-                        id="task-schedule-error"
-                      >
+                    {taskFormSubmitted && taskFormErrors.name && (
+                      <small className="composer-field-error" id="task-name-error">
                         <AlertTriangle size={13} />
-                        {taskFormErrors.scheduleTime}
+                        {taskFormErrors.name}
                       </small>
                     )}
                   </label>
-                  <span className="schedule-timezone">
-                    <Clock3 size={15} />
-                    北京时间
+
+                  <label className={taskFormSubmitted && taskFormErrors.target ? "has-error" : ""}>
+                    <span>数据来源或网址</span>
+                    <input
+                      ref={taskTargetRef}
+                      required
+                      maxLength={240}
+                      aria-invalid={Boolean(taskFormSubmitted && taskFormErrors.target)}
+                      aria-describedby={
+                        taskFormSubmitted && taskFormErrors.target
+                          ? "task-target-error"
+                          : undefined
+                      }
+                      value={taskTarget}
+                      placeholder="网页、文件夹或资料库"
+                      onChange={(event) => setTaskTarget(event.target.value)}
+                    />
+                    {taskFormSubmitted && taskFormErrors.target && (
+                      <small className="composer-field-error" id="task-target-error">
+                        <AlertTriangle size={13} />
+                        {taskFormErrors.target}
+                      </small>
+                    )}
+                  </label>
+                </div>
+
+                <label
+                  className={`composer-instruction ${
+                    taskFormSubmitted && taskFormErrors.description ? "has-error" : ""
+                  }`}
+                >
+                  <span>希望得到什么结果</span>
+                  <textarea
+                    ref={taskDescriptionRef}
+                    required
+                    maxLength={500}
+                    aria-invalid={Boolean(
+                      taskFormSubmitted && taskFormErrors.description,
+                    )}
+                    aria-describedby={
+                      taskFormSubmitted && taskFormErrors.description
+                        ? "task-description-error"
+                        : undefined
+                    }
+                    value={taskDescription}
+                    placeholder="说清楚要做什么、保留哪些证据，以及最终交付什么结果。"
+                    onChange={(event) => setTaskDescription(event.target.value)}
+                  />
+                  <span className="composer-field-meta">
+                    {taskFormSubmitted && taskFormErrors.description ? (
+                      <small className="composer-field-error" id="task-description-error">
+                        <AlertTriangle size={13} />
+                        {taskFormErrors.description}
+                      </small>
+                    ) : (
+                      <small>描述交付结果，AI 会自行规划执行步骤</small>
+                    )}
+                    <small>{taskDescription.length}/500</small>
                   </span>
-                </>
-              )}
-            </div>
+                </label>
 
-            <div className="composer-policy">
-              <span className="composer-policy-icon">
-                <ShieldCheck size={18} />
-              </span>
-              <span>
-                <strong>敏感操作需要确认</strong>
-                <small>对外发送、登录访问和写入文件前先询问你。</small>
-              </span>
-              <button
-                className={`switch-control ${taskApproval ? "on" : ""}`}
-                type="button"
-                role="switch"
-                aria-checked={taskApproval}
-                aria-label="敏感操作需要确认"
-                onClick={() => setTaskApproval((value) => !value)}
-              >
-                <i />
-              </button>
-            </div>
+                <div className="task-composer-launch-preview">
+                  <span>
+                    <Sparkles size={17} />
+                  </span>
+                  <div>
+                    <strong>任务启动预览</strong>
+                    <p>
+                      AI 将从 <b>{taskTarget.trim() || "你指定的数据来源"}</b> 开始，
+                      按 <b>{formatSchedule(taskSchedule, taskScheduleTime, taskScheduleDay)}</b>
+                      {taskApproval ? " 执行；遇到敏感操作会等待你确认。" : " 自动执行已授权的步骤。"}
+                    </p>
+                  </div>
+                </div>
+              </section>
 
-            <div className="clarity-dialog-note">
-              <CalendarDays size={17} />
-              <p>
-                <strong>
-                  {formatSchedule(taskSchedule, taskScheduleTime, taskScheduleDay)}
-                </strong>
-                {taskSchedule === "仅运行一次"
-                  ? "，创建后立即开始。"
-                  : "自动启动，你可以随时暂停或修改计划。"}
-              </p>
+              <div className="task-composer-side">
+                <section
+                  className="task-composer-section task-composer-schedule-section"
+                  id="task-composer-schedule"
+                >
+                  <header className="task-composer-section-heading">
+                    <span>02</span>
+                    <div>
+                      <h3>运行计划</h3>
+                      <p>决定什么时候开始，以及多久执行一次。</p>
+                    </div>
+                    <strong className={taskScheduleReady ? "is-ready" : ""}>
+                      {taskScheduleReady ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+                      {taskScheduleReady ? "已设置" : "待设置"}
+                    </strong>
+                  </header>
+
+                  <section className="composer-schedule" aria-label="运行频率">
+                    <span>运行频率</span>
+                    <div role="radiogroup" aria-label="选择运行频率">
+                      {(["仅运行一次", "每天", "每周"] as TaskSchedule[]).map((schedule) => (
+                        <button
+                          className={taskSchedule === schedule ? "active" : ""}
+                          key={schedule}
+                          type="button"
+                          role="radio"
+                          aria-checked={taskSchedule === schedule}
+                          onClick={() => setTaskSchedule(schedule)}
+                        >
+                          {schedule}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <div className="composer-schedule-detail">
+                    {taskSchedule === "仅运行一次" ? (
+                      <div className="schedule-once-note">
+                        <Play size={16} />
+                        <span>
+                          <strong>创建后立即开始</strong>
+                          <small>只运行一次，完成后保留结果和审计记录。</small>
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        {taskSchedule === "每周" && (
+                          <label>
+                            <span>星期</span>
+                            <select
+                              aria-label="选择每周运行日期"
+                              value={taskScheduleDay}
+                              onChange={(event) =>
+                                setTaskScheduleDay(event.target.value as Weekday)
+                              }
+                            >
+                              {weekdays.map((day) => (
+                                <option key={day} value={day}>{day}</option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                        <label>
+                          <span>运行时间</span>
+                          <input
+                            ref={taskScheduleTimeRef}
+                            aria-label="选择运行时间"
+                            type="time"
+                            required
+                            aria-invalid={Boolean(
+                              taskFormSubmitted && taskFormErrors.scheduleTime,
+                            )}
+                            aria-describedby={
+                              taskFormSubmitted && taskFormErrors.scheduleTime
+                                ? "task-schedule-error"
+                                : undefined
+                            }
+                            value={taskScheduleTime}
+                            onInput={(event) =>
+                              setTaskScheduleTime((event.target as HTMLInputElement).value)
+                            }
+                          />
+                          {taskFormSubmitted && taskFormErrors.scheduleTime && (
+                            <small
+                              className="composer-field-error"
+                              id="task-schedule-error"
+                            >
+                              <AlertTriangle size={13} />
+                              {taskFormErrors.scheduleTime}
+                            </small>
+                          )}
+                        </label>
+                        <span className="schedule-timezone">
+                          <Clock3 size={15} />
+                          北京时间
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </section>
+
+                <section
+                  className="task-composer-section task-composer-policy-section"
+                  id="task-composer-policy"
+                >
+                  <header className="task-composer-section-heading">
+                    <span>03</span>
+                    <div>
+                      <h3>安全确认</h3>
+                      <p>为外部操作保留一道人工确认。</p>
+                    </div>
+                  </header>
+
+                  <div className="composer-policy">
+                    <span className="composer-policy-icon">
+                      <ShieldCheck size={18} />
+                    </span>
+                    <span>
+                      <strong>敏感操作需要确认</strong>
+                      <small>对外发送、登录访问和写入文件前先询问你。</small>
+                    </span>
+                    <button
+                      className={`switch-control ${taskApproval ? "on" : ""}`}
+                      type="button"
+                      role="switch"
+                      aria-checked={taskApproval}
+                      aria-label="敏感操作需要确认"
+                      onClick={() => setTaskApproval((value) => !value)}
+                    >
+                      <i />
+                    </button>
+                  </div>
+
+                </section>
+              </div>
             </div>
 
             <div className="clarity-dialog-actions">
