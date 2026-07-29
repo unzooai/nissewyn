@@ -92,6 +92,13 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /aria-label="复制事件 ID"/);
   assert.match(page, /function exportWorkspace/);
   assert.match(page, /async function importWorkspace/);
+  assert.match(page, /type PendingWorkspaceImport =/);
+  assert.match(page, /pendingWorkspaceImport/);
+  assert.match(page, /function confirmWorkspaceImport/);
+  assert.match(page, /Number\.isNaN\(Date\.parse\(backup\.exportedAt\)\)/);
+  assert.match(page, /备份已通过校验/);
+  assert.match(page, /确认并恢复/);
+  assert.match(page, /先备份当前工作区/);
   assert.match(page, /function resetWorkspace/);
   assert.match(page, /function parseWorkspaceBackup/);
   assert.match(page, /workspaceResetOpen/);
@@ -186,6 +193,11 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.workspace-overview/);
   assert.match(css, /\.workspace-data-actions/);
   assert.match(css, /\.workspace-reset-dialog/);
+  assert.match(css, /\.workspace-import-dialog/);
+  assert.match(css, /\.workspace-import-meta/);
+  assert.match(css, /\.workspace-import-facts/);
+  assert.match(css, /\.workspace-import-comparison/);
+  assert.match(css, /\.workspace-import-actions/);
   assert.match(css, /\.workspace-loading/);
   assert.match(css, /\.workspace-warning/);
   assert.match(css, /\.composer-field-error/);

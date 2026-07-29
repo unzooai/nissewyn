@@ -76,6 +76,11 @@ type WorkspaceBackup = {
   activity: ActivityItem[];
   artifacts?: ArtifactItem[];
 };
+type PendingWorkspaceImport = {
+  backup: WorkspaceBackup;
+  fileName: string;
+  fileSize: number;
+};
 type ApprovalRisk = "低风险" | "中风险" | "高风险";
 type ActivityKind = "任务" | "审批" | "系统";
 type ActivityFilter = "全部" | ActivityKind;
@@ -295,6 +300,7 @@ function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
     backup.version !== 1 ||
     backup.product !== "Unzoo One" ||
     typeof backup.exportedAt !== "string" ||
+    Number.isNaN(Date.parse(backup.exportedAt)) ||
     !Array.isArray(backup.tasks) ||
     backup.tasks.length === 0 ||
     !backup.tasks.every(isTaskItem) ||
@@ -832,6 +838,8 @@ export default function HomePage() {
   const [rejectApprovalId, setRejectApprovalId] = useState<string | null>(null);
   const [temporaryModeOpen, setTemporaryModeOpen] = useState(false);
   const [workspaceResetOpen, setWorkspaceResetOpen] = useState(false);
+  const [pendingWorkspaceImport, setPendingWorkspaceImport] =
+    useState<PendingWorkspaceImport | null>(null);
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
   const [artifacts, setArtifacts] = useState<ArtifactItem[]>(initialArtifacts);
   const [artifactFilter, setArtifactFilter] = useState<ArtifactFilter>("全部");
@@ -882,7 +890,9 @@ export default function HomePage() {
   const deletingTask = tasks.find((task) => task.id === deleteTaskId) ?? null;
   const rejectedApproval =
     approvals.find((item) => item.id === rejectApprovalId) ?? null;
-  const activeOverlayKind = deletingTask
+  const activeOverlayKind = pendingWorkspaceImport
+    ? "import"
+    : deletingTask
     ? "delete"
     : rejectedApproval
       ? "reject"
@@ -1169,7 +1179,8 @@ export default function HomePage() {
         !deletingTask &&
         !rejectedApproval &&
         !temporaryModeOpen &&
-        !workspaceResetOpen
+        !workspaceResetOpen &&
+        !pendingWorkspaceImport
       ) {
         event.preventDefault();
         setNotificationsOpen(false);
@@ -1201,6 +1212,7 @@ export default function HomePage() {
     deletingTask,
     rejectedApproval,
     notificationsOpen,
+    pendingWorkspaceImport,
     searchOpen,
     selectedTask,
     temporaryModeOpen,
@@ -1234,6 +1246,7 @@ export default function HomePage() {
     if (!activeOverlayKind) return;
 
     const selectorByKind = {
+      import: ".workspace-import-dialog",
       delete: ".confirm-delete-dialog",
       reject: ".approval-reject-dialog",
       temporary: ".temporary-session-dialog",
@@ -1258,7 +1271,9 @@ export default function HomePage() {
     });
 
     function closeTopOverlay() {
-      if (activeOverlayKind === "delete") {
+      if (activeOverlayKind === "import") {
+        setPendingWorkspaceImport(null);
+      } else if (activeOverlayKind === "delete") {
         setDeleteTaskId(null);
       } else if (activeOverlayKind === "reject") {
         setRejectApprovalId(null);
@@ -1885,50 +1900,63 @@ export default function HomePage() {
         throw new Error("Workspace backup is too large");
       }
       const backup = parseWorkspaceBackup(JSON.parse(await file.text()));
-      const restoredApprovals = initialApprovals.filter((item) =>
-        backup.approvalIds.includes(item.id),
-      );
-      const restoredPrimary =
-        backup.tasks.find((task) => task.id === "competitor") ?? backup.tasks[0];
-      const restoredArtifacts = backup.artifacts ?? initialArtifacts;
-
-      setTasks(backup.tasks);
-      setArtifacts(restoredArtifacts);
-      setArtifactTaskId(null);
-      setArtifactFilter("全部");
-      setArtifactListQuery("");
-      setArtifactSort("最近更新");
-      setSelectedArtifactId(restoredArtifacts[0]?.id ?? "");
-      setSettings(backup.settings);
-      setApprovals(restoredApprovals);
-      setSelectedApprovalId(restoredApprovals[0]?.id ?? "");
-      setActivityLog(backup.activity.slice(0, 100));
-      setIsRunning(restoredPrimary.status !== "已暂停");
-      setSelectedStep("analyze");
-      setTaskFilter("全部");
-      setActivityFilter("全部");
-      setActivityTaskId(null);
-      setActivityListQuery("");
-      setActivitySort("最新优先");
-      setSelectedActivityId(backup.activity[0]?.id ?? "");
-      setSelectedTaskId(null);
-      setRejectApprovalId(null);
-      setTemporaryModeOpen(false);
-      setNotificationsOpen(false);
-      setWorkspaceLoadWarning("");
-      recordActivity({
-        title: "工作区备份已恢复",
-        detail: `已从“${file.name}”恢复 ${backup.tasks.length} 个任务、${restoredArtifacts.length} 个成果和 ${backup.activity.length} 条运行记录。`,
-        icon: "activity",
-        tone: "green",
-        kind: "系统",
+      setPendingWorkspaceImport({
+        backup,
+        fileName: file.name,
+        fileSize: file.size,
       });
-      setNotice(`已恢复 ${backup.tasks.length} 个任务，工作区可以继续使用`);
     } catch {
       setNotice("导入失败，请选择由 Unzoo One 导出的工作区备份");
     } finally {
       input.value = "";
     }
+  }
+
+  function confirmWorkspaceImport() {
+    if (!pendingWorkspaceImport) return;
+    const { backup, fileName } = pendingWorkspaceImport;
+    const restoredApprovals = initialApprovals.filter((item) =>
+      backup.approvalIds.includes(item.id),
+    );
+    const restoredPrimary =
+      backup.tasks.find((task) => task.id === "competitor") ?? backup.tasks[0];
+    const restoredArtifacts = backup.artifacts ?? initialArtifacts;
+
+    setTasks(backup.tasks);
+    setArtifacts(restoredArtifacts);
+    setArtifactTaskId(null);
+    setArtifactFilter("全部");
+    setArtifactListQuery("");
+    setArtifactSort("最近更新");
+    setSelectedArtifactId(restoredArtifacts[0]?.id ?? "");
+    setSettings(backup.settings);
+    setApprovals(restoredApprovals);
+    setSelectedApprovalId(restoredApprovals[0]?.id ?? "");
+    setActivityLog(backup.activity.slice(0, 100));
+    setIsRunning(restoredPrimary.status !== "已暂停");
+    setSelectedStep("analyze");
+    setTaskFilter("全部");
+    setActivityFilter("全部");
+    setActivityTaskId(null);
+    setActivityListQuery("");
+    setActivitySort("最新优先");
+    setSelectedActivityId(backup.activity[0]?.id ?? "");
+    setSelectedTaskId(null);
+    setRejectApprovalId(null);
+    setTemporaryModeOpen(false);
+    setNotificationsOpen(false);
+    setWorkspaceLoadWarning("");
+    setPendingWorkspaceImport(null);
+    setActiveView("settings");
+    recordActivity({
+      title: "工作区备份已恢复",
+      detail: `已从“${fileName}”恢复 ${backup.tasks.length} 个任务、${restoredArtifacts.length} 个成果和 ${backup.activity.length} 条运行记录。`,
+      icon: "activity",
+      tone: "green",
+      kind: "系统",
+    });
+    setNotice(`已恢复 ${backup.tasks.length} 个任务，工作区可以继续使用`);
+    scrollWorkspaceTop();
   }
 
   function resetWorkspace() {
@@ -5342,6 +5370,141 @@ export default function HomePage() {
               >
                 <Ban size={15} />
                 确认拒绝
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {pendingWorkspaceImport && (
+        <div
+          className="clarity-dialog-backdrop"
+          onMouseDown={() => setPendingWorkspaceImport(null)}
+        >
+          <section
+            className="workspace-import-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="workspace-import-title"
+            aria-describedby="workspace-import-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="workspace-import-close"
+              type="button"
+              aria-label="关闭备份恢复预览"
+              onClick={() => setPendingWorkspaceImport(null)}
+            >
+              <X size={17} />
+            </button>
+            <span className="workspace-import-icon">
+              <Upload size={21} />
+            </span>
+            <span className="workspace-import-eyebrow">备份已通过校验</span>
+            <h2 id="workspace-import-title">
+              恢复“{pendingWorkspaceImport.fileName}”中的工作区？
+            </h2>
+            <p id="workspace-import-description">
+              确认后，当前任务、成果、审批状态、运行记录和设置会被这份备份替换。
+            </p>
+
+            <div className="workspace-import-meta">
+              <span>
+                <Clock3 size={16} />
+                <span>
+                  <small>备份时间</small>
+                  <strong>
+                    {formatAuditTimestamp(
+                      pendingWorkspaceImport.backup.exportedAt,
+                    )}
+                  </strong>
+                </span>
+              </span>
+              <span>
+                <FileJson size={16} />
+                <span>
+                  <small>文件大小</small>
+                  <strong>
+                    {(pendingWorkspaceImport.fileSize / 1024).toFixed(1)} KB
+                  </strong>
+                </span>
+              </span>
+            </div>
+
+            <div className="workspace-import-facts" aria-label="备份内容">
+              <span>
+                <small>任务</small>
+                <strong>{pendingWorkspaceImport.backup.tasks.length}</strong>
+              </span>
+              <span>
+                <small>成果</small>
+                <strong>
+                  {(pendingWorkspaceImport.backup.artifacts ?? initialArtifacts).length}
+                </strong>
+              </span>
+              <span>
+                <small>运行记录</small>
+                <strong>{pendingWorkspaceImport.backup.activity.length}</strong>
+              </span>
+              <span>
+                <small>待确认</small>
+                <strong>
+                  {
+                    initialApprovals.filter((item) =>
+                      pendingWorkspaceImport.backup.approvalIds.includes(item.id),
+                    ).length
+                  }
+                </strong>
+              </span>
+            </div>
+
+            <div className="workspace-import-comparison">
+              <span>
+                <small>当前工作区</small>
+                <strong>{tasks.length} 个任务 · {artifacts.length} 项成果</strong>
+              </span>
+              <i><ChevronRight size={17} /></i>
+              <span>
+                <small>恢复后</small>
+                <strong>
+                  {pendingWorkspaceImport.backup.tasks.length} 个任务 ·{" "}
+                  {(pendingWorkspaceImport.backup.artifacts ?? initialArtifacts).length}
+                  {" "}项成果
+                </strong>
+              </span>
+            </div>
+
+            <div className="workspace-import-note">
+              <ShieldCheck size={16} />
+              <span>
+                文件只在当前设备中读取。恢复前仍可先导出一份当前工作区备份。
+              </span>
+            </div>
+
+            <button
+              className="workspace-import-backup"
+              type="button"
+              onClick={exportWorkspace}
+            >
+              <Download size={16} />
+              先备份当前工作区
+            </button>
+
+            <div className="workspace-import-actions">
+              <button
+                type="button"
+                data-overlay-initial-focus
+                onClick={() => setPendingWorkspaceImport(null)}
+              >
+                取消恢复
+              </button>
+              <button
+                className="confirm"
+                type="button"
+                onClick={confirmWorkspaceImport}
+              >
+                <Upload size={15} />
+                确认并恢复
               </button>
             </div>
           </section>
