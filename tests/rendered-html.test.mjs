@@ -132,7 +132,10 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /notificationWrapRef/);
   assert.match(page, /aria-label="搜索任务列表"/);
   assert.match(page, /aria-label="任务排序"/);
+  assert.match(page, /aria-label="搜索成果列表"/);
+  assert.match(page, /aria-label="成果排序"/);
   assert.match(css, /\.task-list-controls/);
+  assert.match(css, /\.artifact-list-controls/);
   assert.match(css, /\.task-template-picker/);
   assert.match(css, /\.composer-policy/);
   assert.match(css, /\.composer-schedule-detail/);

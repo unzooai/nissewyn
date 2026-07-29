@@ -58,6 +58,7 @@ type TaskSchedule = "仅运行一次" | "每天" | "每周";
 type Weekday = "周一" | "周二" | "周三" | "周四" | "周五" | "周六" | "周日";
 type ArtifactType = "报告" | "数据" | "证据" | "草稿";
 type ArtifactFilter = "全部" | ArtifactType | "重点";
+type ArtifactSort = "最近更新" | "重点优先" | "文件名";
 type ArtifactStatus = "已完成" | "草稿";
 type SettingsState = {
   approval: boolean;
@@ -789,6 +790,8 @@ export default function HomePage() {
   const [artifacts, setArtifacts] = useState<ArtifactItem[]>(initialArtifacts);
   const [artifactFilter, setArtifactFilter] = useState<ArtifactFilter>("全部");
   const [artifactTaskId, setArtifactTaskId] = useState<string | null>(null);
+  const [artifactListQuery, setArtifactListQuery] = useState("");
+  const [artifactSort, setArtifactSort] = useState<ArtifactSort>("最近更新");
   const [selectedArtifactId, setSelectedArtifactId] = useState(
     initialArtifacts[0].id,
   );
@@ -1190,16 +1193,41 @@ export default function HomePage() {
         : artifacts,
     [artifactTaskId, artifacts],
   );
-  const filteredArtifacts = useMemo(
-    () => {
-      if (artifactFilter === "全部") return scopedArtifacts;
-      if (artifactFilter === "重点") {
-        return scopedArtifacts.filter((artifact) => artifact.starred);
+  const filteredArtifacts = useMemo(() => {
+    const keyword = artifactListQuery.trim().toLowerCase();
+    const filteredByType =
+      artifactFilter === "全部"
+        ? scopedArtifacts
+        : artifactFilter === "重点"
+          ? scopedArtifacts.filter((artifact) => artifact.starred)
+          : scopedArtifacts.filter((artifact) => artifact.type === artifactFilter);
+    const searched = keyword
+      ? filteredByType.filter((artifact) => {
+          const taskTitle =
+            tasks.find((task) => task.id === artifact.taskId)?.title ?? "";
+          return `${artifact.title} ${artifact.filename} ${artifact.description} ${artifact.format} ${artifact.type} ${taskTitle}`
+            .toLowerCase()
+            .includes(keyword);
+        })
+      : filteredByType;
+
+    return [...searched].sort((first, second) => {
+      const recent =
+        new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime();
+      if (artifactSort === "重点优先") {
+        return Number(second.starred) - Number(first.starred) || recent;
       }
-      return scopedArtifacts.filter((artifact) => artifact.type === artifactFilter);
-    },
-    [artifactFilter, scopedArtifacts],
-  );
+      if (artifactSort === "文件名") {
+        return (
+          first.filename.localeCompare(second.filename, "zh-CN", {
+            numeric: true,
+            sensitivity: "base",
+          }) || recent
+        );
+      }
+      return recent;
+    });
+  }, [artifactFilter, artifactListQuery, artifactSort, scopedArtifacts, tasks]);
   const selectedArtifact =
     filteredArtifacts.find((artifact) => artifact.id === selectedArtifactId) ??
     filteredArtifacts[0] ??
@@ -1546,6 +1574,8 @@ export default function HomePage() {
       setArtifacts(restoredArtifacts);
       setArtifactTaskId(null);
       setArtifactFilter("全部");
+      setArtifactListQuery("");
+      setArtifactSort("最近更新");
       setSelectedArtifactId(restoredArtifacts[0]?.id ?? "");
       setSettings(backup.settings);
       setApprovals(restoredApprovals);
@@ -1580,6 +1610,8 @@ export default function HomePage() {
     setArtifacts(initialArtifacts.map((artifact) => ({ ...artifact })));
     setArtifactTaskId(null);
     setArtifactFilter("全部");
+    setArtifactListQuery("");
+    setArtifactSort("最近更新");
     setSelectedArtifactId(initialArtifacts[0].id);
     setSettings({ ...defaultSettings });
     setApprovals(initialApprovals.map((item) => ({ ...item })));
@@ -2033,6 +2065,8 @@ export default function HomePage() {
     const taskArtifacts = artifacts.filter((artifact) => artifact.taskId === taskId);
     setArtifactTaskId(taskId);
     setArtifactFilter("全部");
+    setArtifactListQuery("");
+    setArtifactSort("最近更新");
     setSelectedArtifactId(taskArtifacts[0]?.id ?? "");
     setActiveView("artifacts");
     setSelectedTaskId(null);
@@ -3080,58 +3114,106 @@ export default function HomePage() {
             </div>
 
             <div className="artifact-toolbar">
-              <div
-                className="artifact-filter-tabs"
-                role="tablist"
-                aria-label="成果筛选"
-              >
-                {artifactFilters.map((filter) => {
-                  const count =
-                    filter === "全部"
-                      ? scopedArtifacts.length
-                      : filter === "重点"
-                        ? scopedArtifacts.filter((artifact) => artifact.starred)
-                            .length
-                        : scopedArtifacts.filter(
-                            (artifact) => artifact.type === filter,
-                          ).length;
-                  return (
-                    <button
-                      className={artifactFilter === filter ? "active" : ""}
-                      key={filter}
-                      type="button"
-                      role="tab"
-                      aria-selected={artifactFilter === filter}
-                      onClick={() => chooseArtifactFilter(filter)}
-                    >
-                      {filter === "重点" && <Star size={13} />}
-                      {filter}
-                      <span>{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {artifactScopeTask && (
-                <button
-                  className="artifact-scope-clear"
-                  type="button"
-                  onClick={() => {
-                    setArtifactTaskId(null);
-                    setArtifactFilter("全部");
-                    setSelectedArtifactId(artifacts[0]?.id ?? "");
-                  }}
+              <div className="artifact-filter-row">
+                <div
+                  className="artifact-filter-tabs"
+                  role="tablist"
+                  aria-label="成果筛选"
                 >
-                  <X size={14} />
-                  查看全部任务
-                </button>
-              )}
+                  {artifactFilters.map((filter) => {
+                    const count =
+                      filter === "全部"
+                        ? scopedArtifacts.length
+                        : filter === "重点"
+                          ? scopedArtifacts.filter((artifact) => artifact.starred)
+                              .length
+                          : scopedArtifacts.filter(
+                              (artifact) => artifact.type === filter,
+                            ).length;
+                    return (
+                      <button
+                        className={artifactFilter === filter ? "active" : ""}
+                        key={filter}
+                        type="button"
+                        role="tab"
+                        aria-selected={artifactFilter === filter}
+                        onClick={() => chooseArtifactFilter(filter)}
+                      >
+                        {filter === "重点" && <Star size={13} />}
+                        {filter}
+                        <span>{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {artifactScopeTask && (
+                  <button
+                    className="artifact-scope-clear"
+                    type="button"
+                    onClick={() => {
+                      setArtifactTaskId(null);
+                      setArtifactFilter("全部");
+                      setSelectedArtifactId(artifacts[0]?.id ?? "");
+                    }}
+                  >
+                    <X size={14} />
+                    查看全部任务
+                  </button>
+                )}
+              </div>
+
+              <div className="artifact-list-controls">
+                <label className="artifact-list-search">
+                  <Search size={16} />
+                  <input
+                    type="search"
+                    aria-label="搜索成果列表"
+                    autoComplete="off"
+                    placeholder="搜索成果名称、文件名或格式"
+                    value={artifactListQuery}
+                    onChange={(event) => setArtifactListQuery(event.target.value)}
+                  />
+                  {artifactListQuery && (
+                    <button
+                      type="button"
+                      aria-label="清除成果搜索"
+                      onClick={() => setArtifactListQuery("")}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </label>
+
+                <label className="artifact-sort-control">
+                  <ArrowUpDown size={15} />
+                  <span>排序</span>
+                  <select
+                    aria-label="成果排序"
+                    value={artifactSort}
+                    onChange={(event) =>
+                      setArtifactSort(event.target.value as ArtifactSort)
+                    }
+                  >
+                    <option value="最近更新">最近更新</option>
+                    <option value="重点优先">重点优先</option>
+                    <option value="文件名">文件名</option>
+                  </select>
+                </label>
+
+                <span className="artifact-result-count" aria-live="polite">
+                  显示 {filteredArtifacts.length} / {scopedArtifacts.length} 项
+                </span>
+              </div>
             </div>
 
             <div className="artifact-workspace">
               <aside className="artifact-list" aria-label="成果列表">
                 <div className="artifact-list-heading">
-                  <span>最近更新</span>
-                  <strong>{filteredArtifacts.length} 项</strong>
+                  <span>
+                    <strong>成果列表</strong>
+                    <small>{artifactSort}</small>
+                  </span>
+                  <em>{filteredArtifacts.length} 项</em>
                 </div>
                 <div className="artifact-list-items">
                   {filteredArtifacts.map((artifact) => {
@@ -3157,7 +3239,12 @@ export default function HomePage() {
                               <small>{artifact.updated}</small>
                             </span>
                             <strong>{artifact.title}</strong>
-                            <small>{artifact.filename}</small>
+                            <span className="artifact-file-meta">
+                              <small>{artifact.filename}</small>
+                              <em>
+                                {artifact.format} · {artifact.sizeKb.toFixed(1)} KB
+                              </em>
+                            </span>
                           </span>
                         </button>
                         <button
@@ -3178,13 +3265,26 @@ export default function HomePage() {
                   })}
                   {filteredArtifacts.length === 0 && (
                     <div className="artifact-list-empty">
-                      <Files size={22} />
-                      <strong>这个分类还没有成果</strong>
+                      {artifactListQuery.trim() ? <Search size={22} /> : <Files size={22} />}
+                      <strong>
+                        {artifactListQuery.trim()
+                          ? `没有找到“${artifactListQuery.trim()}”`
+                          : "这个分类还没有成果"}
+                      </strong>
+                      <small>
+                        {artifactListQuery.trim()
+                          ? "可以尝试成果名称、文件名、格式或关联任务。"
+                          : "切换到其他分类查看已有交付文件。"}
+                      </small>
                       <button
                         type="button"
-                        onClick={() => chooseArtifactFilter("全部")}
+                        onClick={() =>
+                          artifactListQuery.trim()
+                            ? setArtifactListQuery("")
+                            : chooseArtifactFilter("全部")
+                        }
                       >
-                        查看全部成果
+                        {artifactListQuery.trim() ? "清除搜索" : "查看全部成果"}
                       </button>
                     </div>
                   )}
@@ -3206,7 +3306,7 @@ export default function HomePage() {
                         <p>{selectedArtifact.description}</p>
                       </span>
                     </div>
-                    <div className="artifact-preview-actions">
+                    <div className="artifact-preview-actions" aria-label="成果操作">
                       <button
                         className={selectedArtifact.starred ? "active" : ""}
                         type="button"
@@ -3224,6 +3324,7 @@ export default function HomePage() {
                           size={16}
                           fill={selectedArtifact.starred ? "currentColor" : "none"}
                         />
+                        <span>{selectedArtifact.starred ? "取消重点" : "重点"}</span>
                       </button>
                       <button
                         type="button"
@@ -3232,6 +3333,7 @@ export default function HomePage() {
                         onClick={() => copyArtifactContent(selectedArtifact)}
                       >
                         <Copy size={16} />
+                        <span>复制</span>
                       </button>
                       <button
                         className="download"
