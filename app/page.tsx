@@ -101,11 +101,18 @@ type TeamMember = {
   lastActive: string;
 };
 type TeamInviteFormErrors = Partial<Record<"name" | "email", string>>;
-type BulkDeleteSnapshot = {
+type TaskDeleteSnapshot = {
   tasks: TaskItem[];
   artifacts: ArtifactItem[];
   activity: ActivityItem[];
   approvals: ApprovalItem[];
+  selectedTaskIds: string[];
+  selectedApprovalId: string;
+  selectedApprovalIds: string[];
+  activityTaskId: string | null;
+  artifactTaskId: string | null;
+  restoreTaskId: string | null;
+  isRunning: boolean;
   deletedCount: number;
 };
 type ArtifactDeleteSnapshot = {
@@ -1393,8 +1400,8 @@ export default function HomePage() {
   const [taskSort, setTaskSort] = useState<TaskSort>("状态优先");
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [bulkDeleteSnapshot, setBulkDeleteSnapshot] =
-    useState<BulkDeleteSnapshot | null>(null);
+  const [taskDeleteSnapshot, setTaskDeleteSnapshot] =
+    useState<TaskDeleteSnapshot | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [inspectedRunTaskId, setInspectedRunTaskId] =
     useState<string | null>(null);
@@ -1878,8 +1885,8 @@ export default function HomePage() {
     artifactDeleteSnapshot &&
       notice === `已删除成果“${artifactDeleteSnapshot.artifact.title}”`,
   );
-  const bulkDeleteUndoAvailable = Boolean(
-    bulkDeleteSnapshot && notice.startsWith("已删除 "),
+  const taskDeleteUndoAvailable = Boolean(
+    taskDeleteSnapshot && notice.startsWith("已删除 "),
   );
   const approvalRejectUndoAvailable = Boolean(
     approvalRejectSnapshot && notice.startsWith("已拒绝"),
@@ -2135,7 +2142,7 @@ export default function HomePage() {
       notice.startsWith("已删除") || notice.startsWith("已拒绝") ? 10000 : 4200;
     const timer = window.setTimeout(() => {
       setNotice("");
-      setBulkDeleteSnapshot(null);
+      setTaskDeleteSnapshot(null);
       setArtifactDeleteSnapshot(null);
       setApprovalRejectSnapshot(null);
     }, timeout);
@@ -3014,7 +3021,7 @@ export default function HomePage() {
       (item) => item.id !== artifact.id,
     );
 
-    setBulkDeleteSnapshot(null);
+    setTaskDeleteSnapshot(null);
     setArtifactDeleteSnapshot({
       artifact,
       index: Math.max(0, artifactIndex),
@@ -3257,7 +3264,7 @@ export default function HomePage() {
     setTaskFilter("全部");
     setSelectedTaskIds([]);
     setBulkDeleteOpen(false);
-    setBulkDeleteSnapshot(null);
+    setTaskDeleteSnapshot(null);
     setActivityFilter("全部");
     setActivityTaskId(null);
     setActivityListQuery("");
@@ -3323,7 +3330,7 @@ export default function HomePage() {
     setTaskFilter("全部");
     setSelectedTaskIds([]);
     setBulkDeleteOpen(false);
-    setBulkDeleteSnapshot(null);
+    setTaskDeleteSnapshot(null);
     setActivityFilter("全部");
     setActivityTaskId(null);
     setActivityListQuery("");
@@ -3519,7 +3526,7 @@ export default function HomePage() {
   }
 
   function stageApprovalRejectUndo(rejectedCount: number) {
-    setBulkDeleteSnapshot(null);
+    setTaskDeleteSnapshot(null);
     setArtifactDeleteSnapshot(null);
     setApprovalRejectSnapshot({
       tasks,
@@ -3954,9 +3961,40 @@ export default function HomePage() {
     setDeleteTaskId(task.id);
   }
 
+  function stageTaskDeleteUndo(
+    deletedCount: number,
+    restoreTaskId: string | null = null,
+  ) {
+    setArtifactDeleteSnapshot(null);
+    setApprovalRejectSnapshot(null);
+    setTaskDeleteSnapshot({
+      tasks,
+      artifacts,
+      activity: activityLog,
+      approvals,
+      selectedTaskIds,
+      selectedApprovalId,
+      selectedApprovalIds,
+      activityTaskId,
+      artifactTaskId,
+      restoreTaskId,
+      isRunning,
+      deletedCount,
+    });
+  }
+
   function confirmDeleteTask() {
     if (!deletingTask) return;
     const deletingTaskId = deletingTask.id;
+    const deletedApprovalIds = new Set(
+      approvals
+        .filter((approval) => approval.taskId === deletingTaskId)
+        .map((approval) => approval.id),
+    );
+    const remainingApprovals = approvals.filter(
+      (approval) => approval.taskId !== deletingTaskId,
+    );
+    stageTaskDeleteUndo(1, deletingTaskId);
     setTasks((items) => items.filter((item) => item.id !== deletingTask.id));
     setArtifacts((items) =>
       items.filter((artifact) => artifact.taskId !== deletingTask.id),
@@ -3964,8 +4002,14 @@ export default function HomePage() {
     setActivityLog((items) =>
       items.filter((activity) => activity.taskId !== deletingTask.id),
     );
-    setApprovals((items) =>
-      items.filter((approval) => approval.taskId !== deletingTask.id),
+    setApprovals(remainingApprovals);
+    setSelectedApprovalId((approvalId) =>
+      deletedApprovalIds.has(approvalId)
+        ? (remainingApprovals[0]?.id ?? "")
+        : approvalId,
+    );
+    setSelectedApprovalIds((approvalIds) =>
+      approvalIds.filter((approvalId) => !deletedApprovalIds.has(approvalId)),
     );
     setSelectedTaskIds((selectedIds) =>
       selectedIds.filter((id) => id !== deletingTaskId),
@@ -3983,8 +4027,9 @@ export default function HomePage() {
       icon: "trash",
       tone: "red",
       kind: "任务",
+      taskId: deletingTaskId,
     });
-    setNotice(`任务“${deletingTask.title}”已删除`);
+    setNotice(`已删除 1 个任务“${deletingTask.title}”`);
   }
 
   function toggleTaskSelection(taskId: string) {
@@ -4142,15 +4187,15 @@ export default function HomePage() {
     if (deletableSelectedTasks.length === 0) return;
     const deletedIds = new Set(deletableSelectedTasks.map((task) => task.id));
     const deletedCount = deletedIds.size;
-    const snapshot: BulkDeleteSnapshot = {
-      tasks,
-      artifacts,
-      activity: activityLog,
-      approvals,
-      deletedCount,
-    };
-    setArtifactDeleteSnapshot(null);
-    setBulkDeleteSnapshot(snapshot);
+    const deletedApprovalIds = new Set(
+      approvals
+        .filter((approval) => deletedIds.has(approval.taskId))
+        .map((approval) => approval.id),
+    );
+    const remainingApprovals = approvals.filter(
+      (approval) => !deletedIds.has(approval.taskId),
+    );
+    stageTaskDeleteUndo(deletedCount);
     setTasks((items) => items.filter((task) => !deletedIds.has(task.id)));
     setArtifacts((items) =>
       items.filter((artifact) => !deletedIds.has(artifact.taskId)),
@@ -4158,8 +4203,14 @@ export default function HomePage() {
     setActivityLog((items) =>
       items.filter((activity) => !activity.taskId || !deletedIds.has(activity.taskId)),
     );
-    setApprovals((items) =>
-      items.filter((approval) => !deletedIds.has(approval.taskId)),
+    setApprovals(remainingApprovals);
+    setSelectedApprovalId((approvalId) =>
+      deletedApprovalIds.has(approvalId)
+        ? (remainingApprovals[0]?.id ?? "")
+        : approvalId,
+    );
+    setSelectedApprovalIds((approvalIds) =>
+      approvalIds.filter((approvalId) => !deletedApprovalIds.has(approvalId)),
     );
     setSelectedTaskIds([]);
     setBulkDeleteOpen(false);
@@ -4177,27 +4228,48 @@ export default function HomePage() {
     );
   }
 
-  function undoBulkDelete() {
-    if (!bulkDeleteSnapshot) return;
-    const snapshot = bulkDeleteSnapshot;
+  function undoTaskDelete() {
+    if (!taskDeleteSnapshot) return;
+    const snapshot = taskDeleteSnapshot;
+    const restoredTask = snapshot.restoreTaskId
+      ? snapshot.tasks.find((task) => task.id === snapshot.restoreTaskId)
+      : null;
+    const restoredActivityIds = new Set(
+      snapshot.activity.map((activity) => activity.id),
+    );
     setTasks(snapshot.tasks);
     setArtifacts(snapshot.artifacts);
-    setActivityLog(snapshot.activity);
+    setActivityLog((items) => [
+      ...items.filter((activity) => !restoredActivityIds.has(activity.id)),
+      ...snapshot.activity,
+    ].slice(0, 100));
     setApprovals(snapshot.approvals);
-    setSelectedApprovalId(snapshot.approvals[0]?.id ?? "");
-    setIsRunning(
-      snapshot.tasks.find((task) => task.id === "competitor")?.status !==
-        "已暂停",
-    );
-    setBulkDeleteSnapshot(null);
+    setSelectedTaskIds(snapshot.selectedTaskIds);
+    setSelectedApprovalId(snapshot.selectedApprovalId);
+    setSelectedApprovalIds(snapshot.selectedApprovalIds);
+    setActivityTaskId(snapshot.activityTaskId);
+    setArtifactTaskId(snapshot.artifactTaskId);
+    setIsRunning(snapshot.isRunning);
+    if (snapshot.restoreTaskId) {
+      setActiveView("tasks");
+      setSelectedTaskId(snapshot.restoreTaskId);
+    }
+    setTaskDeleteSnapshot(null);
     recordActivity({
-      title: `已撤销删除 ${snapshot.deletedCount} 个任务`,
+      title: restoredTask
+        ? `已撤销删除：${restoredTask.title}`
+        : `已撤销删除 ${snapshot.deletedCount} 个任务`,
       detail: "任务、关联成果、审批事项和运行记录已恢复。",
       icon: "activity",
       tone: "green",
-      kind: "系统",
+      kind: restoredTask ? "任务" : "系统",
+      taskId: restoredTask?.id,
     });
-    setNotice(`已恢复 ${snapshot.deletedCount} 个任务`);
+    setNotice(
+      restoredTask
+        ? `已恢复任务“${restoredTask.title}”`
+        : `已恢复 ${snapshot.deletedCount} 个任务`,
+    );
   }
 
   function openUsageBudget() {
@@ -10211,7 +10283,8 @@ export default function HomePage() {
             <span className="confirm-delete-eyebrow">删除任务</span>
             <h2 id="delete-task-title">确定删除“{deletingTask.title}”吗？</h2>
             <p id="delete-task-description">
-              任务配置、关联成果和本机运行记录将被移除。这项操作无法撤销。
+              任务配置、关联成果、审批和本机运行记录将移出工作区；完成后 10
+              秒内可以恢复，原始数据源不会被删除。
             </p>
             <div className="confirm-delete-facts">
               <span>
@@ -10624,7 +10697,7 @@ export default function HomePage() {
         <div
           className={`clarity-toast ${noticeIsCaution ? "caution" : ""} ${
             artifactUndoAvailable ||
-            bulkDeleteUndoAvailable ||
+            taskDeleteUndoAvailable ||
             approvalRejectUndoAvailable
               ? "has-action"
               : ""
@@ -10637,14 +10710,14 @@ export default function HomePage() {
             <CheckCircle2 size={18} />
           )}
           <span>{notice}</span>
-          {bulkDeleteUndoAvailable && (
+          {taskDeleteUndoAvailable && (
             <button
               className="clarity-toast-undo"
               type="button"
-              onClick={undoBulkDelete}
+              onClick={undoTaskDelete}
             >
               <RotateCcw size={14} />
-              撤销
+              恢复任务
             </button>
           )}
           {artifactUndoAvailable && (
@@ -10673,7 +10746,7 @@ export default function HomePage() {
             aria-label="关闭提示"
             onClick={() => {
               setNotice("");
-              setBulkDeleteSnapshot(null);
+              setTaskDeleteSnapshot(null);
               setArtifactDeleteSnapshot(null);
               setApprovalRejectSnapshot(null);
             }}

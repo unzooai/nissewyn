@@ -64,6 +64,12 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function beginEditTask/);
   assert.match(page, /function duplicateTask/);
   assert.match(page, /function confirmDeleteTask/);
+  assert.match(page, /type TaskDeleteSnapshot =/);
+  assert.match(page, /function stageTaskDeleteUndo/);
+  assert.match(page, /function undoTaskDelete/);
+  assert.match(page, /完成后 10\s*秒内可以恢复/);
+  assert.match(page, /restoredActivityIds/);
+  assert.match(page, /taskId: deletingTaskId/);
   assert.match(page, /function recordActivity/);
   assert.match(page, /type ApprovalRisk =/);
   assert.match(page, /type ArtifactItem =/);
@@ -204,7 +210,6 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function bulkResumeTasks/);
   assert.match(page, /function bulkEnableApproval/);
   assert.match(page, /function confirmBulkDelete/);
-  assert.match(page, /function undoBulkDelete/);
   assert.match(page, /role="toolbar"/);
   assert.match(page, /全选当前/);
   assert.match(page, /approvalListQuery/);
