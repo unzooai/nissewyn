@@ -73,6 +73,12 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function downloadArtifact/);
   assert.match(page, /async function copyArtifactContent/);
   assert.match(page, /function toggleArtifactStar/);
+  assert.match(page, /type ArtifactDeleteSnapshot =/);
+  assert.match(page, /function requestDeleteArtifact/);
+  assert.match(page, /function confirmDeleteArtifact/);
+  assert.match(page, /function undoArtifactDelete/);
+  assert.match(page, /aria-labelledby="artifact-delete-title"/);
+  assert.match(page, /任务和审计记录不会被删除/);
   assert.match(page, /type ArtifactRevision =/);
   assert.match(page, /function artifactCanBeEdited/);
   assert.match(page, /function openArtifactEditor/);
@@ -300,6 +306,10 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.artifact-editor-actions/);
   assert.match(css, /\.artifact-discard-dialog/);
   assert.match(css, /\.artifact-preview-actions button\.edit/);
+  assert.match(css, /\.artifact-preview-actions button\.delete/);
+  assert.match(css, /\.artifact-delete-dialog/);
+  assert.match(css, /\.artifact-delete-facts/);
+  assert.match(css, /\.artifact-delete-actions/);
   assert.match(css, /\.activity-workspace/);
   assert.match(css, /\.activity-inspector/);
   assert.match(css, /\.task-detail-artifacts/);

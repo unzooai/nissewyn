@@ -108,6 +108,10 @@ type BulkDeleteSnapshot = {
   approvals: ApprovalItem[];
   deletedCount: number;
 };
+type ArtifactDeleteSnapshot = {
+  artifact: ArtifactItem;
+  index: number;
+};
 type WorkspaceBackup = {
   version: 1;
   product: "Unzoo One";
@@ -1369,6 +1373,9 @@ export default function HomePage() {
   const [artifactContentDraft, setArtifactContentDraft] = useState("");
   const [artifactEditSubmitted, setArtifactEditSubmitted] = useState(false);
   const [artifactDiscardOpen, setArtifactDiscardOpen] = useState(false);
+  const [artifactDeleteId, setArtifactDeleteId] = useState<string | null>(null);
+  const [artifactDeleteSnapshot, setArtifactDeleteSnapshot] =
+    useState<ArtifactDeleteSnapshot | null>(null);
   const [isSavingArtifact, setIsSavingArtifact] = useState(false);
   const [tasksReady, setTasksReady] = useState(false);
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("全部");
@@ -1690,6 +1697,14 @@ export default function HomePage() {
     usageBudgetDraftValue > 50000;
   const editingArtifact =
     artifacts.find((artifact) => artifact.id === editingArtifactId) ?? null;
+  const deletingArtifact =
+    artifacts.find((artifact) => artifact.id === artifactDeleteId) ?? null;
+  const DeletingArtifactIcon = deletingArtifact
+    ? artifactIconMap[deletingArtifact.type]
+    : Files;
+  const deletingArtifactTask = deletingArtifact
+    ? tasks.find((task) => task.id === deletingArtifact.taskId) ?? null
+    : null;
   const editingArtifactVersion = editingArtifact?.version ?? 1;
   const artifactRevisionHistory = editingArtifact
     ? [...(editingArtifact.revisions ?? [])].sort(
@@ -1742,6 +1757,8 @@ export default function HomePage() {
     ? "artifact-discard"
     : editingArtifact
       ? "artifact-editor"
+      : deletingArtifact
+        ? "artifact-delete"
       : usageBudgetOpen
         ? "usage-budget"
     : pendingWorkspaceImport
@@ -1847,6 +1864,13 @@ export default function HomePage() {
   const teamInviteFormHasErrors =
     Object.keys(teamInviteFormErrors).length > 0;
   const noticeIsCaution = /失败|不能|请先|无效|损坏/.test(notice);
+  const artifactUndoAvailable = Boolean(
+    artifactDeleteSnapshot &&
+      notice === `已删除成果“${artifactDeleteSnapshot.artifact.title}”`,
+  );
+  const bulkDeleteUndoAvailable = Boolean(
+    bulkDeleteSnapshot && notice.startsWith("已删除 "),
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -2095,7 +2119,11 @@ export default function HomePage() {
   useEffect(() => {
     if (!notice) return;
     const timeout = notice.startsWith("已删除") ? 10000 : 4200;
-    const timer = window.setTimeout(() => setNotice(""), timeout);
+    const timer = window.setTimeout(() => {
+      setNotice("");
+      setBulkDeleteSnapshot(null);
+      setArtifactDeleteSnapshot(null);
+    }, timeout);
     return () => window.clearTimeout(timer);
   }, [notice]);
 
@@ -2126,6 +2154,7 @@ export default function HomePage() {
         !teamInviteOpen &&
         !selectedTeamMember &&
         !selectedConnector &&
+        !deletingArtifact &&
         !inspectedRun &&
         !selectedTask &&
         !deletingTask &&
@@ -2163,6 +2192,7 @@ export default function HomePage() {
     bulkApprovalDecision,
     composerOpen,
     bulkDeleteOpen,
+    deletingArtifact,
     deletingTask,
     rejectedApproval,
     notificationsOpen,
@@ -2207,6 +2237,7 @@ export default function HomePage() {
     const selectorByKind = {
       "artifact-discard": ".artifact-discard-dialog",
       "artifact-editor": ".artifact-editor-dialog",
+      "artifact-delete": ".artifact-delete-dialog",
       "usage-budget": ".usage-budget-dialog",
       import: ".workspace-import-dialog",
       "bulk-approval": ".bulk-approval-dialog",
@@ -2252,6 +2283,8 @@ export default function HomePage() {
           setArtifactContentDraft("");
           setArtifactEditSubmitted(false);
         }
+      } else if (activeOverlayKind === "artifact-delete") {
+        setArtifactDeleteId(null);
       } else if (activeOverlayKind === "usage-budget") {
         setUsageBudgetOpen(false);
       } else if (activeOverlayKind === "import") {
@@ -2951,6 +2984,66 @@ export default function HomePage() {
     setNotice(nextStarred ? "已加入重点成果" : "已取消重点标记");
   }
 
+  function requestDeleteArtifact(artifact: ArtifactItem) {
+    setArtifactDeleteId(artifact.id);
+  }
+
+  function confirmDeleteArtifact() {
+    if (!deletingArtifact) return;
+    const artifact = deletingArtifact;
+    const artifactIndex = artifacts.findIndex((item) => item.id === artifact.id);
+    const nextVisibleArtifact = filteredArtifacts.find(
+      (item) => item.id !== artifact.id,
+    );
+    const nextWorkspaceArtifact = artifacts.find(
+      (item) => item.id !== artifact.id,
+    );
+
+    setBulkDeleteSnapshot(null);
+    setArtifactDeleteSnapshot({
+      artifact,
+      index: Math.max(0, artifactIndex),
+    });
+    setArtifacts((items) => items.filter((item) => item.id !== artifact.id));
+    setSelectedArtifactId(
+      nextVisibleArtifact?.id ?? nextWorkspaceArtifact?.id ?? "",
+    );
+    setArtifactDeleteId(null);
+    recordActivity({
+      title: `成果已删除：${artifact.title}`,
+      detail: `${artifact.filename} 及其 ${
+        (artifact.revisions?.length ?? 0) + 1
+      } 个版本已从工作区移除；关联任务和原审计记录保持不变。`,
+      icon: "trash",
+      tone: "red",
+      kind: "系统",
+      taskId: artifact.taskId,
+    });
+    setNotice(`已删除成果“${artifact.title}”`);
+  }
+
+  function undoArtifactDelete() {
+    if (!artifactDeleteSnapshot) return;
+    const { artifact, index } = artifactDeleteSnapshot;
+    setArtifacts((items) => {
+      if (items.some((item) => item.id === artifact.id)) return items;
+      const restored = [...items];
+      restored.splice(Math.min(index, restored.length), 0, artifact);
+      return restored;
+    });
+    setSelectedArtifactId(artifact.id);
+    setArtifactDeleteSnapshot(null);
+    recordActivity({
+      title: `已撤销成果删除：${artifact.title}`,
+      detail: `${artifact.filename} 和全部修订版本已恢复到原位置。`,
+      icon: "activity",
+      tone: "green",
+      kind: "系统",
+      taskId: artifact.taskId,
+    });
+    setNotice(`已恢复成果“${artifact.title}”`);
+  }
+
   function artifactCanBeEdited(artifact: ArtifactItem) {
     return artifact.type === "报告" || artifact.type === "草稿";
   }
@@ -3121,6 +3214,8 @@ export default function HomePage() {
     setArtifactListQuery("");
     setArtifactSort("最近更新");
     setSelectedArtifactId(restoredArtifacts[0]?.id ?? "");
+    setArtifactDeleteId(null);
+    setArtifactDeleteSnapshot(null);
     setSettings(backup.settings);
     setUsageSettings(backup.usage ?? { ...defaultUsageSettings });
     setUsageBudgetOpen(false);
@@ -3181,6 +3276,8 @@ export default function HomePage() {
     setArtifactListQuery("");
     setArtifactSort("最近更新");
     setSelectedArtifactId(initialArtifacts[0].id);
+    setArtifactDeleteId(null);
+    setArtifactDeleteSnapshot(null);
     setSettings({ ...defaultSettings });
     setUsageSettings({ ...defaultUsageSettings });
     setUsageBudgetOpen(false);
@@ -3992,6 +4089,7 @@ export default function HomePage() {
       approvals,
       deletedCount,
     };
+    setArtifactDeleteSnapshot(null);
     setBulkDeleteSnapshot(snapshot);
     setTasks((items) => items.filter((task) => !deletedIds.has(task.id)));
     setArtifacts((items) =>
@@ -6515,6 +6613,16 @@ export default function HomePage() {
                       >
                         <Copy size={16} />
                         <span>复制</span>
+                      </button>
+                      <button
+                        className="delete"
+                        type="button"
+                        aria-label="删除成果"
+                        title="删除成果"
+                        onClick={() => requestDeleteArtifact(selectedArtifact)}
+                      >
+                        <Trash2 size={16} />
+                        <span>删除</span>
                       </button>
                       <button
                         className="download"
@@ -9495,6 +9603,107 @@ export default function HomePage() {
         </div>
       )}
 
+      {deletingArtifact && (
+        <div
+          className="clarity-dialog-backdrop artifact-delete-backdrop"
+          onMouseDown={() => setArtifactDeleteId(null)}
+        >
+          <section
+            className="artifact-delete-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="artifact-delete-title"
+            aria-describedby="artifact-delete-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="artifact-delete-close"
+              type="button"
+              aria-label="关闭成果删除确认"
+              onClick={() => setArtifactDeleteId(null)}
+            >
+              <X size={17} />
+            </button>
+
+            <header className="artifact-delete-heading">
+              <span>
+                <Trash2 size={21} />
+              </span>
+              <div>
+                <small>删除成果</small>
+                <h2 id="artifact-delete-title">
+                  删除“{deletingArtifact.title}”？
+                </h2>
+                <p id="artifact-delete-description">
+                  文件与全部修订版本将从当前工作区移除，完成后可在底部提示中撤销。
+                </p>
+              </div>
+            </header>
+
+            <div className="artifact-delete-file">
+              <span
+                className={`artifact-preview-icon type-${deletingArtifact.type}`}
+              >
+                <DeletingArtifactIcon size={19} />
+              </span>
+              <span>
+                <strong>{deletingArtifact.filename}</strong>
+                <small>
+                  {deletingArtifact.format} ·{" "}
+                  {deletingArtifact.sizeKb.toFixed(1)} KB
+                </small>
+              </span>
+              <em>{deletingArtifact.status}</em>
+            </div>
+
+            <div className="artifact-delete-facts" aria-label="删除影响">
+              <span>
+                <small>将移除</small>
+                <strong>
+                  {(deletingArtifact.revisions?.length ?? 0) + 1} 个版本
+                </strong>
+              </span>
+              <span>
+                <small>关联任务</small>
+                <strong>{deletingArtifactTask?.title ?? "原任务已移除"}</strong>
+              </span>
+              <span>
+                <small>撤销时间</small>
+                <strong>10 秒</strong>
+              </span>
+            </div>
+
+            <div className="artifact-delete-safety">
+              <ShieldCheck size={18} />
+              <span>
+                <strong>任务和审计记录不会被删除</strong>
+                <small>
+                  系统会保留来源任务及删除事件，方便后续追溯是谁在何时执行了操作。
+                </small>
+              </span>
+            </div>
+
+            <div className="artifact-delete-actions">
+              <button
+                type="button"
+                data-overlay-initial-focus
+                onClick={() => setArtifactDeleteId(null)}
+              >
+                保留成果
+              </button>
+              <button
+                className="danger"
+                type="button"
+                onClick={confirmDeleteArtifact}
+              >
+                <Trash2 size={15} />
+                确认删除
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {usageBudgetOpen && (
         <div
           className="clarity-dialog-backdrop"
@@ -10352,7 +10561,9 @@ export default function HomePage() {
       {notice && (
         <div
           className={`clarity-toast ${noticeIsCaution ? "caution" : ""} ${
-            bulkDeleteSnapshot && notice.startsWith("已删除") ? "has-action" : ""
+            artifactUndoAvailable || bulkDeleteUndoAvailable
+              ? "has-action"
+              : ""
           }`}
           role={noticeIsCaution ? "alert" : "status"}
         >
@@ -10362,7 +10573,7 @@ export default function HomePage() {
             <CheckCircle2 size={18} />
           )}
           <span>{notice}</span>
-          {bulkDeleteSnapshot && notice.startsWith("已删除") && (
+          {bulkDeleteUndoAvailable && (
             <button
               className="clarity-toast-undo"
               type="button"
@@ -10372,11 +10583,25 @@ export default function HomePage() {
               撤销
             </button>
           )}
+          {artifactUndoAvailable && (
+            <button
+              className="clarity-toast-undo"
+              type="button"
+              onClick={undoArtifactDelete}
+            >
+              <RotateCcw size={14} />
+              撤销
+            </button>
+          )}
           <button
             className="clarity-toast-close"
             type="button"
             aria-label="关闭提示"
-            onClick={() => setNotice("")}
+            onClick={() => {
+              setNotice("");
+              setBulkDeleteSnapshot(null);
+              setArtifactDeleteSnapshot(null);
+            }}
           >
             <X size={15} />
           </button>

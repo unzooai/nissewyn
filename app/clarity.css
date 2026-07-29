@@ -17320,3 +17320,345 @@ body {
     grid-row: 1 / span 2;
   }
 }
+
+/* Artifact deletion and recovery */
+.artifact-preview-actions button.delete {
+  border-color: #ead9d7;
+  background: #fffafa;
+  color: #a95751;
+}
+
+.artifact-preview-actions button.delete:hover {
+  border-color: #dfbbb7;
+  background: #fff2f0;
+  color: #a43f39;
+}
+
+.artifact-delete-backdrop {
+  z-index: 92;
+  padding: 18px;
+  background: rgba(29, 39, 54, 0.36);
+  backdrop-filter: blur(8px);
+}
+
+.artifact-delete-dialog {
+  position: relative;
+  width: min(560px, calc(100vw - 36px));
+  overflow: hidden;
+  border: 1px solid #dfd6d5;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow:
+    0 30px 80px rgba(37, 43, 55, 0.22),
+    0 3px 10px rgba(37, 43, 55, 0.08);
+  animation: clarity-dialog-in 220ms cubic-bezier(0.2, 0.78, 0.3, 1) both;
+}
+
+.artifact-delete-dialog::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4px;
+  background: #bf4d47;
+  content: "";
+}
+
+.artifact-delete-close {
+  position: absolute;
+  z-index: 2;
+  top: 17px;
+  right: 17px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e0e4e9;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #667385;
+  cursor: pointer;
+}
+
+.artifact-delete-close:hover {
+  border-color: #d5c3c1;
+  background: #fff8f7;
+  color: #a5413b;
+}
+
+.artifact-delete-heading {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: start;
+  gap: 13px;
+  padding: 26px 70px 21px 22px;
+}
+
+.artifact-delete-heading > span {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid #efcfcb;
+  border-radius: 8px;
+  background: #fff0ee;
+  color: #b6453f;
+}
+
+.artifact-delete-heading small {
+  display: block;
+  color: #a25650;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.artifact-delete-heading h2 {
+  margin: 5px 0 0;
+  color: #342d2d;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.artifact-delete-heading p {
+  margin: 7px 0 0;
+  color: #75696a;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.artifact-delete-file {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  margin: 0 22px;
+  padding: 12px;
+  border: 1px solid #e1e6ec;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.artifact-delete-file .artifact-preview-icon {
+  width: 38px;
+  height: 38px;
+}
+
+.artifact-delete-file > span:nth-child(2) {
+  min-width: 0;
+}
+
+.artifact-delete-file strong,
+.artifact-delete-file small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-delete-file strong {
+  color: #354356;
+  font-size: 12px;
+}
+
+.artifact-delete-file small {
+  margin-top: 4px;
+  color: #7d8999;
+  font-size: 11px;
+}
+
+.artifact-delete-file > em {
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: #edf1f5;
+  color: #667588;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.artifact-delete-facts {
+  display: grid;
+  grid-template-columns: 0.72fr 1.55fr 0.72fr;
+  margin: 16px 22px 0;
+  border-top: 1px solid #e1e6ec;
+  border-bottom: 1px solid #e1e6ec;
+}
+
+.artifact-delete-facts > span {
+  min-width: 0;
+  padding: 12px 11px;
+}
+
+.artifact-delete-facts > span + span {
+  border-left: 1px solid #e1e6ec;
+}
+
+.artifact-delete-facts small,
+.artifact-delete-facts strong {
+  display: block;
+}
+
+.artifact-delete-facts small {
+  color: #818c9b;
+  font-size: 11px;
+}
+
+.artifact-delete-facts strong {
+  margin-top: 5px;
+  overflow: hidden;
+  color: #384659;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-delete-safety {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  margin: 16px 22px 0;
+  padding: 12px;
+  border: 1px solid #cfe1da;
+  border-radius: 7px;
+  background: #f4faf7;
+  color: #25745b;
+}
+
+.artifact-delete-safety > svg {
+  margin: 2px 0 0 7px;
+}
+
+.artifact-delete-safety strong,
+.artifact-delete-safety small {
+  display: block;
+}
+
+.artifact-delete-safety strong {
+  color: #315b4e;
+  font-size: 11px;
+}
+
+.artifact-delete-safety small {
+  margin-top: 4px;
+  color: #657b74;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.artifact-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 13px 22px;
+  border-top: 1px solid #e1e5ea;
+  background: #f8fafc;
+}
+
+.artifact-delete-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 112px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #d7dee7;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #4e5c70;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.artifact-delete-actions button:hover {
+  border-color: #bdc9d7;
+  background: #f5f8fb;
+}
+
+.artifact-delete-actions button.danger {
+  border-color: #b84741;
+  background: #b84741;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(184, 71, 65, 0.17);
+}
+
+.artifact-delete-actions button.danger:hover {
+  border-color: #a43f39;
+  background: #a43f39;
+}
+
+@media (max-width: 680px) {
+  .artifact-delete-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .artifact-delete-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 8px);
+    overflow-y: auto;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .artifact-delete-heading {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 11px;
+    padding: 22px 58px 18px 17px;
+  }
+
+  .artifact-delete-heading > span {
+    width: 42px;
+    height: 42px;
+  }
+
+  .artifact-delete-heading h2 {
+    font-size: 17px;
+  }
+
+  .artifact-delete-close {
+    top: 14px;
+    right: 14px;
+    width: 38px;
+    height: 38px;
+  }
+
+  .artifact-delete-file,
+  .artifact-delete-facts,
+  .artifact-delete-safety {
+    margin-right: 17px;
+    margin-left: 17px;
+  }
+
+  .artifact-delete-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .artifact-delete-facts > span:nth-child(3) {
+    grid-column: 1 / -1;
+    border-top: 1px solid #e1e6ec;
+    border-left: 0;
+  }
+
+  .artifact-delete-actions {
+    position: sticky;
+    bottom: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+    background: rgba(248, 250, 252, 0.96);
+    box-shadow: 0 -10px 24px rgba(38, 51, 70, 0.07);
+    backdrop-filter: blur(14px);
+  }
+
+  .artifact-delete-actions button {
+    min-width: 0;
+    min-height: 44px;
+  }
+}
