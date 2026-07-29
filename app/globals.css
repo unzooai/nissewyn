@@ -495,8 +495,8 @@ button {
 .workflow-canvas {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 18px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 16px;
   min-height: 460px;
   padding: 22px;
   overflow: hidden;
@@ -508,191 +508,291 @@ button {
   background-size: 28px 28px, 28px 28px, auto, auto;
 }
 
-.run-summary-card,
-.current-step-card {
+.run-hero-card,
+.stage-card,
+.run-output-card {
+  position: relative;
+  z-index: 2;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: rgba(9, 12, 9, 0.82);
+  background: rgba(9, 12, 9, 0.84);
 }
 
-.run-summary-card {
-  grid-column: 1 / -1;
-  padding: 16px;
+.run-hero-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  align-items: center;
+  gap: 18px;
+  min-height: 118px;
+  padding: 18px;
+  overflow: hidden;
   background:
-    linear-gradient(135deg, rgba(215, 255, 93, 0.13), rgba(100, 240, 174, 0.04)),
-    rgba(9, 12, 9, 0.84);
+    radial-gradient(circle at 88% 20%, rgba(215, 255, 93, 0.2), transparent 34%),
+    linear-gradient(135deg, rgba(215, 255, 93, 0.14), rgba(100, 240, 174, 0.055)),
+    rgba(9, 12, 9, 0.88);
 }
 
-.run-summary-card span,
-.run-summary-card strong,
-.run-summary-card p,
-.current-step-card span,
-.current-step-card strong,
-.current-step-card p {
+.run-hero-card span,
+.run-hero-card strong,
+.run-hero-card p,
+.run-output-card span,
+.run-output-card strong {
   display: block;
 }
 
-.run-summary-card span,
-.current-step-card span {
+.run-hero-card span,
+.run-output-card span {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
 }
 
-.run-summary-card strong {
+.run-hero-card strong {
   margin-top: 7px;
-  font-size: 18px;
-  line-height: 1.35;
+  font-size: 24px;
+  line-height: 1.2;
 }
 
-.run-summary-card p,
-.current-step-card p {
+.run-hero-card p {
+  max-width: 580px;
   margin: 7px 0 0;
   color: var(--soft);
   font-size: 13px;
   line-height: 1.65;
 }
 
-.run-timeline {
+.run-progress {
   display: grid;
-  gap: 10px;
-  align-content: start;
+  place-items: center;
+  width: 82px;
+  height: 82px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at center, #11150e 0 54%, transparent 55%),
+    conic-gradient(var(--lime) 0 68%, rgba(244, 245, 239, 0.1) 68% 100%);
+  box-shadow: 0 0 38px rgba(215, 255, 93, 0.12);
 }
 
-.timeline-step {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 10px;
-  position: relative;
+.run-progress span {
+  color: #efffd0;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 18px;
+  font-weight: 900;
 }
 
-.timeline-step::before {
+.stage-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.stage-card {
+  min-height: 246px;
+  padding: 15px;
+  overflow: hidden;
+}
+
+.stage-card::before {
   position: absolute;
-  top: 34px;
-  bottom: -10px;
-  left: 16px;
-  width: 2px;
-  background: rgba(244, 245, 239, 0.09);
+  inset: auto 14px 14px;
+  height: 54px;
+  border-radius: 18px;
+  background: linear-gradient(90deg, rgba(244, 245, 239, 0.08), rgba(244, 245, 239, 0.015));
   content: "";
 }
 
-.timeline-step:last-child::before {
-  display: none;
+.stage-card.observe {
+  border-color: rgba(100, 240, 174, 0.24);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(100, 240, 174, 0.16), transparent 40%),
+    rgba(9, 12, 9, 0.88);
 }
 
-.step-marker {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(244, 245, 239, 0.06);
-  color: var(--muted);
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 11px;
-  font-weight: 800;
+.stage-card.analyze {
+  border-color: rgba(130, 183, 255, 0.34);
+  background:
+    radial-gradient(circle at 46% 18%, rgba(130, 183, 255, 0.2), transparent 42%),
+    rgba(10, 13, 13, 0.9);
 }
 
-.timeline-step.done .step-marker {
-  border-color: rgba(100, 240, 174, 0.32);
-  background: rgba(100, 240, 174, 0.12);
-  color: var(--mint);
+.stage-card.approve {
+  border-color: rgba(255, 189, 102, 0.34);
+  background:
+    radial-gradient(circle at 82% 14%, rgba(255, 189, 102, 0.18), transparent 44%),
+    rgba(13, 11, 8, 0.9);
 }
 
-.timeline-step.active .step-marker {
-  border-color: rgba(130, 183, 255, 0.38);
-  background: rgba(130, 183, 255, 0.14);
-  color: var(--blue);
-}
-
-.step-card {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 64px;
+.stage-topline {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  min-height: 64px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: rgba(17, 21, 17, 0.9);
+  margin-bottom: 18px;
 }
 
-.timeline-step.active .step-card {
-  border-color: rgba(130, 183, 255, 0.42);
-  box-shadow: 0 0 0 1px rgba(130, 183, 255, 0.1);
+.stage-topline span {
+  color: rgba(244, 245, 239, 0.38);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  font-weight: 900;
 }
 
-.step-card svg,
-.current-step-card > svg {
-  display: block;
-  width: 34px;
-  height: 34px;
-  padding: 8px;
-  border-radius: 11px;
-  background: rgba(244, 245, 239, 0.07);
-}
-
-.step-card strong {
-  display: block;
-  font-size: 13px;
-}
-
-.step-card p {
-  margin: 3px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.step-card em {
-  justify-self: end;
-  min-width: 50px;
-  padding: 5px 7px;
+.stage-topline em {
+  padding: 5px 8px;
   border-radius: 999px;
-  background: rgba(244, 245, 239, 0.06);
+  background: rgba(244, 245, 239, 0.08);
   color: var(--soft);
   font-size: 11px;
   font-style: normal;
-  text-align: center;
 }
 
-.timeline-step.done .step-card em {
-  background: rgba(100, 240, 174, 0.12);
-  color: #caffe4;
-}
-
-.timeline-step.active .step-card em {
-  background: rgba(130, 183, 255, 0.14);
-  color: #d5e7ff;
-}
-
-.current-step-card {
-  align-self: start;
+.stage-icon {
   display: grid;
-  grid-template-columns: 42px 1fr;
-  gap: 12px;
-  padding: 14px;
-  border-color: rgba(130, 183, 255, 0.24);
-  background:
-    linear-gradient(150deg, rgba(130, 183, 255, 0.13), rgba(215, 255, 93, 0.06)),
-    rgba(10, 13, 10, 0.92);
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(244, 245, 239, 0.075);
 }
 
-.current-step-card > svg {
-  width: 42px;
-  height: 42px;
-  padding: 10px;
-  border-radius: 14px;
-  background: rgba(130, 183, 255, 0.14);
+.observe .stage-icon {
+  color: var(--mint);
+}
+
+.analyze .stage-icon {
   color: var(--blue);
 }
 
-.current-step-card strong {
-  margin-top: 6px;
-  font-size: 16px;
-  line-height: 1.35;
+.approve .stage-icon {
+  color: var(--amber);
+}
+
+.stage-card h3 {
+  margin: 14px 0 0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.stage-card p {
+  margin: 8px 0 0;
+  color: var(--soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.mini-browser,
+.signal-lines,
+.approval-preview {
+  position: absolute;
+  right: 15px;
+  bottom: 15px;
+  left: 15px;
+  z-index: 2;
+}
+
+.mini-browser {
+  display: grid;
+  gap: 6px;
+}
+
+.mini-browser span {
+  display: block;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(100, 240, 174, 0.18);
+}
+
+.mini-browser span:nth-child(2) {
+  width: 72%;
+}
+
+.mini-browser span:nth-child(3) {
+  width: 46%;
+}
+
+.signal-lines {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  align-items: end;
+  height: 48px;
+}
+
+.signal-lines i {
+  display: block;
+  border-radius: 10px 10px 4px 4px;
+  background: linear-gradient(180deg, rgba(130, 183, 255, 0.72), rgba(130, 183, 255, 0.16));
+}
+
+.signal-lines i:nth-child(1) {
+  height: 28px;
+}
+
+.signal-lines i:nth-child(2) {
+  height: 46px;
+}
+
+.signal-lines i:nth-child(3) {
+  height: 34px;
+}
+
+.approval-preview {
+  display: grid;
+  gap: 8px;
+}
+
+.approval-preview b,
+.approval-preview span {
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.approval-preview b {
+  background: linear-gradient(90deg, var(--lime), var(--amber), var(--coral));
+}
+
+.approval-preview span {
+  width: 62%;
+  background: rgba(255, 189, 102, 0.18);
+}
+
+.run-output-card {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 68px;
+  padding: 12px 14px;
+}
+
+.run-output-card > svg {
+  display: block;
+  width: 36px;
+  height: 36px;
+  padding: 9px;
+  border-radius: 12px;
+  background: rgba(215, 255, 93, 0.12);
+  color: var(--lime);
+}
+
+.run-output-card strong {
+  margin-top: 3px;
+  font-size: 13px;
+}
+
+.run-output-card button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(215, 255, 93, 0.28);
+  border-radius: 10px;
+  background: rgba(215, 255, 93, 0.1);
+  color: #efffd0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .evidence-strip {

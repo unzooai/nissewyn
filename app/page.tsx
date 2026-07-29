@@ -275,37 +275,76 @@ export default function Home() {
             </div>
 
             <div className="workflow-canvas">
-              <div className="run-summary-card">
-                <span>当前任务</span>
-                <strong>收集竞品发布信号，并生成可发送给领导的摘要</strong>
-                <p>系统会先观察页面，再由大脑分析，最后在任何外部发送前停下来等你批准。</p>
-              </div>
-
-              <div className="run-timeline" aria-label="任务运行步骤">
-                {nodes.map((node, index) => (
-                  <div className={`timeline-step ${node.className}`} key={node.label}>
-                    <div className="step-marker">
-                      <span>{index + 1}</span>
-                    </div>
-                    <div className="step-card">
-                      <node.icon size={18} />
-                      <div>
-                        <strong>{node.label}</strong>
-                        <p>{node.desc}</p>
-                      </div>
-                      <em>{node.status}</em>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="current-step-card">
-                <Bot size={22} />
+              <div className="run-hero-card">
                 <div>
-                  <span>当前步骤</span>
-                  <strong>Codex 正在分析页面变化</strong>
-                  <p>已读取 12 张截图和 38 次工具调用记录，下一步会生成简报草稿。</p>
+                  <span>当前任务</span>
+                  <strong>竞品发布信号自动化</strong>
+                  <p>先观察网页，再生成摘要。任何发送到外部渠道的动作，都会先停下来让你批准。</p>
                 </div>
+                <div className="run-progress" aria-label="任务进度 68%">
+                  <span>68%</span>
+                </div>
+              </div>
+
+              <div className="stage-board" aria-label="任务运行看板">
+                <article className="stage-card observe">
+                  <div className="stage-topline">
+                    <span>01</span>
+                    <em>已完成</em>
+                  </div>
+                  <div className="stage-icon">
+                    <Globe2 size={22} />
+                  </div>
+                  <h3>观察网页</h3>
+                  <p>Unzoo 打开目标页面，完成截图、DOM 结构读取和页面变化提取。</p>
+                  <div className="mini-browser" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </article>
+
+                <article className="stage-card analyze">
+                  <div className="stage-topline">
+                    <span>02</span>
+                    <em>进行中</em>
+                  </div>
+                  <div className="stage-icon">
+                    <Bot size={22} />
+                  </div>
+                  <h3>AI 分析</h3>
+                  <p>Codex 正在把页面变化整理成结论，并准备生成领导可读的简报。</p>
+                  <div className="signal-lines" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                </article>
+
+                <article className="stage-card approve">
+                  <div className="stage-topline">
+                    <span>03</span>
+                    <em>待审批</em>
+                  </div>
+                  <div className="stage-icon">
+                    <Shield size={22} />
+                  </div>
+                  <h3>发送前确认</h3>
+                  <p>发送对象、内容和授权范围都会在这里确认，批准后才会继续。</p>
+                  <div className="approval-preview" aria-hidden="true">
+                    <b />
+                    <span />
+                  </div>
+                </article>
+              </div>
+
+              <div className="run-output-card">
+                <FileText size={20} />
+                <div>
+                  <span>即将生成</span>
+                  <strong>竞品信号简报 · competitor-report.md</strong>
+                </div>
+                <button type="button">预览草稿</button>
               </div>
             </div>
 
