@@ -2,611 +2,806 @@
 
 import { useMemo, useState } from "react";
 import {
-  Archive,
+  Activity,
   Bell,
-  Bot,
   Brain,
-  CalendarClock,
   Check,
-  ChevronDown,
+  CheckCircle2,
   ChevronRight,
-  Circle,
-  Database,
+  Clock3,
   FileText,
   Globe2,
-  Grid2X2,
-  LayoutDashboard,
+  History,
+  Home,
+  ListChecks,
   Mail,
-  MonitorCog,
-  MousePointer2,
   Pause,
   Play,
   Plus,
-  Radio,
-  Route,
   Search,
-  Shield,
+  Send,
+  Settings2,
   ShieldCheck,
   Sparkles,
-  TerminalSquare,
-  Workflow,
   X,
 } from "lucide-react";
 
-const navItems = [
-  { label: "控制台", icon: LayoutDashboard },
-  { label: "任务流", icon: Workflow },
-  { label: "大脑路由", icon: Brain },
-  { label: "能力市场", icon: Grid2X2 },
-  { label: "权限中心", icon: ShieldCheck },
-  { label: "产物库", icon: Archive },
+type ViewId = "home" | "tasks" | "approvals" | "activity" | "settings";
+
+const navItems: Array<{ id: ViewId; label: string; icon: typeof Home }> = [
+  { id: "home", label: "首页", icon: Home },
+  { id: "tasks", label: "任务", icon: ListChecks },
+  { id: "approvals", label: "待确认", icon: ShieldCheck },
+  { id: "activity", label: "运行记录", icon: History },
+  { id: "settings", label: "设置", icon: Settings2 },
 ];
 
-const palette = [
-  { name: "浏览器观察", desc: "读取页面、截图、结构化提取", icon: Globe2, tone: "mint" },
-  { name: "浏览器执行", desc: "点击、输入、上传、下载", icon: MousePointer2, tone: "lime" },
-  { name: "终端运行", desc: "PTY、命令、代码验证", icon: TerminalSquare, tone: "blue" },
-  { name: "邮件连接器", desc: "收件箱、草稿、发送审批", icon: Mail, tone: "coral" },
-  { name: "日历连接器", desc: "日程检索、空闲时间、会议", icon: CalendarClock, tone: "amber" },
-  { name: "长期记忆", desc: "任务上下文、偏好、事实库", icon: Database, tone: "violet" },
-];
+const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: string }> = {
+  home: {
+    eyebrow: "今天 · 7 月 29 日",
+    title: "下午好，今天有 1 件事需要你处理",
+    description: "任务正在后台运行，只有需要你决定时才会停下来。",
+  },
+  tasks: {
+    eyebrow: "任务",
+    title: "所有任务",
+    description: "查看正在运行、等待确认和已经完成的任务。",
+  },
+  approvals: {
+    eyebrow: "待确认",
+    title: "需要你决定的操作",
+    description: "Unzoo One 不会在你确认前执行外部发送或敏感访问。",
+  },
+  activity: {
+    eyebrow: "运行记录",
+    title: "系统刚刚做了什么",
+    description: "每一步都有时间、结果和证据，可以随时回看。",
+  },
+  settings: {
+    eyebrow: "设置",
+    title: "工作方式",
+    description: "决定任务如何运行，以及哪些操作必须经过你确认。",
+  },
+};
 
-const brainRoutes = [
-  { name: "Codex SDK", role: "代码与工具执行", health: "主路由" },
-  { name: "Claude Agent SDK", role: "长文分析与沟通", health: "备用" },
-  { name: "Gemini / ACP", role: "多模态补位", health: "待接入" },
-];
-
-const stageCards = [
+const initialTasks = [
   {
-    id: "observe",
-    number: "01",
-    title: "观察网页",
+    id: "competitor",
+    title: "跟踪竞品发布动态",
+    description: "每天检查 3 个竞品页面，有变化时生成一份摘要。",
+    status: "运行中",
+    progress: 68,
+    updated: "刚刚更新",
+  },
+  {
+    id: "weekly-report",
+    title: "整理本周项目进展",
+    description: "汇总项目文件和工作记录，生成周报草稿。",
+    status: "待确认",
+    progress: 92,
+    updated: "8 分钟前",
+  },
+  {
+    id: "meeting",
+    title: "准备产品评审材料",
+    description: "整理评审议题、相关文件和待解决问题。",
     status: "已完成",
-    body: "Unzoo 打开目标页面，完成截图、DOM 结构读取和页面变化提取。",
-    activities: ["目标页面已打开", "12 张页面截图已保存", "DOM 结构与变化已提取"],
-    icon: Globe2,
-    className: "observe",
+    progress: 100,
+    updated: "今天 10:32",
   },
   {
-    id: "analyze",
-    number: "02",
-    title: "AI 分析",
-    status: "进行中",
-    body: "Codex 正在把页面变化整理成结论，并准备生成领导可读的简报。",
-    activities: ["12 张截图已完成索引", "38 次工具调用已核对", "正在生成领导摘要"],
-    icon: Bot,
-    className: "analyze",
+    id: "research",
+    title: "收集 AI 浏览器产品资料",
+    description: "保存产品页面并提取功能、定价和团队信息。",
+    status: "已完成",
+    progress: 100,
+    updated: "昨天 18:06",
   },
-  {
-    id: "approve",
-    number: "03",
-    title: "发送前确认",
-    status: "待审批",
-    body: "发送对象、内容和授权范围都会在这里确认，批准后才会继续。",
-    activities: ["发送对象等待确认", "凭证访问范围待授权", "报告写入目录已准备"],
-    icon: Shield,
-    className: "approve",
-  },
-];
-
-const evidence = [
-  { label: "页面截图", value: "12 张", icon: MonitorCog },
-  { label: "工具调用", value: "38 次", icon: Route },
-  { label: "审计事件", value: "146 条", icon: Radio },
 ];
 
 const initialApprovals = [
-  { id: "send", title: "发送摘要到领导沟通群", risk: "外部副作用", time: "8 分钟后过期" },
-  { id: "cookie", title: "读取工作浏览器身份凭证", risk: "凭证访问", time: "需要一次性授权" },
-  { id: "write", title: "写入生成报告到项目目录", risk: "本地修改", time: "等待确认范围" },
+  {
+    id: "send-summary",
+    title: "把竞品摘要发送到领导沟通群",
+    reason: "摘要已经生成，下一步会通过邮件连接器发送到群组。",
+    impact: "发送后，群内 3 位成员可以看到这份摘要。",
+    action: "发送摘要",
+    icon: Send,
+  },
+  {
+    id: "browser-access",
+    title: "读取工作浏览器的登录状态",
+    reason: "目标页面需要登录，系统想使用当前浏览器的会话继续访问。",
+    impact: "只用于本次任务，任务结束后自动失效。",
+    action: "允许本次访问",
+    icon: Globe2,
+  },
+  {
+    id: "write-report",
+    title: "把报告保存到项目目录",
+    reason: "系统准备把生成的报告写入当前项目。",
+    impact: "将新增文件 competitor-report.md，不会修改其他文件。",
+    action: "允许保存",
+    icon: FileText,
+  },
 ];
 
-const audit = [
-  "能力租约已续期：unzoo.local",
-  "工具请求进入权限策略：brain:codex",
-  "产物已登记：competitor-report.md",
-  "恢复快照已加载：unterm-core",
+const activityItems = [
+  {
+    time: "14:28",
+    title: "摘要已生成",
+    detail: "整理出 4 项产品变化和 2 项值得关注的信号。",
+    icon: Sparkles,
+    tone: "blue",
+  },
+  {
+    time: "14:26",
+    title: "页面变化整理完成",
+    detail: "对比了今天与昨天的页面内容，过滤了无意义变化。",
+    icon: Brain,
+    tone: "violet",
+  },
+  {
+    time: "14:23",
+    title: "完成 12 张页面截图",
+    detail: "3 个目标页面均已读取，截图和页面结构已保存。",
+    icon: Globe2,
+    tone: "green",
+  },
+  {
+    time: "09:00",
+    title: "任务按计划开始",
+    detail: "由每日 09:00 的计划自动启动。",
+    icon: Clock3,
+    tone: "neutral",
+  },
 ];
 
-export default function Home() {
-  const [activeNav, setActiveNav] = useState("控制台");
+const runSteps = [
+  {
+    id: "collect",
+    title: "检查网页",
+    description: "3 个页面已读取，保存了 12 张截图",
+    status: "完成",
+    icon: Globe2,
+  },
+  {
+    id: "analyze",
+    title: "整理变化",
+    description: "正在把页面变化整理成简短结论",
+    status: "进行中",
+    icon: Sparkles,
+  },
+  {
+    id: "send",
+    title: "发送摘要",
+    description: "发送前会先等你确认",
+    status: "等待",
+    icon: Mail,
+  },
+];
+
+export default function HomePage() {
+  const [activeView, setActiveView] = useState<ViewId>("home");
   const [query, setQuery] = useState("");
-  const [selectedCapability, setSelectedCapability] = useState("浏览器观察");
-  const [selectedBrain, setSelectedBrain] = useState("Codex SDK");
-  const [selectedStageId, setSelectedStageId] = useState("analyze");
   const [isRunning, setIsRunning] = useState(true);
+  const [selectedStep, setSelectedStep] = useState("analyze");
   const [approvals, setApprovals] = useState(initialApprovals);
-  const [composerOpen, setComposerOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [paletteOpen, setPaletteOpen] = useState(true);
   const [selectedApprovalId, setSelectedApprovalId] = useState(initialApprovals[0].id);
-  const [taskName, setTaskName] = useState("监控竞品发布页面");
-  const [taskTarget, setTaskTarget] = useState("https://example.com/releases");
-  const [queuedTasks, setQueuedTasks] = useState(0);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [notice, setNotice] = useState("");
+  const [taskName, setTaskName] = useState("跟踪一个新网页");
+  const [taskTarget, setTaskTarget] = useState("https://example.com");
+  const [queuedTasks, setQueuedTasks] = useState(0);
+  const [settings, setSettings] = useState({
+    approval: true,
+    local: true,
+    notifications: true,
+  });
 
-  const filteredPalette = useMemo(() => {
+  const pageTitle = viewTitles[activeView];
+  const selectedApproval =
+    approvals.find((item) => item.id === selectedApprovalId) ?? approvals[0];
+
+  const filteredTasks = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    if (!keyword) return palette;
-    return palette.filter((item) =>
-      `${item.name} ${item.desc}`.toLowerCase().includes(keyword),
+    if (!keyword) return initialTasks;
+    return initialTasks.filter((task) =>
+      `${task.title} ${task.description} ${task.status}`.toLowerCase().includes(keyword),
     );
   }, [query]);
 
-  const selectedStage = stageCards.find((stage) => stage.id === selectedStageId) ?? stageCards[1];
-  const selectedCapabilityItem =
-    palette.find((item) => item.name === selectedCapability) ?? palette[0];
-  const pendingCount = approvals.length;
-  const approvedCount = initialApprovals.length - approvals.length;
-  const selectedApproval =
-    approvals.find((item) => item.id === selectedApprovalId) ?? approvals[0];
-  const highestRisk =
-    approvals.find((item) => item.risk === "凭证访问")?.risk ??
-    approvals[0]?.risk;
-
-  function approveFirst() {
+  function approveCurrent() {
     if (!selectedApproval) return;
     setApprovals((items) => items.filter((item) => item.id !== selectedApproval.id));
     setSelectedApprovalId(
       approvals.find((item) => item.id !== selectedApproval.id)?.id ?? "",
     );
-    setSelectedStageId("approve");
-    setNotice(`已批准：${selectedApproval.title}`);
+    setNotice(`已允许：${selectedApproval.title}`);
   }
 
-  function selectApproval(id: string) {
-    setSelectedApprovalId(id);
-    setSelectedStageId("approve");
+  function holdCurrent() {
+    if (!selectedApproval) return;
+    setNotice("已暂不执行，这项操作会继续留在待确认列表中");
   }
 
   function createTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const name = taskName.trim();
-    const target = taskTarget.trim();
-    if (!name || !target) return;
+    if (!taskName.trim() || !taskTarget.trim()) return;
     setQueuedTasks((count) => count + 1);
     setComposerOpen(false);
-    setNotice(`任务“${name}”已加入运行队列`);
+    setNotice(`任务“${taskName.trim()}”已开始准备`);
   }
 
-  function switchView(label: string) {
-    setActiveNav(label);
-    setNotice(`已切换到${label}`);
+  function openView(view: ViewId) {
+    setActiveView(view);
+    setNotificationsOpen(false);
   }
 
   return (
-    <main className="product-shell">
-      <aside className="rail" aria-label="主导航">
-        <div className="logo-block">
-          <div className="logo-mark">U1</div>
+    <main className="clarity-shell">
+      <aside className="clarity-sidebar" aria-label="主导航">
+        <div className="clarity-brand">
+          <span>U1</span>
           <div>
-            <span>Unzoo One</span>
-            <strong>个人 AI 操作系统</strong>
+            <strong>Unzoo One</strong>
+            <small>AI 工作助理</small>
           </div>
         </div>
 
-        <nav className="rail-nav">
+        <nav className="clarity-nav">
           {navItems.map((item) => (
             <button
-              key={item.label}
-              className={`rail-link ${activeNav === item.label ? "active" : ""}`}
+              className={activeView === item.id ? "active" : ""}
+              key={item.id}
               type="button"
-              aria-label={item.label}
-              onClick={() => switchView(item.label)}
+              onClick={() => openView(item.id)}
             >
-              <item.icon size={18} strokeWidth={1.9} />
+              <item.icon size={18} />
               <span>{item.label}</span>
+              {item.id === "approvals" && approvals.length > 0 && (
+                <em>{approvals.length}</em>
+              )}
             </button>
           ))}
         </nav>
 
-        <div className="runtime-badge">
-          <span className="pulse-dot" />
+        <div className="clarity-sidebar-status">
+          <i className={isRunning ? "online" : ""} />
           <div>
-            <strong>{isRunning ? "Core 正在运行" : "Core 已暂停"}</strong>
-            <small>当前视图：{activeNav}</small>
+            <strong>{isRunning ? "系统运行正常" : "任务已暂停"}</strong>
+            <small>数据保存在本机</small>
           </div>
         </div>
       </aside>
 
-      <section className="command-area">
-        <header className="command-header">
-          <div className="title-group">
-            <span className="workspace-chip">
-              <Sparkles size={14} />
-              MVP 操作台 · 本地优先
-            </span>
-            <h1>AI 任务控制台</h1>
-            <p>把长期任务、能力调用、审批和证据沉淀在同一个可靠的操作面里。</p>
+      <section className="clarity-main">
+        <header className="clarity-header">
+          <div className="clarity-page-title">
+            <span>{pageTitle.eyebrow}</span>
+            <h1>{pageTitle.title}</h1>
+            <p>{pageTitle.description}</p>
           </div>
 
-          <div className="header-tools">
-            <label className="search-field">
+          <div className="clarity-header-actions">
+            <label className="clarity-search">
               <Search size={16} />
               <input
-                aria-label="搜索"
-                placeholder="搜索任务、能力、审批"
+                aria-label="搜索任务"
+                placeholder="搜索任务"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
             </label>
-            <div className="notification-wrap">
+
+            <div className="clarity-notification-wrap">
               <button
-                className={`icon-action ${notificationsOpen ? "active" : ""}`}
+                className="clarity-icon-button"
                 type="button"
                 aria-label="通知"
                 aria-expanded={notificationsOpen}
                 onClick={() => setNotificationsOpen((open) => !open)}
               >
                 <Bell size={18} />
-                <span className="notification-dot" />
+                {approvals.length > 0 && <i />}
               </button>
               {notificationsOpen && (
-                <div className="notification-popover" role="dialog" aria-label="通知中心">
-                  <div className="popover-heading">
-                    <div>
-                      <span>通知中心</span>
-                      <strong>3 条新动态</strong>
-                    </div>
-                    <button type="button" aria-label="关闭通知" onClick={() => setNotificationsOpen(false)}>
+                <div className="clarity-notifications" role="dialog" aria-label="通知">
+                  <div>
+                    <strong>通知</strong>
+                    <button
+                      type="button"
+                      aria-label="关闭通知"
+                      onClick={() => setNotificationsOpen(false)}
+                    >
                       <X size={16} />
                     </button>
                   </div>
-                  <button type="button" onClick={() => setSelectedStageId("approve")}>
-                    <span className="notice-tone amber" />
-                    <div>
-                      <strong>有 3 项操作等待审批</strong>
-                      <small>其中 1 项涉及浏览器身份凭证</small>
-                    </div>
+                  <button type="button" onClick={() => openView("approvals")}>
+                    <ShieldCheck size={17} />
+                    <span>
+                      <strong>{approvals.length} 项操作等你确认</strong>
+                      <small>外部发送前任务已经暂停</small>
+                    </span>
                   </button>
-                  <button type="button" onClick={() => setSelectedStageId("analyze")}>
-                    <span className="notice-tone blue" />
-                    <div>
-                      <strong>页面分析仍在运行</strong>
-                      <small>已整理 12 张截图和 38 次工具调用</small>
-                    </div>
+                  <button type="button" onClick={() => openView("activity")}>
+                    <CheckCircle2 size={17} />
+                    <span>
+                      <strong>竞品摘要已经生成</strong>
+                      <small>包含 4 项产品变化</small>
+                    </span>
                   </button>
                 </div>
               )}
             </div>
+
             <button
-              className="create-action"
+              className="clarity-primary-button"
               type="button"
-              onClick={() => setComposerOpen((open) => !open)}
+              onClick={() => setComposerOpen(true)}
             >
-              <Plus size={18} />
+              <Plus size={17} />
               新建任务
             </button>
           </div>
         </header>
 
-        <section className="mission-strip" aria-label="运行摘要">
-          <div>
-            <span>今日运行</span>
-            <strong>{isRunning ? 18 + queuedTasks : 17 + queuedTasks}</strong>
-            <small>{isRunning ? `${4 + queuedTasks} 个任务正在执行` : "任务已暂停，等待恢复"}</small>
-          </div>
-          <div>
-            <span>等待审批</span>
-            <strong>{pendingCount}</strong>
-            <small>{pendingCount ? `最高风险：${highestRisk}` : "审批队列已清空"}</small>
-          </div>
-          <div>
-            <span>能力健康度</span>
-            <strong>97%</strong>
-            <small>已选择：{selectedCapability}</small>
-          </div>
-          <div>
-            <span>证据产物</span>
-            <strong>146</strong>
-            <small>本轮已批准 {approvedCount} 项</small>
-          </div>
-        </section>
-
-        <section className="studio-grid">
-          <section className="palette-panel" aria-label="能力市场">
-            <div className="section-heading">
-              <div>
-                <span>能力工具</span>
-                <h2>能力市场</h2>
-              </div>
-              <button
-                type="button"
-                aria-label={paletteOpen ? "收起能力市场" : "展开能力市场"}
-                aria-expanded={paletteOpen}
-                onClick={() => setPaletteOpen((open) => !open)}
-              >
-                <ChevronDown className={paletteOpen ? "rotate-open" : ""} size={18} />
-              </button>
+        {activeView === "home" && (
+          <section className="home-view">
+            <div className="home-summary" aria-label="今日概览">
+              <span>
+                <i className="running" />
+                正在运行 <strong>{4 + queuedTasks}</strong>
+              </span>
+              <span>
+                <i className="waiting" />
+                等待确认 <strong>{approvals.length}</strong>
+              </span>
+              <span>
+                <i className="done" />
+                今天已完成 <strong>12</strong>
+              </span>
             </div>
 
-            {paletteOpen && (
-              <>
-                <div className="palette-list">
-                  {filteredPalette.map((item) => (
+            <div className="home-focus-grid">
+              <section className="active-task-panel" aria-label="正在运行的任务">
+                <div className="focus-panel-heading">
+                  <div>
+                    <span>正在运行</span>
+                    <strong>跟踪竞品发布动态</strong>
+                  </div>
+                  <span className={`live-state ${isRunning ? "" : "paused"}`}>
+                    <i />
+                    {isRunning ? "运行中" : "已暂停"}
+                  </span>
+                </div>
+
+                <p className="task-purpose">
+                  每天检查 3 个竞品页面。有变化时，系统会整理成一份可以直接阅读的摘要。
+                </p>
+
+                <div className="simple-progress">
+                  <div>
+                    <span>已完成 2 / 3 步</span>
+                    <strong>{isRunning ? "68%" : "暂停"}</strong>
+                  </div>
+                  <span>
+                    <i className={isRunning ? "moving" : ""} />
+                  </span>
+                </div>
+
+                <div className="plain-steps">
+                  {runSteps.map((step, index) => (
                     <button
-                      className={`palette-row ${item.tone} ${selectedCapability === item.name ? "selected" : ""}`}
-                      key={item.name}
+                      className={`${selectedStep === step.id ? "selected" : ""} step-${step.id}`}
+                      key={step.id}
                       type="button"
-                      onClick={() => {
-                        setSelectedCapability(item.name);
-                        setNotice(`已启用能力：${item.name}`);
-                      }}
+                      onClick={() => setSelectedStep(step.id)}
                     >
-                      <item.icon size={18} />
-                      <div>
-                        <strong>{item.name}</strong>
-                        <small>{item.desc}</small>
-                      </div>
+                      <span className="plain-step-marker">
+                        {index === 0 ? <Check size={15} /> : <step.icon size={16} />}
+                      </span>
+                      <span>
+                        <strong>{step.title}</strong>
+                        <small>{step.description}</small>
+                      </span>
+                      <em>{step.id === "analyze" && !isRunning ? "已暂停" : step.status}</em>
                       <ChevronRight size={16} />
                     </button>
                   ))}
-                  {!filteredPalette.length && <p className="empty-note">没有匹配的能力。</p>}
                 </div>
 
-                <div className="capability-detail">
-                  <selectedCapabilityItem.icon size={18} />
-                  <div>
-                    <span>已选择能力</span>
-                    <strong>{selectedCapabilityItem.name}</strong>
-                    <small>{selectedCapabilityItem.desc}</small>
+                <div className="current-work">
+                  <div className="current-work-icon">
+                    {selectedStep === "collect" && <Globe2 size={19} />}
+                    {selectedStep === "analyze" && <Sparkles size={19} />}
+                    {selectedStep === "send" && <Mail size={19} />}
                   </div>
-                </div>
-              </>
-            )}
-
-            <div className="brain-route-box">
-              <div className="section-heading compact">
-                <div>
-                  <span>模型路由</span>
-                  <h2>大脑路由</h2>
-                </div>
-              </div>
-              {brainRoutes.map((route) => (
-                <button
-                  className={`brain-row ${selectedBrain === route.name ? "selected" : ""}`}
-                  key={route.name}
-                  type="button"
-                  onClick={() => {
-                    setSelectedBrain(route.name);
-                    setNotice(`模型路由已切换为 ${route.name}`);
-                  }}
-                >
-                  <Brain size={16} />
                   <div>
-                    <strong>{route.name}</strong>
-                    <small>{route.role}</small>
+                    <span>当前查看</span>
+                    <strong>
+                      {runSteps.find((step) => step.id === selectedStep)?.title}
+                    </strong>
+                    <small>
+                      {selectedStep === "collect" && "网页已经检查完成，截图和页面内容均已保存。"}
+                      {selectedStep === "analyze" && "正在提取真正有意义的变化，预计还需要 2 分钟。"}
+                      {selectedStep === "send" && "摘要已经准备好，确认收件人后才能发送。"}
+                    </small>
                   </div>
-                  <span>{selectedBrain === route.name ? "使用中" : route.health}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section
-            className={`canvas-panel ${isRunning ? "is-running" : "is-paused"}`}
-            aria-label="任务流画布"
-          >
-            <div className="canvas-toolbar">
-              <div>
-                <span>自动化流程</span>
-                <h2>竞品信号自动化任务</h2>
-              </div>
-              <div className="toolbar-actions">
-                <button
-                  type="button"
-                  aria-label={isRunning ? "暂停任务" : "继续任务"}
-                  onClick={() => setIsRunning((running) => !running)}
-                >
-                  {isRunning ? <Pause size={16} /> : <Play size={16} />}
-                </button>
-              </div>
-            </div>
-
-            <div className="workflow-canvas">
-              <div className="run-hero-card">
-                <div>
-                  <span>当前任务</span>
-                  <strong>竞品发布信号自动化</strong>
-                  <p>当前由 {selectedBrain} 调度，使用「{selectedCapability}」。任何发送到外部渠道的动作，都会先停下来让你批准。</p>
-                </div>
-                <div className="run-progress" aria-label="任务进度 68%">
-                  <span>{isRunning ? "68%" : "暂停"}</span>
-                </div>
-              </div>
-
-              <div className="stage-stepper" aria-label="任务运行步骤">
-                {stageCards.map((stage) => (
                   <button
-                    className={`stage-step ${stage.className} ${selectedStageId === stage.id ? "active" : ""}`}
-                    key={stage.id}
                     type="button"
-                    onClick={() => setSelectedStageId(stage.id)}
+                    onClick={() => setIsRunning((running) => !running)}
                   >
-                    <span className="step-number">{stage.number}</span>
-                    <span className="step-icon">
-                      <stage.icon size={18} />
-                    </span>
-                    <div>
-                      <strong>{stage.title}</strong>
-                      <small>{stage.id === "analyze" && !isRunning ? "已暂停" : stage.status}</small>
+                    {isRunning ? <Pause size={15} /> : <Play size={15} />}
+                    {isRunning ? "暂停" : "继续"}
+                  </button>
+                </div>
+
+                <footer className="task-tools">
+                  <span>本次使用</span>
+                  <span><Globe2 size={14} /> 浏览器</span>
+                  <span><Brain size={14} /> Codex</span>
+                  <span><Mail size={14} /> 邮件</span>
+                  <button type="button" onClick={() => openView("activity")}>
+                    查看完整记录
+                    <ChevronRight size={14} />
+                  </button>
+                </footer>
+              </section>
+
+              <aside className="needs-action-panel" aria-label="需要你确认">
+                <div className="attention-heading">
+                  <span>需要你处理</span>
+                  <strong>{approvals.length}</strong>
+                </div>
+
+                {selectedApproval ? (
+                  <>
+                    <div className="attention-icon">
+                      <selectedApproval.icon size={20} />
                     </div>
+                    <h2>{selectedApproval.title}</h2>
+                    <p>{selectedApproval.reason}</p>
+
+                    <div className="plain-impact">
+                      <ShieldCheck size={17} />
+                      <span>
+                        <strong>确认后会发生什么</strong>
+                        <small>{selectedApproval.impact}</small>
+                      </span>
+                    </div>
+
+                    <div className="attention-actions">
+                      <button className="confirm" type="button" onClick={approveCurrent}>
+                        <Check size={16} />
+                        {selectedApproval.action}
+                      </button>
+                      <button type="button" onClick={holdCurrent}>暂不执行</button>
+                    </div>
+
+                    <button
+                      className="all-approvals-link"
+                      type="button"
+                      onClick={() => openView("approvals")}
+                    >
+                      查看全部待确认操作
+                      <ChevronRight size={15} />
+                    </button>
+                  </>
+                ) : (
+                  <div className="nothing-pending">
+                    <CheckCircle2 size={28} />
+                    <strong>暂时没有需要处理的事</strong>
+                    <p>任务会继续在后台运行。</p>
+                  </div>
+                )}
+              </aside>
+            </div>
+
+            <section className="recent-section">
+              <div className="section-title-row">
+                <div>
+                  <span>最近任务</span>
+                  <h2>你交给 Unzoo One 的工作</h2>
+                </div>
+                <button type="button" onClick={() => openView("tasks")}>
+                  查看全部
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+              <div className="recent-task-list">
+                {filteredTasks.slice(0, 3).map((task) => (
+                  <button
+                    className="recent-task-row"
+                    key={task.id}
+                    type="button"
+                    onClick={() => setNotice(`已打开任务：${task.title}`)}
+                  >
+                    <span className={`task-status-dot status-${task.status}`} />
+                    <span>
+                      <strong>{task.title}</strong>
+                      <small>{task.description}</small>
+                    </span>
+                    <em className={`status-label status-${task.status}`}>{task.status}</em>
+                    <span className="task-updated">{task.updated}</span>
                     <ChevronRight size={16} />
                   </button>
                 ))}
               </div>
+            </section>
+          </section>
+        )}
 
-              <div className={`stage-detail ${selectedStage.className}`}>
-                <div className="stage-detail-copy">
-                  <div className="detail-eyebrow">
-                    <span className="detail-icon">
-                      <selectedStage.icon size={19} />
-                    </span>
-                    <span>当前步骤</span>
-                    <em>{selectedStage.id === "analyze" && !isRunning ? "已暂停" : selectedStage.status}</em>
-                  </div>
-                  <h3>{selectedStage.title}</h3>
-                  <p>{selectedStage.body}</p>
-                  <div className="detail-actions">
-                    <button type="button" onClick={() => setIsRunning((running) => !running)}>
-                      {isRunning ? <Pause size={15} /> : <Play size={15} />}
-                      {isRunning ? "暂停任务" : "继续任务"}
-                    </button>
-                    <button className="primary" type="button" onClick={() => setSelectedStageId("approve")}>
-                      <Shield size={15} />
-                      查看审批
-                    </button>
-                  </div>
-                </div>
-                <div className="activity-panel" aria-label="实时活动">
-                  <div className="activity-heading">
-                    <span>实时活动</span>
-                    <strong>
-                      <i />
-                      {isRunning ? "运行中" : "已暂停"}
-                    </strong>
-                  </div>
-                  {selectedStage.activities.map((activity, index) => (
-                    <div className="activity-row" key={activity}>
-                      <span className={index === selectedStage.activities.length - 1 ? "current" : ""}>
-                        {index === selectedStage.activities.length - 1 ? <Radio size={14} /> : <Check size={14} />}
-                      </span>
-                      <div>
-                        <strong>{activity}</strong>
-                        <small>{index === selectedStage.activities.length - 1 ? "刚刚更新" : `${index + 2} 分钟前`}</small>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+        {activeView === "tasks" && (
+          <section className="tasks-view">
+            <div className="view-toolbar">
+              <div className="view-filter-tabs" role="tablist" aria-label="任务筛选">
+                <button className="active" type="button">全部</button>
+                <button type="button">运行中</button>
+                <button type="button">待确认</button>
+                <button type="button">已完成</button>
               </div>
+              <button
+                className="clarity-secondary-button"
+                type="button"
+                onClick={() => setComposerOpen(true)}
+              >
+                <Plus size={16} />
+                新建任务
+              </button>
             </div>
 
-            <div className="evidence-strip">
-              {evidence.map((item) => (
-                <div className="evidence-item" key={item.label}>
-                  <item.icon size={18} />
-                  <div>
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
+            <div className="task-table">
+              <div className="task-table-head">
+                <span>任务</span>
+                <span>状态</span>
+                <span>进度</span>
+                <span>最后更新</span>
+                <span />
+              </div>
+              {filteredTasks.map((task) => (
+                <button
+                  className="task-table-row"
+                  key={task.id}
+                  type="button"
+                  onClick={() => setNotice(`已打开任务：${task.title}`)}
+                >
+                  <span>
+                    <strong>{task.title}</strong>
+                    <small>{task.description}</small>
+                  </span>
+                  <em className={`status-label status-${task.status}`}>{task.status}</em>
+                  <span className="table-progress">
+                    <i><b style={{ width: `${task.progress}%` }} /></i>
+                    <small>{task.progress}%</small>
+                  </span>
+                  <span className="task-updated">{task.updated}</span>
+                  <ChevronRight size={16} />
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {activeView === "approvals" && (
+          <section className="approvals-view">
+            {approvals.length ? (
+              <>
+                <div className="approval-queue">
+                  <div className="approval-queue-heading">
+                    <span>等待处理</span>
+                    <strong>{approvals.length} 项</strong>
                   </div>
+                  {approvals.map((item) => (
+                    <button
+                      className={selectedApproval?.id === item.id ? "selected" : ""}
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSelectedApprovalId(item.id)}
+                    >
+                      <item.icon size={17} />
+                      <span>
+                        <strong>{item.title}</strong>
+                        <small>{item.reason}</small>
+                      </span>
+                      <ChevronRight size={16} />
+                    </button>
+                  ))}
+                </div>
+
+                {selectedApproval && (
+                  <div className="approval-detail">
+                    <span className="approval-kicker">
+                      <ShieldCheck size={15} />
+                      等待你的确认
+                    </span>
+                    <h2>{selectedApproval.title}</h2>
+                    <p>{selectedApproval.reason}</p>
+                    <div className="approval-explanation">
+                      <strong>确认后会发生什么</strong>
+                      <p>{selectedApproval.impact}</p>
+                    </div>
+                    <div className="approval-scope">
+                      <span><Check size={14} /> 只允许这一次</span>
+                      <span><Check size={14} /> 操作会写入运行记录</span>
+                      <span><Check size={14} /> 可以随时暂停任务</span>
+                    </div>
+                    <div className="approval-detail-actions">
+                      <button className="confirm" type="button" onClick={approveCurrent}>
+                        <Check size={16} />
+                        {selectedApproval.action}
+                      </button>
+                      <button type="button" onClick={holdCurrent}>暂不执行</button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="empty-view">
+                <CheckCircle2 size={34} />
+                <h2>所有操作都处理完了</h2>
+                <p>任务会继续在后台运行，有新的决定需要你处理时会再次提醒。</p>
+                <button type="button" onClick={() => openView("home")}>返回首页</button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeView === "activity" && (
+          <section className="activity-view">
+            <div className="activity-summary">
+              <Activity size={18} />
+              <div>
+                <strong>跟踪竞品发布动态</strong>
+                <small>今天 09:00 开始 · 已运行 5 小时 28 分钟</small>
+              </div>
+              <span className="live-state"><i />运行中</span>
+            </div>
+
+            <div className="activity-timeline">
+              {activityItems.map((item) => (
+                <div className="timeline-row" key={`${item.time}-${item.title}`}>
+                  <time>{item.time}</time>
+                  <span className={`timeline-icon ${item.tone}`}>
+                    <item.icon size={17} />
+                  </span>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setNotice(`正在查看：${item.title}`)}
+                  >
+                    查看
+                  </button>
                 </div>
               ))}
             </div>
           </section>
+        )}
 
-          <aside className="inspector-panel" aria-label="审批检查器">
-            <div className="approval-hero">
-              <span className="workspace-chip warning">
-                <Shield size={14} />
-                审批检查器
-              </span>
-              <h2>{pendingCount ? selectedApproval?.title : "审批已完成"}</h2>
-              <p>
-                {pendingCount
-                  ? `${selectedApproval?.risk} · ${selectedApproval?.time}。确认后只批准当前选中的这一项。`
-                  : "当前任务没有阻塞项，可以继续进入下一步。"}
-              </p>
-              <div className="risk-meter" aria-label="风险等级">
-                <span />
-                <strong>{pendingCount ? "高风险" : "无阻塞"}</strong>
+        {activeView === "settings" && (
+          <section className="settings-view">
+            <div className="settings-group">
+              <div>
+                <span>安全与确认</span>
+                <h2>任务执行规则</h2>
               </div>
-              <div className="approval-buttons">
-                <button className="allow" type="button" onClick={approveFirst} disabled={!pendingCount}>
-                  <Check size={16} />
-                  {pendingCount ? "批准所选" : "已处理"}
-                </button>
+              <label className="setting-row">
+                <span>
+                  <strong>外部操作前必须确认</strong>
+                  <small>发送邮件、发布内容或访问敏感信息前暂停任务。</small>
+                </span>
                 <button
+                  className={`switch-control ${settings.approval ? "on" : ""}`}
                   type="button"
-                  onClick={() => {
-                    setIsRunning(false);
-                    setNotice("任务已暂停并转入人工处理");
-                  }}
+                  role="switch"
+                  aria-checked={settings.approval}
+                  onClick={() =>
+                    setSettings((value) => ({ ...value, approval: !value.approval }))
+                  }
                 >
-                  转人工
+                  <i />
                 </button>
-              </div>
-            </div>
-
-            <div className="approval-list">
-              {approvals.map((item) => (
+              </label>
+              <label className="setting-row">
+                <span>
+                  <strong>数据只保存在本机</strong>
+                  <small>任务记录、截图和生成文件默认不上传到外部服务。</small>
+                </span>
                 <button
-                  className={`approval-row ${selectedApproval?.id === item.id ? "selected" : ""}`}
-                  key={item.id}
+                  className={`switch-control ${settings.local ? "on" : ""}`}
                   type="button"
-                  onClick={() => selectApproval(item.id)}
+                  role="switch"
+                  aria-checked={settings.local}
+                  onClick={() =>
+                    setSettings((value) => ({ ...value, local: !value.local }))
+                  }
                 >
-                  <Circle size={10} />
-                  <div>
-                    <strong>{item.title}</strong>
-                    <small>{item.risk} · {item.time}</small>
-                  </div>
+                  <i />
                 </button>
-              ))}
-              {!approvals.length && (
-                <div className="approval-empty">
-                  <Check size={16} />
-                  <span>审批队列已清空</span>
-                </div>
-              )}
+              </label>
             </div>
 
-            <div className="audit-box">
-              <div className="section-heading compact">
-                <div>
-                  <span>操作记录</span>
-                  <h2>实时审计</h2>
-                </div>
+            <div className="settings-group">
+              <div>
+                <span>通知</span>
+                <h2>什么时候提醒我</h2>
               </div>
-              {audit.map((item) => (
-                <p key={item}>{item}</p>
-              ))}
-              {approvedCount > 0 && <p>本轮已批准：{approvedCount} 项</p>}
+              <label className="setting-row">
+                <span>
+                  <strong>需要确认时通知</strong>
+                  <small>任务需要你做决定时，在桌面显示通知。</small>
+                </span>
+                <button
+                  className={`switch-control ${settings.notifications ? "on" : ""}`}
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.notifications}
+                  onClick={() =>
+                    setSettings((value) => ({
+                      ...value,
+                      notifications: !value.notifications,
+                    }))
+                  }
+                >
+                  <i />
+                </button>
+              </label>
             </div>
-          </aside>
-        </section>
+          </section>
+        )}
       </section>
 
       {composerOpen && (
-        <div className="dialog-backdrop" role="presentation" onMouseDown={() => setComposerOpen(false)}>
+        <div className="clarity-dialog-backdrop" onMouseDown={() => setComposerOpen(false)}>
           <form
-            className="task-dialog"
+            className="clarity-dialog"
             aria-label="新建任务"
             onSubmit={createTask}
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <div className="dialog-heading">
+            <div className="clarity-dialog-heading">
               <div>
-                <span>新建自动化任务</span>
-                <h2>把一个目标交给 Unzoo One</h2>
+                <span>新建任务</span>
+                <h2>你希望 Unzoo One 做什么？</h2>
               </div>
-              <button type="button" aria-label="关闭新建任务" onClick={() => setComposerOpen(false)}>
-                <X size={18} />
+              <button type="button" aria-label="关闭" onClick={() => setComposerOpen(false)}>
+                <X size={17} />
               </button>
             </div>
+
             <label>
               <span>任务名称</span>
-              <input required value={taskName} onChange={(event) => setTaskName(event.target.value)} />
+              <input
+                required
+                value={taskName}
+                onChange={(event) => setTaskName(event.target.value)}
+              />
             </label>
+
             <label>
-              <span>目标网页</span>
+              <span>要处理的网页</span>
               <input
                 required
                 type="url"
-                inputMode="url"
                 value={taskTarget}
                 onChange={(event) => setTaskTarget(event.target.value)}
               />
             </label>
-            <div className="dialog-summary">
-              <Globe2 size={18} />
-              <p>系统会观察网页变化、调用 {selectedBrain} 分析，并在任何外部发送动作前等待审批。</p>
+
+            <div className="clarity-dialog-note">
+              <ShieldCheck size={17} />
+              <p>任何对外发送或敏感访问，都会先停下来等你确认。</p>
             </div>
-            <div className="dialog-actions">
+
+            <div className="clarity-dialog-actions">
               <button type="button" onClick={() => setComposerOpen(false)}>取消</button>
-              <button className="primary" type="submit">
+              <button className="confirm" type="submit">
                 <Plus size={16} />
-                加入运行队列
+                创建任务
               </button>
             </div>
           </form>
@@ -614,8 +809,8 @@ export default function Home() {
       )}
 
       {notice && (
-        <div className="action-toast" role="status">
-          <Check size={16} />
+        <div className="clarity-toast" role="status">
+          <CheckCircle2 size={18} />
           <span>{notice}</span>
           <button type="button" aria-label="关闭提示" onClick={() => setNotice("")}>
             <X size={15} />
