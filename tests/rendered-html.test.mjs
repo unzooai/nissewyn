@@ -123,6 +123,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /role="tab"/);
   assert.match(page, /aria-selected=/);
   assert.match(css, /\.task-detail-drawer/);
+  assert.match(css, /\.task-detail-intro-heading/);
   assert.match(css, /\.task-template-picker/);
   assert.match(css, /\.composer-policy/);
   assert.match(css, /\.composer-schedule-detail/);

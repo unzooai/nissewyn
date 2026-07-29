@@ -3434,14 +3434,18 @@ export default function HomePage() {
             </header>
 
             <div className="task-detail-intro">
-              <span className={`task-detail-icon status-${selectedTask.status}`}>
-                {selectedTask.status === "运行中" && <Activity size={21} />}
-                {selectedTask.status === "待确认" && <ShieldCheck size={21} />}
-                {selectedTask.status === "已暂停" && <Pause size={21} />}
-                {selectedTask.status === "已完成" && <CheckCircle2 size={21} />}
-              </span>
-              <h2>{selectedTask.title}</h2>
-              <p>{selectedTask.description}</p>
+              <div className="task-detail-intro-heading">
+                <span className={`task-detail-icon status-${selectedTask.status}`}>
+                  {selectedTask.status === "运行中" && <Activity size={21} />}
+                  {selectedTask.status === "待确认" && <ShieldCheck size={21} />}
+                  {selectedTask.status === "已暂停" && <Pause size={21} />}
+                  {selectedTask.status === "已完成" && <CheckCircle2 size={21} />}
+                </span>
+                <div>
+                  <h2>{selectedTask.title}</h2>
+                  <p>{selectedTask.description}</p>
+                </div>
+              </div>
             </div>
 
             <section className="task-detail-progress" aria-label="任务进度">
