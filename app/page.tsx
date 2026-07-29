@@ -55,11 +55,12 @@ type ViewId =
   | "artifacts"
   | "activity"
   | "settings";
-type TaskStatus = "运行中" | "待确认" | "已完成" | "已暂停";
+type TaskStatus = "运行中" | "待确认" | "失败" | "已完成" | "已暂停";
 type TaskFilter = "全部" | TaskStatus;
 type TaskSort = "状态优先" | "进度最高" | "名称";
 type TaskSchedule = "仅运行一次" | "每天" | "每周";
 type Weekday = "周一" | "周二" | "周三" | "周四" | "周五" | "周六" | "周日";
+type TaskRunStatus = "运行中" | "成功" | "失败" | "已取消";
 type ArtifactType = "报告" | "数据" | "证据" | "草稿";
 type ArtifactFilter = "全部" | ArtifactType | "重点";
 type ArtifactSort = "最近更新" | "重点优先" | "文件名";
@@ -151,7 +152,7 @@ type SearchResultSection = {
   canClear?: boolean;
 };
 type NotificationFilter = "全部" | "未读";
-type NotificationTarget = "approvals" | "activity" | "artifact";
+type NotificationTarget = "approvals" | "activity" | "artifact" | "task";
 type NotificationItem = {
   id: string;
   title: string;
@@ -160,7 +161,7 @@ type NotificationItem = {
   target: NotificationTarget;
   targetId?: string;
   icon: typeof Bell;
-  tone: "amber" | "blue" | "green";
+  tone: "amber" | "blue" | "green" | "red";
 };
 type TaskFormErrors = Partial<
   Record<"name" | "target" | "description" | "scheduleTime", string>
@@ -181,6 +182,16 @@ type ActivityItem = {
   taskId?: string;
 };
 
+type TaskRun = {
+  id: string;
+  status: TaskRunStatus;
+  startedAt: string;
+  durationSeconds?: number;
+  summary: string;
+  errorCode?: string;
+  errorMessage?: string;
+};
+
 type TaskItem = {
   id: string;
   title: string;
@@ -194,6 +205,10 @@ type TaskItem = {
   scheduleDay?: Weekday;
   requiresApproval?: boolean;
   pinned?: boolean;
+  runs?: TaskRun[];
+  lastError?: string;
+  errorCode?: string;
+  retryCount?: number;
 };
 
 type ArtifactTable = {
@@ -411,6 +426,24 @@ function isTeamMember(value: unknown): value is TeamMember {
   );
 }
 
+function isTaskRun(value: unknown): value is TaskRun {
+  if (!value || typeof value !== "object") return false;
+  const run = value as Partial<TaskRun>;
+  return (
+    typeof run.id === "string" &&
+    ["运行中", "成功", "失败", "已取消"].includes(run.status ?? "") &&
+    typeof run.startedAt === "string" &&
+    !Number.isNaN(Date.parse(run.startedAt)) &&
+    (run.durationSeconds === undefined ||
+      (typeof run.durationSeconds === "number" &&
+        Number.isFinite(run.durationSeconds) &&
+        run.durationSeconds >= 0)) &&
+    typeof run.summary === "string" &&
+    (run.errorCode === undefined || typeof run.errorCode === "string") &&
+    (run.errorMessage === undefined || typeof run.errorMessage === "string")
+  );
+}
+
 function isTaskItem(value: unknown): value is TaskItem {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<TaskItem>;
@@ -419,7 +452,9 @@ function isTaskItem(value: unknown): value is TaskItem {
     typeof item.title === "string" &&
     typeof item.description === "string" &&
     typeof item.target === "string" &&
-    ["运行中", "待确认", "已完成", "已暂停"].includes(item.status ?? "") &&
+    ["运行中", "待确认", "失败", "已完成", "已暂停"].includes(
+      item.status ?? "",
+    ) &&
     typeof item.progress === "number" &&
     Number.isFinite(item.progress) &&
     typeof item.updated === "string" &&
@@ -429,7 +464,15 @@ function isTaskItem(value: unknown): value is TaskItem {
     (item.scheduleDay === undefined || weekdays.includes(item.scheduleDay)) &&
     (item.requiresApproval === undefined ||
       typeof item.requiresApproval === "boolean") &&
-    (item.pinned === undefined || typeof item.pinned === "boolean")
+    (item.pinned === undefined || typeof item.pinned === "boolean") &&
+    (item.runs === undefined ||
+      (Array.isArray(item.runs) && item.runs.every(isTaskRun))) &&
+    (item.lastError === undefined || typeof item.lastError === "string") &&
+    (item.errorCode === undefined || typeof item.errorCode === "string") &&
+    (item.retryCount === undefined ||
+      (typeof item.retryCount === "number" &&
+        Number.isInteger(item.retryCount) &&
+        item.retryCount >= 0))
   );
 }
 
@@ -574,6 +617,26 @@ function formatTaskSchedule(task: TaskItem) {
   );
 }
 
+function formatTaskRunTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "时间未知";
+  return date.toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function formatTaskRunDuration(seconds?: number) {
+  if (seconds === undefined) return "进行中";
+  if (seconds < 60) return `${seconds} 秒`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return remainder ? `${minutes} 分 ${remainder} 秒` : `${minutes} 分钟`;
+}
+
 function formatAuditTimestamp(createdAt: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
@@ -611,7 +674,14 @@ const navItems: Array<{
   { id: "settings", label: "设置", mobileLabel: "设置", icon: Settings2 },
 ];
 
-const taskFilters: TaskFilter[] = ["全部", "运行中", "待确认", "已暂停", "已完成"];
+const taskFilters: TaskFilter[] = [
+  "全部",
+  "运行中",
+  "待确认",
+  "失败",
+  "已暂停",
+  "已完成",
+];
 const approvalRiskFilters: ApprovalRiskFilter[] = [
   "全部",
   "高风险",
@@ -631,13 +701,13 @@ const activityFilters: ActivityFilter[] = ["全部", "任务", "审批", "系统
 const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: string }> = {
   home: {
     eyebrow: "今天 · 7 月 29 日",
-    title: "下午好，今天有 1 件事需要你处理",
+    title: "下午好，今天有需要你处理的事项",
     description: "任务正在后台运行，只有需要你决定时才会停下来。",
   },
   tasks: {
     eyebrow: "任务",
     title: "所有任务",
-    description: "查看正在运行、等待确认和已经完成的任务。",
+    description: "查看运行、确认、失败恢复与已完成任务。",
   },
   approvals: {
     eyebrow: "待确认",
@@ -663,6 +733,47 @@ const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: 
 
 const initialTasks: TaskItem[] = [
   {
+    id: "sales-digest",
+    title: "同步销售线索周报",
+    description: "汇总新增线索和跟进状态，生成摘要后发送给销售负责人。",
+    target: "销售工作区 / 邮件连接器",
+    status: "失败",
+    progress: 42,
+    updated: "6 分钟前失败",
+    schedule: "每周",
+    scheduleTime: "10:00",
+    scheduleDay: "周一",
+    requiresApproval: true,
+    lastError: "邮件连接器授权已过期，任务在发送前安全停止。",
+    errorCode: "MAIL_AUTH_EXPIRED",
+    retryCount: 1,
+    runs: [
+      {
+        id: "run-sales-20260729",
+        status: "失败",
+        startedAt: "2026-07-29T15:18:00+08:00",
+        durationSeconds: 94,
+        summary: "已生成销售摘要，但没有执行外部发送。",
+        errorCode: "MAIL_AUTH_EXPIRED",
+        errorMessage: "邮件连接器授权已过期。",
+      },
+      {
+        id: "run-sales-20260722",
+        status: "成功",
+        startedAt: "2026-07-22T10:00:00+08:00",
+        durationSeconds: 128,
+        summary: "周报已生成并在确认后发送给销售负责人。",
+      },
+      {
+        id: "run-sales-20260715",
+        status: "成功",
+        startedAt: "2026-07-15T10:00:00+08:00",
+        durationSeconds: 121,
+        summary: "完成 18 条销售线索汇总并保存证据。",
+      },
+    ],
+  },
+  {
     id: "competitor",
     title: "跟踪竞品发布动态",
     description: "每天检查 3 个竞品页面，有变化时生成一份摘要。",
@@ -674,6 +785,21 @@ const initialTasks: TaskItem[] = [
     scheduleTime: "09:00",
     requiresApproval: true,
     pinned: true,
+    runs: [
+      {
+        id: "run-competitor-current",
+        status: "运行中",
+        startedAt: "2026-07-29T15:24:00+08:00",
+        summary: "正在比对 3 个竞品页面的最新变化。",
+      },
+      {
+        id: "run-competitor-previous",
+        status: "成功",
+        startedAt: "2026-07-28T09:00:00+08:00",
+        durationSeconds: 156,
+        summary: "发现 2 处有效变化并生成竞品摘要。",
+      },
+    ],
   },
   {
     id: "weekly-report",
@@ -687,6 +813,21 @@ const initialTasks: TaskItem[] = [
     scheduleTime: "17:30",
     scheduleDay: "周五",
     requiresApproval: true,
+    runs: [
+      {
+        id: "run-weekly-current",
+        status: "运行中",
+        startedAt: "2026-07-29T15:12:00+08:00",
+        summary: "周报草稿已完成，正在等待发送确认。",
+      },
+      {
+        id: "run-weekly-previous",
+        status: "成功",
+        startedAt: "2026-07-25T17:30:00+08:00",
+        durationSeconds: 202,
+        summary: "已汇总 5 个项目文件并保存周报草稿。",
+      },
+    ],
   },
   {
     id: "meeting",
@@ -698,6 +839,15 @@ const initialTasks: TaskItem[] = [
     updated: "今天 10:32",
     schedule: "仅运行一次",
     requiresApproval: true,
+    runs: [
+      {
+        id: "run-meeting-complete",
+        status: "成功",
+        startedAt: "2026-07-29T10:28:00+08:00",
+        durationSeconds: 244,
+        summary: "评审材料、议题和待解决问题已整理完成。",
+      },
+    ],
   },
   {
     id: "research",
@@ -709,6 +859,15 @@ const initialTasks: TaskItem[] = [
     updated: "昨天 18:06",
     schedule: "仅运行一次",
     requiresApproval: false,
+    runs: [
+      {
+        id: "run-research-complete",
+        status: "成功",
+        startedAt: "2026-07-28T17:58:00+08:00",
+        durationSeconds: 486,
+        summary: "已保存 8 个产品页面并提取结构化信息。",
+      },
+    ],
   },
 ];
 
@@ -926,6 +1085,17 @@ const artifactIconMap: Record<ArtifactType, typeof Files> = {
 };
 
 const initialActivityItems: ActivityItem[] = [
+  {
+    id: "activity-sales-auth-failed",
+    time: "15:20",
+    createdAt: "2026-07-29T15:20:00+08:00",
+    title: "任务已在发送前安全停止",
+    detail: "邮件连接器授权已过期，未向销售负责人发送任何内容。",
+    icon: "shield",
+    tone: "red",
+    kind: "系统",
+    taskId: "sales-digest",
+  },
   {
     id: "activity-summary-ready",
     time: "14:28",
@@ -1181,7 +1351,19 @@ export default function HomePage() {
   const taskSavingRef = useRef(false);
   const inviteSavingRef = useRef(false);
 
-  const pageTitle = viewTitles[activeView];
+  const failedTaskCount = tasks.filter((task) => task.status === "失败").length;
+  const attentionCount = approvals.length + failedTaskCount;
+  const pageTitle =
+    activeView === "home"
+      ? {
+          ...viewTitles.home,
+          title: `下午好，今天有 ${attentionCount} 件事需要你处理`,
+          description:
+            failedTaskCount > 0
+              ? `${failedTaskCount} 个任务需要恢复，${approvals.length} 项操作等待确认。`
+              : viewTitles.home.description,
+        }
+      : viewTitles[activeView];
   const selectedApproval =
     approvals.find((item) => item.id === selectedApprovalId) ?? approvals[0];
   const normalizedApprovalQuery = approvalListQuery.trim().toLowerCase();
@@ -1233,6 +1415,28 @@ export default function HomePage() {
     低风险: approvals.filter((approval) => approval.risk === "低风险").length,
   };
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
+  const selectedTaskRuns = selectedTask?.runs ?? [];
+  const selectedTaskFinishedRuns = selectedTaskRuns.filter((run) =>
+    ["成功", "失败"].includes(run.status),
+  );
+  const selectedTaskSuccessfulRuns = selectedTaskFinishedRuns.filter(
+    (run) => run.status === "成功",
+  );
+  const selectedTaskSuccessRate = selectedTaskFinishedRuns.length
+    ? Math.round(
+        (selectedTaskSuccessfulRuns.length / selectedTaskFinishedRuns.length) *
+          100,
+      )
+    : null;
+  const selectedTaskRunDurations = selectedTaskFinishedRuns
+    .map((run) => run.durationSeconds)
+    .filter((duration): duration is number => duration !== undefined);
+  const selectedTaskAverageDuration = selectedTaskRunDurations.length
+    ? Math.round(
+        selectedTaskRunDurations.reduce((total, duration) => total + duration, 0) /
+          selectedTaskRunDurations.length,
+      )
+    : undefined;
   const selectedConnector =
     connectorCatalog.find((connector) => connector.id === selectedConnectorId) ??
     null;
@@ -1541,6 +1745,11 @@ export default function HomePage() {
                   task.scheduleDay ?? (schedule === "每周" ? "周一" : undefined),
                 requiresApproval: task.requiresApproval ?? true,
                 pinned: task.pinned ?? task.id === "competitor",
+                runs: Array.isArray(task.runs)
+                  ? task.runs.filter(isTaskRun).slice(0, 12)
+                  : [],
+                retryCount:
+                  typeof task.retryCount === "number" ? task.retryCount : 0,
               };
             });
             setTasks(normalizedTasks);
@@ -1649,7 +1858,7 @@ export default function HomePage() {
             setReadNotificationIds(parsedReadNotifications.slice(0, 30));
           }
         }
-        window.localStorage.setItem("unzoo-one-schema-version", "8");
+        window.localStorage.setItem("unzoo-one-schema-version", "9");
       } catch {
         window.localStorage.removeItem("unzoo-one-tasks");
         window.localStorage.removeItem("unzoo-one-settings");
@@ -2205,6 +2414,7 @@ export default function HomePage() {
       全部: tasks.length,
       运行中: tasks.filter((task) => task.status === "运行中").length,
       待确认: tasks.filter((task) => task.status === "待确认").length,
+      失败: tasks.filter((task) => task.status === "失败").length,
       已完成: tasks.filter((task) => task.status === "已完成").length,
       已暂停: tasks.filter((task) => task.status === "已暂停").length,
     }),
@@ -2214,10 +2424,11 @@ export default function HomePage() {
   const filteredTasks = useMemo(() => {
     const keyword = taskListQuery.trim().toLowerCase();
     const statusPriority: Record<TaskStatus, number> = {
-      运行中: 0,
+      失败: 0,
       待确认: 1,
-      已暂停: 2,
-      已完成: 3,
+      运行中: 2,
+      已暂停: 3,
+      已完成: 4,
     };
     const matchingTasks = tasks.filter((task) => {
       if (taskFilter !== "全部" && task.status !== taskFilter) return false;
@@ -2251,7 +2462,10 @@ export default function HomePage() {
     (task) => task.status === "运行中" || task.status === "待确认",
   ).length;
   const resumableSelectedTaskCount = selectedTasks.filter(
-    (task) => task.status === "已暂停" || task.status === "已完成",
+    (task) =>
+      task.status === "已暂停" ||
+      task.status === "已完成" ||
+      task.status === "失败",
   ).length;
   const unprotectedSelectedTaskCount = selectedTasks.filter(
     (task) => !(task.requiresApproval ?? true),
@@ -2334,6 +2548,19 @@ export default function HomePage() {
   const latestArtifact = artifacts[0] ?? null;
   const notificationItems = useMemo<NotificationItem[]>(() => {
     const items: NotificationItem[] = [];
+    const failedTasks = tasks.filter((task) => task.status === "失败");
+    failedTasks.slice(0, 2).forEach((task) => {
+      items.push({
+        id: `task-failed-${task.id}-${task.retryCount ?? 0}`,
+        title: `任务需要恢复：${task.title}`,
+        detail: task.lastError ?? "任务已安全停止，等待检查后重新运行。",
+        meta: task.updated,
+        target: "task",
+        targetId: task.id,
+        icon: AlertTriangle,
+        tone: "red",
+      });
+    });
     if (approvals.length > 0) {
       items.push({
         id: `approvals-${approvals.map((item) => item.id).join("-")}`,
@@ -2368,7 +2595,7 @@ export default function HomePage() {
       });
     }
     return items;
-  }, [approvals, latestActivity, latestArtifact]);
+  }, [approvals, latestActivity, latestArtifact, tasks]);
   const unreadNotificationCount = notificationItems.filter(
     (item) => !readNotificationIds.includes(item.id),
   ).length;
@@ -3267,6 +3494,15 @@ export default function HomePage() {
         scheduleTime: taskSchedule === "仅运行一次" ? undefined : taskScheduleTime,
         scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
         requiresApproval: taskApproval,
+        retryCount: 0,
+        runs: [
+          {
+            id: `run-${Date.now()}`,
+            status: "运行中",
+            startedAt: new Date().toISOString(),
+            summary: "任务已创建，正在检查数据来源和执行范围。",
+          },
+        ],
       };
       setTasks((items) => [newTask, ...items]);
       setTaskFilter("全部");
@@ -3367,6 +3603,10 @@ export default function HomePage() {
       progress: 0,
       updated: "刚刚复制",
       pinned: false,
+      runs: [],
+      lastError: undefined,
+      errorCode: undefined,
+      retryCount: 0,
     };
     setTasks((items) => [duplicate, ...items]);
     setSelectedTaskId(duplicate.id);
@@ -3473,7 +3713,12 @@ export default function HomePage() {
   function bulkResumeTasks() {
     const targetIds = new Set(
       selectedTasks
-        .filter((task) => task.status === "已暂停" || task.status === "已完成")
+        .filter(
+          (task) =>
+            task.status === "已暂停" ||
+            task.status === "已完成" ||
+            task.status === "失败",
+        )
         .map((task) => task.id),
     );
     if (targetIds.size === 0) {
@@ -3487,10 +3732,28 @@ export default function HomePage() {
               ...task,
               status: "运行中",
               progress:
-                task.status === "已完成"
+                task.status === "已完成" || task.status === "失败"
                   ? Math.max(3, Math.min(task.progress, 12))
                   : task.progress,
               updated: "刚刚批量继续",
+              lastError: undefined,
+              errorCode: undefined,
+              retryCount:
+                task.status === "失败"
+                  ? (task.retryCount ?? 0) + 1
+                  : task.retryCount,
+              runs:
+                task.status === "失败"
+                  ? [
+                      {
+                        id: `run-${task.id}-${Date.now()}`,
+                        status: "运行中" as const,
+                        startedAt: new Date().toISOString(),
+                        summary: "批量重试已启动，正在重新验证任务依赖。",
+                      },
+                      ...(task.runs ?? []),
+                    ].slice(0, 12)
+                  : task.runs,
             }
           : task,
       ),
@@ -4071,9 +4334,12 @@ export default function HomePage() {
     } else if (item.target === "activity") {
       openView("activity");
       if (item.targetId) setSelectedActivityId(item.targetId);
-    } else {
+    } else if (item.target === "artifact") {
       openView("artifacts");
       if (item.targetId) setSelectedArtifactId(item.targetId);
+    } else {
+      openView("tasks");
+      if (item.targetId) setSelectedTaskId(item.targetId);
     }
   }
 
@@ -4115,10 +4381,58 @@ export default function HomePage() {
     }
   }
 
+  function retryTask(task: TaskItem) {
+    const now = new Date();
+    const nextRun: TaskRun = {
+      id: `run-${task.id}-${now.getTime()}`,
+      status: "运行中",
+      startedAt: now.toISOString(),
+      summary: "重试已启动，正在重新验证连接器授权和任务依赖。",
+    };
+
+    setTasks((items) =>
+      items.map((item) =>
+        item.id === task.id
+          ? {
+              ...item,
+              status: "运行中",
+              progress: Math.max(3, Math.min(item.progress, 12)),
+              updated: "刚刚重试",
+              lastError: undefined,
+              errorCode: undefined,
+              retryCount: (item.retryCount ?? 0) + 1,
+              runs: [nextRun, ...(item.runs ?? [])].slice(0, 12),
+            }
+          : item,
+      ),
+    );
+    if (task.id === "competitor") setIsRunning(true);
+    recordActivity({
+      title: `任务已重新运行：${task.title}`,
+      detail: `重试 #${(task.retryCount ?? 0) + 1} 已启动；系统会先验证连接器授权，再从安全检查点继续。`,
+      icon: "activity",
+      tone: "blue",
+      kind: "任务",
+      taskId: task.id,
+    });
+    setNotice(`任务“${task.title}”已重新运行`);
+  }
+
+  function openTaskRecoverySettings() {
+    setSelectedTaskId(null);
+    setActiveView("settings");
+    setSelectedConnectorId("mail");
+  }
+
   function updateTaskStatus(task: TaskItem) {
     if (task.status === "待确认") {
       setSelectedTaskId(null);
       openView("approvals");
+      return;
+    }
+
+    if (task.status === "失败") {
+      retryTask(task);
       return;
     }
 
@@ -4135,6 +4449,21 @@ export default function HomePage() {
               status: nextStatus,
               progress: nextProgress,
               updated: nextStatus === "已暂停" ? "刚刚暂停" : "刚刚继续",
+              runs:
+                nextStatus === "运行中"
+                  ? [
+                      {
+                        id: `run-${task.id}-${Date.now()}`,
+                        status: "运行中" as const,
+                        startedAt: new Date().toISOString(),
+                        summary:
+                          task.status === "已完成"
+                            ? "再次运行已启动，正在重新读取任务目标。"
+                            : "任务已从保存的检查点继续运行。",
+                      },
+                      ...(item.runs ?? []),
+                    ].slice(0, 12)
+                  : item.runs,
             }
           : item,
       ),
@@ -4662,6 +4991,13 @@ export default function HomePage() {
                   <strong>{approvals.length}</strong>
                 </span>
               </span>
+              <span className="summary-failed">
+                <i><AlertTriangle size={14} /></i>
+                <span>
+                  <small>需要恢复</small>
+                  <strong>{failedTaskCount}</strong>
+                </span>
+              </span>
               <span className="summary-done">
                 <i><CheckCircle2 size={14} /></i>
                 <span>
@@ -4925,6 +5261,8 @@ export default function HomePage() {
                     <span className={`recent-task-icon status-${task.status}`}>
                       {task.status === "运行中" && <Activity size={17} />}
                       {task.status === "待确认" && <ShieldCheck size={17} />}
+                      {task.status === "失败" && <AlertTriangle size={17} />}
+                      {task.status === "已暂停" && <Pause size={17} />}
                       {task.status === "已完成" && <CheckCircle2 size={17} />}
                     </span>
                     <span className="recent-task-copy">
@@ -5122,7 +5460,7 @@ export default function HomePage() {
                 <div
                   className={`task-table-row-shell ${
                     selectedTaskIds.includes(task.id) ? "is-selected" : ""
-                  }`}
+                  } ${task.status === "失败" ? "is-failed" : ""}`}
                   key={task.id}
                 >
                   <label className="task-selection-control">
@@ -5153,6 +5491,12 @@ export default function HomePage() {
                       )}
                     </span>
                     <small>{task.description}</small>
+                    {task.status === "失败" && task.lastError && (
+                      <small className="task-table-error">
+                        <AlertTriangle size={12} />
+                        {task.lastError}
+                      </small>
+                    )}
                     <small className="task-table-schedule">
                       <CalendarDays size={12} />
                       {formatTaskSchedule(task)}
@@ -7472,6 +7816,7 @@ export default function HomePage() {
                 <span className={`task-detail-icon status-${selectedTask.status}`}>
                   {selectedTask.status === "运行中" && <Activity size={21} />}
                   {selectedTask.status === "待确认" && <ShieldCheck size={21} />}
+                  {selectedTask.status === "失败" && <AlertTriangle size={21} />}
                   {selectedTask.status === "已暂停" && <Pause size={21} />}
                   {selectedTask.status === "已完成" && <CheckCircle2 size={21} />}
                 </span>
@@ -7482,7 +7827,51 @@ export default function HomePage() {
               </div>
             </div>
 
-            <section className="task-detail-progress" aria-label="任务进度">
+            {selectedTask.status === "失败" && (
+              <section className="task-failure-diagnostic" role="alert">
+                <div className="task-failure-heading">
+                  <span>
+                    <AlertTriangle size={18} />
+                  </span>
+                  <div>
+                    <em>已安全停止</em>
+                    <h3>任务未完成，但没有执行外部发送</h3>
+                  </div>
+                  <code>{selectedTask.errorCode ?? "TASK_FAILED"}</code>
+                </div>
+                <p>
+                  {selectedTask.lastError ??
+                    "任务遇到无法自动恢复的问题，已在安全检查点停止。"}
+                </p>
+                <div className="task-failure-impact">
+                  <span>
+                    <CheckCircle2 size={15} />
+                    已生成的成果与证据仍然保留
+                  </span>
+                  <span>
+                    <ShieldCheck size={15} />
+                    未向外部人员发送任何内容
+                  </span>
+                </div>
+                <div className="task-failure-actions">
+                  <button type="button" onClick={() => retryTask(selectedTask)}>
+                    <RotateCcw size={15} />
+                    立即重试
+                  </button>
+                  <button type="button" onClick={openTaskRecoverySettings}>
+                    <Link2 size={15} />
+                    检查邮件连接器
+                  </button>
+                </div>
+              </section>
+            )}
+
+            <section
+              className={`task-detail-progress ${
+                selectedTask.status === "失败" ? "is-failed" : ""
+              }`}
+              aria-label="任务进度"
+            >
               <div>
                 <span>整体进度</span>
                 <strong>{selectedTask.progress}%</strong>
@@ -7512,7 +7901,11 @@ export default function HomePage() {
                 <Clock3 size={17} />
                 <span>
                   <small>下次运行</small>
-                  <strong>{getNextRunLabel(selectedTask)}</strong>
+                  <strong>
+                    {selectedTask.status === "失败"
+                      ? "等待你确认重试"
+                      : getNextRunLabel(selectedTask)}
+                  </strong>
                 </span>
               </div>
               <div>
@@ -7526,6 +7919,82 @@ export default function HomePage() {
                   </strong>
                 </span>
               </div>
+            </section>
+
+            <section className="task-run-health" aria-label="运行健康">
+              <div className="task-run-health-heading">
+                <span>
+                  <small>运行健康</small>
+                  <strong>最近执行是否稳定</strong>
+                </span>
+                <em
+                  className={
+                    selectedTask.status === "失败"
+                      ? "is-attention"
+                      : selectedTask.status === "运行中"
+                        ? "is-live"
+                        : "is-healthy"
+                  }
+                >
+                  {selectedTask.status === "失败"
+                    ? "需要处理"
+                    : selectedTask.status === "运行中"
+                      ? "正在运行"
+                      : "运行正常"}
+                </em>
+              </div>
+              <div className="task-run-metrics">
+                <span>
+                  <small>成功率</small>
+                  <strong>
+                    {selectedTaskSuccessRate === null
+                      ? "暂无"
+                      : `${selectedTaskSuccessRate}%`}
+                  </strong>
+                </span>
+                <span>
+                  <small>近期开跑</small>
+                  <strong>{selectedTaskRuns.length} 次</strong>
+                </span>
+                <span>
+                  <small>平均耗时</small>
+                  <strong>
+                    {selectedTaskAverageDuration === undefined
+                      ? "暂无"
+                      : formatTaskRunDuration(selectedTaskAverageDuration)}
+                  </strong>
+                </span>
+              </div>
+              {selectedTaskRuns.length > 0 ? (
+                <ol className="task-run-list">
+                  {selectedTaskRuns.slice(0, 3).map((run) => (
+                    <li className={`run-${run.status}`} key={run.id}>
+                      <span>
+                        {run.status === "成功" && <CheckCircle2 size={14} />}
+                        {run.status === "失败" && <AlertTriangle size={14} />}
+                        {run.status === "运行中" && (
+                          <LoaderCircle className="is-spinning" size={14} />
+                        )}
+                        {run.status === "已取消" && <Pause size={14} />}
+                      </span>
+                      <span>
+                        <strong>{run.status}</strong>
+                        <small>{run.summary}</small>
+                      </span>
+                      <span>
+                        <time dateTime={run.startedAt}>
+                          {formatTaskRunTime(run.startedAt)}
+                        </time>
+                        <small>{formatTaskRunDuration(run.durationSeconds)}</small>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <div className="task-run-empty">
+                  第一次运行开始后，这里会显示成功率和耗时。
+                </div>
+              )}
             </section>
 
             <section className="task-detail-artifacts">
@@ -7632,11 +8101,13 @@ export default function HomePage() {
               >
                 {selectedTask.status === "运行中" && <Pause size={16} />}
                 {selectedTask.status === "待确认" && <ShieldCheck size={16} />}
+                {selectedTask.status === "失败" && <RotateCcw size={16} />}
                 {(selectedTask.status === "已暂停" || selectedTask.status === "已完成") && (
                   <Play size={16} />
                 )}
                 {selectedTask.status === "运行中" && "暂停任务"}
                 {selectedTask.status === "待确认" && "处理确认"}
+                {selectedTask.status === "失败" && "重试任务"}
                 {selectedTask.status === "已暂停" && "继续任务"}
                 {selectedTask.status === "已完成" && "再次运行"}
               </button>

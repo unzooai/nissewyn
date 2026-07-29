@@ -33,7 +33,7 @@ test("server-renders the Unzoo One task console", async () => {
   const html = await response.text();
   assert.match(html, /<html lang="zh-CN">/);
   assert.match(html, /<title>Unzoo One \| AI 任务操作系统<\/title>/);
-  assert.match(html, /下午好，今天有 1 件事需要你处理/);
+  assert.match(html, /下午好，今天有 4 件事需要你处理/);
   assert.match(html, /跟踪竞品发布动态/);
   assert.match(html, /需要你处理/);
   assert.match(html, /你交给 Unzoo One 的工作/);
@@ -56,7 +56,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /"unzoo-one-connectors"/);
   assert.match(page, /"unzoo-one-team"/);
   assert.match(page, /"unzoo-one-usage"/);
-  assert.match(page, /"unzoo-one-schema-version", "8"/);
+  assert.match(page, /"unzoo-one-schema-version", "9"/);
   assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-activity"/);
   assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-artifacts"/);
   assert.match(page, /"unzoo-one-pending-approvals"/);
@@ -160,6 +160,14 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /<select/);
   assert.match(page, /type="time"/);
   assert.match(page, /function updateTaskStatus/);
+  assert.match(page, /type TaskRunStatus =/);
+  assert.match(page, /type TaskRun =/);
+  assert.match(page, /function isTaskRun/);
+  assert.match(page, /function retryTask/);
+  assert.match(page, /function formatTaskRunDuration/);
+  assert.match(page, /MAIL_AUTH_EXPIRED/);
+  assert.match(page, /任务未完成，但没有执行外部发送/);
+  assert.match(page, /aria-label="运行健康"/);
   assert.match(page, /selectedTaskIds/);
   assert.match(page, /function toggleAllVisibleTasks/);
   assert.match(page, /function bulkPauseTasks/);
@@ -193,6 +201,10 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /aria-selected=/);
   assert.match(css, /\.task-detail-drawer/);
   assert.match(css, /\.task-detail-intro-heading/);
+  assert.match(css, /\.task-failure-diagnostic/);
+  assert.match(css, /\.task-run-health/);
+  assert.match(css, /\.task-run-list/);
+  assert.match(css, /\.status-label\.status-失败/);
   assert.match(page, /执行边界与审计/);
   assert.match(page, /打开完整运行记录/);
   assert.match(css, /\.settings-trust-center/);
