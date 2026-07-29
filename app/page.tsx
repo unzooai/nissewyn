@@ -32,6 +32,7 @@ import {
   Play,
   Plus,
   RotateCcw,
+  Save,
   Search,
   Send,
   Settings2,
@@ -62,7 +63,7 @@ type Weekday = "周一" | "周二" | "周三" | "周四" | "周五" | "周六" |
 type ArtifactType = "报告" | "数据" | "证据" | "草稿";
 type ArtifactFilter = "全部" | ArtifactType | "重点";
 type ArtifactSort = "最近更新" | "重点优先" | "文件名";
-type ArtifactStatus = "已完成" | "草稿";
+type ArtifactStatus = "已完成" | "草稿" | "已修订";
 type SettingsState = {
   approval: boolean;
   local: boolean;
@@ -164,6 +165,9 @@ type NotificationItem = {
 type TaskFormErrors = Partial<
   Record<"name" | "target" | "description" | "scheduleTime", string>
 >;
+type ArtifactFormErrors = Partial<
+  Record<"title" | "filename" | "content", string>
+>;
 
 type ActivityItem = {
   id: string;
@@ -197,6 +201,15 @@ type ArtifactTable = {
   rows: string[][];
 };
 
+type ArtifactRevision = {
+  version: number;
+  title: string;
+  filename: string;
+  content: string;
+  createdAt: string;
+  editor: string;
+};
+
 type ArtifactItem = {
   id: string;
   taskId: string;
@@ -214,6 +227,10 @@ type ArtifactItem = {
   table?: ArtifactTable;
   evidenceCount?: number;
   starred?: boolean;
+  version?: number;
+  editedAt?: string;
+  editedBy?: string;
+  revisions?: ArtifactRevision[];
 };
 
 type ApprovalItem = {
@@ -428,6 +445,21 @@ function isArtifactItem(value: unknown): value is ArtifactItem {
         (row) =>
           Array.isArray(row) && row.every((cell) => typeof cell === "string"),
       ));
+  const validRevisions =
+    item.revisions === undefined ||
+    (Array.isArray(item.revisions) &&
+      item.revisions.every(
+        (revision) =>
+          revision &&
+          typeof revision === "object" &&
+          typeof revision.version === "number" &&
+          Number.isFinite(revision.version) &&
+          typeof revision.title === "string" &&
+          typeof revision.filename === "string" &&
+          typeof revision.content === "string" &&
+          typeof revision.createdAt === "string" &&
+          typeof revision.editor === "string",
+      ));
   return (
     typeof item.id === "string" &&
     typeof item.taskId === "string" &&
@@ -435,7 +467,7 @@ function isArtifactItem(value: unknown): value is ArtifactItem {
     typeof item.filename === "string" &&
     typeof item.description === "string" &&
     ["报告", "数据", "证据", "草稿"].includes(item.type ?? "") &&
-    ["已完成", "草稿"].includes(item.status ?? "") &&
+    ["已完成", "草稿", "已修订"].includes(item.status ?? "") &&
     typeof item.format === "string" &&
     typeof item.sizeKb === "number" &&
     Number.isFinite(item.sizeKb) &&
@@ -448,7 +480,14 @@ function isArtifactItem(value: unknown): value is ArtifactItem {
     (item.evidenceCount === undefined ||
       (typeof item.evidenceCount === "number" &&
         Number.isFinite(item.evidenceCount))) &&
-    (item.starred === undefined || typeof item.starred === "boolean")
+    (item.starred === undefined || typeof item.starred === "boolean") &&
+    (item.version === undefined ||
+      (typeof item.version === "number" &&
+        Number.isFinite(item.version) &&
+        item.version >= 1)) &&
+    (item.editedAt === undefined || typeof item.editedAt === "string") &&
+    (item.editedBy === undefined || typeof item.editedBy === "string") &&
+    validRevisions
   );
 }
 
@@ -1058,6 +1097,15 @@ export default function HomePage() {
   const [selectedArtifactId, setSelectedArtifactId] = useState(
     initialArtifacts[0].id,
   );
+  const [editingArtifactId, setEditingArtifactId] = useState<string | null>(
+    null,
+  );
+  const [artifactTitleDraft, setArtifactTitleDraft] = useState("");
+  const [artifactFilenameDraft, setArtifactFilenameDraft] = useState("");
+  const [artifactContentDraft, setArtifactContentDraft] = useState("");
+  const [artifactEditSubmitted, setArtifactEditSubmitted] = useState(false);
+  const [artifactDiscardOpen, setArtifactDiscardOpen] = useState(false);
+  const [isSavingArtifact, setIsSavingArtifact] = useState(false);
   const [tasksReady, setTasksReady] = useState(false);
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("全部");
   const [taskListQuery, setTaskListQuery] = useState("");
@@ -1122,6 +1170,10 @@ export default function HomePage() {
   const importInputRef = useRef<HTMLInputElement>(null);
   const approvalDetailRef = useRef<HTMLDivElement>(null);
   const activityInspectorRef = useRef<HTMLElement>(null);
+  const artifactTitleRef = useRef<HTMLInputElement>(null);
+  const artifactFilenameRef = useRef<HTMLInputElement>(null);
+  const artifactContentRef = useRef<HTMLTextAreaElement>(null);
+  const artifactSavingRef = useRef(false);
   const taskNameRef = useRef<HTMLInputElement>(null);
   const taskTargetRef = useRef<HTMLInputElement>(null);
   const taskDescriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -1283,11 +1335,62 @@ export default function HomePage() {
     !Number.isFinite(usageBudgetDraftValue) ||
     usageBudgetDraftValue < 100 ||
     usageBudgetDraftValue > 50000;
+  const editingArtifact =
+    artifacts.find((artifact) => artifact.id === editingArtifactId) ?? null;
+  const editingArtifactVersion = editingArtifact?.version ?? 1;
+  const artifactRevisionHistory = editingArtifact
+    ? [...(editingArtifact.revisions ?? [])].sort(
+        (first, second) => second.version - first.version,
+      )
+    : [];
+  const artifactEditorDirty = Boolean(
+    editingArtifact &&
+      (artifactTitleDraft !== editingArtifact.title ||
+        artifactFilenameDraft !== editingArtifact.filename ||
+        artifactContentDraft !== editingArtifact.content),
+  );
+  const artifactFormErrors = useMemo<ArtifactFormErrors>(() => {
+    const errors: ArtifactFormErrors = {};
+    const normalizedTitle = artifactTitleDraft.trim();
+    const normalizedFilename = artifactFilenameDraft.trim();
+    const normalizedContent = artifactContentDraft.trim();
+
+    if (!normalizedTitle) {
+      errors.title = "请输入成果名称";
+    } else if (normalizedTitle.length > 100) {
+      errors.title = "成果名称不能超过 100 个字";
+    }
+
+    if (!normalizedFilename) {
+      errors.filename = "请输入文件名";
+    } else if (normalizedFilename.length > 120) {
+      errors.filename = "文件名不能超过 120 个字符";
+    } else if (/[/\\:*?"<>|]/.test(normalizedFilename)) {
+      errors.filename = "文件名不能包含 / \\ : * ? \" < > |";
+    } else if (!/\.[a-z0-9]{1,10}$/i.test(normalizedFilename)) {
+      errors.filename = "请保留文件扩展名，例如 .md";
+    }
+
+    if (!normalizedContent) {
+      errors.content = "成果内容不能为空";
+    } else if (normalizedContent.length < 20) {
+      errors.content = "成果内容至少需要 20 个字";
+    } else if (artifactContentDraft.length > 100000) {
+      errors.content = "成果内容不能超过 100,000 个字符";
+    }
+
+    return errors;
+  }, [artifactContentDraft, artifactFilenameDraft, artifactTitleDraft]);
+  const artifactFormHasErrors = Object.keys(artifactFormErrors).length > 0;
   const deletingTask = tasks.find((task) => task.id === deleteTaskId) ?? null;
   const rejectedApproval =
     approvals.find((item) => item.id === rejectApprovalId) ?? null;
-  const activeOverlayKind = usageBudgetOpen
-    ? "usage-budget"
+  const activeOverlayKind = artifactDiscardOpen
+    ? "artifact-discard"
+    : editingArtifact
+      ? "artifact-editor"
+      : usageBudgetOpen
+        ? "usage-budget"
     : pendingWorkspaceImport
       ? "import"
     : bulkApprovalDecision
@@ -1546,7 +1649,7 @@ export default function HomePage() {
             setReadNotificationIds(parsedReadNotifications.slice(0, 30));
           }
         }
-        window.localStorage.setItem("unzoo-one-schema-version", "7");
+        window.localStorage.setItem("unzoo-one-schema-version", "8");
       } catch {
         window.localStorage.removeItem("unzoo-one-tasks");
         window.localStorage.removeItem("unzoo-one-settings");
@@ -1740,6 +1843,8 @@ export default function HomePage() {
     if (!activeOverlayKind) return;
 
     const selectorByKind = {
+      "artifact-discard": ".artifact-discard-dialog",
+      "artifact-editor": ".artifact-editor-dialog",
       "usage-budget": ".usage-budget-dialog",
       import: ".workspace-import-dialog",
       "bulk-approval": ".bulk-approval-dialog",
@@ -1771,7 +1876,20 @@ export default function HomePage() {
     });
 
     function closeTopOverlay() {
-      if (activeOverlayKind === "usage-budget") {
+      if (activeOverlayKind === "artifact-discard") {
+        setArtifactDiscardOpen(false);
+      } else if (activeOverlayKind === "artifact-editor") {
+        if (artifactSavingRef.current || isSavingArtifact) return;
+        if (artifactEditorDirty) {
+          setArtifactDiscardOpen(true);
+        } else {
+          setEditingArtifactId(null);
+          setArtifactTitleDraft("");
+          setArtifactFilenameDraft("");
+          setArtifactContentDraft("");
+          setArtifactEditSubmitted(false);
+        }
+      } else if (activeOverlayKind === "usage-budget") {
         setUsageBudgetOpen(false);
       } else if (activeOverlayKind === "import") {
         setPendingWorkspaceImport(null);
@@ -1805,6 +1923,18 @@ export default function HomePage() {
     }
 
     function handleOverlayKeyDown(event: KeyboardEvent) {
+      if (
+        activeOverlayKind === "artifact-editor" &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "s"
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        overlay
+          .querySelector<HTMLButtonElement>('button[type="submit"]')
+          ?.click();
+        return;
+      }
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
@@ -1851,7 +1981,11 @@ export default function HomePage() {
       window.cancelAnimationFrame(focusFrame);
       window.removeEventListener("keydown", handleOverlayKeyDown, true);
     };
-  }, [activeOverlayKind]);
+  }, [
+    activeOverlayKind,
+    artifactEditorDirty,
+    isSavingArtifact,
+  ]);
 
   const searchedTasks = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -2431,6 +2565,136 @@ export default function HomePage() {
     setNotice(nextStarred ? "已加入重点成果" : "已取消重点标记");
   }
 
+  function artifactCanBeEdited(artifact: ArtifactItem) {
+    return artifact.type === "报告" || artifact.type === "草稿";
+  }
+
+  function openArtifactEditor(artifact: ArtifactItem) {
+    if (!artifactCanBeEdited(artifact)) {
+      setNotice("数据和证据保持只读，避免破坏原始交付记录");
+      return;
+    }
+    setEditingArtifactId(artifact.id);
+    setArtifactTitleDraft(artifact.title);
+    setArtifactFilenameDraft(artifact.filename);
+    setArtifactContentDraft(artifact.content);
+    setArtifactEditSubmitted(false);
+    setArtifactDiscardOpen(false);
+    setIsSavingArtifact(false);
+  }
+
+  function closeArtifactEditor() {
+    artifactSavingRef.current = false;
+    setEditingArtifactId(null);
+    setArtifactTitleDraft("");
+    setArtifactFilenameDraft("");
+    setArtifactContentDraft("");
+    setArtifactEditSubmitted(false);
+    setArtifactDiscardOpen(false);
+    setIsSavingArtifact(false);
+  }
+
+  function requestCloseArtifactEditor() {
+    if (artifactSavingRef.current || isSavingArtifact) return;
+    if (artifactEditorDirty) {
+      setArtifactDiscardOpen(true);
+      return;
+    }
+    closeArtifactEditor();
+  }
+
+  function loadArtifactRevision(revision: ArtifactRevision) {
+    setArtifactTitleDraft(revision.title);
+    setArtifactFilenameDraft(revision.filename);
+    setArtifactContentDraft(revision.content);
+    setArtifactEditSubmitted(false);
+    setNotice(`已将 v${revision.version} 载入编辑器，保存后会生成新版本`);
+    window.requestAnimationFrame(() => artifactTitleRef.current?.focus());
+  }
+
+  async function saveArtifactEdit() {
+    if (
+      !editingArtifact ||
+      artifactSavingRef.current ||
+      isSavingArtifact
+    ) {
+      return;
+    }
+    setArtifactEditSubmitted(true);
+    if (artifactFormHasErrors) {
+      if (artifactFormErrors.title) {
+        artifactTitleRef.current?.focus();
+      } else if (artifactFormErrors.filename) {
+        artifactFilenameRef.current?.focus();
+      } else {
+        artifactContentRef.current?.focus();
+      }
+      return;
+    }
+    if (!artifactEditorDirty) {
+      setNotice("当前版本没有需要保存的修改");
+      return;
+    }
+
+    artifactSavingRef.current = true;
+    setIsSavingArtifact(true);
+    await new Promise((resolve) => window.setTimeout(resolve, 420));
+
+    const now = new Date();
+    const nextVersion = editingArtifactVersion + 1;
+    const normalizedTitle = artifactTitleDraft.trim();
+    const normalizedFilename = artifactFilenameDraft.trim();
+    const normalizedContent = artifactContentDraft.trim();
+    const previousRevision: ArtifactRevision = {
+      version: editingArtifactVersion,
+      title: editingArtifact.title,
+      filename: editingArtifact.filename,
+      content: editingArtifact.content,
+      createdAt: editingArtifact.editedAt ?? editingArtifact.createdAt,
+      editor: editingArtifact.editedBy ?? "Unzoo One AI",
+    };
+    const nextRevisions = [
+      ...(editingArtifact.revisions ?? []),
+      previousRevision,
+    ].slice(-12);
+    const nextSizeKb = Math.max(
+      0.1,
+      new TextEncoder().encode(normalizedContent).byteLength / 1024,
+    );
+
+    setArtifacts((items) =>
+      items.map((artifact) =>
+        artifact.id === editingArtifact.id
+          ? {
+              ...artifact,
+              title: normalizedTitle,
+              filename: normalizedFilename,
+              content: normalizedContent,
+              sizeKb: nextSizeKb,
+              status: artifact.type === "报告" ? "已修订" : artifact.status,
+              updated: "刚刚",
+              editedAt: now.toISOString(),
+              editedBy: "刘一帆",
+              version: nextVersion,
+              revisions: nextRevisions,
+            }
+          : artifact,
+      ),
+    );
+    recordActivity({
+      title: `成果已保存为 v${nextVersion}：${normalizedTitle}`,
+      detail: `${normalizedFilename} 已由刘一帆修订；v${editingArtifactVersion} 仍保留在版本记录中。`,
+      icon: "file",
+      tone: "green",
+      kind: "系统",
+      taskId: editingArtifact.taskId,
+    });
+    artifactSavingRef.current = false;
+    setIsSavingArtifact(false);
+    setNotice(`已保存 v${nextVersion}，上一版本可随时恢复`);
+    closeArtifactEditor();
+  }
+
   async function importWorkspace(event: React.ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const file = input.files?.[0];
@@ -2465,6 +2729,7 @@ export default function HomePage() {
 
     setTasks(backup.tasks);
     setArtifacts(restoredArtifacts);
+    closeArtifactEditor();
     setArtifactTaskId(null);
     setArtifactFilter("全部");
     setArtifactListQuery("");
@@ -2522,6 +2787,7 @@ export default function HomePage() {
   function resetWorkspace() {
     setTasks(initialTasks.map((task) => ({ ...task })));
     setArtifacts(initialArtifacts.map((artifact) => ({ ...artifact })));
+    closeArtifactEditor();
     setArtifactTaskId(null);
     setArtifactFilter("全部");
     setArtifactListQuery("");
@@ -5501,6 +5767,16 @@ export default function HomePage() {
                       </span>
                     </div>
                     <div className="artifact-preview-actions" aria-label="成果操作">
+                      {artifactCanBeEdited(selectedArtifact) && (
+                        <button
+                          className="edit"
+                          type="button"
+                          onClick={() => openArtifactEditor(selectedArtifact)}
+                        >
+                          <Pencil size={16} />
+                          <span>编辑</span>
+                        </button>
+                      )}
                       <button
                         className={selectedArtifact.starred ? "active" : ""}
                         type="button"
@@ -5547,14 +5823,17 @@ export default function HomePage() {
                     </span>
                     <span>
                       <small>格式</small>
-                      <strong>{selectedArtifact.format}</strong>
+                      <strong>
+                        {selectedArtifact.format} ·{" "}
+                        {selectedArtifact.sizeKb.toFixed(1)} KB
+                      </strong>
                     </span>
                     <span>
-                      <small>大小</small>
-                      <strong>{selectedArtifact.sizeKb.toFixed(1)} KB</strong>
+                      <small>当前版本</small>
+                      <strong>v{selectedArtifact.version ?? 1}</strong>
                     </span>
                     <span>
-                      <small>生成时间</small>
+                      <small>最近更新</small>
                       <strong>{selectedArtifact.updated}</strong>
                     </span>
                   </div>
@@ -5571,7 +5850,12 @@ export default function HomePage() {
                   <section className="artifact-content-preview">
                     <div>
                       <span>内容预览</span>
-                      <em>只读</em>
+                      <em>
+                        v{selectedArtifact.version ?? 1} ·{" "}
+                        {artifactCanBeEdited(selectedArtifact)
+                          ? "可修订"
+                          : "原始记录只读"}
+                      </em>
                     </div>
                     {selectedArtifact.table ? (
                       <div className="artifact-table-wrap">
@@ -7656,6 +7940,328 @@ export default function HomePage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {editingArtifact && (
+        <div
+          className="clarity-dialog-backdrop artifact-editor-backdrop"
+          onMouseDown={requestCloseArtifactEditor}
+        >
+          <form
+            className="artifact-editor-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-busy={isSavingArtifact}
+            aria-labelledby="artifact-editor-title"
+            aria-describedby="artifact-editor-description"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveArtifactEdit();
+            }}
+            onMouseDown={(event) => event.stopPropagation()}
+            noValidate
+          >
+            <header className="artifact-editor-heading">
+              <span className="artifact-editor-icon">
+                <Pencil size={20} />
+              </span>
+              <div>
+                <span>成果编辑</span>
+                <h2 id="artifact-editor-title">修订内容并保存新版本</h2>
+                <p id="artifact-editor-description">
+                  保存不会覆盖原文件。当前 v{editingArtifactVersion} 会进入版本记录，
+                  新内容保存为 v{editingArtifactVersion + 1}。
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="关闭成果编辑器"
+                disabled={isSavingArtifact}
+                onClick={requestCloseArtifactEditor}
+              >
+                <X size={17} />
+              </button>
+            </header>
+
+            <div className="artifact-editor-workspace">
+              <section className="artifact-editor-main">
+                <div className="artifact-editor-field-grid">
+                  <label
+                    className={
+                      artifactEditSubmitted && artifactFormErrors.title
+                        ? "has-error"
+                        : ""
+                    }
+                  >
+                    <span>成果名称</span>
+                    <input
+                      ref={artifactTitleRef}
+                      data-overlay-initial-focus
+                      required
+                      maxLength={100}
+                      aria-invalid={Boolean(
+                        artifactEditSubmitted && artifactFormErrors.title,
+                      )}
+                      aria-describedby={
+                        artifactEditSubmitted && artifactFormErrors.title
+                          ? "artifact-title-error"
+                          : undefined
+                      }
+                      value={artifactTitleDraft}
+                      onChange={(event) =>
+                        setArtifactTitleDraft(event.target.value)
+                      }
+                    />
+                    {artifactEditSubmitted && artifactFormErrors.title && (
+                      <small
+                        className="artifact-editor-error"
+                        id="artifact-title-error"
+                      >
+                        <AlertTriangle size={13} />
+                        {artifactFormErrors.title}
+                      </small>
+                    )}
+                  </label>
+
+                  <label
+                    className={
+                      artifactEditSubmitted && artifactFormErrors.filename
+                        ? "has-error"
+                        : ""
+                    }
+                  >
+                    <span>文件名</span>
+                    <input
+                      ref={artifactFilenameRef}
+                      required
+                      maxLength={120}
+                      spellCheck={false}
+                      aria-invalid={Boolean(
+                        artifactEditSubmitted && artifactFormErrors.filename,
+                      )}
+                      aria-describedby={
+                        artifactEditSubmitted && artifactFormErrors.filename
+                          ? "artifact-filename-error"
+                          : undefined
+                      }
+                      value={artifactFilenameDraft}
+                      onChange={(event) =>
+                        setArtifactFilenameDraft(event.target.value)
+                      }
+                    />
+                    {artifactEditSubmitted && artifactFormErrors.filename && (
+                      <small
+                        className="artifact-editor-error"
+                        id="artifact-filename-error"
+                      >
+                        <AlertTriangle size={13} />
+                        {artifactFormErrors.filename}
+                      </small>
+                    )}
+                  </label>
+                </div>
+
+                <label
+                  className={`artifact-editor-content ${
+                    artifactEditSubmitted && artifactFormErrors.content
+                      ? "has-error"
+                      : ""
+                  }`}
+                >
+                  <span>
+                    <strong>内容</strong>
+                    <small>{editingArtifact.format} · 支持 Markdown</small>
+                  </span>
+                  <textarea
+                    ref={artifactContentRef}
+                    required
+                    maxLength={100000}
+                    spellCheck
+                    aria-invalid={Boolean(
+                      artifactEditSubmitted && artifactFormErrors.content,
+                    )}
+                    aria-describedby={
+                      artifactEditSubmitted && artifactFormErrors.content
+                        ? "artifact-content-error"
+                        : "artifact-content-meta"
+                    }
+                    value={artifactContentDraft}
+                    onChange={(event) =>
+                      setArtifactContentDraft(event.target.value)
+                    }
+                  />
+                  <span className="artifact-editor-content-meta">
+                    {artifactEditSubmitted && artifactFormErrors.content ? (
+                      <small
+                        className="artifact-editor-error"
+                        id="artifact-content-error"
+                      >
+                        <AlertTriangle size={13} />
+                        {artifactFormErrors.content}
+                      </small>
+                    ) : (
+                      <small id="artifact-content-meta">
+                        人工修订会写入审计，不改变来源任务与原始证据。
+                      </small>
+                    )}
+                    <small>
+                      {artifactContentDraft.length.toLocaleString()} / 100,000
+                    </small>
+                  </span>
+                </label>
+              </section>
+
+              <aside className="artifact-version-panel">
+                <div className="artifact-version-current">
+                  <span>
+                    <History size={17} />
+                    当前版本
+                  </span>
+                  <strong>v{editingArtifactVersion}</strong>
+                  <p>{editingArtifact.filename}</p>
+                  <dl>
+                    <div>
+                      <dt>状态</dt>
+                      <dd>{editingArtifact.status}</dd>
+                    </div>
+                    <div>
+                      <dt>最近编辑</dt>
+                      <dd>{editingArtifact.editedBy ?? "Unzoo One AI"}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="artifact-version-history">
+                  <div>
+                    <span>历史版本</span>
+                    <em>{artifactRevisionHistory.length} 个</em>
+                  </div>
+                  {artifactRevisionHistory.length > 0 ? (
+                    <div>
+                      {artifactRevisionHistory.map((revision) => (
+                        <button
+                          key={`${editingArtifact.id}-${revision.version}`}
+                          type="button"
+                          onClick={() => loadArtifactRevision(revision)}
+                        >
+                          <span>v{revision.version}</span>
+                          <span>
+                            <strong>{revision.title}</strong>
+                            <small>
+                              {revision.editor} ·{" "}
+                              {new Date(revision.createdAt).toLocaleDateString(
+                                "zh-CN",
+                                { month: "numeric", day: "numeric" },
+                              )}
+                            </small>
+                          </span>
+                          <RotateCcw size={14} />
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="artifact-version-empty">
+                      <History size={20} />
+                      <strong>这是第一个版本</strong>
+                      <small>首次保存修改后，v1 会保留在这里。</small>
+                    </div>
+                  )}
+                </div>
+
+                <div className="artifact-version-safety">
+                  <ShieldCheck size={16} />
+                  <span>
+                    <strong>原始记录受保护</strong>
+                    <small>数据和证据不可编辑；报告修订会保留全部版本。</small>
+                  </span>
+                </div>
+              </aside>
+            </div>
+
+            <footer className="artifact-editor-actions">
+              <span className={artifactEditorDirty ? "is-dirty" : ""}>
+                <i />
+                {artifactEditorDirty ? "有未保存修改" : "当前内容未修改"}
+                <kbd>Ctrl S</kbd>
+              </span>
+              {artifactEditSubmitted && artifactFormHasErrors && (
+                <span className="artifact-editor-summary" role="alert">
+                  <AlertTriangle size={14} />
+                  请先修正标出的内容
+                </span>
+              )}
+              <button
+                type="button"
+                disabled={isSavingArtifact}
+                onClick={requestCloseArtifactEditor}
+              >
+                取消
+              </button>
+              <button
+                className="confirm"
+                type="submit"
+                disabled={isSavingArtifact || !artifactEditorDirty}
+              >
+                {isSavingArtifact ? (
+                  <LoaderCircle className="composer-saving-icon" size={16} />
+                ) : (
+                  <Save size={16} />
+                )}
+                {isSavingArtifact
+                  ? "正在保存"
+                  : `保存为 v${editingArtifactVersion + 1}`}
+              </button>
+            </footer>
+          </form>
+        </div>
+      )}
+
+      {artifactDiscardOpen && editingArtifact && (
+        <div
+          className="clarity-dialog-backdrop artifact-discard-backdrop"
+          onMouseDown={() => setArtifactDiscardOpen(false)}
+        >
+          <section
+            className="artifact-discard-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="artifact-discard-title"
+            aria-describedby="artifact-discard-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label="关闭放弃修改确认"
+              onClick={() => setArtifactDiscardOpen(false)}
+            >
+              <X size={17} />
+            </button>
+            <span>
+              <AlertTriangle size={20} />
+            </span>
+            <small>未保存修改</small>
+            <h2 id="artifact-discard-title">放弃这次成果修订？</h2>
+            <p id="artifact-discard-description">
+              对“{editingArtifact.title}”的修改还没有保存，关闭后无法恢复。
+            </p>
+            <div>
+              <button
+                type="button"
+                data-overlay-initial-focus
+                onClick={() => setArtifactDiscardOpen(false)}
+              >
+                继续编辑
+              </button>
+              <button
+                className="danger"
+                type="button"
+                onClick={closeArtifactEditor}
+              >
+                放弃修改
+              </button>
+            </div>
+          </section>
         </div>
       )}
 

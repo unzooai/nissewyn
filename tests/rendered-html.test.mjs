@@ -56,7 +56,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /"unzoo-one-connectors"/);
   assert.match(page, /"unzoo-one-team"/);
   assert.match(page, /"unzoo-one-usage"/);
-  assert.match(page, /"unzoo-one-schema-version", "7"/);
+  assert.match(page, /"unzoo-one-schema-version", "8"/);
   assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-activity"/);
   assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-artifacts"/);
   assert.match(page, /"unzoo-one-pending-approvals"/);
@@ -73,6 +73,15 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function downloadArtifact/);
   assert.match(page, /async function copyArtifactContent/);
   assert.match(page, /function toggleArtifactStar/);
+  assert.match(page, /type ArtifactRevision =/);
+  assert.match(page, /function artifactCanBeEdited/);
+  assert.match(page, /function openArtifactEditor/);
+  assert.match(page, /function requestCloseArtifactEditor/);
+  assert.match(page, /function loadArtifactRevision/);
+  assert.match(page, /async function saveArtifactEdit/);
+  assert.match(page, /status: artifact\.type === "报告" \? "已修订"/);
+  assert.match(page, /aria-labelledby="artifact-editor-title"/);
+  assert.match(page, /aria-labelledby="artifact-discard-title"/);
   assert.match(page, /function requestToggleLocalPersistence/);
   assert.match(page, /function confirmTemporaryMode/);
   assert.match(page, /type ConnectorId =/);
@@ -252,6 +261,11 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.artifact-overview/);
   assert.match(css, /\.artifact-workspace/);
   assert.match(css, /\.artifact-content-preview/);
+  assert.match(css, /\.artifact-editor-dialog/);
+  assert.match(css, /\.artifact-version-panel/);
+  assert.match(css, /\.artifact-editor-actions/);
+  assert.match(css, /\.artifact-discard-dialog/);
+  assert.match(css, /\.artifact-preview-actions button\.edit/);
   assert.match(css, /\.activity-workspace/);
   assert.match(css, /\.activity-inspector/);
   assert.match(css, /\.task-detail-artifacts/);
