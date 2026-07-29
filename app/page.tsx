@@ -14,7 +14,9 @@ import {
   Clock3,
   Copy,
   Download,
+  FileJson,
   FileText,
+  Files,
   Globe2,
   HardDrive,
   History,
@@ -32,17 +34,28 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  Star,
+  Table2,
   Timer,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
 
-type ViewId = "home" | "tasks" | "approvals" | "activity" | "settings";
+type ViewId =
+  | "home"
+  | "tasks"
+  | "approvals"
+  | "artifacts"
+  | "activity"
+  | "settings";
 type TaskStatus = "运行中" | "待确认" | "已完成" | "已暂停";
 type TaskFilter = "全部" | TaskStatus;
 type TaskSchedule = "仅运行一次" | "每天" | "每周";
 type Weekday = "周一" | "周二" | "周三" | "周四" | "周五" | "周六" | "周日";
+type ArtifactType = "报告" | "数据" | "证据" | "草稿";
+type ArtifactFilter = "全部" | ArtifactType | "重点";
+type ArtifactStatus = "已完成" | "草稿";
 type SettingsState = {
   approval: boolean;
   local: boolean;
@@ -56,6 +69,7 @@ type WorkspaceBackup = {
   settings: SettingsState;
   approvalIds: string[];
   activity: ActivityItem[];
+  artifacts?: ArtifactItem[];
 };
 type ApprovalRisk = "低风险" | "中风险" | "高风险";
 type ActivityKind = "任务" | "审批" | "系统";
@@ -66,12 +80,13 @@ type ActivityIconKey =
   | "brain"
   | "clock"
   | "copy"
+  | "file"
   | "globe"
   | "settings"
   | "shield"
   | "sparkles"
   | "trash";
-type SearchResultKind = "task" | "view" | "action";
+type SearchResultKind = "task" | "artifact" | "view" | "action";
 
 type ActivityItem = {
   id: string;
@@ -98,6 +113,30 @@ type TaskItem = {
   scheduleDay?: Weekday;
   requiresApproval?: boolean;
   pinned?: boolean;
+};
+
+type ArtifactTable = {
+  columns: string[];
+  rows: string[][];
+};
+
+type ArtifactItem = {
+  id: string;
+  taskId: string;
+  title: string;
+  filename: string;
+  description: string;
+  type: ArtifactType;
+  status: ArtifactStatus;
+  format: string;
+  sizeKb: number;
+  updated: string;
+  createdAt: string;
+  content: string;
+  highlights: string[];
+  table?: ArtifactTable;
+  evidenceCount?: number;
+  starred?: boolean;
 };
 
 type ApprovalItem = {
@@ -155,6 +194,42 @@ function isTaskItem(value: unknown): value is TaskItem {
   );
 }
 
+function isArtifactItem(value: unknown): value is ArtifactItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<ArtifactItem>;
+  const validTable =
+    item.table === undefined ||
+    (Array.isArray(item.table.columns) &&
+      item.table.columns.every((column) => typeof column === "string") &&
+      Array.isArray(item.table.rows) &&
+      item.table.rows.every(
+        (row) =>
+          Array.isArray(row) && row.every((cell) => typeof cell === "string"),
+      ));
+  return (
+    typeof item.id === "string" &&
+    typeof item.taskId === "string" &&
+    typeof item.title === "string" &&
+    typeof item.filename === "string" &&
+    typeof item.description === "string" &&
+    ["报告", "数据", "证据", "草稿"].includes(item.type ?? "") &&
+    ["已完成", "草稿"].includes(item.status ?? "") &&
+    typeof item.format === "string" &&
+    typeof item.sizeKb === "number" &&
+    Number.isFinite(item.sizeKb) &&
+    typeof item.updated === "string" &&
+    typeof item.createdAt === "string" &&
+    typeof item.content === "string" &&
+    Array.isArray(item.highlights) &&
+    item.highlights.every((highlight) => typeof highlight === "string") &&
+    validTable &&
+    (item.evidenceCount === undefined ||
+      (typeof item.evidenceCount === "number" &&
+        Number.isFinite(item.evidenceCount))) &&
+    (item.starred === undefined || typeof item.starred === "boolean")
+  );
+}
+
 function isActivityItem(value: unknown): value is ActivityItem {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<ActivityItem>;
@@ -169,6 +244,7 @@ function isActivityItem(value: unknown): value is ActivityItem {
       "brain",
       "clock",
       "copy",
+      "file",
       "globe",
       "settings",
       "shield",
@@ -202,7 +278,10 @@ function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
     !Array.isArray(backup.approvalIds) ||
     !backup.approvalIds.every((id) => typeof id === "string") ||
     !Array.isArray(backup.activity) ||
-    !backup.activity.every(isActivityItem)
+    !backup.activity.every(isActivityItem) ||
+    (backup.artifacts !== undefined &&
+      (!Array.isArray(backup.artifacts) ||
+        !backup.artifacts.every(isArtifactItem)))
   ) {
     throw new Error("Invalid workspace backup");
   }
@@ -240,11 +319,20 @@ const navItems: Array<{ id: ViewId; label: string; icon: typeof Home }> = [
   { id: "home", label: "首页", icon: Home },
   { id: "tasks", label: "任务", icon: ListChecks },
   { id: "approvals", label: "待确认", icon: ShieldCheck },
+  { id: "artifacts", label: "成果", icon: Files },
   { id: "activity", label: "运行记录", icon: History },
   { id: "settings", label: "设置", icon: Settings2 },
 ];
 
 const taskFilters: TaskFilter[] = ["全部", "运行中", "待确认", "已暂停", "已完成"];
+const artifactFilters: ArtifactFilter[] = [
+  "全部",
+  "重点",
+  "报告",
+  "数据",
+  "证据",
+  "草稿",
+];
 const activityFilters: ActivityFilter[] = ["全部", "任务", "审批", "系统"];
 
 const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: string }> = {
@@ -262,6 +350,11 @@ const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: 
     eyebrow: "待确认",
     title: "需要你决定的操作",
     description: "Unzoo One 不会在你确认前执行外部发送或敏感访问。",
+  },
+  artifacts: {
+    eyebrow: "成果",
+    title: "任务交付与证据",
+    description: "查看 AI 生成的报告、数据和证据包，并追溯到对应任务。",
   },
   activity: {
     eyebrow: "运行记录",
@@ -374,16 +467,169 @@ const initialApprovals: ApprovalItem[] = [
   },
 ];
 
+const initialArtifacts: ArtifactItem[] = [
+  {
+    id: "artifact-competitor-report",
+    taskId: "competitor",
+    title: "竞品发布动态摘要",
+    filename: "competitor-report.md",
+    description: "汇总 3 个竞品页面的 4 项变化，并给出值得跟进的产品信号。",
+    type: "报告",
+    status: "已完成",
+    format: "Markdown",
+    sizeKb: 18.4,
+    updated: "2 分钟前",
+    createdAt: "2026-07-29T14:28:00+08:00",
+    content: `# 竞品发布动态摘要
+
+## 今日变化
+- Unzoo Browser 更新了团队工作区说明。
+- 两个竞品新增企业权限控制页面。
+- 一个竞品调整了自动化套餐价格。
+- 三个页面共识别出 4 项有效变化。
+
+## 建议
+优先跟进企业权限与审计能力，并确认定价变化是否影响当前产品定位。`,
+    highlights: ["4 项有效变化", "3 个竞品页面", "2 项高价值信号"],
+    starred: true,
+  },
+  {
+    id: "artifact-evidence-package",
+    taskId: "competitor",
+    title: "页面变化证据包",
+    filename: "competitor-evidence.json",
+    description: "包含页面地址、采集时间、内容哈希和 12 张页面截图的证据清单。",
+    type: "证据",
+    status: "已完成",
+    format: "JSON",
+    sizeKb: 46.8,
+    updated: "7 分钟前",
+    createdAt: "2026-07-29T14:23:00+08:00",
+    content: `{
+  "task": "跟踪竞品发布动态",
+  "capturedAt": "2026-07-29T14:23:00+08:00",
+  "pages": 3,
+  "screenshots": 12,
+  "integrity": "verified"
+}`,
+    highlights: ["12 张页面截图", "3 个来源", "完整性已验证"],
+    evidenceCount: 12,
+  },
+  {
+    id: "artifact-change-data",
+    taskId: "competitor",
+    title: "竞品变化结构化数据",
+    filename: "competitor-changes.csv",
+    description: "适合继续分析或导入表格的结构化变化明细。",
+    type: "数据",
+    status: "已完成",
+    format: "CSV",
+    sizeKb: 8.2,
+    updated: "8 分钟前",
+    createdAt: "2026-07-29T14:22:00+08:00",
+    content: `竞品,变化类型,优先级,采集时间
+Unzoo Browser,企业权限,高,14:21
+Browserbase,套餐定价,中,14:20
+MultiOn,产品文案,低,14:18`,
+    highlights: ["3 条结构化记录", "1 项高优先级", "可直接导入表格"],
+    table: {
+      columns: ["竞品", "变化类型", "优先级", "采集时间"],
+      rows: [
+        ["Unzoo Browser", "企业权限", "高", "14:21"],
+        ["Browserbase", "套餐定价", "中", "14:20"],
+        ["MultiOn", "产品文案", "低", "14:18"],
+      ],
+    },
+  },
+  {
+    id: "artifact-weekly-draft",
+    taskId: "weekly-report",
+    title: "本周项目进展草稿",
+    filename: "weekly-progress-draft.md",
+    description: "已汇总项目文件和运行记录，等待审批后写入项目目录。",
+    type: "草稿",
+    status: "草稿",
+    format: "Markdown",
+    sizeKb: 12.6,
+    updated: "11 分钟前",
+    createdAt: "2026-07-29T14:19:00+08:00",
+    content: `# 本周项目进展
+
+## 已完成
+- 完成 AI 任务控制台首页与任务管理。
+- 补齐审批、审计和本机数据恢复流程。
+
+## 下周计划
+- 接入真实任务运行数据。
+- 完善团队协作和交付物管理。`,
+    highlights: ["2 项已完成", "2 项下周计划", "等待写入审批"],
+  },
+  {
+    id: "artifact-review-brief",
+    taskId: "meeting",
+    title: "产品评审议题简报",
+    filename: "product-review-brief.md",
+    description: "整理本次产品评审的核心议题、相关背景和待决策问题。",
+    type: "报告",
+    status: "已完成",
+    format: "Markdown",
+    sizeKb: 15.1,
+    updated: "今天 10:32",
+    createdAt: "2026-07-29T10:32:00+08:00",
+    content: `# 产品评审议题简报
+
+## 核心议题
+1. 审批流程是否覆盖高风险外部操作。
+2. 任务成果是否能够完整追溯。
+3. 团队工作区的数据保留策略。`,
+    highlights: ["3 个核心议题", "5 份关联资料", "评审材料已就绪"],
+  },
+  {
+    id: "artifact-research-data",
+    taskId: "research",
+    title: "AI 浏览器产品研究表",
+    filename: "ai-browser-research.csv",
+    description: "包含 6 个产品的功能、团队、定价和企业能力对比。",
+    type: "数据",
+    status: "已完成",
+    format: "CSV",
+    sizeKb: 22.9,
+    updated: "昨天 18:06",
+    createdAt: "2026-07-28T18:06:00+08:00",
+    content: `产品,自动化,团队协作,企业权限
+Unzoo Browser,支持,支持,支持
+Browserbase,支持,支持,支持
+MultiOn,支持,有限,有限`,
+    highlights: ["6 个产品", "4 个对比维度", "研究已完成"],
+    table: {
+      columns: ["产品", "自动化", "团队协作", "企业权限"],
+      rows: [
+        ["Unzoo Browser", "支持", "支持", "支持"],
+        ["Browserbase", "支持", "支持", "支持"],
+        ["MultiOn", "支持", "有限", "有限"],
+      ],
+    },
+  },
+];
+
 const activityIconMap: Record<ActivityIconKey, typeof Activity> = {
   activity: Activity,
   brain: Brain,
   clock: Clock3,
   copy: Copy,
+  file: Files,
   globe: Globe2,
   settings: Settings2,
   shield: ShieldCheck,
   sparkles: Sparkles,
   trash: Trash2,
+};
+
+const artifactIconMap: Record<ArtifactType, typeof Files> = {
+  报告: FileText,
+  数据: Table2,
+  证据: FileJson,
+  草稿: Pencil,
 };
 
 const initialActivityItems: ActivityItem[] = [
@@ -531,6 +777,12 @@ export default function HomePage() {
   const [rejectApprovalId, setRejectApprovalId] = useState<string | null>(null);
   const [workspaceResetOpen, setWorkspaceResetOpen] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
+  const [artifacts, setArtifacts] = useState<ArtifactItem[]>(initialArtifacts);
+  const [artifactFilter, setArtifactFilter] = useState<ArtifactFilter>("全部");
+  const [artifactTaskId, setArtifactTaskId] = useState<string | null>(null);
+  const [selectedArtifactId, setSelectedArtifactId] = useState(
+    initialArtifacts[0].id,
+  );
   const [tasksReady, setTasksReady] = useState(false);
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("全部");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -562,6 +814,9 @@ export default function HomePage() {
   const selectedTaskActivity = selectedTask
     ? activityLog.filter((item) => item.taskId === selectedTask.id).slice(0, 3)
     : [];
+  const selectedTaskArtifacts = selectedTask
+    ? artifacts.filter((artifact) => artifact.taskId === selectedTask.id).slice(0, 2)
+    : [];
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -572,6 +827,7 @@ export default function HomePage() {
           "unzoo-one-pending-approvals",
         );
         const savedActivity = window.localStorage.getItem("unzoo-one-activity");
+        const savedArtifacts = window.localStorage.getItem("unzoo-one-artifacts");
         const schemaVersion = Number(
           window.localStorage.getItem("unzoo-one-schema-version") ?? "1",
         );
@@ -651,12 +907,23 @@ export default function HomePage() {
             );
           }
         }
-        window.localStorage.setItem("unzoo-one-schema-version", "3");
+        if (savedArtifacts) {
+          const parsedArtifacts = JSON.parse(savedArtifacts);
+          if (Array.isArray(parsedArtifacts)) {
+            const validArtifacts = parsedArtifacts
+              .filter(isArtifactItem)
+              .slice(0, 100);
+            setArtifacts(validArtifacts);
+            setSelectedArtifactId(validArtifacts[0]?.id ?? "");
+          }
+        }
+        window.localStorage.setItem("unzoo-one-schema-version", "4");
       } catch {
         window.localStorage.removeItem("unzoo-one-tasks");
         window.localStorage.removeItem("unzoo-one-settings");
         window.localStorage.removeItem("unzoo-one-pending-approvals");
         window.localStorage.removeItem("unzoo-one-activity");
+        window.localStorage.removeItem("unzoo-one-artifacts");
       } finally {
         setTasksReady(true);
       }
@@ -678,13 +945,18 @@ export default function HomePage() {
         "unzoo-one-activity",
         JSON.stringify(activityLog.slice(0, 100)),
       );
+      window.localStorage.setItem(
+        "unzoo-one-artifacts",
+        JSON.stringify(artifacts.slice(0, 100)),
+      );
     } else {
       window.localStorage.removeItem("unzoo-one-tasks");
       window.localStorage.removeItem("unzoo-one-settings");
       window.localStorage.removeItem("unzoo-one-pending-approvals");
       window.localStorage.removeItem("unzoo-one-activity");
+      window.localStorage.removeItem("unzoo-one-artifacts");
     }
-  }, [activityLog, approvals, settings, tasks, tasksReady]);
+  }, [activityLog, approvals, artifacts, settings, tasks, tasksReady]);
 
   useEffect(() => {
     if (!notice) return;
@@ -785,6 +1057,45 @@ export default function HomePage() {
     );
   }, [query, tasks]);
 
+  const artifactScopeTask =
+    tasks.find((task) => task.id === artifactTaskId) ?? null;
+  const scopedArtifacts = useMemo(
+    () =>
+      artifactTaskId
+        ? artifacts.filter((artifact) => artifact.taskId === artifactTaskId)
+        : artifacts,
+    [artifactTaskId, artifacts],
+  );
+  const filteredArtifacts = useMemo(
+    () => {
+      if (artifactFilter === "全部") return scopedArtifacts;
+      if (artifactFilter === "重点") {
+        return scopedArtifacts.filter((artifact) => artifact.starred);
+      }
+      return scopedArtifacts.filter((artifact) => artifact.type === artifactFilter);
+    },
+    [artifactFilter, scopedArtifacts],
+  );
+  const selectedArtifact =
+    filteredArtifacts.find((artifact) => artifact.id === selectedArtifactId) ??
+    filteredArtifacts[0] ??
+    null;
+  const SelectedArtifactIcon = selectedArtifact
+    ? artifactIconMap[selectedArtifact.type]
+    : Files;
+  const artifactStats = useMemo(
+    () => ({
+      total: scopedArtifacts.length,
+      reports: scopedArtifacts.filter((artifact) => artifact.type === "报告").length,
+      evidence: scopedArtifacts.reduce(
+        (sum, artifact) => sum + (artifact.evidenceCount ?? 0),
+        0,
+      ),
+      size: scopedArtifacts.reduce((sum, artifact) => sum + artifact.sizeKb, 0),
+    }),
+    [scopedArtifacts],
+  );
+
   const searchResults = useMemo<SearchResult[]>(() => {
     const keyword = query.trim().toLowerCase();
     const taskResults: SearchResult[] = tasks.map((task) => ({
@@ -795,6 +1106,15 @@ export default function HomePage() {
       description: `${formatTaskSchedule(task)} · ${task.description}`,
       meta: task.status,
       icon: ListChecks,
+    }));
+    const artifactResults: SearchResult[] = artifacts.map((artifact) => ({
+      key: `artifact-${artifact.id}`,
+      kind: "artifact",
+      id: artifact.id,
+      title: artifact.title,
+      description: `${artifact.filename} · ${artifact.description}`,
+      meta: artifact.type,
+      icon: artifactIconMap[artifact.type],
     }));
     const viewResults: SearchResult[] = navItems.map((item) => ({
       key: `view-${item.id}`,
@@ -826,23 +1146,33 @@ export default function HomePage() {
         meta: approvals.length ? `${approvals.length} 项` : "已清空",
         icon: ShieldCheck,
       },
+      {
+        key: "action-artifacts",
+        kind: "action",
+        id: "artifacts",
+        title: "查看最新成果",
+        description: `${artifacts.length} 个报告、数据或证据包可以查看。`,
+        meta: `${artifacts.length} 项`,
+        icon: Files,
+      },
     ];
 
     if (!keyword) {
       return [
         ...actionResults,
-        ...taskResults.slice(0, 4),
+        ...taskResults.slice(0, 3),
+        ...artifactResults.slice(0, 1),
       ];
     }
 
-    return [...taskResults, ...viewResults, ...actionResults]
+    return [...taskResults, ...artifactResults, ...viewResults, ...actionResults]
       .filter((result) =>
         `${result.title} ${result.description} ${result.meta}`
           .toLowerCase()
           .includes(keyword),
       )
       .slice(0, 8);
-  }, [approvals.length, query, tasks]);
+  }, [approvals.length, artifacts, query, tasks]);
 
   const filteredTasks = useMemo(() => {
     if (taskFilter === "全部") return searchedTasks;
@@ -880,9 +1210,10 @@ export default function HomePage() {
       settings,
       approvalIds: approvals.map((item) => item.id),
       activity: activityLog,
+      artifacts,
     });
     return Math.max(1, Math.ceil(serialized.length / 1024));
-  }, [activityLog, approvals, settings, tasks]);
+  }, [activityLog, approvals, artifacts, settings, tasks]);
   const latestActivity = activityLog[0] ?? initialActivityItems[0];
   const LatestActivityIcon = activityIconMap[latestActivity.icon] ?? Activity;
 
@@ -945,6 +1276,7 @@ export default function HomePage() {
       settings,
       approvalIds: approvals.map((item) => item.id),
       activity: activityLog,
+      artifacts,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
@@ -961,12 +1293,75 @@ export default function HomePage() {
     window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
     recordActivity({
       title: "工作区备份已导出",
-      detail: `已备份 ${tasks.length} 个任务、${activityLog.length} 条运行记录和当前设置。`,
+      detail: `已备份 ${tasks.length} 个任务、${artifacts.length} 个成果和 ${activityLog.length} 条运行记录。`,
       icon: "activity",
       tone: "blue",
       kind: "系统",
     });
     setNotice("工作区备份已保存到本机");
+  }
+
+  function downloadArtifact(artifact: ArtifactItem) {
+    const mimeType =
+      artifact.format === "JSON"
+        ? "application/json"
+        : artifact.format === "CSV"
+          ? "text/csv"
+          : "text/markdown";
+    const blob = new Blob([artifact.content], {
+      type: `${mimeType};charset=utf-8`,
+    });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = artifact.filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+    recordActivity({
+      title: `成果已下载：${artifact.title}`,
+      detail: `${artifact.filename} · ${artifact.sizeKb.toFixed(1)} KB`,
+      icon: "file",
+      tone: "blue",
+      kind: "系统",
+      taskId: artifact.taskId,
+    });
+    setNotice(`已下载“${artifact.filename}”`);
+  }
+
+  async function copyArtifactContent(artifact: ArtifactItem) {
+    try {
+      await window.navigator.clipboard.writeText(artifact.content);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = artifact.content;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    recordActivity({
+      title: `成果内容已复制：${artifact.title}`,
+      detail: `已复制 ${artifact.filename} 的可读内容。`,
+      icon: "copy",
+      tone: "violet",
+      kind: "系统",
+      taskId: artifact.taskId,
+    });
+    setNotice(`已复制“${artifact.title}”的内容`);
+  }
+
+  function toggleArtifactStar(artifact: ArtifactItem) {
+    const nextStarred = !artifact.starred;
+    setArtifacts((items) =>
+      items.map((item) =>
+        item.id === artifact.id ? { ...item, starred: nextStarred } : item,
+      ),
+    );
+    setNotice(nextStarred ? "已加入重点成果" : "已取消重点标记");
   }
 
   async function importWorkspace(event: React.ChangeEvent<HTMLInputElement>) {
@@ -984,8 +1379,13 @@ export default function HomePage() {
       );
       const restoredPrimary =
         backup.tasks.find((task) => task.id === "competitor") ?? backup.tasks[0];
+      const restoredArtifacts = backup.artifacts ?? initialArtifacts;
 
       setTasks(backup.tasks);
+      setArtifacts(restoredArtifacts);
+      setArtifactTaskId(null);
+      setArtifactFilter("全部");
+      setSelectedArtifactId(restoredArtifacts[0]?.id ?? "");
       setSettings(backup.settings);
       setApprovals(restoredApprovals);
       setSelectedApprovalId(restoredApprovals[0]?.id ?? "");
@@ -1000,7 +1400,7 @@ export default function HomePage() {
       setNotificationsOpen(false);
       recordActivity({
         title: "工作区备份已恢复",
-        detail: `已从“${file.name}”恢复 ${backup.tasks.length} 个任务和 ${backup.activity.length} 条运行记录。`,
+        detail: `已从“${file.name}”恢复 ${backup.tasks.length} 个任务、${restoredArtifacts.length} 个成果和 ${backup.activity.length} 条运行记录。`,
         icon: "activity",
         tone: "green",
         kind: "系统",
@@ -1015,6 +1415,10 @@ export default function HomePage() {
 
   function resetWorkspace() {
     setTasks(initialTasks.map((task) => ({ ...task })));
+    setArtifacts(initialArtifacts.map((artifact) => ({ ...artifact })));
+    setArtifactTaskId(null);
+    setArtifactFilter("全部");
+    setSelectedArtifactId(initialArtifacts[0].id);
     setSettings({ ...defaultSettings });
     setApprovals(initialApprovals.map((item) => ({ ...item })));
     setSelectedApprovalId(initialApprovals[0].id);
@@ -1031,7 +1435,7 @@ export default function HomePage() {
     setWorkspaceResetOpen(false);
     recordActivity({
       title: "工作区已恢复初始状态",
-      detail: "任务、待确认事项、运行记录和设置已重新初始化。",
+      detail: "任务、成果、待确认事项、运行记录和设置已重新初始化。",
       icon: "settings",
       tone: "amber",
       kind: "系统",
@@ -1313,13 +1717,22 @@ export default function HomePage() {
   function confirmDeleteTask() {
     if (!deletingTask) return;
     setTasks((items) => items.filter((item) => item.id !== deletingTask.id));
+    setArtifacts((items) =>
+      items.filter((artifact) => artifact.taskId !== deletingTask.id),
+    );
+    setActivityLog((items) =>
+      items.filter((activity) => activity.taskId !== deletingTask.id),
+    );
     if (activityTaskId === deletingTask.id) {
       setActivityTaskId(null);
+    }
+    if (artifactTaskId === deletingTask.id) {
+      setArtifactTaskId(null);
     }
     setDeleteTaskId(null);
     recordActivity({
       title: `任务已删除：${deletingTask.title}`,
-      detail: `已移除任务配置和本机记录，原数据来源：${deletingTask.target}`,
+      detail: `已移除任务配置、关联成果和本机记录，原数据来源：${deletingTask.target}`,
       icon: "trash",
       tone: "red",
       kind: "任务",
@@ -1345,6 +1758,11 @@ export default function HomePage() {
     if (view === "activity") {
       setActivityTaskId(null);
     }
+    if (view === "artifacts") {
+      setArtifactTaskId(null);
+      setArtifactFilter("全部");
+      setSelectedArtifactId(artifacts[0]?.id ?? "");
+    }
     setNotificationsOpen(false);
     setSelectedTaskId(null);
   }
@@ -1362,6 +1780,27 @@ export default function HomePage() {
     setNotificationsOpen(false);
   }
 
+  function openTaskArtifacts(taskId: string) {
+    const taskArtifacts = artifacts.filter((artifact) => artifact.taskId === taskId);
+    setArtifactTaskId(taskId);
+    setArtifactFilter("全部");
+    setSelectedArtifactId(taskArtifacts[0]?.id ?? "");
+    setActiveView("artifacts");
+    setSelectedTaskId(null);
+    setNotificationsOpen(false);
+  }
+
+  function chooseArtifactFilter(filter: ArtifactFilter) {
+    const nextArtifact =
+      filter === "全部"
+        ? scopedArtifacts[0]
+        : filter === "重点"
+          ? scopedArtifacts.find((artifact) => artifact.starred)
+          : scopedArtifacts.find((artifact) => artifact.type === filter);
+    setArtifactFilter(filter);
+    setSelectedArtifactId(nextArtifact?.id ?? "");
+  }
+
   function chooseSearchResult(result: SearchResult) {
     setSearchOpen(false);
     setQuery("");
@@ -1370,10 +1809,17 @@ export default function HomePage() {
     if (result.kind === "task") {
       setActiveView("tasks");
       openTask(result.id);
+    } else if (result.kind === "artifact") {
+      setActiveView("artifacts");
+      setArtifactTaskId(null);
+      setArtifactFilter("全部");
+      setSelectedArtifactId(result.id);
     } else if (result.kind === "view") {
       openView(result.id as ViewId);
     } else if (result.id === "new-task") {
       beginCreateTask();
+    } else if (result.id === "artifacts") {
+      openView("artifacts");
     } else {
       openView("approvals");
     }
@@ -1857,10 +2303,19 @@ export default function HomePage() {
                   <span><Globe2 size={14} /> 浏览器</span>
                   <span><Brain size={14} /> Codex</span>
                   <span><Mail size={14} /> 邮件</span>
-                  <button type="button" onClick={() => openView("activity")}>
-                    查看完整记录
-                    <ChevronRight size={14} />
-                  </button>
+                  <div className="task-tools-actions">
+                    <button
+                      type="button"
+                      onClick={() => openTaskArtifacts(primaryTask.id)}
+                    >
+                      <Files size={14} />
+                      查看成果
+                    </button>
+                    <button type="button" onClick={() => openView("activity")}>
+                      完整记录
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
                 </footer>
               </section>
 
@@ -2217,6 +2672,303 @@ export default function HomePage() {
           </section>
         )}
 
+        {activeView === "artifacts" && (
+          <section className="artifacts-view">
+            <div className="artifact-overview">
+              <div className="artifact-overview-title">
+                <span>
+                  <Files size={21} />
+                </span>
+                <div>
+                  <small>{artifactScopeTask ? "任务成果" : "成果库"}</small>
+                  <h2>
+                    {artifactScopeTask
+                      ? artifactScopeTask.title
+                      : "AI 已交付的工作成果"}
+                  </h2>
+                  <p>
+                    {artifactScopeTask
+                      ? "这里只显示当前任务生成的文件和证据。"
+                      : "所有成果都保存在本机，并与原始任务和审计记录关联。"}
+                  </p>
+                </div>
+              </div>
+              <div className="artifact-overview-metrics">
+                <span>
+                  <small>全部成果</small>
+                  <strong>{artifactStats.total}</strong>
+                </span>
+                <span>
+                  <small>完成报告</small>
+                  <strong>{artifactStats.reports}</strong>
+                </span>
+                <span>
+                  <small>截图证据</small>
+                  <strong>{artifactStats.evidence}</strong>
+                </span>
+                <span>
+                  <small>本机占用</small>
+                  <strong>{artifactStats.size.toFixed(1)} KB</strong>
+                </span>
+              </div>
+            </div>
+
+            <div className="artifact-toolbar">
+              <div
+                className="artifact-filter-tabs"
+                role="tablist"
+                aria-label="成果筛选"
+              >
+                {artifactFilters.map((filter) => {
+                  const count =
+                    filter === "全部"
+                      ? scopedArtifacts.length
+                      : filter === "重点"
+                        ? scopedArtifacts.filter((artifact) => artifact.starred)
+                            .length
+                        : scopedArtifacts.filter(
+                            (artifact) => artifact.type === filter,
+                          ).length;
+                  return (
+                    <button
+                      className={artifactFilter === filter ? "active" : ""}
+                      key={filter}
+                      type="button"
+                      role="tab"
+                      aria-selected={artifactFilter === filter}
+                      onClick={() => chooseArtifactFilter(filter)}
+                    >
+                      {filter === "重点" && <Star size={13} />}
+                      {filter}
+                      <span>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {artifactScopeTask && (
+                <button
+                  className="artifact-scope-clear"
+                  type="button"
+                  onClick={() => {
+                    setArtifactTaskId(null);
+                    setArtifactFilter("全部");
+                    setSelectedArtifactId(artifacts[0]?.id ?? "");
+                  }}
+                >
+                  <X size={14} />
+                  查看全部任务
+                </button>
+              )}
+            </div>
+
+            <div className="artifact-workspace">
+              <aside className="artifact-list" aria-label="成果列表">
+                <div className="artifact-list-heading">
+                  <span>最近更新</span>
+                  <strong>{filteredArtifacts.length} 项</strong>
+                </div>
+                <div className="artifact-list-items">
+                  {filteredArtifacts.map((artifact) => {
+                    const ArtifactIcon = artifactIconMap[artifact.type];
+                    return (
+                      <div
+                        className={`artifact-list-row ${
+                          selectedArtifact?.id === artifact.id ? "selected" : ""
+                        }`}
+                        key={artifact.id}
+                      >
+                        <button
+                          className="artifact-list-main"
+                          type="button"
+                          onClick={() => setSelectedArtifactId(artifact.id)}
+                        >
+                          <span className={`artifact-type-icon type-${artifact.type}`}>
+                            <ArtifactIcon size={18} />
+                          </span>
+                          <span className="artifact-list-copy">
+                            <span>
+                              <em>{artifact.type}</em>
+                              <small>{artifact.updated}</small>
+                            </span>
+                            <strong>{artifact.title}</strong>
+                            <small>{artifact.filename}</small>
+                          </span>
+                        </button>
+                        <button
+                          className={`artifact-star ${artifact.starred ? "active" : ""}`}
+                          type="button"
+                          aria-label={
+                            artifact.starred
+                              ? `取消重点标记：${artifact.title}`
+                              : `标记为重点：${artifact.title}`
+                          }
+                          title={artifact.starred ? "取消重点" : "标记为重点"}
+                          onClick={() => toggleArtifactStar(artifact)}
+                        >
+                          <Star size={15} fill={artifact.starred ? "currentColor" : "none"} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {filteredArtifacts.length === 0 && (
+                    <div className="artifact-list-empty">
+                      <Files size={22} />
+                      <strong>这个分类还没有成果</strong>
+                      <button
+                        type="button"
+                        onClick={() => chooseArtifactFilter("全部")}
+                      >
+                        查看全部成果
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </aside>
+
+              {selectedArtifact ? (
+                <article className="artifact-preview">
+                  <header className="artifact-preview-heading">
+                    <div>
+                      <span className={`artifact-preview-icon type-${selectedArtifact.type}`}>
+                        <SelectedArtifactIcon size={22} />
+                      </span>
+                      <span>
+                        <small>
+                          {selectedArtifact.type} · {selectedArtifact.status}
+                        </small>
+                        <h2>{selectedArtifact.title}</h2>
+                        <p>{selectedArtifact.description}</p>
+                      </span>
+                    </div>
+                    <div className="artifact-preview-actions">
+                      <button
+                        className={selectedArtifact.starred ? "active" : ""}
+                        type="button"
+                        aria-label={
+                          selectedArtifact.starred
+                            ? "取消重点标记"
+                            : "标记为重点"
+                        }
+                        title={
+                          selectedArtifact.starred ? "取消重点" : "标记为重点"
+                        }
+                        onClick={() => toggleArtifactStar(selectedArtifact)}
+                      >
+                        <Star
+                          size={16}
+                          fill={selectedArtifact.starred ? "currentColor" : "none"}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="复制成果内容"
+                        title="复制内容"
+                        onClick={() => copyArtifactContent(selectedArtifact)}
+                      >
+                        <Copy size={16} />
+                      </button>
+                      <button
+                        className="download"
+                        type="button"
+                        onClick={() => downloadArtifact(selectedArtifact)}
+                      >
+                        <Download size={16} />
+                        下载
+                      </button>
+                    </div>
+                  </header>
+
+                  <div className="artifact-preview-meta">
+                    <span>
+                      <small>文件名</small>
+                      <strong>{selectedArtifact.filename}</strong>
+                    </span>
+                    <span>
+                      <small>格式</small>
+                      <strong>{selectedArtifact.format}</strong>
+                    </span>
+                    <span>
+                      <small>大小</small>
+                      <strong>{selectedArtifact.sizeKb.toFixed(1)} KB</strong>
+                    </span>
+                    <span>
+                      <small>生成时间</small>
+                      <strong>{selectedArtifact.updated}</strong>
+                    </span>
+                  </div>
+
+                  <div className="artifact-highlights" aria-label="成果摘要">
+                    {selectedArtifact.highlights.map((highlight) => (
+                      <span key={highlight}>
+                        <CheckCircle2 size={14} />
+                        {highlight}
+                      </span>
+                    ))}
+                  </div>
+
+                  <section className="artifact-content-preview">
+                    <div>
+                      <span>内容预览</span>
+                      <em>只读</em>
+                    </div>
+                    {selectedArtifact.table ? (
+                      <div className="artifact-table-wrap">
+                        <table>
+                          <thead>
+                            <tr>
+                              {selectedArtifact.table.columns.map((column) => (
+                                <th key={column}>{column}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedArtifact.table.rows.map((row, rowIndex) => (
+                              <tr key={`${selectedArtifact.id}-${rowIndex}`}>
+                                {row.map((cell, cellIndex) => (
+                                  <td key={`${rowIndex}-${cellIndex}`}>{cell}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <pre>{selectedArtifact.content}</pre>
+                    )}
+                  </section>
+
+                  <footer className="artifact-preview-footer">
+                    <span>
+                      <ShieldCheck size={16} />
+                      <span>
+                        <small>来源已验证</small>
+                        <strong>
+                          {tasks.find(
+                            (task) => task.id === selectedArtifact.taskId,
+                          )?.title ?? selectedArtifact.taskId}
+                        </strong>
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openTask(selectedArtifact.taskId)}
+                    >
+                      查看关联任务
+                      <ChevronRight size={14} />
+                    </button>
+                  </footer>
+                </article>
+              ) : (
+                <div className="artifact-preview-empty">
+                  <Files size={28} />
+                  <strong>选择一个成果查看内容</strong>
+                  <p>切换筛选条件，或从任务详情进入对应成果。</p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {activeView === "activity" && (
           <section className="activity-view">
             <div className="activity-toolbar">
@@ -2443,7 +3195,7 @@ export default function HomePage() {
                 </span>
                 <div>
                   <strong>约 {workspaceDataSize} KB 本机数据</strong>
-                  <small>备份包含任务、审批状态、运行记录和全部设置。</small>
+                  <small>备份包含任务、成果、审批状态、运行记录和全部设置。</small>
                 </div>
               </div>
               <div className="workspace-data-actions">
@@ -2599,6 +3351,60 @@ export default function HomePage() {
                   </strong>
                 </span>
               </div>
+            </section>
+
+            <section className="task-detail-artifacts">
+              <div>
+                <span>关联成果</span>
+                <button
+                  type="button"
+                  onClick={() => openTaskArtifacts(selectedTask.id)}
+                >
+                  {artifacts.filter((artifact) => artifact.taskId === selectedTask.id)
+                    .length}{" "}
+                  项
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+              {selectedTaskArtifacts.length > 0 ? (
+                <div className="task-artifact-list">
+                  {selectedTaskArtifacts.map((artifact) => {
+                    const ArtifactIcon = artifactIconMap[artifact.type];
+                    return (
+                      <button
+                        key={artifact.id}
+                        type="button"
+                        onClick={() => {
+                          setArtifactTaskId(selectedTask.id);
+                          setArtifactFilter("全部");
+                          setSelectedArtifactId(artifact.id);
+                          setActiveView("artifacts");
+                          setSelectedTaskId(null);
+                        }}
+                      >
+                        <span className={`type-${artifact.type}`}>
+                          <ArtifactIcon size={15} />
+                        </span>
+                        <span>
+                          <strong>{artifact.title}</strong>
+                          <small>
+                            {artifact.format} · {artifact.sizeKb.toFixed(1)} KB
+                          </small>
+                        </span>
+                        <ChevronRight size={14} />
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="task-artifact-empty">
+                  <Files size={17} />
+                  <span>
+                    <strong>还没有生成成果</strong>
+                    <small>任务完成交付后会自动显示在这里。</small>
+                  </span>
+                </div>
+              )}
             </section>
 
             <section className="task-detail-trace">
@@ -2890,7 +3696,7 @@ export default function HomePage() {
             <span className="confirm-delete-eyebrow">删除任务</span>
             <h2 id="delete-task-title">确定删除“{deletingTask.title}”吗？</h2>
             <p id="delete-task-description">
-              任务配置和本机运行记录将被移除。这项操作无法撤销。
+              任务配置、关联成果和本机运行记录将被移除。这项操作无法撤销。
             </p>
             <div className="confirm-delete-facts">
               <span>

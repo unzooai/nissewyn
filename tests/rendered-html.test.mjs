@@ -54,6 +54,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-tasks"/);
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-settings"/);
   assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-activity"/);
+  assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-artifacts"/);
   assert.match(page, /"unzoo-one-pending-approvals"/);
   assert.match(page, /function createTask/);
   assert.match(page, /function beginEditTask/);
@@ -61,6 +62,13 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function confirmDeleteTask/);
   assert.match(page, /function recordActivity/);
   assert.match(page, /type ApprovalRisk =/);
+  assert.match(page, /type ArtifactItem =/);
+  assert.match(page, /const initialArtifacts: ArtifactItem\[\]/);
+  assert.match(page, /function isArtifactItem/);
+  assert.match(page, /function openTaskArtifacts/);
+  assert.match(page, /function downloadArtifact/);
+  assert.match(page, /async function copyArtifactContent/);
+  assert.match(page, /function toggleArtifactStar/);
   assert.match(page, /function requestRejectApproval/);
   assert.match(page, /function confirmRejectApproval/);
   assert.match(page, /rejectedApproval/);
@@ -111,6 +119,10 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.approval-context-grid/);
   assert.match(css, /\.approval-policy-review/);
   assert.match(css, /\.approval-reject-dialog/);
+  assert.match(css, /\.artifact-overview/);
+  assert.match(css, /\.artifact-workspace/);
+  assert.match(css, /\.artifact-content-preview/);
+  assert.match(css, /\.task-detail-artifacts/);
   assert.match(css, /\.task-detail-heading-actions/);
   assert.match(css, /\.activity-filter-tabs/);
   assert.match(css, /\.activity-export/);
