@@ -282,6 +282,17 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /handleOverlayKeyDown/);
   assert.match(page, /data-overlay-initial-focus/);
   assert.match(page, /notificationWrapRef/);
+  assert.match(page, /workspaceMenuOpen/);
+  assert.match(page, /workspaceMenuWrapRef/);
+  assert.match(page, /workspaceMenuPanelRef/);
+  assert.match(page, /function openWorkspaceSection/);
+  assert.match(page, /function openWorkspaceBudget/);
+  assert.match(page, /function openWorkspaceInvite/);
+  assert.match(page, /aria-label="打开工作区控制中心"/);
+  assert.match(page, /role="dialog"\s+aria-label="工作区控制中心"/);
+  assert.match(page, /id="settings-usage"/);
+  assert.match(page, /id="settings-team"/);
+  assert.match(page, /id="settings-connectors"/);
   assert.match(page, /recentSearchKeys/);
   assert.match(page, /readNotificationIds/);
   assert.match(page, /workspaceLoadWarning/);
@@ -376,6 +387,16 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.clarity-search-panel/);
   assert.match(css, /\.clarity-search-results/);
   assert.match(css, /\.clarity-search-result-icon/);
+  assert.match(css, /\.workspace-menu-trigger/);
+  assert.match(css, /\.workspace-menu-panel/);
+  assert.match(css, /\.workspace-menu-summary/);
+  assert.match(css, /\.workspace-menu-nav/);
+  assert.match(css, /\.workspace-menu-footer/);
+  assert.match(css, /\.workspace-menu-wrap\s*\{[^}]*z-index:\s*72/s);
+  assert.match(
+    css,
+    /\.clarity-header-actions\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*44px\s*44px/s,
+  );
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   const pixelFontSizes = [...css.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)].map(
     (match) => Number(match[1]),

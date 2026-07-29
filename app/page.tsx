@@ -7,10 +7,12 @@ import {
   ArrowUpDown,
   Ban,
   Bell,
+  Building2,
   Brain,
   CalendarDays,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Clock3,
   Copy,
@@ -1449,6 +1451,7 @@ export default function HomePage() {
     initialActivityItems[0].id,
   );
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [notificationFilter, setNotificationFilter] =
     useState<NotificationFilter>("全部");
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
@@ -1547,6 +1550,9 @@ export default function HomePage() {
   const notificationWrapRef = useRef<HTMLDivElement>(null);
   const notificationButtonRef = useRef<HTMLButtonElement>(null);
   const notificationPanelRef = useRef<HTMLDivElement>(null);
+  const workspaceMenuWrapRef = useRef<HTMLDivElement>(null);
+  const workspaceMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const workspaceMenuPanelRef = useRef<HTMLDivElement>(null);
   const overlayTriggerRef = useRef<HTMLElement | null>(null);
   const routeReadyRef = useRef(false);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -2318,6 +2324,12 @@ export default function HomePage() {
       ) {
         setNotificationsOpen(false);
       }
+      if (
+        workspaceMenuWrapRef.current &&
+        !workspaceMenuWrapRef.current.contains(event.target as Node)
+      ) {
+        setWorkspaceMenuOpen(false);
+      }
     }
 
     function handleSearchShortcut(event: KeyboardEvent) {
@@ -2342,6 +2354,7 @@ export default function HomePage() {
       ) {
         event.preventDefault();
         setNotificationsOpen(false);
+        setWorkspaceMenuOpen(false);
         setSearchOpen(true);
         window.requestAnimationFrame(() => searchInputRef.current?.focus());
       }
@@ -2355,6 +2368,12 @@ export default function HomePage() {
         setNotificationsOpen(false);
         window.requestAnimationFrame(() =>
           window.requestAnimationFrame(() => notificationButtonRef.current?.focus()),
+        );
+      } else if (event.key === "Escape" && workspaceMenuOpen) {
+        event.preventDefault();
+        setWorkspaceMenuOpen(false);
+        window.requestAnimationFrame(() =>
+          window.requestAnimationFrame(() => workspaceMenuButtonRef.current?.focus()),
         );
       }
     }
@@ -2382,6 +2401,7 @@ export default function HomePage() {
     teamInviteOpen,
     temporaryModeOpen,
     usageBudgetOpen,
+    workspaceMenuOpen,
     workspaceResetOpen,
   ]);
 
@@ -4910,7 +4930,10 @@ export default function HomePage() {
     });
   }
 
-  function openView(view: ViewId) {
+  function openView(
+    view: ViewId,
+    options: { scrollToTop?: boolean } = {},
+  ) {
     setActiveView(view);
     if (view !== "tasks") {
       setSelectedTaskIds([]);
@@ -4934,6 +4957,7 @@ export default function HomePage() {
       setSelectedArtifactId(artifacts[0]?.id ?? "");
     }
     setNotificationsOpen(false);
+    setWorkspaceMenuOpen(false);
     setSelectedTaskId(null);
     setInspectedRunTaskId(null);
     setInspectedRunId(null);
@@ -4941,7 +4965,36 @@ export default function HomePage() {
       { view, taskId: null, runId: null },
       "push",
     );
-    scrollWorkspaceTop();
+    if (options.scrollToTop !== false) {
+      scrollWorkspaceTop();
+    }
+  }
+
+  function openWorkspaceSection(sectionId: string) {
+    openView("settings", { scrollToTop: false });
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() =>
+        document.getElementById(sectionId)?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        }),
+      ),
+    );
+  }
+
+  function openWorkspaceBudget() {
+    openView("settings");
+    openUsageBudget();
+  }
+
+  function openWorkspaceInvite() {
+    openView("settings");
+    openTeamInvite();
+  }
+
+  function exportWorkspaceFromMenu() {
+    setWorkspaceMenuOpen(false);
+    exportWorkspace();
   }
 
   function openTask(taskId: string) {
@@ -5516,6 +5569,7 @@ export default function HomePage() {
                   value={query}
                   onFocus={() => {
                     setNotificationsOpen(false);
+                    setWorkspaceMenuOpen(false);
                     setSearchOpen(true);
                   }}
                   onChange={(event) => {
@@ -5635,6 +5689,7 @@ export default function HomePage() {
                 aria-haspopup="dialog"
                 onClick={() => {
                   setSearchOpen(false);
+                  setWorkspaceMenuOpen(false);
                   setNotificationsOpen((open) => {
                     const nextOpen = !open;
                     if (nextOpen) {
@@ -5793,6 +5848,186 @@ export default function HomePage() {
                     查看全部运行记录
                     <ChevronRight size={14} />
                   </button>
+                </div>
+              )}
+            </div>
+
+            <div className="workspace-menu-wrap" ref={workspaceMenuWrapRef}>
+              <button
+                ref={workspaceMenuButtonRef}
+                className={`workspace-menu-trigger ${
+                  workspaceMenuOpen ? "open" : ""
+                }`}
+                type="button"
+                aria-label="打开工作区控制中心"
+                aria-controls="workspace-control-center"
+                aria-expanded={workspaceMenuOpen}
+                aria-haspopup="dialog"
+                onClick={() => {
+                  setSearchOpen(false);
+                  setNotificationsOpen(false);
+                  setWorkspaceMenuOpen((open) => {
+                    const nextOpen = !open;
+                    if (nextOpen) {
+                      window.requestAnimationFrame(() =>
+                        window.requestAnimationFrame(() =>
+                          workspaceMenuPanelRef.current
+                            ?.querySelector<HTMLButtonElement>(
+                              ".workspace-menu-nav button",
+                            )
+                            ?.focus(),
+                        ),
+                      );
+                    }
+                    return nextOpen;
+                  });
+                }}
+              >
+                <span className="workspace-menu-trigger-icon">
+                  <Building2 size={17} />
+                </span>
+                <span className="workspace-menu-trigger-copy">
+                  <strong>MVP 工作区</strong>
+                  <small>Team 方案</small>
+                </span>
+                <ChevronDown
+                  className={workspaceMenuOpen ? "is-open" : ""}
+                  size={15}
+                />
+              </button>
+
+              {workspaceMenuOpen && (
+                <div
+                  className="workspace-menu-panel"
+                  id="workspace-control-center"
+                  role="dialog"
+                  aria-label="工作区控制中心"
+                  ref={workspaceMenuPanelRef}
+                >
+                  <header className="workspace-menu-heading">
+                    <span className="workspace-menu-avatar">M</span>
+                    <div>
+                      <span>当前工作区</span>
+                      <strong>MVP 工作区</strong>
+                      <small>
+                        {settings.local ? "数据保存在本机" : "当前为临时会话"}
+                      </small>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="关闭工作区控制中心"
+                      onClick={() => {
+                        setWorkspaceMenuOpen(false);
+                        window.requestAnimationFrame(() =>
+                          workspaceMenuButtonRef.current?.focus(),
+                        );
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </header>
+
+                  <div className="workspace-menu-summary" aria-label="工作区状态">
+                    <span>
+                      <small>成员</small>
+                      <strong>{teamMembers.length}</strong>
+                    </span>
+                    <span>
+                      <small>可用连接</small>
+                      <strong>
+                        {healthyConnectorCount}/{connectorCatalog.length}
+                      </strong>
+                    </span>
+                    <span className={budgetAlertReached ? "is-alert" : ""}>
+                      <small>本月用量</small>
+                      <strong>{usagePercent}%</strong>
+                    </span>
+                  </div>
+
+                  <nav className="workspace-menu-nav" aria-label="工作区快捷操作">
+                    <button
+                      type="button"
+                      onClick={() => openWorkspaceSection("settings-team")}
+                    >
+                      <span className="tone-blue">
+                        <Users size={17} />
+                      </span>
+                      <span>
+                        <strong>团队与权限</strong>
+                        <small>
+                          {onlineMemberCount} 位在线 · {approverMemberCount} 位可审批
+                        </small>
+                      </span>
+                      <ChevronRight size={15} />
+                    </button>
+                    <button type="button" onClick={openWorkspaceBudget}>
+                      <span className="tone-violet">
+                        <Sparkles size={17} />
+                      </span>
+                      <span>
+                        <strong>用量与预算</strong>
+                        <small>
+                          已使用 {usedCredits} / {usageSettings.monthlyBudget} 点
+                        </small>
+                      </span>
+                      <ChevronRight size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openWorkspaceSection("settings-connectors")
+                      }
+                    >
+                      <span
+                        className={
+                          connectorIssueCount > 0 ? "tone-amber" : "tone-green"
+                        }
+                      >
+                        <Link2 size={17} />
+                      </span>
+                      <span>
+                        <strong>能力连接</strong>
+                        <small>
+                          {connectorIssueCount > 0
+                            ? `${connectorIssueCount} 项需要处理`
+                            : `${connectedConnectorCount} 项已连接`}
+                        </small>
+                      </span>
+                      <ChevronRight size={15} />
+                    </button>
+                    <button type="button" onClick={exportWorkspaceFromMenu}>
+                      <span className="tone-slate">
+                        <Download size={17} />
+                      </span>
+                      <span>
+                        <strong>导出工作区备份</strong>
+                        <small>下载任务、成果、设置和审计记录</small>
+                      </span>
+                      <ChevronRight size={15} />
+                    </button>
+                  </nav>
+
+                  <footer className="workspace-menu-footer">
+                    <div
+                      className="workspace-menu-people"
+                      aria-label={`${teamMembers.length} 位工作区成员`}
+                    >
+                      {teamMembers.slice(0, 3).map((member) => (
+                        <span
+                          className={`tone-${member.tone}`}
+                          key={member.id}
+                          title={member.name}
+                        >
+                          {member.avatar}
+                        </span>
+                      ))}
+                      <small>{teamMembers.length} 位成员</small>
+                    </div>
+                    <button type="button" onClick={openWorkspaceInvite}>
+                      <UserPlus size={15} />
+                      邀请成员
+                    </button>
+                  </footer>
                 </div>
               )}
             </div>
@@ -7522,6 +7757,7 @@ export default function HomePage() {
             </div>
 
             <section
+              id="settings-usage"
               className={`settings-usage-center ${
                 budgetExceeded
                   ? "is-over"
@@ -7706,7 +7942,7 @@ export default function HomePage() {
               </footer>
             </section>
 
-            <section className="settings-team-center">
+            <section className="settings-team-center" id="settings-team">
               <header className="settings-team-heading">
                 <div>
                   <span>团队与权限</span>
@@ -7862,7 +8098,10 @@ export default function HomePage() {
               </label>
             </div>
 
-            <div className="settings-group workspace-data-group">
+            <div
+              className="settings-group workspace-data-group"
+              id="settings-data"
+            >
               <div>
                 <span>数据与恢复</span>
                 <h2>备份或迁移工作区</h2>
@@ -7929,7 +8168,10 @@ export default function HomePage() {
               </div>
             </div>
 
-            <section className="settings-connectors-center">
+            <section
+              className="settings-connectors-center"
+              id="settings-connectors"
+            >
               <header className="settings-connectors-heading">
                 <div>
                   <span>能力连接</span>
