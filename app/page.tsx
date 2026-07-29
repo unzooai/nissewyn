@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import {
   Archive,
   Bell,
@@ -8,13 +11,10 @@ import {
   ChevronDown,
   ChevronRight,
   Circle,
-  Clock3,
   Database,
   FileText,
-  Fingerprint,
   Globe2,
   Grid2X2,
-  KeyRound,
   LayoutDashboard,
   Mail,
   MonitorCog,
@@ -25,17 +25,15 @@ import {
   Radio,
   Route,
   Search,
-  Send,
   Shield,
   ShieldCheck,
   Sparkles,
   TerminalSquare,
   Workflow,
-  Zap,
 } from "lucide-react";
 
 const navItems = [
-  { label: "控制台", icon: LayoutDashboard, active: true },
+  { label: "控制台", icon: LayoutDashboard },
   { label: "任务流", icon: Workflow },
   { label: "大脑路由", icon: Brain },
   { label: "能力市场", icon: Grid2X2 },
@@ -53,60 +51,38 @@ const palette = [
 ];
 
 const brainRoutes = [
-  { name: "Codex SDK", role: "代码与工具执行", health: "主路由", load: "63%" },
-  { name: "Claude Agent SDK", role: "长文分析与沟通", health: "备用", load: "24%" },
-  { name: "Gemini / ACP", role: "多模态补位", health: "待接入", load: "0%" },
+  { name: "Codex SDK", role: "代码与工具执行", health: "主路由" },
+  { name: "Claude Agent SDK", role: "长文分析与沟通", health: "备用" },
+  { name: "Gemini / ACP", role: "多模态补位", health: "待接入" },
 ];
 
-const nodes = [
+const stageCards = [
   {
-    label: "定时触发",
-    desc: "每天 09:00 自动开始，不需要打开桌面端。",
-    status: "完成",
-    icon: Clock3,
-    className: "done",
-  },
-  {
-    label: "读取竞品页面",
-    desc: "Unzoo 打开目标网页，截图并提取页面结构。",
-    status: "完成",
+    id: "observe",
+    number: "01",
+    title: "观察网页",
+    status: "已完成",
+    body: "Unzoo 打开目标页面，完成截图、DOM 结构读取和页面变化提取。",
     icon: Globe2,
-    className: "done",
+    className: "observe",
   },
   {
-    label: "Codex 分析",
-    desc: "把收集到的页面变化整理成可读结论。",
+    id: "analyze",
+    number: "02",
+    title: "AI 分析",
     status: "进行中",
+    body: "Codex 正在把页面变化整理成结论，并准备生成领导可读的简报。",
     icon: Bot,
-    className: "active",
+    className: "analyze",
   },
   {
-    label: "权限检查",
-    desc: "判断下一步是否会修改本地文件或影响外部渠道。",
-    status: "等待",
+    id: "approve",
+    number: "03",
+    title: "发送前确认",
+    status: "待审批",
+    body: "发送对象、内容和授权范围都会在这里确认，批准后才会继续。",
     icon: Shield,
-    className: "waiting",
-  },
-  {
-    label: "生成简报",
-    desc: "把结论保存为报告产物，自动关联任务证据。",
-    status: "等待",
-    icon: FileText,
-    className: "waiting",
-  },
-  {
-    label: "领导审批",
-    desc: "发送前由你确认内容、对象和授权范围。",
-    status: "等待",
-    icon: Fingerprint,
-    className: "waiting",
-  },
-  {
-    label: "发送摘要",
-    desc: "批准后再发送到指定沟通渠道。",
-    status: "未开始",
-    icon: Send,
-    className: "idle",
+    className: "approve",
   },
 ];
 
@@ -116,10 +92,10 @@ const evidence = [
   { label: "审计事件", value: "146 条", icon: Radio },
 ];
 
-const approvals = [
-  { title: "发送摘要到领导沟通群", risk: "外部副作用", time: "8 分钟后过期" },
-  { title: "读取工作浏览器身份凭证", risk: "凭证访问", time: "需要一次性授权" },
-  { title: "写入生成报告到项目目录", risk: "本地修改", time: "等待确认范围" },
+const initialApprovals = [
+  { id: "send", title: "发送摘要到领导沟通群", risk: "外部副作用", time: "8 分钟后过期" },
+  { id: "cookie", title: "读取工作浏览器身份凭证", risk: "凭证访问", time: "需要一次性授权" },
+  { id: "write", title: "写入生成报告到项目目录", risk: "本地修改", time: "等待确认范围" },
 ];
 
 const audit = [
@@ -130,6 +106,39 @@ const audit = [
 ];
 
 export default function Home() {
+  const [activeNav, setActiveNav] = useState("控制台");
+  const [query, setQuery] = useState("");
+  const [selectedCapability, setSelectedCapability] = useState("浏览器观察");
+  const [selectedBrain, setSelectedBrain] = useState("Codex SDK");
+  const [selectedStageId, setSelectedStageId] = useState("analyze");
+  const [isRunning, setIsRunning] = useState(true);
+  const [approvals, setApprovals] = useState(initialApprovals);
+  const [composerOpen, setComposerOpen] = useState(false);
+
+  const filteredPalette = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    if (!keyword) return palette;
+    return palette.filter((item) =>
+      `${item.name} ${item.desc}`.toLowerCase().includes(keyword),
+    );
+  }, [query]);
+
+  const selectedStage = stageCards.find((stage) => stage.id === selectedStageId) ?? stageCards[1];
+  const selectedCapabilityItem =
+    palette.find((item) => item.name === selectedCapability) ?? palette[0];
+  const pendingCount = approvals.length;
+  const approvedCount = initialApprovals.length - approvals.length;
+
+  function approveFirst() {
+    setApprovals((items) => items.slice(1));
+    setSelectedStageId("approve");
+  }
+
+  function approveById(id: string) {
+    setApprovals((items) => items.filter((item) => item.id !== id));
+    setSelectedStageId("approve");
+  }
+
   return (
     <main className="product-shell">
       <aside className="rail" aria-label="主导航">
@@ -145,9 +154,10 @@ export default function Home() {
           {navItems.map((item) => (
             <button
               key={item.label}
-              className={`rail-link ${item.active ? "active" : ""}`}
+              className={`rail-link ${activeNav === item.label ? "active" : ""}`}
               type="button"
               aria-label={item.label}
+              onClick={() => setActiveNav(item.label)}
             >
               <item.icon size={18} strokeWidth={1.9} />
               <span>{item.label}</span>
@@ -158,8 +168,8 @@ export default function Home() {
         <div className="runtime-badge">
           <span className="pulse-dot" />
           <div>
-            <strong>Core 正在运行</strong>
-            <small>任务、审批、审计均已接入</small>
+            <strong>{isRunning ? "Core 正在运行" : "Core 已暂停"}</strong>
+            <small>当前视图：{activeNav}</small>
           </div>
         </div>
       </aside>
@@ -178,12 +188,21 @@ export default function Home() {
           <div className="header-tools">
             <label className="search-field">
               <Search size={16} />
-              <input aria-label="搜索" placeholder="搜索任务、能力、审批" />
+              <input
+                aria-label="搜索"
+                placeholder="搜索任务、能力、审批"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
             </label>
             <button className="icon-action" type="button" aria-label="通知">
               <Bell size={18} />
             </button>
-            <button className="create-action" type="button">
+            <button
+              className="create-action"
+              type="button"
+              onClick={() => setComposerOpen((open) => !open)}
+            >
               <Plus size={18} />
               新建任务
             </button>
@@ -193,23 +212,23 @@ export default function Home() {
         <section className="mission-strip" aria-label="运行摘要">
           <div>
             <span>今日运行</span>
-            <strong>18</strong>
-            <small>4 个任务正在执行</small>
+            <strong>{isRunning ? "18" : "17"}</strong>
+            <small>{isRunning ? "4 个任务正在执行" : "任务已暂停，等待恢复"}</small>
           </div>
           <div>
             <span>等待审批</span>
-            <strong>3</strong>
-            <small>最高风险：凭证访问</small>
+            <strong>{pendingCount}</strong>
+            <small>{pendingCount ? "最高风险：凭证访问" : "审批队列已清空"}</small>
           </div>
           <div>
             <span>能力健康度</span>
             <strong>97%</strong>
-            <small>Unzoo Browser 已绑定</small>
+            <small>已选择：{selectedCapability}</small>
           </div>
           <div>
             <span>证据产物</span>
             <strong>146</strong>
-            <small>全部关联到任务</small>
+            <small>本轮已批准 {approvedCount} 项</small>
           </div>
         </section>
 
@@ -226,16 +245,31 @@ export default function Home() {
             </div>
 
             <div className="palette-list">
-              {palette.map((item) => (
-                <div className={`palette-row ${item.tone}`} key={item.name}>
+              {filteredPalette.map((item) => (
+                <button
+                  className={`palette-row ${item.tone} ${selectedCapability === item.name ? "selected" : ""}`}
+                  key={item.name}
+                  type="button"
+                  onClick={() => setSelectedCapability(item.name)}
+                >
                   <item.icon size={18} />
                   <div>
                     <strong>{item.name}</strong>
                     <small>{item.desc}</small>
                   </div>
                   <ChevronRight size={16} />
-                </div>
+                </button>
               ))}
+              {!filteredPalette.length && <p className="empty-note">没有匹配的能力。</p>}
+            </div>
+
+            <div className="capability-detail">
+              <selectedCapabilityItem.icon size={18} />
+              <div>
+                <span>已选择能力</span>
+                <strong>{selectedCapabilityItem.name}</strong>
+                <small>{selectedCapabilityItem.desc}</small>
+              </div>
             </div>
 
             <div className="brain-route-box">
@@ -246,14 +280,19 @@ export default function Home() {
                 </div>
               </div>
               {brainRoutes.map((route) => (
-                <div className="brain-row" key={route.name}>
+                <button
+                  className={`brain-row ${selectedBrain === route.name ? "selected" : ""}`}
+                  key={route.name}
+                  type="button"
+                  onClick={() => setSelectedBrain(route.name)}
+                >
                   <Brain size={16} />
                   <div>
                     <strong>{route.name}</strong>
                     <small>{route.role}</small>
                   </div>
-                  <span>{route.health}</span>
-                </div>
+                  <span>{selectedBrain === route.name ? "使用中" : route.health}</span>
+                </button>
               ))}
             </div>
           </section>
@@ -265,86 +304,90 @@ export default function Home() {
                 <h2>竞品信号自动化任务</h2>
               </div>
               <div className="toolbar-actions">
-                <button type="button" aria-label="暂停">
-                  <Pause size={16} />
-                </button>
-                <button type="button" aria-label="运行">
-                  <Play size={16} />
+                <button
+                  type="button"
+                  aria-label={isRunning ? "暂停任务" : "继续任务"}
+                  onClick={() => setIsRunning((running) => !running)}
+                >
+                  {isRunning ? <Pause size={16} /> : <Play size={16} />}
                 </button>
               </div>
             </div>
 
             <div className="workflow-canvas">
+              {composerOpen && (
+                <div className="task-composer">
+                  <div>
+                    <span>快速创建</span>
+                    <strong>监控一个网页，并在变化后生成摘要</strong>
+                  </div>
+                  <button type="button" onClick={() => setComposerOpen(false)}>
+                    加入队列
+                  </button>
+                </div>
+              )}
+
               <div className="run-hero-card">
                 <div>
                   <span>当前任务</span>
                   <strong>竞品发布信号自动化</strong>
-                  <p>先观察网页，再生成摘要。任何发送到外部渠道的动作，都会先停下来让你批准。</p>
+                  <p>当前由 {selectedBrain} 调度，使用「{selectedCapability}」。任何发送到外部渠道的动作，都会先停下来让你批准。</p>
                 </div>
                 <div className="run-progress" aria-label="任务进度 68%">
-                  <span>68%</span>
+                  <span>{isRunning ? "68%" : "暂停"}</span>
                 </div>
               </div>
 
               <div className="stage-board" aria-label="任务运行看板">
-                <article className="stage-card observe">
-                  <div className="stage-topline">
-                    <span>01</span>
-                    <em>已完成</em>
-                  </div>
-                  <div className="stage-icon">
-                    <Globe2 size={22} />
-                  </div>
-                  <h3>观察网页</h3>
-                  <p>Unzoo 打开目标页面，完成截图、DOM 结构读取和页面变化提取。</p>
-                  <div className="mini-browser" aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                </article>
-
-                <article className="stage-card analyze">
-                  <div className="stage-topline">
-                    <span>02</span>
-                    <em>进行中</em>
-                  </div>
-                  <div className="stage-icon">
-                    <Bot size={22} />
-                  </div>
-                  <h3>AI 分析</h3>
-                  <p>Codex 正在把页面变化整理成结论，并准备生成领导可读的简报。</p>
-                  <div className="signal-lines" aria-hidden="true">
-                    <i />
-                    <i />
-                    <i />
-                  </div>
-                </article>
-
-                <article className="stage-card approve">
-                  <div className="stage-topline">
-                    <span>03</span>
-                    <em>待审批</em>
-                  </div>
-                  <div className="stage-icon">
-                    <Shield size={22} />
-                  </div>
-                  <h3>发送前确认</h3>
-                  <p>发送对象、内容和授权范围都会在这里确认，批准后才会继续。</p>
-                  <div className="approval-preview" aria-hidden="true">
-                    <b />
-                    <span />
-                  </div>
-                </article>
+                {stageCards.map((stage) => (
+                  <button
+                    className={`stage-card ${stage.className} ${selectedStageId === stage.id ? "selected" : ""}`}
+                    key={stage.id}
+                    type="button"
+                    onClick={() => setSelectedStageId(stage.id)}
+                  >
+                    <div className="stage-topline">
+                      <span>{stage.number}</span>
+                      <em>{stage.id === "analyze" && !isRunning ? "已暂停" : stage.status}</em>
+                    </div>
+                    <div className="stage-icon">
+                      <stage.icon size={22} />
+                    </div>
+                    <h3>{stage.title}</h3>
+                    <p>{stage.body}</p>
+                    {stage.id === "observe" && (
+                      <div className="mini-browser" aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                    )}
+                    {stage.id === "analyze" && (
+                      <div className="signal-lines" aria-hidden="true">
+                        <i />
+                        <i />
+                        <i />
+                      </div>
+                    )}
+                    {stage.id === "approve" && (
+                      <div className="approval-preview" aria-hidden="true">
+                        <b />
+                        <span />
+                      </div>
+                    )}
+                  </button>
+                ))}
               </div>
 
               <div className="run-output-card">
-                <FileText size={20} />
+                <selectedStage.icon size={20} />
                 <div>
-                  <span>即将生成</span>
-                  <strong>竞品信号简报 · competitor-report.md</strong>
+                  <span>当前选择</span>
+                  <strong>{selectedStage.title} · {selectedStage.status}</strong>
                 </div>
-                <button type="button">预览草稿</button>
+                <button type="button" onClick={() => setSelectedStageId("approve")}>
+                  查看审批
+                </button>
               </div>
             </div>
 
@@ -367,31 +410,37 @@ export default function Home() {
                 <Shield size={14} />
                 审批检查器
               </span>
-              <h2>发送前需要你批准</h2>
-              <p>目标动作会影响外部沟通渠道，默认进入提交前审批。</p>
+              <h2>{pendingCount ? "发送前需要你批准" : "审批已完成"}</h2>
+              <p>{pendingCount ? "目标动作会影响外部沟通渠道，默认进入提交前审批。" : "当前任务没有阻塞项，可以继续进入下一步。"}</p>
               <div className="risk-meter" aria-label="风险等级">
                 <span />
-                <strong>高风险</strong>
+                <strong>{pendingCount ? "高风险" : "无阻塞"}</strong>
               </div>
               <div className="approval-buttons">
-                <button className="allow" type="button">
+                <button className="allow" type="button" onClick={approveFirst} disabled={!pendingCount}>
                   <Check size={16} />
-                  批准一次
+                  {pendingCount ? "批准一次" : "已处理"}
                 </button>
-                <button type="button">转人工</button>
+                <button type="button" onClick={() => setIsRunning(false)}>转人工</button>
               </div>
             </div>
 
             <div className="approval-list">
               {approvals.map((item) => (
-                <div className="approval-row" key={item.title}>
+                <button className="approval-row" key={item.id} type="button" onClick={() => approveById(item.id)}>
                   <Circle size={10} />
                   <div>
                     <strong>{item.title}</strong>
                     <small>{item.risk} · {item.time}</small>
                   </div>
-                </div>
+                </button>
               ))}
+              {!approvals.length && (
+                <div className="approval-empty">
+                  <Check size={16} />
+                  <span>审批队列已清空</span>
+                </div>
+              )}
             </div>
 
             <div className="audit-box">
@@ -404,6 +453,7 @@ export default function Home() {
               {audit.map((item) => (
                 <p key={item}>{item}</p>
               ))}
+              {approvedCount > 0 && <p>本轮已批准：{approvedCount} 项</p>}
             </div>
           </aside>
         </section>
