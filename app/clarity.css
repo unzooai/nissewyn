@@ -16138,6 +16138,41 @@ body {
   background: #e8f1fb;
 }
 
+.view-link-copy {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #d4dfe8;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #687c90;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.view-link-copy:hover {
+  border-color: #9bb7d1;
+  background: #edf5fc;
+  color: #315f96;
+}
+
+.view-link-copy:focus-visible {
+  outline: 2px solid #7ba8d2;
+  outline-offset: 2px;
+}
+
+.approval-result-meta {
+  display: inline-flex;
+  justify-self: end;
+  align-items: center;
+  gap: 7px;
+}
+
 @media (max-width: 1180px) {
   .settings-usage-layout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -16301,6 +16336,15 @@ body {
 
   .task-result-meta {
     gap: 6px;
+  }
+
+  .approval-result-meta {
+    justify-self: start;
+  }
+
+  .view-link-copy {
+    width: 40px;
+    height: 40px;
   }
 
   .usage-budget-facts {

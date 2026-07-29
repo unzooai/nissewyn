@@ -68,6 +68,7 @@ type WorkspaceRoute = {
   taskId: string | null;
   runId: string | null;
   taskFilter?: TaskFilter | null;
+  approvalFilter?: ApprovalRiskFilter | null;
 };
 type WorkspaceHistoryState = {
   unzooOne: true;
@@ -1375,11 +1376,18 @@ function readWorkspaceRoute(): WorkspaceRoute {
       ? (requestedTaskFilter as TaskFilter)
       : null;
   const resolvedView = taskId ? "tasks" : view;
+  const requestedApprovalFilter = url.searchParams.get("risk");
+  const approvalFilter =
+    requestedApprovalFilter &&
+    approvalRiskFilters.includes(requestedApprovalFilter as ApprovalRiskFilter)
+      ? (requestedApprovalFilter as ApprovalRiskFilter)
+      : null;
   return {
     view: resolvedView,
     taskId,
     runId,
     taskFilter: resolvedView === "tasks" ? taskFilter : null,
+    approvalFilter: resolvedView === "approvals" ? approvalFilter : null,
   };
 }
 
@@ -1412,6 +1420,15 @@ function writeWorkspaceRoute(
     url.searchParams.set("status", route.taskFilter);
   } else {
     url.searchParams.delete("status");
+  }
+  if (
+    route.view === "approvals" &&
+    route.approvalFilter &&
+    route.approvalFilter !== "全部"
+  ) {
+    url.searchParams.set("risk", route.approvalFilter);
+  } else {
+    url.searchParams.delete("risk");
   }
 
   const nextLocation = `${url.pathname}${url.search}${url.hash}`;
@@ -1486,6 +1503,31 @@ const approvalRiskFilters: ApprovalRiskFilter[] = [
   "低风险",
   "稍后",
 ];
+const approvalFilterPageCopy: Record<
+  Exclude<ApprovalRiskFilter, "全部">,
+  { eyebrow: string; title: string; description: string }
+> = {
+  高风险: {
+    eyebrow: "待确认 · 高风险",
+    title: "需要逐项确认的高风险操作",
+    description: "逐项核对执行对象、影响范围和证据后再做决定。",
+  },
+  中风险: {
+    eyebrow: "待确认 · 中风险",
+    title: "需要确认的中风险操作",
+    description: "确认执行范围与授权边界，批准后任务才会继续。",
+  },
+  低风险: {
+    eyebrow: "待确认 · 低风险",
+    title: "可以快速处理的低风险操作",
+    description: "检查目标和内容后，可以逐项或批量处理。",
+  },
+  稍后: {
+    eyebrow: "待确认 · 稍后提醒",
+    title: "已经安排稍后处理的操作",
+    description: "这些操作仍未执行，会在约定时间重新进入待确认列表。",
+  },
+};
 const artifactFilters: ArtifactFilter[] = [
   "全部",
   "重点",
@@ -2330,6 +2372,8 @@ export default function HomePage() {
         }
       : activeView === "tasks" && taskFilter !== "全部"
         ? taskFilterPageCopy[taskFilter]
+        : activeView === "approvals" && approvalRiskFilter !== "全部"
+          ? approvalFilterPageCopy[approvalRiskFilter]
         : viewTitles[activeView];
   const normalizedApprovalQuery = approvalListQuery.trim().toLowerCase();
   const filteredApprovals = useMemo(
@@ -3438,6 +3482,10 @@ export default function HomePage() {
           requestedRoute.view === "tasks"
             ? (requestedRoute.taskFilter ?? null)
             : null,
+        approvalFilter:
+          requestedRoute.view === "approvals"
+            ? (requestedRoute.approvalFilter ?? null)
+            : null,
       };
       const currentHistoryState = window.history.state as
         | WorkspaceHistoryState
@@ -3447,6 +3495,11 @@ export default function HomePage() {
       setTaskFilter(
         resolvedRoute.view === "tasks"
           ? (resolvedRoute.taskFilter ?? "全部")
+          : "全部",
+      );
+      setApprovalRiskFilter(
+        resolvedRoute.view === "approvals"
+          ? (resolvedRoute.approvalFilter ?? "全部")
           : "全部",
       );
       setSelectedTaskId(
@@ -5716,7 +5769,7 @@ export default function HomePage() {
       [held.id]: deferredUntil.toISOString(),
     }));
     setApprovalClock(Date.now());
-    setApprovalRiskFilter("全部");
+    chooseApprovalRiskFilter("全部");
     setSelectedApprovalId(nextApproval?.id ?? "");
     setSelectedApprovalIds((ids) => ids.filter((id) => id !== held.id));
     setApprovalSnoozeId(null);
@@ -5749,7 +5802,7 @@ export default function HomePage() {
       return next;
     });
     setApprovalClock(Date.now());
-    setApprovalRiskFilter("全部");
+    chooseApprovalRiskFilter("全部");
     setSelectedApprovalId(approvalId);
     recordActivity({
       title: `已恢复待确认：${approval.title}`,
@@ -7255,10 +7308,16 @@ export default function HomePage() {
 
   function openView(
     view: ViewId,
-    options: { scrollToTop?: boolean; taskFilter?: TaskFilter } = {},
+    options: {
+      scrollToTop?: boolean;
+      taskFilter?: TaskFilter;
+      approvalFilter?: ApprovalRiskFilter;
+    } = {},
   ) {
     const nextTaskFilter =
       view === "tasks" ? (options.taskFilter ?? "全部") : "全部";
+    const nextApprovalFilter =
+      view === "approvals" ? (options.approvalFilter ?? "全部") : "全部";
     setActiveView(view);
     if (view === "tasks") {
       setTaskFilter(nextTaskFilter);
@@ -7273,6 +7332,9 @@ export default function HomePage() {
       setBulkApprovalDecision(null);
       setApprovalRejectReason("");
       setApprovalRiskFilter("全部");
+    } else {
+      setApprovalRiskFilter(nextApprovalFilter);
+      setApprovalListQuery("");
     }
     if (view === "activity") {
       setActivityTaskId(null);
@@ -7297,6 +7359,8 @@ export default function HomePage() {
         taskId: null,
         runId: null,
         taskFilter: view === "tasks" ? nextTaskFilter : null,
+        approvalFilter:
+          view === "approvals" ? nextApprovalFilter : null,
       },
       "push",
     );
@@ -7317,8 +7381,6 @@ export default function HomePage() {
   }
 
   function openApprovalQueue() {
-    setApprovalRiskFilter("全部");
-    setApprovalListQuery("");
     setSelectedApprovalIds([]);
     openView("approvals");
     setNotice(
@@ -7326,6 +7388,45 @@ export default function HomePage() {
         ? `正在查看 ${activeApprovalCount} 项待确认操作`
         : "当前没有待确认操作",
     );
+  }
+
+  function chooseApprovalRiskFilter(filter: ApprovalRiskFilter) {
+    setApprovalRiskFilter(filter);
+    setSelectedApprovalIds([]);
+    writeWorkspaceRoute(
+      {
+        view: "approvals",
+        taskId: null,
+        runId: null,
+        approvalFilter: filter,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
+  }
+
+  async function copyCurrentViewLink(label: string) {
+    const currentUrl = window.location.href;
+    let copied = false;
+    try {
+      await window.navigator.clipboard.writeText(currentUrl);
+      copied = true;
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = currentUrl;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      try {
+        textarea.select();
+        copied = document.execCommand("copy");
+      } catch {
+        copied = false;
+      } finally {
+        textarea.remove();
+      }
+    }
+    setNotice(copied ? `${label}已复制` : "复制失败，请稍后重试");
   }
 
   function openWorkspaceSection(sectionId: string) {
@@ -9062,10 +9163,11 @@ export default function HomePage() {
                     {deferredApprovalCount > 0 && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setApprovalRiskFilter("稍后");
-                          openView("approvals");
-                        }}
+                        onClick={() =>
+                          openView("approvals", {
+                            approvalFilter: "稍后",
+                          })
+                        }
                       >
                         查看稍后提醒
                         <ChevronRight size={14} />
@@ -9204,6 +9306,15 @@ export default function HomePage() {
                 <span className="task-result-count" aria-live="polite">
                   显示 <strong>{filteredTasks.length}</strong> / {tasks.length} 个任务
                 </span>
+                <button
+                  className="view-link-copy"
+                  type="button"
+                  aria-label="复制当前任务视图链接"
+                  title="复制当前任务视图链接"
+                  onClick={() => copyCurrentViewLink("任务视图链接")}
+                >
+                  <Link2 size={14} />
+                </button>
               </div>
             </div>
 
@@ -9475,10 +9586,7 @@ export default function HomePage() {
                           type="button"
                           role="tab"
                           aria-selected={approvalRiskFilter === filter}
-                          onClick={() => {
-                            setApprovalRiskFilter(filter);
-                            setSelectedApprovalIds([]);
-                          }}
+                          onClick={() => chooseApprovalRiskFilter(filter)}
                         >
                           {filter === "稍后" && <Clock3 size={13} />}
                           {filter}
@@ -9486,13 +9594,24 @@ export default function HomePage() {
                         </button>
                       ))}
                     </div>
-                    <span className="approval-result-count" aria-live="polite">
-                      显示 {filteredApprovals.length} /{" "}
-                      {approvalRiskFilter === "稍后"
-                        ? deferredApprovalCount
-                        : activeApprovalCount}{" "}
-                      项
-                    </span>
+                    <div className="approval-result-meta">
+                      <span className="approval-result-count" aria-live="polite">
+                        显示 {filteredApprovals.length} /{" "}
+                        {approvalRiskFilter === "稍后"
+                          ? deferredApprovalCount
+                          : activeApprovalCount}{" "}
+                        项
+                      </span>
+                      <button
+                        className="view-link-copy"
+                        type="button"
+                        aria-label="复制当前审批视图链接"
+                        title="复制当前审批视图链接"
+                        onClick={() => copyCurrentViewLink("审批视图链接")}
+                      >
+                        <Link2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -9674,7 +9793,7 @@ export default function HomePage() {
                         type="button"
                         onClick={() => {
                           setApprovalListQuery("");
-                          setApprovalRiskFilter(
+                          chooseApprovalRiskFilter(
                             activeApprovalCount === 0 &&
                               deferredApprovalCount > 0
                               ? "稍后"

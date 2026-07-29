@@ -90,8 +90,13 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function openTaskStatus/);
   assert.match(page, /function openApprovalQueue/);
   assert.match(page, /function chooseTaskFilter/);
+  assert.match(page, /function chooseApprovalRiskFilter/);
+  assert.match(page, /function copyCurrentViewLink/);
   assert.match(page, /searchParams\.get\("status"\)/);
   assert.match(page, /searchParams\.set\("status", route\.taskFilter\)/);
+  assert.match(page, /searchParams\.get\("risk"\)/);
+  assert.match(page, /searchParams\.set\("risk", route\.approvalFilter\)/);
+  assert.match(page, /复制当前审批视图链接/);
   assert.match(page, /className="summary-running"/);
   assert.match(page, /className="task-filter-context"/);
   assert.match(page, /type DesktopNotificationPermission =/);
