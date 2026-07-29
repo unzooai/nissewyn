@@ -388,6 +388,7 @@ export default function HomePage() {
   const [selectedApprovalId, setSelectedApprovalId] = useState(initialApprovals[0].id);
   const [activityLog, setActivityLog] = useState<ActivityItem[]>(initialActivityItems);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("全部");
+  const [activityTaskId, setActivityTaskId] = useState<string | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -420,6 +421,11 @@ export default function HomePage() {
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
   const deletingTask = tasks.find((task) => task.id === deleteTaskId) ?? null;
   const primaryTask = tasks.find((task) => task.id === "competitor") ?? initialTasks[0];
+  const activityTask = tasks.find((task) => task.id === activityTaskId) ?? null;
+  const activitySummaryTask = activityTask ?? primaryTask;
+  const selectedTaskActivity = selectedTask
+    ? activityLog.filter((item) => item.taskId === selectedTask.id).slice(0, 3)
+    : [];
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -682,19 +688,27 @@ export default function HomePage() {
     return searchedTasks.filter((task) => task.status === taskFilter);
   }, [searchedTasks, taskFilter]);
 
+  const scopedActivityLog = useMemo(
+    () =>
+      activityTaskId
+        ? activityLog.filter((item) => item.taskId === activityTaskId)
+        : activityLog,
+    [activityLog, activityTaskId],
+  );
+
   const filteredActivityLog = useMemo(() => {
-    if (activityFilter === "全部") return activityLog;
-    return activityLog.filter((item) => item.kind === activityFilter);
-  }, [activityFilter, activityLog]);
+    if (activityFilter === "全部") return scopedActivityLog;
+    return scopedActivityLog.filter((item) => item.kind === activityFilter);
+  }, [activityFilter, scopedActivityLog]);
 
   const activityCounts = useMemo(
     () => ({
-      全部: activityLog.length,
-      任务: activityLog.filter((item) => item.kind === "任务").length,
-      审批: activityLog.filter((item) => item.kind === "审批").length,
-      系统: activityLog.filter((item) => item.kind === "系统").length,
+      全部: scopedActivityLog.length,
+      任务: scopedActivityLog.filter((item) => item.kind === "任务").length,
+      审批: scopedActivityLog.filter((item) => item.kind === "审批").length,
+      系统: scopedActivityLog.filter((item) => item.kind === "系统").length,
     }),
-    [activityLog],
+    [scopedActivityLog],
   );
 
   const runningTaskCount = tasks.filter((task) => task.status === "运行中").length;
@@ -948,6 +962,9 @@ export default function HomePage() {
   function confirmDeleteTask() {
     if (!deletingTask) return;
     setTasks((items) => items.filter((item) => item.id !== deletingTask.id));
+    if (activityTaskId === deletingTask.id) {
+      setActivityTaskId(null);
+    }
     setDeleteTaskId(null);
     recordActivity({
       title: `任务已删除：${deletingTask.title}`,
@@ -974,12 +991,23 @@ export default function HomePage() {
 
   function openView(view: ViewId) {
     setActiveView(view);
+    if (view === "activity") {
+      setActivityTaskId(null);
+    }
     setNotificationsOpen(false);
     setSelectedTaskId(null);
   }
 
   function openTask(taskId: string) {
     setSelectedTaskId(taskId);
+    setNotificationsOpen(false);
+  }
+
+  function openTaskActivity(taskId: string) {
+    setActivityTaskId(taskId);
+    setActivityFilter("全部");
+    setActiveView("activity");
+    setSelectedTaskId(null);
     setNotificationsOpen(false);
   }
 
@@ -1763,8 +1791,8 @@ export default function HomePage() {
           <section className="activity-view">
             <div className="activity-toolbar">
               <div>
-                <span>可信审计</span>
-                <strong>{activityLog.length} 条记录</strong>
+                <span>{activityTask ? "任务审计" : "可信审计"}</span>
+                <strong>{scopedActivityLog.length} 条记录</strong>
               </div>
               <div
                 className="activity-filter-tabs"
@@ -1798,15 +1826,35 @@ export default function HomePage() {
             <div className="activity-summary">
               <Activity size={18} />
               <div>
-                <strong>{primaryTask.title}</strong>
+                <strong>{activitySummaryTask.title}</strong>
                 <small>
-                  {formatTaskSchedule(primaryTask)} · 已记录 {activityLog.length} 个事件
+                  {formatTaskSchedule(activitySummaryTask)} ·{" "}
+                  {activityTask
+                    ? "仅显示此任务的记录"
+                    : `已记录 ${scopedActivityLog.length} 个事件`}
                 </small>
               </div>
-              <span className={`live-state ${isRunning ? "" : "paused"}`}>
-                <i />
-                {isRunning ? "运行中" : "已暂停"}
-              </span>
+              <div className="activity-summary-actions">
+                {activityTask && (
+                  <button
+                    className="activity-scope-clear"
+                    type="button"
+                    aria-label={`取消“${activityTask.title}”任务筛选`}
+                    onClick={() => setActivityTaskId(null)}
+                  >
+                    <X size={14} />
+                    查看全部
+                  </button>
+                )}
+                <span
+                  className={`live-state ${
+                    activitySummaryTask.status === "运行中" ? "" : "paused"
+                  }`}
+                >
+                  <i />
+                  {activitySummaryTask.status}
+                </span>
+              </div>
             </div>
 
             <div className="activity-timeline" aria-live="polite">
@@ -1835,9 +1883,24 @@ export default function HomePage() {
               {filteredActivityLog.length === 0 && (
                 <div className="activity-empty">
                   <Search size={22} />
-                  <strong>这个分类还没有记录</strong>
-                  <button type="button" onClick={() => setActivityFilter("全部")}>
-                    查看全部记录
+                  <strong>
+                    {activityTask
+                      ? activityFilter === "全部"
+                        ? "这个任务还没有运行记录"
+                        : "这个任务还没有此类记录"
+                      : "这个分类还没有记录"}
+                  </strong>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activityFilter !== "全部") {
+                        setActivityFilter("全部");
+                      } else {
+                        setActivityTaskId(null);
+                      }
+                    }}
+                  >
+                    {activityFilter !== "全部" ? "查看此任务全部记录" : "查看全部任务"}
                   </button>
                 </div>
               )}
@@ -2016,46 +2079,43 @@ export default function HomePage() {
             <section className="task-detail-trace">
               <div>
                 <span>最近动作</span>
-                <button type="button" onClick={() => openView("activity")}>
+                <button
+                  type="button"
+                  onClick={() => openTaskActivity(selectedTask.id)}
+                >
                   完整记录
                   <ChevronRight size={14} />
                 </button>
               </div>
-              <ol>
-                <li className="complete">
-                  <i><Check size={13} /></i>
+              {selectedTaskActivity.length > 0 ? (
+                <ol className="task-activity-list">
+                  {selectedTaskActivity.map((item) => {
+                    const TraceIcon = activityIconMap[item.icon] ?? Activity;
+                    return (
+                      <li className={`trace-${item.tone}`} key={item.id}>
+                        <i>
+                          <TraceIcon size={13} />
+                        </i>
+                        <span>
+                          <strong>{item.title}</strong>
+                          <small>
+                            <time dateTime={item.createdAt}>{item.time}</time>
+                            {item.detail}
+                          </small>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                <div className="task-trace-empty">
+                  <History size={18} />
                   <span>
-                    <strong>任务已安全启动</strong>
-                    <small>已加载目标和本机执行策略</small>
+                    <strong>还没有可用记录</strong>
+                    <small>新的关键动作会自动显示在这里。</small>
                   </span>
-                </li>
-                <li className={selectedTask.progress >= 40 ? "complete" : "current"}>
-                  <i>
-                    {selectedTask.progress >= 40 ? <Check size={13} /> : <Brain size={13} />}
-                  </i>
-                  <span>
-                    <strong>AI 正在整理信息</strong>
-                    <small>保留证据，只提取有意义的变化</small>
-                  </span>
-                </li>
-                <li className={selectedTask.status === "已完成" ? "complete" : ""}>
-                  <i>
-                    {selectedTask.status === "已完成" ? (
-                      <Check size={13} />
-                    ) : (
-                      <ShieldCheck size={13} />
-                    )}
-                  </i>
-                  <span>
-                    <strong>生成可审计结果</strong>
-                    <small>
-                      {selectedTask.status === "待确认"
-                        ? "正在等待你的确认"
-                        : "完成后可随时回看执行记录"}
-                    </small>
-                  </span>
-                </li>
-              </ol>
+                </div>
+              )}
             </section>
 
             <footer className="task-detail-actions">

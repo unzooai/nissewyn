@@ -61,6 +61,10 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function confirmDeleteTask/);
   assert.match(page, /function recordActivity/);
   assert.match(page, /function exportActivity/);
+  assert.match(page, /function openTaskActivity/);
+  assert.match(page, /const scopedActivityLog = useMemo/);
+  assert.match(page, /selectedTaskActivity\.map/);
+  assert.match(page, /activityTaskId/);
   assert.match(page, /const taskTemplates:/);
   assert.match(page, /type TaskSchedule =/);
   assert.match(page, /type Weekday =/);
@@ -96,6 +100,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.task-detail-heading-actions/);
   assert.match(css, /\.activity-filter-tabs/);
   assert.match(css, /\.activity-export/);
+  assert.match(css, /\.activity-scope-clear/);
+  assert.match(css, /\.task-activity-list/);
+  assert.match(css, /\.task-trace-empty/);
   assert.match(css, /\.timeline-kind/);
   assert.match(css, /\.clarity-search-panel/);
   assert.match(css, /\.clarity-search-results/);
