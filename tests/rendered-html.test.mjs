@@ -60,6 +60,12 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /window\.addEventListener\("offline"/);
   assert.match(page, /function checkNetworkConnection/);
   assert.match(page, /className="network-status-banner"/);
+  assert.match(page, /function requireOnline/);
+  assert.match(page, /const startImmediately = isOnline/);
+  assert.match(page, /className="task-offline-note"/);
+  assert.match(page, /保存，联网后运行/);
+  assert.match(page, /设备离线，未执行批准操作/);
+  assert.match(page, /设备离线，无法测试/);
   assert.match(page, /function toggleDesktopNotifications/);
   assert.match(page, /window\.Notification\.requestPermission/);
   assert.match(page, /new window\.Notification/);
@@ -289,6 +295,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.settings-policy-row > button:disabled/);
   assert.match(css, /\.network-status-banner/);
   assert.match(css, /\.clarity-sidebar-status > i\.offline/);
+  assert.match(css, /\.task-offline-note/);
   assert.match(css, /@keyframes notification-sheet-in/);
   assert.match(css, /\.notification-backdrop/);
   assert.match(css, /\.settings-connectors-center/);

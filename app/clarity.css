@@ -7643,6 +7643,44 @@ body {
   padding: 20px 26px 0;
 }
 
+.task-offline-note {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  margin: 18px 26px 0;
+  padding: 10px 12px;
+  border: 1px solid #ecd2a8;
+  border-radius: 7px;
+  background: #fffbf3;
+  color: #b36e1b;
+}
+
+.task-offline-note > svg {
+  justify-self: center;
+}
+
+.task-offline-note > span,
+.task-offline-note strong,
+.task-offline-note small {
+  display: block;
+  min-width: 0;
+}
+
+.task-offline-note strong {
+  color: #5a4226;
+  font-size: 11px;
+  font-weight: 820;
+}
+
+.task-offline-note small {
+  margin-top: 3px;
+  color: #7a674e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .task-template-picker > span,
 .composer-field-grid label > span,
 .composer-instruction > span,
@@ -7979,6 +8017,10 @@ body {
 
   .task-template-picker {
     padding: 17px 18px 0;
+  }
+
+  .task-offline-note {
+    margin: 14px 18px 0;
   }
 
   .task-template-picker button {

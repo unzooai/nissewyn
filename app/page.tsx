@@ -4522,6 +4522,14 @@ export default function HomePage() {
 
   function confirmBulkApprove() {
     if (bulkApprovableApprovals.length === 0) return;
+    if (
+      !requireOnline(
+        "设备离线，未执行批量批准；所选操作仍保留在待确认列表中",
+      )
+    ) {
+      setBulkApprovalDecision(null);
+      return;
+    }
     const approvedIds = new Set(
       bulkApprovableApprovals.map((approval) => approval.id),
     );
@@ -4681,6 +4689,13 @@ export default function HomePage() {
 
   function approveCurrent() {
     if (!selectedApproval) return;
+    if (
+      !requireOnline(
+        "设备离线，未执行批准操作；这项操作仍保留在待确认列表中",
+      )
+    ) {
+      return;
+    }
     const approved = selectedApproval;
     const relatedTask = tasks.find((task) => task.id === approved.taskId);
     const shouldResume = relatedTask?.status === "待确认";
@@ -4871,27 +4886,30 @@ export default function HomePage() {
         return;
       }
 
+      const startImmediately = isOnline;
       const newTask: TaskItem = {
         id: `task-${Date.now()}`,
         title: taskName.trim(),
         description: taskDescription.trim(),
         target: taskTarget.trim(),
-        status: "运行中",
-        progress: 3,
-        updated: "刚刚创建",
+        status: startImmediately ? "运行中" : "已暂停",
+        progress: startImmediately ? 3 : 0,
+        updated: startImmediately ? "刚刚创建" : "已保存，等待网络",
         schedule: taskSchedule,
         scheduleTime: taskSchedule === "仅运行一次" ? undefined : taskScheduleTime,
         scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
         requiresApproval: taskApproval,
         retryCount: 0,
-        runs: [
-          {
-            id: `run-${Date.now()}`,
-            status: "运行中",
-            startedAt: new Date().toISOString(),
-            summary: "任务已创建，正在检查数据来源和执行范围。",
-          },
-        ],
+        runs: startImmediately
+          ? [
+              {
+                id: `run-${Date.now()}`,
+                status: "运行中",
+                startedAt: new Date().toISOString(),
+                summary: "任务已创建，正在检查数据来源和执行范围。",
+              },
+            ]
+          : [],
       };
       setTasks((items) => [newTask, ...items]);
       setTaskFilter("全部");
@@ -4911,14 +4929,22 @@ export default function HomePage() {
       setTaskScheduleDay("周一");
       setTaskApproval(true);
       recordActivity({
-        title: `任务已创建：${newTask.title}`,
-        detail: `${formatTaskSchedule(newTask)} · 目标：${newTask.target}`,
+        title: `${
+          startImmediately ? "任务已创建" : "离线任务已保存"
+        }：${newTask.title}`,
+        detail: startImmediately
+          ? `${formatTaskSchedule(newTask)} · 目标：${newTask.target}`
+          : `${formatTaskSchedule(newTask)} · 已保存配置，恢复网络后可手动开始运行。`,
         icon: "sparkles",
-        tone: "blue",
+        tone: startImmediately ? "blue" : "amber",
         kind: "任务",
         taskId: newTask.id,
       });
-      setNotice(`任务“${newTask.title}”已开始运行`);
+      setNotice(
+        startImmediately
+          ? `任务“${newTask.title}”已开始运行`
+          : `任务“${newTask.title}”已保存，联网后可以开始运行`,
+      );
     } finally {
       taskSavingRef.current = false;
       setIsSavingTask(false);
@@ -5730,6 +5756,13 @@ export default function HomePage() {
   function connectConnector(connectorId: ConnectorId) {
     const connector = connectorCatalog.find((item) => item.id === connectorId);
     if (!connector) return;
+    if (
+      !requireOnline(
+        `设备离线，${connector.name}尚未连接；恢复网络后可以继续授权`,
+      )
+    ) {
+      return;
+    }
     setConnectorStates((current) => ({ ...current, [connectorId]: true }));
     setConnectorDisconnectConfirm(false);
     recordActivity({
@@ -5745,6 +5778,13 @@ export default function HomePage() {
   function testConnector(connectorId: ConnectorId) {
     const connector = connectorCatalog.find((item) => item.id === connectorId);
     if (!connector || !connectorStates[connectorId] || connectorTestingId) return;
+    if (
+      !requireOnline(
+        `设备离线，无法测试${connector.name}；当前授权状态没有改变`,
+      )
+    ) {
+      return;
+    }
     setConnectorTestingId(connectorId);
     window.setTimeout(() => {
       setConnectorTestingId(null);
@@ -5763,6 +5803,13 @@ export default function HomePage() {
     const connector = connectorCatalog.find((item) => item.id === connectorId);
     const impactedTasks = connectorIssueTasks[connectorId];
     if (!connector || impactedTasks.length === 0 || connectorTestingId) return;
+    if (
+      !requireOnline(
+        `设备离线，${connector.name}尚未重新授权；受影响任务仍保持安全停止`,
+      )
+    ) {
+      return;
+    }
 
     const impactedTaskIds = new Set(impactedTasks.map((task) => task.id));
     setConnectorTestingId(connectorId);
@@ -6301,6 +6348,12 @@ export default function HomePage() {
     );
   }
 
+  function requireOnline(message: string) {
+    if (isOnline) return true;
+    setNotice(message);
+    return false;
+  }
+
   async function checkNetworkConnection() {
     if (isCheckingNetwork) return;
     setIsCheckingNetwork(true);
@@ -6385,6 +6438,13 @@ export default function HomePage() {
   }
 
   function retryTask(task: TaskItem) {
+    if (
+      !requireOnline(
+        `设备离线，任务“${task.title}”仍保持停止；恢复网络后可以重试`,
+      )
+    ) {
+      return;
+    }
     const now = new Date();
     const nextRun: TaskRun = {
       id: `run-${task.id}-${now.getTime()}`,
@@ -6435,6 +6495,16 @@ export default function HomePage() {
 
     if (task.status === "失败") {
       retryTask(task);
+      return;
+    }
+
+    const willStart = task.status !== "运行中";
+    if (
+      willStart &&
+      !requireOnline(
+        `设备离线，任务“${task.title}”仍保持暂停；恢复网络后可以继续`,
+      )
+    ) {
       return;
     }
 
@@ -6498,6 +6568,14 @@ export default function HomePage() {
 
   function togglePrimaryTask() {
     const nextRunning = !isRunning;
+    if (
+      nextRunning &&
+      !requireOnline(
+        `设备离线，任务“${primaryTask.title}”仍保持暂停；恢复网络后可以继续`,
+      )
+    ) {
+      return;
+    }
     setIsRunning(nextRunning);
     setTasks((items) =>
       items.map((task) =>
@@ -10877,6 +10955,18 @@ export default function HomePage() {
               </button>
             </div>
 
+            {!isOnline && (
+              <div className="task-offline-note" role="status">
+                <Globe2 size={16} />
+                <span>
+                  <strong>当前处于离线状态</strong>
+                  <small>
+                    任务配置会保存在本机，但不会显示为正在运行；恢复网络后可以手动开始。
+                  </small>
+                </span>
+              </div>
+            )}
+
             <section className="task-template-picker" aria-label="快速模板">
               <span>快速开始</span>
               <div>
@@ -11139,16 +11229,22 @@ export default function HomePage() {
                   <LoaderCircle className="composer-saving-icon" size={16} />
                 ) : editingTaskId ? (
                   <Pencil size={16} />
+                ) : !isOnline ? (
+                  <Save size={16} />
                 ) : (
                   <Sparkles size={16} />
                 )}
                 {isSavingTask
                   ? editingTaskId
                     ? "正在保存"
-                    : "正在创建"
+                    : isOnline
+                      ? "正在创建"
+                      : "正在保存"
                   : editingTaskId
                     ? "保存修改"
-                    : "创建并运行"}
+                    : isOnline
+                      ? "创建并运行"
+                      : "保存，联网后运行"}
               </button>
             </div>
           </form>
