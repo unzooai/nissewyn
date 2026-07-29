@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Clock3,
   Copy,
+  Download,
   FileText,
   Globe2,
   History,
@@ -39,6 +40,31 @@ type SettingsState = {
   local: boolean;
   notifications: boolean;
 };
+type ActivityKind = "任务" | "审批" | "系统";
+type ActivityFilter = "全部" | ActivityKind;
+type ActivityTone = "blue" | "violet" | "green" | "amber" | "red" | "neutral";
+type ActivityIconKey =
+  | "activity"
+  | "brain"
+  | "clock"
+  | "copy"
+  | "globe"
+  | "settings"
+  | "shield"
+  | "sparkles"
+  | "trash";
+
+type ActivityItem = {
+  id: string;
+  time: string;
+  createdAt: string;
+  title: string;
+  detail: string;
+  icon: ActivityIconKey;
+  tone: ActivityTone;
+  kind: ActivityKind;
+  taskId?: string;
+};
 
 type TaskItem = {
   id: string;
@@ -62,6 +88,7 @@ const navItems: Array<{ id: ViewId; label: string; icon: typeof Home }> = [
 ];
 
 const taskFilters: TaskFilter[] = ["全部", "运行中", "待确认", "已暂停", "已完成"];
+const activityFilters: ActivityFilter[] = ["全部", "任务", "审批", "系统"];
 
 const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: string }> = {
   home: {
@@ -166,34 +193,62 @@ const initialApprovals = [
   },
 ];
 
-const activityItems = [
+const activityIconMap: Record<ActivityIconKey, typeof Activity> = {
+  activity: Activity,
+  brain: Brain,
+  clock: Clock3,
+  copy: Copy,
+  globe: Globe2,
+  settings: Settings2,
+  shield: ShieldCheck,
+  sparkles: Sparkles,
+  trash: Trash2,
+};
+
+const initialActivityItems: ActivityItem[] = [
   {
+    id: "activity-summary-ready",
     time: "14:28",
+    createdAt: "2026-07-29T14:28:00+08:00",
     title: "摘要已生成",
     detail: "整理出 4 项产品变化和 2 项值得关注的信号。",
-    icon: Sparkles,
+    icon: "sparkles",
     tone: "blue",
+    kind: "任务",
+    taskId: "competitor",
   },
   {
+    id: "activity-analysis-complete",
     time: "14:26",
+    createdAt: "2026-07-29T14:26:00+08:00",
     title: "页面变化整理完成",
     detail: "对比了今天与昨天的页面内容，过滤了无意义变化。",
-    icon: Brain,
+    icon: "brain",
     tone: "violet",
+    kind: "任务",
+    taskId: "competitor",
   },
   {
+    id: "activity-evidence-saved",
     time: "14:23",
+    createdAt: "2026-07-29T14:23:00+08:00",
     title: "完成 12 张页面截图",
     detail: "3 个目标页面均已读取，截图和页面结构已保存。",
-    icon: Globe2,
+    icon: "globe",
     tone: "green",
+    kind: "任务",
+    taskId: "competitor",
   },
   {
+    id: "activity-schedule-started",
     time: "09:00",
+    createdAt: "2026-07-29T09:00:00+08:00",
     title: "任务按计划开始",
     detail: "由每日 09:00 的计划自动启动。",
-    icon: Clock3,
+    icon: "clock",
     tone: "neutral",
+    kind: "系统",
+    taskId: "competitor",
   },
 ];
 
@@ -275,6 +330,8 @@ export default function HomePage() {
   const [selectedStep, setSelectedStep] = useState("analyze");
   const [approvals, setApprovals] = useState(initialApprovals);
   const [selectedApprovalId, setSelectedApprovalId] = useState(initialApprovals[0].id);
+  const [activityLog, setActivityLog] = useState<ActivityItem[]>(initialActivityItems);
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("全部");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -309,6 +366,10 @@ export default function HomePage() {
       try {
         const saved = window.localStorage.getItem("unzoo-one-tasks");
         const savedSettings = window.localStorage.getItem("unzoo-one-settings");
+        const savedApprovalIds = window.localStorage.getItem(
+          "unzoo-one-pending-approvals",
+        );
+        const savedActivity = window.localStorage.getItem("unzoo-one-activity");
         const schemaVersion = Number(
           window.localStorage.getItem("unzoo-one-schema-version") ?? "1",
         );
@@ -355,10 +416,38 @@ export default function HomePage() {
                 : current.notifications,
           }));
         }
+        if (savedApprovalIds) {
+          const approvalIds = JSON.parse(savedApprovalIds);
+          if (Array.isArray(approvalIds)) {
+            const pendingApprovals = initialApprovals.filter((item) =>
+              approvalIds.includes(item.id),
+            );
+            setApprovals(pendingApprovals);
+            setSelectedApprovalId(pendingApprovals[0]?.id ?? "");
+          }
+        }
+        if (savedActivity) {
+          const parsedActivity = JSON.parse(savedActivity);
+          if (Array.isArray(parsedActivity)) {
+            setActivityLog(
+              (parsedActivity as ActivityItem[])
+                .filter(
+                  (item) =>
+                    item &&
+                    typeof item.id === "string" &&
+                    typeof item.title === "string" &&
+                    typeof item.detail === "string",
+                )
+                .slice(0, 100),
+            );
+          }
+        }
         window.localStorage.setItem("unzoo-one-schema-version", "2");
       } catch {
         window.localStorage.removeItem("unzoo-one-tasks");
         window.localStorage.removeItem("unzoo-one-settings");
+        window.localStorage.removeItem("unzoo-one-pending-approvals");
+        window.localStorage.removeItem("unzoo-one-activity");
       } finally {
         setTasksReady(true);
       }
@@ -372,11 +461,21 @@ export default function HomePage() {
     if (settings.local) {
       window.localStorage.setItem("unzoo-one-tasks", JSON.stringify(tasks));
       window.localStorage.setItem("unzoo-one-settings", JSON.stringify(settings));
+      window.localStorage.setItem(
+        "unzoo-one-pending-approvals",
+        JSON.stringify(approvals.map((item) => item.id)),
+      );
+      window.localStorage.setItem(
+        "unzoo-one-activity",
+        JSON.stringify(activityLog.slice(0, 100)),
+      );
     } else {
       window.localStorage.removeItem("unzoo-one-tasks");
       window.localStorage.removeItem("unzoo-one-settings");
+      window.localStorage.removeItem("unzoo-one-pending-approvals");
+      window.localStorage.removeItem("unzoo-one-activity");
     }
-  }, [settings, tasks, tasksReady]);
+  }, [activityLog, approvals, settings, tasks, tasksReady]);
 
   useEffect(() => {
     if (!notice) return;
@@ -419,8 +518,87 @@ export default function HomePage() {
     return searchedTasks.filter((task) => task.status === taskFilter);
   }, [searchedTasks, taskFilter]);
 
+  const filteredActivityLog = useMemo(() => {
+    if (activityFilter === "全部") return activityLog;
+    return activityLog.filter((item) => item.kind === activityFilter);
+  }, [activityFilter, activityLog]);
+
+  const activityCounts = useMemo(
+    () => ({
+      全部: activityLog.length,
+      任务: activityLog.filter((item) => item.kind === "任务").length,
+      审批: activityLog.filter((item) => item.kind === "审批").length,
+      系统: activityLog.filter((item) => item.kind === "系统").length,
+    }),
+    [activityLog],
+  );
+
   const runningTaskCount = tasks.filter((task) => task.status === "运行中").length;
   const completedTaskCount = tasks.filter((task) => task.status === "已完成").length;
+  const latestActivity = activityLog[0] ?? initialActivityItems[0];
+  const LatestActivityIcon = activityIconMap[latestActivity.icon] ?? Activity;
+
+  function recordActivity(
+    item: Omit<ActivityItem, "id" | "time" | "createdAt">,
+  ) {
+    const now = new Date();
+    const time = now.toLocaleTimeString("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    setActivityLog((items) =>
+      [
+        {
+          ...item,
+          id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          time,
+          createdAt: now.toISOString(),
+        },
+        ...items,
+      ].slice(0, 100),
+    );
+  }
+
+  function exportActivity() {
+    const payload = {
+      product: "Unzoo One",
+      exportedAt: new Date().toISOString(),
+      recordCount: activityLog.length,
+      records: activityLog,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `unzoo-one-audit-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+    recordActivity({
+      title: "审计记录已导出",
+      detail: `已导出 ${activityLog.length} 条记录，文件仅保存在本机。`,
+      icon: "activity",
+      tone: "blue",
+      kind: "系统",
+    });
+    setNotice(`已导出 ${activityLog.length} 条审计记录`);
+  }
+
+  function openActivityItem(item: ActivityItem) {
+    if (item.taskId && tasks.some((task) => task.id === item.taskId)) {
+      setSelectedTaskId(item.taskId);
+      return;
+    }
+    if (item.kind === "审批" && approvals.length > 0) {
+      openView("approvals");
+      return;
+    }
+    setNotice(item.detail);
+  }
 
   function approveCurrent() {
     if (!selectedApproval) return;
@@ -428,11 +606,25 @@ export default function HomePage() {
     setSelectedApprovalId(
       approvals.find((item) => item.id !== selectedApproval.id)?.id ?? "",
     );
+    recordActivity({
+      title: `已批准：${selectedApproval.title}`,
+      detail: selectedApproval.impact,
+      icon: "shield",
+      tone: "green",
+      kind: "审批",
+    });
     setNotice(`已允许：${selectedApproval.title}`);
   }
 
   function holdCurrent() {
     if (!selectedApproval) return;
+    recordActivity({
+      title: `已暂缓：${selectedApproval.title}`,
+      detail: "操作仍保留在待确认列表中，没有执行任何外部动作。",
+      icon: "clock",
+      tone: "amber",
+      kind: "审批",
+    });
     setNotice("已暂不执行，这项操作会继续留在待确认列表中");
   }
 
@@ -461,6 +653,16 @@ export default function HomePage() {
       setComposerOpen(false);
       setEditingTaskId(null);
       setSelectedTaskId(task.id);
+      recordActivity({
+        title: `任务配置已更新：${taskName.trim()}`,
+        detail: `${taskSchedule}运行 · ${
+          taskApproval ? "敏感操作需要确认" : "按任务范围自动执行"
+        }`,
+        icon: "settings",
+        tone: "blue",
+        kind: "任务",
+        taskId: task.id,
+      });
       setNotice(`任务“${taskName.trim()}”已更新`);
       return;
     }
@@ -486,6 +688,14 @@ export default function HomePage() {
     setTaskDescription("");
     setTaskSchedule("仅运行一次");
     setTaskApproval(true);
+    recordActivity({
+      title: `任务已创建：${newTask.title}`,
+      detail: `${newTask.schedule}运行 · 目标：${newTask.target}`,
+      icon: "sparkles",
+      tone: "blue",
+      kind: "任务",
+      taskId: newTask.id,
+    });
     setNotice(`任务“${newTask.title}”已开始运行`);
   }
 
@@ -534,6 +744,14 @@ export default function HomePage() {
     };
     setTasks((items) => [duplicate, ...items]);
     setSelectedTaskId(duplicate.id);
+    recordActivity({
+      title: `任务已复制：${duplicate.title}`,
+      detail: "为避免误执行，复制后的任务保持暂停。",
+      icon: "copy",
+      tone: "violet",
+      kind: "任务",
+      taskId: duplicate.id,
+    });
     setNotice(`已复制“${task.title}”，副本保持暂停`);
   }
 
@@ -550,12 +768,26 @@ export default function HomePage() {
     if (!deletingTask) return;
     setTasks((items) => items.filter((item) => item.id !== deletingTask.id));
     setDeleteTaskId(null);
+    recordActivity({
+      title: `任务已删除：${deletingTask.title}`,
+      detail: `已移除任务配置和本机记录，原数据来源：${deletingTask.target}`,
+      icon: "trash",
+      tone: "red",
+      kind: "任务",
+    });
     setNotice(`任务“${deletingTask.title}”已删除`);
   }
 
   function toggleSetting(key: keyof SettingsState, label: string) {
     const nextValue = !settings[key];
     setSettings((current) => ({ ...current, [key]: nextValue }));
+    recordActivity({
+      title: `${label}已${nextValue ? "开启" : "关闭"}`,
+      detail: "设置变更已应用到后续任务执行。",
+      icon: "settings",
+      tone: "neutral",
+      kind: "系统",
+    });
     setNotice(`${label}已${nextValue ? "开启" : "关闭"}`);
   }
 
@@ -599,6 +831,17 @@ export default function HomePage() {
       setIsRunning(nextStatus === "运行中");
     }
 
+    recordActivity({
+      title: `${nextStatus === "已暂停" ? "任务已暂停" : "任务已继续"}：${task.title}`,
+      detail:
+        nextStatus === "已暂停"
+          ? "任务停止执行，但保留当前进度和已保存证据。"
+          : "任务从上次进度继续运行。",
+      icon: nextStatus === "已暂停" ? "clock" : "activity",
+      tone: nextStatus === "已暂停" ? "amber" : "green",
+      kind: "任务",
+      taskId: task.id,
+    });
     setNotice(
       nextStatus === "已暂停"
         ? `任务“${task.title}”已暂停`
@@ -620,6 +863,16 @@ export default function HomePage() {
           : task,
       ),
     );
+    recordActivity({
+      title: `${nextRunning ? "任务已继续" : "任务已暂停"}：${primaryTask.title}`,
+      detail: nextRunning
+        ? "首页主任务已恢复后台执行。"
+        : "首页主任务停止执行，已保存当前进度。",
+      icon: nextRunning ? "activity" : "clock",
+      tone: nextRunning ? "green" : "amber",
+      kind: "任务",
+      taskId: primaryTask.id,
+    });
   }
 
   return (
@@ -709,15 +962,23 @@ export default function HomePage() {
                   <button type="button" onClick={() => openView("approvals")}>
                     <ShieldCheck size={17} />
                     <span>
-                      <strong>{approvals.length} 项操作等你确认</strong>
-                      <small>外部发送前任务已经暂停</small>
+                      <strong>
+                        {approvals.length
+                          ? `${approvals.length} 项操作等你确认`
+                          : "暂无待确认操作"}
+                      </strong>
+                      <small>
+                        {approvals.length
+                          ? "外部发送前任务已经暂停"
+                          : "所有敏感操作都已处理"}
+                      </small>
                     </span>
                   </button>
                   <button type="button" onClick={() => openView("activity")}>
-                    <CheckCircle2 size={17} />
+                    <LatestActivityIcon size={17} />
                     <span>
-                      <strong>竞品摘要已经生成</strong>
-                      <small>包含 4 项产品变化</small>
+                      <strong>{latestActivity.title}</strong>
+                      <small>{latestActivity.detail}</small>
                     </span>
                   </button>
                 </div>
@@ -1175,34 +1436,86 @@ export default function HomePage() {
 
         {activeView === "activity" && (
           <section className="activity-view">
+            <div className="activity-toolbar">
+              <div>
+                <span>可信审计</span>
+                <strong>{activityLog.length} 条记录</strong>
+              </div>
+              <div
+                className="activity-filter-tabs"
+                role="tablist"
+                aria-label="运行记录筛选"
+              >
+                {activityFilters.map((filter) => (
+                  <button
+                    className={activityFilter === filter ? "active" : ""}
+                    key={filter}
+                    type="button"
+                    role="tab"
+                    aria-selected={activityFilter === filter}
+                    onClick={() => setActivityFilter(filter)}
+                  >
+                    {filter}
+                    <span>{activityCounts[filter]}</span>
+                  </button>
+                ))}
+              </div>
+              <button
+                className="activity-export"
+                type="button"
+                onClick={exportActivity}
+              >
+                <Download size={15} />
+                导出记录
+              </button>
+            </div>
+
             <div className="activity-summary">
               <Activity size={18} />
               <div>
-                <strong>跟踪竞品发布动态</strong>
-                <small>今天 09:00 开始 · 已运行 5 小时 28 分钟</small>
+                <strong>{primaryTask.title}</strong>
+                <small>
+                  {primaryTask.schedule ?? "仅运行一次"} · 已记录 {activityLog.length} 个事件
+                </small>
               </div>
-              <span className="live-state"><i />运行中</span>
+              <span className={`live-state ${isRunning ? "" : "paused"}`}>
+                <i />
+                {isRunning ? "运行中" : "已暂停"}
+              </span>
             </div>
 
-            <div className="activity-timeline">
-              {activityItems.map((item) => (
-                <div className="timeline-row" key={`${item.time}-${item.title}`}>
-                  <time>{item.time}</time>
-                  <span className={`timeline-icon ${item.tone}`}>
-                    <item.icon size={17} />
-                  </span>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <p>{item.detail}</p>
+            <div className="activity-timeline" aria-live="polite">
+              {filteredActivityLog.map((item) => {
+                const ItemIcon = activityIconMap[item.icon] ?? Activity;
+                const hasTask = Boolean(
+                  item.taskId && tasks.some((task) => task.id === item.taskId),
+                );
+                return (
+                  <div className="timeline-row" key={item.id}>
+                    <time dateTime={item.createdAt}>{item.time}</time>
+                    <span className={`timeline-icon ${item.tone}`}>
+                      <ItemIcon size={17} />
+                    </span>
+                    <div className="timeline-content">
+                      <span className={`timeline-kind kind-${item.kind}`}>{item.kind}</span>
+                      <strong>{item.title}</strong>
+                      <p>{item.detail}</p>
+                    </div>
+                    <button type="button" onClick={() => openActivityItem(item)}>
+                      {hasTask ? "打开任务" : item.kind === "审批" ? "查看审批" : "详情"}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setNotice(`正在查看：${item.title}`)}
-                  >
-                    查看
+                );
+              })}
+              {filteredActivityLog.length === 0 && (
+                <div className="activity-empty">
+                  <Search size={22} />
+                  <strong>这个分类还没有记录</strong>
+                  <button type="button" onClick={() => setActivityFilter("全部")}>
+                    查看全部记录
                   </button>
                 </div>
-              ))}
+              )}
             </div>
           </section>
         )}

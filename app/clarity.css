@@ -5069,3 +5069,289 @@ body {
     grid-template-columns: 104px minmax(0, 1fr);
   }
 }
+
+/* Live audit stream */
+.activity-view {
+  overflow: hidden;
+}
+
+.activity-toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 72px;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(128, 148, 175, 0.17);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.activity-toolbar > div:first-child span,
+.activity-toolbar > div:first-child strong {
+  display: block;
+}
+
+.activity-toolbar > div:first-child span {
+  color: #718198;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.activity-toolbar > div:first-child strong {
+  margin-top: 4px;
+  color: #263244;
+  font-size: 13px;
+}
+
+.activity-filter-tabs {
+  justify-self: center;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #dce3ed;
+  border-radius: 7px;
+  background: #f3f6f9;
+}
+
+.activity-filter-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #69778a;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.activity-filter-tabs button > span {
+  display: grid;
+  place-items: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+  border-radius: 5px;
+  background: rgba(122, 139, 163, 0.11);
+  color: #738096;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+}
+
+.activity-filter-tabs button.active {
+  background: #ffffff;
+  color: #1f58b5;
+  box-shadow: 0 2px 7px rgba(46, 67, 97, 0.1);
+}
+
+.activity-filter-tabs button.active > span {
+  background: #eaf2ff;
+  color: #245fc6;
+}
+
+.activity-export {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid #d6dee9;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #536176;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 760;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.activity-export:hover {
+  border-color: #b8c9df;
+  background: #f5f8fc;
+  color: #285ba9;
+}
+
+.activity-summary {
+  min-height: 78px;
+  padding-right: 20px;
+  padding-left: 20px;
+  border-bottom-color: rgba(128, 148, 175, 0.16);
+  background:
+    linear-gradient(90deg, rgba(237, 244, 255, 0.82), rgba(247, 250, 254, 0.72)),
+    #f8fafc;
+}
+
+.activity-timeline {
+  padding: 4px 20px 22px;
+}
+
+.timeline-row {
+  grid-template-columns: 50px 38px minmax(0, 1fr) auto;
+  min-height: 98px;
+  padding: 17px 0;
+  border-bottom-color: rgba(128, 148, 175, 0.15);
+}
+
+.timeline-content {
+  min-width: 0;
+}
+
+.timeline-kind {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: #eef1f5;
+  color: #667286;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.timeline-kind.kind-任务 {
+  background: #eaf2ff;
+  color: #245fc6;
+}
+
+.timeline-kind.kind-审批 {
+  background: #fff3e6;
+  color: #a85d20;
+}
+
+.timeline-kind.kind-系统 {
+  background: #eef1f5;
+  color: #657184;
+}
+
+.timeline-row .timeline-content > strong {
+  margin-top: 7px;
+  padding: 0;
+  color: #283344;
+  font-size: 12px;
+}
+
+.timeline-row .timeline-content > p {
+  max-width: 760px;
+  color: #737f90;
+}
+
+.timeline-icon.amber {
+  background: #fff3e6;
+  color: #b46727;
+}
+
+.timeline-icon.red {
+  background: #fff0ef;
+  color: #b6433d;
+}
+
+.timeline-row > button {
+  align-self: center;
+  min-height: 34px;
+  border-color: #dce3ec;
+  color: #536176;
+  font-weight: 730;
+}
+
+.timeline-row > button:hover {
+  border-color: #bfcde0;
+  background: #f6f9fc;
+  color: #285ba9;
+}
+
+.activity-empty {
+  display: grid;
+  place-items: center;
+  min-height: 280px;
+  padding: 36px 20px;
+  color: #7a8798;
+  text-align: center;
+}
+
+.activity-empty > svg {
+  color: #7e95b7;
+}
+
+.activity-empty > strong {
+  margin-top: 12px;
+  color: #3d4858;
+  font-size: 13px;
+}
+
+.activity-empty > button {
+  min-height: 36px;
+  margin-top: 14px;
+  padding: 0 13px;
+  border: 1px solid #d8e0eb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #345f9d;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+@media (max-width: 680px) {
+  .activity-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 13px 14px;
+  }
+
+  .activity-filter-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: stretch;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .activity-filter-tabs button {
+    gap: 4px;
+    min-height: 40px;
+    padding: 0 5px;
+  }
+
+  .activity-export {
+    min-height: 40px;
+    padding: 0 10px;
+  }
+
+  .activity-summary {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 10px;
+    padding: 13px 14px;
+  }
+
+  .activity-summary .live-state {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .activity-timeline {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .timeline-row {
+    grid-template-columns: 42px 34px minmax(0, 1fr);
+    gap: 10px;
+    min-height: 124px;
+  }
+
+  .timeline-row > button {
+    grid-column: 3;
+    justify-self: start;
+    min-height: 40px;
+    margin-top: 2px;
+  }
+}

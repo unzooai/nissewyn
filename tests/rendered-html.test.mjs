@@ -54,13 +54,18 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /const taskFilters: TaskFilter\[\]/);
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-tasks"/);
   assert.match(page, /window\.localStorage\.setItem\("unzoo-one-settings"/);
+  assert.match(page, /window\.localStorage\.setItem\(\s*"unzoo-one-activity"/);
+  assert.match(page, /"unzoo-one-pending-approvals"/);
   assert.match(page, /function createTask/);
   assert.match(page, /function beginEditTask/);
   assert.match(page, /function duplicateTask/);
   assert.match(page, /function confirmDeleteTask/);
+  assert.match(page, /function recordActivity/);
+  assert.match(page, /function exportActivity/);
   assert.match(page, /const taskTemplates:/);
   assert.match(page, /type TaskSchedule =/);
   assert.match(page, /role="radiogroup"/);
+  assert.match(page, /aria-label="运行记录筛选"/);
   assert.match(page, /role="switch"/);
   assert.match(page, /<textarea/);
   assert.match(page, /function updateTaskStatus/);
@@ -74,6 +79,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.composer-policy/);
   assert.match(css, /\.confirm-delete-dialog/);
   assert.match(css, /\.task-detail-heading-actions/);
+  assert.match(css, /\.activity-filter-tabs/);
+  assert.match(css, /\.activity-export/);
+  assert.match(css, /\.timeline-kind/);
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   const pixelFontSizes = [...css.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)].map(
     (match) => Number(match[1]),
