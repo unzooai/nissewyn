@@ -37,8 +37,8 @@ export const metadata: Metadata = {
     images: ["https://unzoo-one-console.matiancheng528.chatgpt.site/og.png"],
   },
   icons: {
-    icon: "/unzoo-mark.svg",
-    shortcut: "/unzoo-mark.svg",
+    icon: "/unzoo-favicon.png",
+    shortcut: "/unzoo-favicon.png",
   },
 };
 

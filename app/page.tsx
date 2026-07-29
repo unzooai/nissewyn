@@ -415,7 +415,7 @@ export default function HomePage() {
         <div className="clarity-brand">
           <span className="clarity-brand-mark">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/unzoo-mark.svg" alt="Unzoo One" />
+            <img src="/unzoo-mark-ai.webp" alt="Unzoo One" />
           </span>
           <div>
             <strong>Unzoo One</strong>
