@@ -35,6 +35,7 @@ type ViewId = "home" | "tasks" | "approvals" | "activity" | "settings";
 type TaskStatus = "运行中" | "待确认" | "已完成" | "已暂停";
 type TaskFilter = "全部" | TaskStatus;
 type TaskSchedule = "仅运行一次" | "每天" | "每周";
+type Weekday = "周一" | "周二" | "周三" | "周四" | "周五" | "周六" | "周日";
 type SettingsState = {
   approval: boolean;
   local: boolean;
@@ -75,9 +76,40 @@ type TaskItem = {
   progress: number;
   updated: string;
   schedule?: TaskSchedule;
+  scheduleTime?: string;
+  scheduleDay?: Weekday;
   requiresApproval?: boolean;
   pinned?: boolean;
 };
+
+const weekdays: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+
+function formatSchedule(
+  schedule: TaskSchedule = "仅运行一次",
+  time = "09:00",
+  day: Weekday = "周一",
+) {
+  if (schedule === "每天") return `每天 ${time}`;
+  if (schedule === "每周") return `每${day} ${time}`;
+  return "立即运行一次";
+}
+
+function formatTaskSchedule(task: TaskItem) {
+  return formatSchedule(
+    task.schedule ?? "仅运行一次",
+    task.scheduleTime ?? "09:00",
+    task.scheduleDay ?? "周一",
+  );
+}
+
+function getNextRunLabel(task: TaskItem) {
+  if (task.status === "已暂停") return "恢复任务后重新计算";
+  if (task.schedule === "每天") return `明天 ${task.scheduleTime ?? "09:00"}`;
+  if (task.schedule === "每周") {
+    return `下一个${task.scheduleDay ?? "周一"} ${task.scheduleTime ?? "09:00"}`;
+  }
+  return task.status === "已完成" ? "已完成" : "创建后立即运行";
+}
 
 const navItems: Array<{ id: ViewId; label: string; icon: typeof Home }> = [
   { id: "home", label: "首页", icon: Home },
@@ -128,6 +160,7 @@ const initialTasks: TaskItem[] = [
     progress: 68,
     updated: "刚刚更新",
     schedule: "每天",
+    scheduleTime: "09:00",
     requiresApproval: true,
     pinned: true,
   },
@@ -140,6 +173,8 @@ const initialTasks: TaskItem[] = [
     progress: 92,
     updated: "8 分钟前",
     schedule: "每周",
+    scheduleTime: "17:30",
+    scheduleDay: "周五",
     requiresApproval: true,
   },
   {
@@ -292,6 +327,8 @@ const taskTemplates: Array<{
   description: string;
   target: string;
   schedule: TaskSchedule;
+  scheduleTime: string;
+  scheduleDay: Weekday;
   icon: typeof Globe2;
 }> = [
   {
@@ -301,6 +338,8 @@ const taskTemplates: Array<{
     description: "检查页面内容变化，只保留有意义的更新并生成摘要。",
     target: "https://example.com/product",
     schedule: "每天",
+    scheduleTime: "09:00",
+    scheduleDay: "周一",
     icon: Globe2,
   },
   {
@@ -310,6 +349,8 @@ const taskTemplates: Array<{
     description: "从可信来源收集信息，交叉验证后整理成结构化结论。",
     target: "输入主题或资料来源",
     schedule: "仅运行一次",
+    scheduleTime: "09:00",
+    scheduleDay: "周一",
     icon: Brain,
   },
   {
@@ -319,6 +360,8 @@ const taskTemplates: Array<{
     description: "汇总本周项目文件和工作记录，生成可直接发送的周报草稿。",
     target: "本地项目工作区",
     schedule: "每周",
+    scheduleTime: "17:30",
+    scheduleDay: "周五",
     icon: FileText,
   },
 ];
@@ -347,6 +390,8 @@ export default function HomePage() {
     "检查页面内容变化，只保留有意义的更新并生成摘要。",
   );
   const [taskSchedule, setTaskSchedule] = useState<TaskSchedule>("每天");
+  const [taskScheduleTime, setTaskScheduleTime] = useState("09:00");
+  const [taskScheduleDay, setTaskScheduleDay] = useState<Weekday>("周一");
   const [taskApproval, setTaskApproval] = useState(true);
   const [settings, setSettings] = useState<SettingsState>({
     approval: true,
@@ -376,9 +421,8 @@ export default function HomePage() {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            const normalizedTasks = (parsed as TaskItem[]).map((task) => ({
-              ...task,
-              schedule:
+            const normalizedTasks = (parsed as TaskItem[]).map((task) => {
+              const schedule: TaskSchedule =
                 schemaVersion < 2 &&
                 task.id === "competitor" &&
                 task.schedule === "仅运行一次"
@@ -388,10 +432,18 @@ export default function HomePage() {
                       ? "每天"
                       : task.id === "weekly-report"
                         ? "每周"
-                        : "仅运行一次"),
-              requiresApproval: task.requiresApproval ?? true,
-              pinned: task.pinned ?? task.id === "competitor",
-            }));
+                        : "仅运行一次");
+              return {
+                ...task,
+                schedule,
+                scheduleTime:
+                  task.scheduleTime ?? (schedule === "仅运行一次" ? undefined : "09:00"),
+                scheduleDay:
+                  task.scheduleDay ?? (schedule === "每周" ? "周一" : undefined),
+                requiresApproval: task.requiresApproval ?? true,
+                pinned: task.pinned ?? task.id === "competitor",
+              };
+            });
             setTasks(normalizedTasks);
             const primaryTask = normalizedTasks.find(
               (task) => task.id === "competitor",
@@ -442,7 +494,7 @@ export default function HomePage() {
             );
           }
         }
-        window.localStorage.setItem("unzoo-one-schema-version", "2");
+        window.localStorage.setItem("unzoo-one-schema-version", "3");
       } catch {
         window.localStorage.removeItem("unzoo-one-tasks");
         window.localStorage.removeItem("unzoo-one-settings");
@@ -644,6 +696,9 @@ export default function HomePage() {
                 description: taskDescription.trim(),
                 target: taskTarget.trim(),
                 schedule: taskSchedule,
+                scheduleTime:
+                  taskSchedule === "仅运行一次" ? undefined : taskScheduleTime,
+                scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
                 requiresApproval: taskApproval,
                 updated: "刚刚修改",
               }
@@ -655,7 +710,11 @@ export default function HomePage() {
       setSelectedTaskId(task.id);
       recordActivity({
         title: `任务配置已更新：${taskName.trim()}`,
-        detail: `${taskSchedule}运行 · ${
+        detail: `${formatSchedule(
+          taskSchedule,
+          taskScheduleTime,
+          taskScheduleDay,
+        )} · ${
           taskApproval ? "敏感操作需要确认" : "按任务范围自动执行"
         }`,
         icon: "settings",
@@ -676,6 +735,8 @@ export default function HomePage() {
       progress: 3,
       updated: "刚刚创建",
       schedule: taskSchedule,
+      scheduleTime: taskSchedule === "仅运行一次" ? undefined : taskScheduleTime,
+      scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
       requiresApproval: taskApproval,
     };
     setTasks((items) => [newTask, ...items]);
@@ -687,10 +748,12 @@ export default function HomePage() {
     setTaskTarget("");
     setTaskDescription("");
     setTaskSchedule("仅运行一次");
+    setTaskScheduleTime("09:00");
+    setTaskScheduleDay("周一");
     setTaskApproval(true);
     recordActivity({
       title: `任务已创建：${newTask.title}`,
-      detail: `${newTask.schedule}运行 · 目标：${newTask.target}`,
+      detail: `${formatTaskSchedule(newTask)} · 目标：${newTask.target}`,
       icon: "sparkles",
       tone: "blue",
       kind: "任务",
@@ -705,6 +768,8 @@ export default function HomePage() {
     setTaskTarget("https://example.com");
     setTaskDescription("检查页面内容变化，只保留有意义的更新并生成摘要。");
     setTaskSchedule("每天");
+    setTaskScheduleTime("09:00");
+    setTaskScheduleDay("周一");
     setTaskApproval(settings.approval);
     setComposerOpen(true);
   }
@@ -714,6 +779,8 @@ export default function HomePage() {
     setTaskTarget(task.target);
     setTaskDescription(task.description);
     setTaskSchedule(task.schedule ?? "仅运行一次");
+    setTaskScheduleTime(task.scheduleTime ?? "09:00");
+    setTaskScheduleDay(task.scheduleDay ?? "周一");
     setTaskApproval(task.requiresApproval ?? true);
     setEditingTaskId(task.id);
     setSelectedTaskId(null);
@@ -730,6 +797,8 @@ export default function HomePage() {
     setTaskDescription(template.description);
     setTaskTarget(template.target);
     setTaskSchedule(template.schedule);
+    setTaskScheduleTime(template.scheduleTime);
+    setTaskScheduleDay(template.scheduleDay);
   }
 
   function duplicateTask(task: TaskItem) {
@@ -1029,7 +1098,8 @@ export default function HomePage() {
                     <div className="focus-panel-heading">
                       <div>
                         <span>
-                          {primaryTask.schedule ?? "自主任务"} · {isRunning ? "正在运行" : "已暂停"}
+                          {formatTaskSchedule(primaryTask)} ·{" "}
+                          {isRunning ? "正在运行" : "已暂停"}
                         </span>
                         <strong>{primaryTask.title}</strong>
                       </div>
@@ -1475,7 +1545,7 @@ export default function HomePage() {
               <div>
                 <strong>{primaryTask.title}</strong>
                 <small>
-                  {primaryTask.schedule ?? "仅运行一次"} · 已记录 {activityLog.length} 个事件
+                  {formatTaskSchedule(primaryTask)} · 已记录 {activityLog.length} 个事件
                 </small>
               </div>
               <span className={`live-state ${isRunning ? "" : "paused"}`}>
@@ -1664,8 +1734,15 @@ export default function HomePage() {
               <div>
                 <CalendarDays size={17} />
                 <span>
-                  <small>运行频率</small>
-                  <strong>{selectedTask.schedule ?? "仅运行一次"}</strong>
+                  <small>运行计划</small>
+                  <strong>{formatTaskSchedule(selectedTask)}</strong>
+                </span>
+              </div>
+              <div>
+                <Clock3 size={17} />
+                <span>
+                  <small>下次运行</small>
+                  <strong>{getNextRunLabel(selectedTask)}</strong>
                 </span>
               </div>
               <div>
@@ -1856,6 +1933,53 @@ export default function HomePage() {
               </div>
             </section>
 
+            <div className="composer-schedule-detail">
+              {taskSchedule === "仅运行一次" ? (
+                <div className="schedule-once-note">
+                  <Play size={16} />
+                  <span>
+                    <strong>创建后立即开始</strong>
+                    <small>只运行一次，完成后保留结果和审计记录。</small>
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {taskSchedule === "每周" && (
+                    <label>
+                      <span>星期</span>
+                      <select
+                        aria-label="选择每周运行日期"
+                        value={taskScheduleDay}
+                        onChange={(event) =>
+                          setTaskScheduleDay(event.target.value as Weekday)
+                        }
+                      >
+                        {weekdays.map((day) => (
+                          <option key={day} value={day}>{day}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <label>
+                    <span>运行时间</span>
+                    <input
+                      aria-label="选择运行时间"
+                      type="time"
+                      required
+                      value={taskScheduleTime}
+                      onInput={(event) =>
+                        setTaskScheduleTime((event.target as HTMLInputElement).value)
+                      }
+                    />
+                  </label>
+                  <span className="schedule-timezone">
+                    <Clock3 size={15} />
+                    北京时间
+                  </span>
+                </>
+              )}
+            </div>
+
             <div className="composer-policy">
               <span className="composer-policy-icon">
                 <ShieldCheck size={18} />
@@ -1879,10 +2003,12 @@ export default function HomePage() {
             <div className="clarity-dialog-note">
               <CalendarDays size={17} />
               <p>
-                <strong>{taskSchedule}</strong>
+                <strong>
+                  {formatSchedule(taskSchedule, taskScheduleTime, taskScheduleDay)}
+                </strong>
                 {taskSchedule === "仅运行一次"
-                  ? "运行，完成后保留结果和执行记录。"
-                  : "自动启动，你可以随时暂停或修改任务。"}
+                  ? "，创建后立即开始。"
+                  : "自动启动，你可以随时暂停或修改计划。"}
               </p>
             </div>
 
@@ -1929,7 +2055,7 @@ export default function HomePage() {
             <div className="confirm-delete-facts">
               <span>
                 <small>运行频率</small>
-                <strong>{deletingTask.schedule ?? "仅运行一次"}</strong>
+                <strong>{formatTaskSchedule(deletingTask)}</strong>
               </span>
               <span>
                 <small>数据来源</small>

@@ -64,10 +64,17 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function exportActivity/);
   assert.match(page, /const taskTemplates:/);
   assert.match(page, /type TaskSchedule =/);
+  assert.match(page, /type Weekday =/);
+  assert.match(page, /function formatTaskSchedule/);
+  assert.match(page, /function getNextRunLabel/);
+  assert.match(page, /taskScheduleTime/);
+  assert.match(page, /taskScheduleDay/);
   assert.match(page, /role="radiogroup"/);
   assert.match(page, /aria-label="运行记录筛选"/);
   assert.match(page, /role="switch"/);
   assert.match(page, /<textarea/);
+  assert.match(page, /<select/);
+  assert.match(page, /type="time"/);
   assert.match(page, /function updateTaskStatus/);
   assert.match(page, /role="dialog"/);
   assert.match(page, /role="alertdialog"/);
@@ -77,6 +84,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.task-detail-drawer/);
   assert.match(css, /\.task-template-picker/);
   assert.match(css, /\.composer-policy/);
+  assert.match(css, /\.composer-schedule-detail/);
+  assert.match(css, /\.schedule-timezone/);
   assert.match(css, /\.confirm-delete-dialog/);
   assert.match(css, /\.task-detail-heading-actions/);
   assert.match(css, /\.activity-filter-tabs/);
