@@ -30,6 +30,7 @@ import {
   Sparkles,
   TerminalSquare,
   Workflow,
+  X,
 } from "lucide-react";
 
 const navItems = [
@@ -114,6 +115,13 @@ export default function Home() {
   const [isRunning, setIsRunning] = useState(true);
   const [approvals, setApprovals] = useState(initialApprovals);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(true);
+  const [selectedApprovalId, setSelectedApprovalId] = useState(initialApprovals[0].id);
+  const [taskName, setTaskName] = useState("监控竞品发布页面");
+  const [taskTarget, setTaskTarget] = useState("https://example.com/releases");
+  const [queuedTasks, setQueuedTasks] = useState(0);
+  const [notice, setNotice] = useState("");
 
   const filteredPalette = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -128,15 +136,40 @@ export default function Home() {
     palette.find((item) => item.name === selectedCapability) ?? palette[0];
   const pendingCount = approvals.length;
   const approvedCount = initialApprovals.length - approvals.length;
+  const selectedApproval =
+    approvals.find((item) => item.id === selectedApprovalId) ?? approvals[0];
+  const highestRisk =
+    approvals.find((item) => item.risk === "凭证访问")?.risk ??
+    approvals[0]?.risk;
 
   function approveFirst() {
-    setApprovals((items) => items.slice(1));
+    if (!selectedApproval) return;
+    setApprovals((items) => items.filter((item) => item.id !== selectedApproval.id));
+    setSelectedApprovalId(
+      approvals.find((item) => item.id !== selectedApproval.id)?.id ?? "",
+    );
+    setSelectedStageId("approve");
+    setNotice(`已批准：${selectedApproval.title}`);
+  }
+
+  function selectApproval(id: string) {
+    setSelectedApprovalId(id);
     setSelectedStageId("approve");
   }
 
-  function approveById(id: string) {
-    setApprovals((items) => items.filter((item) => item.id !== id));
-    setSelectedStageId("approve");
+  function createTask(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = taskName.trim();
+    const target = taskTarget.trim();
+    if (!name || !target) return;
+    setQueuedTasks((count) => count + 1);
+    setComposerOpen(false);
+    setNotice(`任务“${name}”已加入运行队列`);
+  }
+
+  function switchView(label: string) {
+    setActiveNav(label);
+    setNotice(`已切换到${label}`);
   }
 
   return (
@@ -157,7 +190,7 @@ export default function Home() {
               className={`rail-link ${activeNav === item.label ? "active" : ""}`}
               type="button"
               aria-label={item.label}
-              onClick={() => setActiveNav(item.label)}
+              onClick={() => switchView(item.label)}
             >
               <item.icon size={18} strokeWidth={1.9} />
               <span>{item.label}</span>
@@ -195,9 +228,45 @@ export default function Home() {
                 onChange={(event) => setQuery(event.target.value)}
               />
             </label>
-            <button className="icon-action" type="button" aria-label="通知">
-              <Bell size={18} />
-            </button>
+            <div className="notification-wrap">
+              <button
+                className={`icon-action ${notificationsOpen ? "active" : ""}`}
+                type="button"
+                aria-label="通知"
+                aria-expanded={notificationsOpen}
+                onClick={() => setNotificationsOpen((open) => !open)}
+              >
+                <Bell size={18} />
+                <span className="notification-dot" />
+              </button>
+              {notificationsOpen && (
+                <div className="notification-popover" role="dialog" aria-label="通知中心">
+                  <div className="popover-heading">
+                    <div>
+                      <span>通知中心</span>
+                      <strong>3 条新动态</strong>
+                    </div>
+                    <button type="button" aria-label="关闭通知" onClick={() => setNotificationsOpen(false)}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <button type="button" onClick={() => setSelectedStageId("approve")}>
+                    <span className="notice-tone amber" />
+                    <div>
+                      <strong>有 3 项操作等待审批</strong>
+                      <small>其中 1 项涉及浏览器身份凭证</small>
+                    </div>
+                  </button>
+                  <button type="button" onClick={() => setSelectedStageId("analyze")}>
+                    <span className="notice-tone blue" />
+                    <div>
+                      <strong>页面分析仍在运行</strong>
+                      <small>已整理 12 张截图和 38 次工具调用</small>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               className="create-action"
               type="button"
@@ -212,13 +281,13 @@ export default function Home() {
         <section className="mission-strip" aria-label="运行摘要">
           <div>
             <span>今日运行</span>
-            <strong>{isRunning ? "18" : "17"}</strong>
-            <small>{isRunning ? "4 个任务正在执行" : "任务已暂停，等待恢复"}</small>
+            <strong>{isRunning ? 18 + queuedTasks : 17 + queuedTasks}</strong>
+            <small>{isRunning ? `${4 + queuedTasks} 个任务正在执行` : "任务已暂停，等待恢复"}</small>
           </div>
           <div>
             <span>等待审批</span>
             <strong>{pendingCount}</strong>
-            <small>{pendingCount ? "最高风险：凭证访问" : "审批队列已清空"}</small>
+            <small>{pendingCount ? `最高风险：${highestRisk}` : "审批队列已清空"}</small>
           </div>
           <div>
             <span>能力健康度</span>
@@ -239,38 +308,50 @@ export default function Home() {
                 <span>能力工具</span>
                 <h2>能力市场</h2>
               </div>
-              <button type="button" aria-label="展开能力市场">
-                <ChevronDown size={18} />
+              <button
+                type="button"
+                aria-label={paletteOpen ? "收起能力市场" : "展开能力市场"}
+                aria-expanded={paletteOpen}
+                onClick={() => setPaletteOpen((open) => !open)}
+              >
+                <ChevronDown className={paletteOpen ? "rotate-open" : ""} size={18} />
               </button>
             </div>
 
-            <div className="palette-list">
-              {filteredPalette.map((item) => (
-                <button
-                  className={`palette-row ${item.tone} ${selectedCapability === item.name ? "selected" : ""}`}
-                  key={item.name}
-                  type="button"
-                  onClick={() => setSelectedCapability(item.name)}
-                >
-                  <item.icon size={18} />
-                  <div>
-                    <strong>{item.name}</strong>
-                    <small>{item.desc}</small>
-                  </div>
-                  <ChevronRight size={16} />
-                </button>
-              ))}
-              {!filteredPalette.length && <p className="empty-note">没有匹配的能力。</p>}
-            </div>
+            {paletteOpen && (
+              <>
+                <div className="palette-list">
+                  {filteredPalette.map((item) => (
+                    <button
+                      className={`palette-row ${item.tone} ${selectedCapability === item.name ? "selected" : ""}`}
+                      key={item.name}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCapability(item.name);
+                        setNotice(`已启用能力：${item.name}`);
+                      }}
+                    >
+                      <item.icon size={18} />
+                      <div>
+                        <strong>{item.name}</strong>
+                        <small>{item.desc}</small>
+                      </div>
+                      <ChevronRight size={16} />
+                    </button>
+                  ))}
+                  {!filteredPalette.length && <p className="empty-note">没有匹配的能力。</p>}
+                </div>
 
-            <div className="capability-detail">
-              <selectedCapabilityItem.icon size={18} />
-              <div>
-                <span>已选择能力</span>
-                <strong>{selectedCapabilityItem.name}</strong>
-                <small>{selectedCapabilityItem.desc}</small>
-              </div>
-            </div>
+                <div className="capability-detail">
+                  <selectedCapabilityItem.icon size={18} />
+                  <div>
+                    <span>已选择能力</span>
+                    <strong>{selectedCapabilityItem.name}</strong>
+                    <small>{selectedCapabilityItem.desc}</small>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="brain-route-box">
               <div className="section-heading compact">
@@ -284,7 +365,10 @@ export default function Home() {
                   className={`brain-row ${selectedBrain === route.name ? "selected" : ""}`}
                   key={route.name}
                   type="button"
-                  onClick={() => setSelectedBrain(route.name)}
+                  onClick={() => {
+                    setSelectedBrain(route.name);
+                    setNotice(`模型路由已切换为 ${route.name}`);
+                  }}
                 >
                   <Brain size={16} />
                   <div>
@@ -315,18 +399,6 @@ export default function Home() {
             </div>
 
             <div className="workflow-canvas">
-              {composerOpen && (
-                <div className="task-composer">
-                  <div>
-                    <span>快速创建</span>
-                    <strong>监控一个网页，并在变化后生成摘要</strong>
-                  </div>
-                  <button type="button" onClick={() => setComposerOpen(false)}>
-                    加入队列
-                  </button>
-                </div>
-              )}
-
               <div className="run-hero-card">
                 <div>
                   <span>当前任务</span>
@@ -410,8 +482,12 @@ export default function Home() {
                 <Shield size={14} />
                 审批检查器
               </span>
-              <h2>{pendingCount ? "发送前需要你批准" : "审批已完成"}</h2>
-              <p>{pendingCount ? "目标动作会影响外部沟通渠道，默认进入提交前审批。" : "当前任务没有阻塞项，可以继续进入下一步。"}</p>
+              <h2>{pendingCount ? selectedApproval?.title : "审批已完成"}</h2>
+              <p>
+                {pendingCount
+                  ? `${selectedApproval?.risk} · ${selectedApproval?.time}。确认后只批准当前选中的这一项。`
+                  : "当前任务没有阻塞项，可以继续进入下一步。"}
+              </p>
               <div className="risk-meter" aria-label="风险等级">
                 <span />
                 <strong>{pendingCount ? "高风险" : "无阻塞"}</strong>
@@ -419,15 +495,28 @@ export default function Home() {
               <div className="approval-buttons">
                 <button className="allow" type="button" onClick={approveFirst} disabled={!pendingCount}>
                   <Check size={16} />
-                  {pendingCount ? "批准一次" : "已处理"}
+                  {pendingCount ? "批准所选" : "已处理"}
                 </button>
-                <button type="button" onClick={() => setIsRunning(false)}>转人工</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRunning(false);
+                    setNotice("任务已暂停并转入人工处理");
+                  }}
+                >
+                  转人工
+                </button>
               </div>
             </div>
 
             <div className="approval-list">
               {approvals.map((item) => (
-                <button className="approval-row" key={item.id} type="button" onClick={() => approveById(item.id)}>
+                <button
+                  className={`approval-row ${selectedApproval?.id === item.id ? "selected" : ""}`}
+                  key={item.id}
+                  type="button"
+                  onClick={() => selectApproval(item.id)}
+                >
                   <Circle size={10} />
                   <div>
                     <strong>{item.title}</strong>
@@ -458,6 +547,62 @@ export default function Home() {
           </aside>
         </section>
       </section>
+
+      {composerOpen && (
+        <div className="dialog-backdrop" role="presentation" onMouseDown={() => setComposerOpen(false)}>
+          <form
+            className="task-dialog"
+            aria-label="新建任务"
+            onSubmit={createTask}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="dialog-heading">
+              <div>
+                <span>新建自动化任务</span>
+                <h2>把一个目标交给 Unzoo One</h2>
+              </div>
+              <button type="button" aria-label="关闭新建任务" onClick={() => setComposerOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <label>
+              <span>任务名称</span>
+              <input required value={taskName} onChange={(event) => setTaskName(event.target.value)} />
+            </label>
+            <label>
+              <span>目标网页</span>
+              <input
+                required
+                type="url"
+                inputMode="url"
+                value={taskTarget}
+                onChange={(event) => setTaskTarget(event.target.value)}
+              />
+            </label>
+            <div className="dialog-summary">
+              <Globe2 size={18} />
+              <p>系统会观察网页变化、调用 {selectedBrain} 分析，并在任何外部发送动作前等待审批。</p>
+            </div>
+            <div className="dialog-actions">
+              <button type="button" onClick={() => setComposerOpen(false)}>取消</button>
+              <button className="primary" type="submit">
+                <Plus size={16} />
+                加入运行队列
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {notice && (
+        <div className="action-toast" role="status">
+          <Check size={16} />
+          <span>{notice}</span>
+          <button type="button" aria-label="关闭提示" onClick={() => setNotice("")}>
+            <X size={15} />
+          </button>
+        </div>
+      )}
     </main>
   );
 }
