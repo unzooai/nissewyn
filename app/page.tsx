@@ -182,6 +182,13 @@ const runSteps = [
 ];
 
 const signalBars = [30, 44, 34, 58, 48, 72, 42, 64, 82, 52, 68, 46, 76, 60, 88, 62, 78, 96];
+const signalPoints = signalBars
+  .map((height, index) => {
+    const x = 2 + (index / (signalBars.length - 1)) * 96;
+    const y = 48 - (height / 100) * 42;
+    return `${x},${y}`;
+  })
+  .join(" ");
 
 export default function HomePage() {
   const [activeView, setActiveView] = useState<ViewId>("home");
@@ -420,11 +427,11 @@ export default function HomePage() {
                     <small>处页面变化</small>
                   </div>
                   <div className="signal-chart" aria-hidden="true">
-                    <div>
-                      {signalBars.map((height, index) => (
-                        <i key={`${height}-${index}`} style={{ height: `${height}%` }} />
-                      ))}
-                    </div>
+                    <svg viewBox="0 0 100 50" preserveAspectRatio="none">
+                      <path d="M2 13 H98 M2 25 H98 M2 37 H98" />
+                      <polyline points={signalPoints} />
+                      <circle cx="98" cy="7.68" r="1.8" />
+                    </svg>
                     <span>
                       <small>09:00</small>
                       <small>现在</small>
@@ -542,6 +549,32 @@ export default function HomePage() {
                       </span>
                     </div>
 
+                    <div className="decision-boundary" aria-label="本次操作边界">
+                      <span>
+                        <small>执行对象</small>
+                        <strong>
+                          {selectedApproval.id === "send-summary" && "领导沟通群"}
+                          {selectedApproval.id === "browser-access" && "工作浏览器"}
+                          {selectedApproval.id === "write-report" && "项目目录"}
+                        </strong>
+                      </span>
+                      <span>
+                        <small>影响范围</small>
+                        <strong>
+                          {selectedApproval.id === "send-summary" && "3 人可见"}
+                          {selectedApproval.id === "browser-access" && "仅本次任务"}
+                          {selectedApproval.id === "write-report" && "新增 1 个文件"}
+                        </strong>
+                      </span>
+                      <span>
+                        <small>安全检查</small>
+                        <strong className="verified-boundary">
+                          <CheckCircle2 size={13} />
+                          已通过
+                        </strong>
+                      </span>
+                    </div>
+
                     <div className="attention-actions">
                       <button className="confirm" type="button" onClick={approveCurrent}>
                         <Check size={16} />
@@ -588,14 +621,26 @@ export default function HomePage() {
                     type="button"
                     onClick={() => setNotice(`已打开任务：${task.title}`)}
                   >
-                    <span className={`task-status-dot status-${task.status}`} />
-                    <span>
+                    <span className={`recent-task-icon status-${task.status}`}>
+                      {task.status === "运行中" && <Activity size={17} />}
+                      {task.status === "待确认" && <ShieldCheck size={17} />}
+                      {task.status === "已完成" && <CheckCircle2 size={17} />}
+                    </span>
+                    <span className="recent-task-copy">
+                      <span className="recent-task-topline">
+                        <em className={`status-label status-${task.status}`}>{task.status}</em>
+                        <small>{task.updated}</small>
+                      </span>
                       <strong>{task.title}</strong>
                       <small>{task.description}</small>
                     </span>
-                    <em className={`status-label status-${task.status}`}>{task.status}</em>
-                    <span className="task-updated">{task.updated}</span>
-                    <ChevronRight size={16} />
+                    <span className="recent-task-progress">
+                      <span>
+                        <i style={{ width: `${task.progress}%` }} />
+                      </span>
+                      <small>{task.progress}%</small>
+                      <ChevronRight size={16} />
+                    </span>
                   </button>
                 ))}
               </div>
