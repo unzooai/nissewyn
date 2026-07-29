@@ -24,6 +24,7 @@ import {
   Home,
   ListChecks,
   Link2,
+  LoaderCircle,
   Mail,
   Pause,
   Pencil,
@@ -110,6 +111,9 @@ type NotificationItem = {
   icon: typeof Bell;
   tone: "amber" | "blue" | "green";
 };
+type TaskFormErrors = Partial<
+  Record<"name" | "target" | "description" | "scheduleTime", string>
+>;
 
 type ActivityItem = {
   id: string;
@@ -843,6 +847,7 @@ export default function HomePage() {
   const [taskSort, setTaskSort] = useState<TaskSort>("状态优先");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [workspaceLoadWarning, setWorkspaceLoadWarning] = useState("");
   const [taskName, setTaskName] = useState("跟踪一个新网页");
   const [taskTarget, setTaskTarget] = useState("https://example.com");
   const [taskDescription, setTaskDescription] = useState(
@@ -852,6 +857,8 @@ export default function HomePage() {
   const [taskScheduleTime, setTaskScheduleTime] = useState("09:00");
   const [taskScheduleDay, setTaskScheduleDay] = useState<Weekday>("周一");
   const [taskApproval, setTaskApproval] = useState(true);
+  const [taskFormSubmitted, setTaskFormSubmitted] = useState(false);
+  const [isSavingTask, setIsSavingTask] = useState(false);
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -862,6 +869,11 @@ export default function HomePage() {
   const importInputRef = useRef<HTMLInputElement>(null);
   const approvalDetailRef = useRef<HTMLDivElement>(null);
   const activityInspectorRef = useRef<HTMLElement>(null);
+  const taskNameRef = useRef<HTMLInputElement>(null);
+  const taskTargetRef = useRef<HTMLInputElement>(null);
+  const taskDescriptionRef = useRef<HTMLTextAreaElement>(null);
+  const taskScheduleTimeRef = useRef<HTMLInputElement>(null);
+  const taskSavingRef = useRef(false);
 
   const pageTitle = viewTitles[activeView];
   const selectedApproval =
@@ -892,6 +904,51 @@ export default function HomePage() {
   const selectedTaskArtifacts = selectedTask
     ? artifacts.filter((artifact) => artifact.taskId === selectedTask.id).slice(0, 2)
     : [];
+  const taskFormErrors = useMemo<TaskFormErrors>(() => {
+    const errors: TaskFormErrors = {};
+    const normalizedName = taskName.trim();
+    const normalizedTarget = taskTarget.trim();
+    const normalizedDescription = taskDescription.trim();
+
+    if (!normalizedName) {
+      errors.name = "请给任务起一个容易识别的名称";
+    } else if (normalizedName.length > 80) {
+      errors.name = "任务名称不能超过 80 个字";
+    }
+
+    if (!normalizedTarget) {
+      errors.target = "请填写网页、文件夹或资料库";
+    } else if (normalizedTarget.length < 3) {
+      errors.target = "请把数据来源写得更具体一些";
+    } else if (normalizedTarget.length > 240) {
+      errors.target = "数据来源不能超过 240 个字";
+    } else if (/^https?:\/\//i.test(normalizedTarget)) {
+      try {
+        const parsedTarget = new URL(normalizedTarget);
+        if (!parsedTarget.hostname) {
+          errors.target = "请填写完整的网址，例如 https://example.com";
+        }
+      } catch {
+        errors.target = "请填写完整的网址，例如 https://example.com";
+      }
+    }
+
+    if (!normalizedDescription) {
+      errors.description = "请描述 AI 最终需要交付什么";
+    } else if (normalizedDescription.length < 8) {
+      errors.description = "再补充一点结果要求，至少写 8 个字";
+    } else if (normalizedDescription.length > 500) {
+      errors.description = "结果要求不能超过 500 个字";
+    }
+
+    if (taskSchedule !== "仅运行一次" && !taskScheduleTime) {
+      errors.scheduleTime = "请选择自动运行时间";
+    }
+
+    return errors;
+  }, [taskDescription, taskName, taskSchedule, taskScheduleTime, taskTarget]);
+  const taskFormHasErrors = Object.keys(taskFormErrors).length > 0;
+  const noticeIsCaution = /失败|不能|请先|无效|损坏/.test(notice);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -1025,6 +1082,9 @@ export default function HomePage() {
         window.localStorage.removeItem("unzoo-one-artifacts");
         window.localStorage.removeItem("unzoo-one-recent-searches");
         window.localStorage.removeItem("unzoo-one-read-notifications");
+        setWorkspaceLoadWarning(
+          "检测到损坏的本机数据，已使用安全的默认工作区启动。你可以继续使用，或从备份恢复原有内容。",
+        );
       } finally {
         setTasksReady(true);
       }
@@ -1855,6 +1915,7 @@ export default function HomePage() {
       setRejectApprovalId(null);
       setTemporaryModeOpen(false);
       setNotificationsOpen(false);
+      setWorkspaceLoadWarning("");
       recordActivity({
         title: "工作区备份已恢复",
         detail: `已从“${file.name}”恢复 ${backup.tasks.length} 个任务、${restoredArtifacts.length} 个成果和 ${backup.activity.length} 条运行记录。`,
@@ -1899,6 +1960,7 @@ export default function HomePage() {
     setTemporaryModeOpen(false);
     setNotificationsOpen(false);
     setWorkspaceResetOpen(false);
+    setWorkspaceLoadWarning("");
     recordActivity({
       title: "工作区已恢复初始状态",
       detail: "任务、成果、待确认事项、运行记录和设置已重新初始化。",
@@ -2076,86 +2138,107 @@ export default function HomePage() {
     }
   }
 
-  function createTask(event: React.FormEvent<HTMLFormElement>) {
+  async function createTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!taskName.trim() || !taskDescription.trim() || !taskTarget.trim()) return;
-
-    if (editingTaskId) {
-      const task = tasks.find((item) => item.id === editingTaskId);
-      if (!task) return;
-      setTasks((items) =>
-        items.map((item) =>
-          item.id === editingTaskId
-            ? {
-                ...item,
-                title: taskName.trim(),
-                description: taskDescription.trim(),
-                target: taskTarget.trim(),
-                schedule: taskSchedule,
-                scheduleTime:
-                  taskSchedule === "仅运行一次" ? undefined : taskScheduleTime,
-                scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
-                requiresApproval: taskApproval,
-                updated: "刚刚修改",
-              }
-            : item,
-        ),
-      );
-      setComposerOpen(false);
-      setEditingTaskId(null);
-      setSelectedTaskId(task.id);
-      recordActivity({
-        title: `任务配置已更新：${taskName.trim()}`,
-        detail: `${formatSchedule(
-          taskSchedule,
-          taskScheduleTime,
-          taskScheduleDay,
-        )} · ${
-          taskApproval ? "敏感操作需要确认" : "按任务范围自动执行"
-        }`,
-        icon: "settings",
-        tone: "blue",
-        kind: "任务",
-        taskId: task.id,
-      });
-      setNotice(`任务“${taskName.trim()}”已更新`);
+    setTaskFormSubmitted(true);
+    if (taskFormHasErrors || taskSavingRef.current) {
+      const firstInvalidField =
+        (taskFormErrors.name && taskNameRef.current) ||
+        (taskFormErrors.target && taskTargetRef.current) ||
+        (taskFormErrors.description && taskDescriptionRef.current) ||
+        (taskFormErrors.scheduleTime && taskScheduleTimeRef.current);
+      window.requestAnimationFrame(() => firstInvalidField?.focus());
       return;
     }
 
-    const newTask: TaskItem = {
-      id: `task-${Date.now()}`,
-      title: taskName.trim(),
-      description: taskDescription.trim(),
-      target: taskTarget.trim(),
-      status: "运行中",
-      progress: 3,
-      updated: "刚刚创建",
-      schedule: taskSchedule,
-      scheduleTime: taskSchedule === "仅运行一次" ? undefined : taskScheduleTime,
-      scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
-      requiresApproval: taskApproval,
-    };
-    setTasks((items) => [newTask, ...items]);
-    setTaskFilter("全部");
-    setActiveView("tasks");
-    setSelectedTaskId(newTask.id);
-    setComposerOpen(false);
-    setTaskName("");
-    setTaskTarget("");
-    setTaskDescription("");
-    setTaskSchedule("仅运行一次");
-    setTaskScheduleTime("09:00");
-    setTaskScheduleDay("周一");
-    setTaskApproval(true);
-    recordActivity({
-      title: `任务已创建：${newTask.title}`,
-      detail: `${formatTaskSchedule(newTask)} · 目标：${newTask.target}`,
-      icon: "sparkles",
-      tone: "blue",
-      kind: "任务",
-      taskId: newTask.id,
-    });
-    setNotice(`任务“${newTask.title}”已开始运行`);
+    taskSavingRef.current = true;
+    setIsSavingTask(true);
+    await new Promise((resolve) => window.setTimeout(resolve, 260));
+
+    try {
+      if (editingTaskId) {
+        const task = tasks.find((item) => item.id === editingTaskId);
+        if (!task) return;
+        setTasks((items) =>
+          items.map((item) =>
+            item.id === editingTaskId
+              ? {
+                  ...item,
+                  title: taskName.trim(),
+                  description: taskDescription.trim(),
+                  target: taskTarget.trim(),
+                  schedule: taskSchedule,
+                  scheduleTime:
+                    taskSchedule === "仅运行一次" ? undefined : taskScheduleTime,
+                  scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
+                  requiresApproval: taskApproval,
+                  updated: "刚刚修改",
+                }
+              : item,
+          ),
+        );
+        setComposerOpen(false);
+        setEditingTaskId(null);
+        setTaskFormSubmitted(false);
+        setSelectedTaskId(task.id);
+        recordActivity({
+          title: `任务配置已更新：${taskName.trim()}`,
+          detail: `${formatSchedule(
+            taskSchedule,
+            taskScheduleTime,
+            taskScheduleDay,
+          )} · ${
+            taskApproval ? "敏感操作需要确认" : "按任务范围自动执行"
+          }`,
+          icon: "settings",
+          tone: "blue",
+          kind: "任务",
+          taskId: task.id,
+        });
+        setNotice(`任务“${taskName.trim()}”已更新`);
+        return;
+      }
+
+      const newTask: TaskItem = {
+        id: `task-${Date.now()}`,
+        title: taskName.trim(),
+        description: taskDescription.trim(),
+        target: taskTarget.trim(),
+        status: "运行中",
+        progress: 3,
+        updated: "刚刚创建",
+        schedule: taskSchedule,
+        scheduleTime: taskSchedule === "仅运行一次" ? undefined : taskScheduleTime,
+        scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
+        requiresApproval: taskApproval,
+      };
+      setTasks((items) => [newTask, ...items]);
+      setTaskFilter("全部");
+      setActiveView("tasks");
+      setSelectedTaskId(newTask.id);
+      setComposerOpen(false);
+      setEditingTaskId(null);
+      setTaskFormSubmitted(false);
+      setTaskName("");
+      setTaskTarget("");
+      setTaskDescription("");
+      setTaskSchedule("仅运行一次");
+      setTaskScheduleTime("09:00");
+      setTaskScheduleDay("周一");
+      setTaskApproval(true);
+      recordActivity({
+        title: `任务已创建：${newTask.title}`,
+        detail: `${formatTaskSchedule(newTask)} · 目标：${newTask.target}`,
+        icon: "sparkles",
+        tone: "blue",
+        kind: "任务",
+        taskId: newTask.id,
+      });
+      setNotice(`任务“${newTask.title}”已开始运行`);
+    } finally {
+      taskSavingRef.current = false;
+      setIsSavingTask(false);
+    }
   }
 
   function beginCreateTask() {
@@ -2173,6 +2256,7 @@ export default function HomePage() {
     setTaskScheduleTime("09:00");
     setTaskScheduleDay("周一");
     setTaskApproval(settings.approval);
+    setTaskFormSubmitted(false);
     setComposerOpen(true);
   }
 
@@ -2190,14 +2274,17 @@ export default function HomePage() {
     setTaskScheduleTime(task.scheduleTime ?? "09:00");
     setTaskScheduleDay(task.scheduleDay ?? "周一");
     setTaskApproval(task.requiresApproval ?? true);
+    setTaskFormSubmitted(false);
     setEditingTaskId(task.id);
     setSelectedTaskId(null);
     setComposerOpen(true);
   }
 
   function closeComposer() {
+    if (taskSavingRef.current) return;
     setComposerOpen(false);
     setEditingTaskId(null);
+    setTaskFormSubmitted(false);
   }
 
   function applyTaskTemplate(template: (typeof taskTemplates)[number]) {
@@ -2207,6 +2294,11 @@ export default function HomePage() {
     setTaskSchedule(template.schedule);
     setTaskScheduleTime(template.scheduleTime);
     setTaskScheduleDay(template.scheduleDay);
+    setTaskFormSubmitted(false);
+  }
+
+  function restoreWorkspaceFromWarning() {
+    importInputRef.current?.click();
   }
 
   function duplicateTask(task: TaskItem) {
@@ -2609,7 +2701,7 @@ export default function HomePage() {
         </div>
       </aside>
 
-      <section className="clarity-main">
+      <section className="clarity-main" aria-busy={!tasksReady}>
         <div className="clarity-mobile-topbar">
           <button
             className="clarity-mobile-brand"
@@ -2957,6 +3049,66 @@ export default function HomePage() {
             </button>
           </div>
         </header>
+
+        <input
+          ref={importInputRef}
+          className="workspace-import-input"
+          type="file"
+          accept=".json,application/json"
+          onChange={importWorkspace}
+        />
+
+        {!tasksReady && (
+          <section
+            className="workspace-loading"
+            role="status"
+            aria-label="正在恢复工作区"
+          >
+            <div className="workspace-loading-heading">
+              <span className="workspace-loading-icon">
+                <LoaderCircle size={19} />
+              </span>
+              <span>
+                <strong>正在恢复你的工作区</strong>
+                <small>读取本机任务、成果和运行记录</small>
+              </span>
+            </div>
+            <div className="workspace-loading-metrics" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </div>
+            <div className="workspace-loading-canvas" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+          </section>
+        )}
+
+        {tasksReady && workspaceLoadWarning && (
+          <section className="workspace-warning" role="status">
+            <span className="workspace-warning-icon">
+              <AlertTriangle size={19} />
+            </span>
+            <span className="workspace-warning-copy">
+              <strong>工作区已安全恢复</strong>
+              <small>{workspaceLoadWarning}</small>
+            </span>
+            <button type="button" onClick={restoreWorkspaceFromWarning}>
+              <Upload size={15} />
+              从备份恢复
+            </button>
+            <button
+              className="workspace-warning-dismiss"
+              type="button"
+              aria-label="关闭工作区提示"
+              onClick={() => setWorkspaceLoadWarning("")}
+            >
+              <X size={15} />
+            </button>
+          </section>
+        )}
 
         {activeView === "home" && (
           <section className="home-view">
@@ -4386,13 +4538,6 @@ export default function HomePage() {
                   <ChevronRight size={17} />
                 </button>
               </div>
-              <input
-                ref={importInputRef}
-                className="workspace-import-input"
-                type="file"
-                accept=".json,application/json"
-                onChange={importWorkspace}
-              />
             </div>
 
             <section className="settings-trust-center">
@@ -4798,10 +4943,12 @@ export default function HomePage() {
             className="clarity-dialog"
             role="dialog"
             aria-modal="true"
+            aria-busy={isSavingTask}
             aria-label={editingTaskId ? "编辑任务" : "新建任务"}
             aria-labelledby="task-composer-title"
             onSubmit={createTask}
             onMouseDown={(event) => event.stopPropagation()}
+            noValidate
           >
             <div className="clarity-dialog-heading">
               <div>
@@ -4815,7 +4962,12 @@ export default function HomePage() {
                     : "描述结果，选择节奏，然后让 AI 持续执行。"}
                 </p>
               </div>
-              <button type="button" aria-label="关闭" onClick={closeComposer}>
+              <button
+                type="button"
+                aria-label="关闭"
+                disabled={isSavingTask}
+                onClick={closeComposer}
+              >
                 <X size={17} />
               </button>
             </div>
@@ -4837,37 +4989,90 @@ export default function HomePage() {
             </section>
 
             <div className="composer-field-grid">
-              <label>
+              <label className={taskFormSubmitted && taskFormErrors.name ? "has-error" : ""}>
                 <span>任务名称</span>
                 <input
+                  ref={taskNameRef}
                   autoFocus
                   data-overlay-initial-focus
                   required
+                  maxLength={80}
+                  aria-invalid={Boolean(taskFormSubmitted && taskFormErrors.name)}
+                  aria-describedby={
+                    taskFormSubmitted && taskFormErrors.name
+                      ? "task-name-error"
+                      : undefined
+                  }
                   value={taskName}
                   placeholder="例如：每天跟踪竞品更新"
                   onChange={(event) => setTaskName(event.target.value)}
                 />
+                {taskFormSubmitted && taskFormErrors.name && (
+                  <small className="composer-field-error" id="task-name-error">
+                    <AlertTriangle size={13} />
+                    {taskFormErrors.name}
+                  </small>
+                )}
               </label>
 
-              <label>
+              <label className={taskFormSubmitted && taskFormErrors.target ? "has-error" : ""}>
                 <span>数据来源或网址</span>
                 <input
+                  ref={taskTargetRef}
                   required
+                  maxLength={240}
+                  aria-invalid={Boolean(taskFormSubmitted && taskFormErrors.target)}
+                  aria-describedby={
+                    taskFormSubmitted && taskFormErrors.target
+                      ? "task-target-error"
+                      : undefined
+                  }
                   value={taskTarget}
                   placeholder="网页、文件夹或资料库"
                   onChange={(event) => setTaskTarget(event.target.value)}
                 />
+                {taskFormSubmitted && taskFormErrors.target && (
+                  <small className="composer-field-error" id="task-target-error">
+                    <AlertTriangle size={13} />
+                    {taskFormErrors.target}
+                  </small>
+                )}
               </label>
             </div>
 
-            <label className="composer-instruction">
+            <label
+              className={`composer-instruction ${
+                taskFormSubmitted && taskFormErrors.description ? "has-error" : ""
+              }`}
+            >
               <span>希望得到什么结果</span>
               <textarea
+                ref={taskDescriptionRef}
                 required
+                maxLength={500}
+                aria-invalid={Boolean(
+                  taskFormSubmitted && taskFormErrors.description,
+                )}
+                aria-describedby={
+                  taskFormSubmitted && taskFormErrors.description
+                    ? "task-description-error"
+                    : undefined
+                }
                 value={taskDescription}
                 placeholder="说清楚要做什么、保留哪些证据，以及最终交付什么结果。"
                 onChange={(event) => setTaskDescription(event.target.value)}
               />
+              <span className="composer-field-meta">
+                {taskFormSubmitted && taskFormErrors.description ? (
+                  <small className="composer-field-error" id="task-description-error">
+                    <AlertTriangle size={13} />
+                    {taskFormErrors.description}
+                  </small>
+                ) : (
+                  <small>描述交付结果，AI 会自行规划执行步骤</small>
+                )}
+                <small>{taskDescription.length}/500</small>
+              </span>
             </label>
 
             <section className="composer-schedule" aria-label="运行频率">
@@ -4918,14 +5123,32 @@ export default function HomePage() {
                   <label>
                     <span>运行时间</span>
                     <input
+                      ref={taskScheduleTimeRef}
                       aria-label="选择运行时间"
                       type="time"
                       required
+                      aria-invalid={Boolean(
+                        taskFormSubmitted && taskFormErrors.scheduleTime,
+                      )}
+                      aria-describedby={
+                        taskFormSubmitted && taskFormErrors.scheduleTime
+                          ? "task-schedule-error"
+                          : undefined
+                      }
                       value={taskScheduleTime}
                       onInput={(event) =>
                         setTaskScheduleTime((event.target as HTMLInputElement).value)
                       }
                     />
+                    {taskFormSubmitted && taskFormErrors.scheduleTime && (
+                      <small
+                        className="composer-field-error"
+                        id="task-schedule-error"
+                      >
+                        <AlertTriangle size={13} />
+                        {taskFormErrors.scheduleTime}
+                      </small>
+                    )}
                   </label>
                   <span className="schedule-timezone">
                     <Clock3 size={15} />
@@ -4968,10 +5191,30 @@ export default function HomePage() {
             </div>
 
             <div className="clarity-dialog-actions">
-              <button type="button" onClick={closeComposer}>取消</button>
-              <button className="confirm" type="submit">
-                {editingTaskId ? <Pencil size={16} /> : <Sparkles size={16} />}
-                {editingTaskId ? "保存修改" : "创建并运行"}
+              {taskFormSubmitted && taskFormHasErrors && (
+                <span className="composer-error-summary" role="alert">
+                  <AlertTriangle size={14} />
+                  请先修正标出的内容
+                </span>
+              )}
+              <button type="button" disabled={isSavingTask} onClick={closeComposer}>
+                取消
+              </button>
+              <button className="confirm" type="submit" disabled={isSavingTask}>
+                {isSavingTask ? (
+                  <LoaderCircle className="composer-saving-icon" size={16} />
+                ) : editingTaskId ? (
+                  <Pencil size={16} />
+                ) : (
+                  <Sparkles size={16} />
+                )}
+                {isSavingTask
+                  ? editingTaskId
+                    ? "正在保存"
+                    : "正在创建"
+                  : editingTaskId
+                    ? "保存修改"
+                    : "创建并运行"}
               </button>
             </div>
           </form>
@@ -5252,8 +5495,15 @@ export default function HomePage() {
       )}
 
       {notice && (
-        <div className="clarity-toast" role="status">
-          <CheckCircle2 size={18} />
+        <div
+          className={`clarity-toast ${noticeIsCaution ? "caution" : ""}`}
+          role={noticeIsCaution ? "alert" : "status"}
+        >
+          {noticeIsCaution ? (
+            <AlertTriangle size={18} />
+          ) : (
+            <CheckCircle2 size={18} />
+          )}
           <span>{notice}</span>
           <button type="button" aria-label="关闭提示" onClick={() => setNotice("")}>
             <X size={15} />

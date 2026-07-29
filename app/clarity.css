@@ -16,6 +16,335 @@
   --clarity-red: #c55650;
 }
 
+/* Workspace recovery and resilient form feedback */
+.workspace-loading {
+  display: grid;
+  grid-template-rows: auto auto minmax(280px, 1fr);
+  gap: 18px;
+  min-height: 560px;
+  padding: 24px;
+  border: 1px solid rgba(126, 147, 172, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.95)),
+    radial-gradient(circle at 78% 8%, rgba(57, 118, 222, 0.12), transparent 34%),
+    #f8fafc;
+  overflow: hidden;
+}
+
+.workspace-loading-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.workspace-loading-heading > span:last-child,
+.workspace-loading-heading strong,
+.workspace-loading-heading small {
+  display: block;
+}
+
+.workspace-loading-heading strong {
+  color: #243247;
+  font-size: 14px;
+  font-weight: 780;
+}
+
+.workspace-loading-heading small {
+  margin-top: 4px;
+  color: #7a8798;
+  font-size: 11px;
+}
+
+.workspace-loading-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #cfe0f8;
+  border-radius: 8px;
+  background: #edf5ff;
+  color: #2d69c8;
+}
+
+.workspace-loading-icon svg,
+.composer-saving-icon {
+  animation: clarity-spin 850ms linear infinite;
+}
+
+.workspace-loading-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.workspace-loading-metrics i,
+.workspace-loading-canvas > span {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(132, 151, 176, 0.12);
+  border-radius: 7px;
+  background: #eef2f6;
+}
+
+.workspace-loading-metrics i {
+  height: 82px;
+}
+
+.workspace-loading-canvas {
+  display: grid;
+  grid-template-columns: 1.3fr 0.8fr;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.workspace-loading-canvas > span:first-child {
+  grid-row: 1 / -1;
+}
+
+.workspace-loading-metrics i::after,
+.workspace-loading-canvas > span::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.72) 48%,
+    transparent 76%
+  );
+  content: "";
+  transform: translateX(-100%);
+  animation: workspace-shimmer 1.5s ease-in-out infinite;
+}
+
+.workspace-warning {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto 36px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid #ead7aa;
+  border-radius: 8px;
+  background: #fffaf0;
+  color: #775522;
+  box-shadow: 0 8px 22px rgba(94, 69, 27, 0.06);
+  animation: workspace-warning-in 240ms ease-out both;
+}
+
+.workspace-warning-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 7px;
+  background: #ffefc9;
+  color: #a56a12;
+}
+
+.workspace-warning-copy,
+.workspace-warning-copy strong,
+.workspace-warning-copy small {
+  display: block;
+}
+
+.workspace-warning-copy strong {
+  color: #654819;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.workspace-warning-copy small {
+  margin-top: 4px;
+  color: #8a6d3e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.workspace-warning button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #dcc58f;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #795715;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.workspace-warning .workspace-warning-dismiss {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: #9b865e;
+}
+
+.clarity-dialog .has-error > span:first-child {
+  color: #a43c38;
+}
+
+.clarity-dialog .composer-field-grid .has-error input,
+.clarity-dialog .composer-instruction.has-error textarea,
+.clarity-dialog input[aria-invalid="true"] {
+  border-color: #d77872;
+  background: #fffafa;
+  box-shadow: 0 0 0 3px rgba(190, 63, 57, 0.08);
+}
+
+.composer-field-error {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin-top: 6px;
+  color: #a43c38;
+  font-size: 11px;
+  font-weight: 680;
+  line-height: 1.45;
+}
+
+.composer-field-error svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.composer-field-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.composer-field-meta > small {
+  color: #8490a0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.composer-field-meta > small:last-child {
+  flex: 0 0 auto;
+}
+
+.composer-error-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  color: #a43c38;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.clarity-dialog button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.clarity-dialog-actions .confirm:disabled {
+  border-color: #335d9a;
+  background: #335d9a;
+}
+
+.clarity-toast.caution {
+  border-color: #e6cf9c;
+  background: #fffaf0;
+  color: #8a5d18;
+}
+
+@keyframes clarity-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes workspace-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes workspace-warning-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 680px) {
+  .workspace-loading {
+    min-height: 520px;
+    padding: 18px;
+  }
+
+  .workspace-loading-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-loading-metrics i {
+    height: 56px;
+  }
+
+  .workspace-loading-canvas {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1.5fr 1fr;
+  }
+
+  .workspace-loading-canvas > span:first-child {
+    grid-row: auto;
+  }
+
+  .workspace-loading-canvas > span:last-child {
+    display: none;
+  }
+
+  .workspace-warning {
+    grid-template-columns: 38px minmax(0, 1fr) 36px;
+  }
+
+  .workspace-warning-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .workspace-warning > button:not(.workspace-warning-dismiss) {
+    grid-column: 2 / -1;
+    width: 100%;
+  }
+
+  .workspace-warning-dismiss {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .composer-error-summary {
+    width: 100%;
+    margin-bottom: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-loading-icon svg,
+  .workspace-loading-metrics i::after,
+  .workspace-loading-canvas > span::after,
+  .workspace-warning,
+  .composer-saving-icon {
+    animation: none;
+  }
+}
+
 body {
   background: var(--clarity-bg);
   color: var(--clarity-ink);
@@ -10115,5 +10444,76 @@ body {
 
   .task-detail-actions {
     padding: 12px 17px max(12px, env(safe-area-inset-bottom));
+  }
+}
+
+/* Keep validation visually dominant over the regular focus treatment. */
+.clarity-main {
+  position: relative;
+}
+
+.workspace-loading {
+  position: absolute;
+  z-index: 45;
+  top: 138px;
+  right: 32px;
+  left: 32px;
+  width: auto;
+  box-shadow: 0 20px 50px rgba(34, 51, 76, 0.08);
+}
+
+.clarity-dialog .composer-field-grid .has-error input:focus,
+.clarity-dialog .composer-instruction.has-error textarea:focus,
+.clarity-dialog input[aria-invalid="true"]:focus {
+  border-color: #c95f59;
+  background: #fffafa;
+  box-shadow: 0 0 0 3px rgba(190, 63, 57, 0.1);
+}
+
+.clarity-dialog-actions:has(.composer-error-summary) {
+  flex-wrap: wrap;
+}
+
+.clarity-dialog-actions:has(.composer-error-summary) .composer-error-summary {
+  flex: 1 0 100%;
+}
+
+.switch-control {
+  width: 44px;
+  height: 26px;
+}
+
+.switch-control > i {
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+}
+
+.switch-control.on > i {
+  transform: translateX(18px);
+}
+
+@media (max-width: 680px) {
+  .workspace-loading {
+    top: 76px;
+    right: 10px;
+    left: 10px;
+  }
+
+  .clarity-dialog-actions:has(.composer-error-summary) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clarity-dialog-actions:has(.composer-error-summary) .composer-error-summary {
+    grid-column: 1 / -1;
+    width: auto;
+    margin: 0 0 2px;
+  }
+
+  .clarity-dialog-actions:has(.composer-error-summary) button {
+    width: auto;
+    min-width: 0;
   }
 }
