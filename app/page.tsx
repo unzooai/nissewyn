@@ -67,6 +67,7 @@ type WorkspaceRoute = {
   view: ViewId;
   taskId: string | null;
   runId: string | null;
+  taskFilter?: TaskFilter | null;
 };
 type WorkspaceHistoryState = {
   unzooOne: true;
@@ -1367,10 +1368,18 @@ function readWorkspaceRoute(): WorkspaceRoute {
   const runId = taskId
     ? url.searchParams.get("run")?.trim() || null
     : null;
+  const requestedTaskFilter = url.searchParams.get("status");
+  const taskFilter =
+    requestedTaskFilter &&
+    taskFilters.includes(requestedTaskFilter as TaskFilter)
+      ? (requestedTaskFilter as TaskFilter)
+      : null;
+  const resolvedView = taskId ? "tasks" : view;
   return {
-    view: taskId ? "tasks" : view,
+    view: resolvedView,
     taskId,
     runId,
+    taskFilter: resolvedView === "tasks" ? taskFilter : null,
   };
 }
 
@@ -1394,6 +1403,15 @@ function writeWorkspaceRoute(
     url.searchParams.set("run", route.runId);
   } else {
     url.searchParams.delete("run");
+  }
+  if (
+    route.view === "tasks" &&
+    route.taskFilter &&
+    route.taskFilter !== "全部"
+  ) {
+    url.searchParams.set("status", route.taskFilter);
+  } else {
+    url.searchParams.delete("status");
   }
 
   const nextLocation = `${url.pathname}${url.search}${url.hash}`;
@@ -3416,12 +3434,21 @@ export default function HomePage() {
         view: routeTask ? "tasks" : requestedRoute.view,
         taskId: routeTask?.id ?? null,
         runId: routeRun?.id ?? null,
+        taskFilter:
+          requestedRoute.view === "tasks"
+            ? (requestedRoute.taskFilter ?? null)
+            : null,
       };
       const currentHistoryState = window.history.state as
         | WorkspaceHistoryState
         | null;
 
       setActiveView(resolvedRoute.view);
+      setTaskFilter(
+        resolvedRoute.view === "tasks"
+          ? (resolvedRoute.taskFilter ?? "全部")
+          : "全部",
+      );
       setSelectedTaskId(
         resolvedRoute.taskId && !resolvedRoute.runId
           ? resolvedRoute.taskId
@@ -4065,6 +4092,7 @@ export default function HomePage() {
                 view: "tasks",
                 taskId: inspectedRunTaskId,
                 runId: null,
+                taskFilter,
               },
               "replace",
             );
@@ -4076,7 +4104,12 @@ export default function HomePage() {
         } else {
           setSelectedTaskId(null);
           writeWorkspaceRoute(
-            { view: activeView, taskId: null, runId: null },
+            {
+              view: activeView,
+              taskId: null,
+              runId: null,
+              taskFilter: activeView === "tasks" ? taskFilter : null,
+            },
             "replace",
           );
         }
@@ -4150,6 +4183,7 @@ export default function HomePage() {
     isSavingArtifact,
     isSavingTask,
     taskComposerDirty,
+    taskFilter,
     teamInviteDirty,
     teamMemberRoleDirty,
     usageBudgetDirty,
@@ -6316,7 +6350,7 @@ export default function HomePage() {
     setDeleteTaskId(null);
     setSelectedTaskId(null);
     writeWorkspaceRoute(
-      { view: "tasks", taskId: null, runId: null },
+      { view: "tasks", taskId: null, runId: null, taskFilter },
       "replace",
     );
     recordActivity({
@@ -7221,9 +7255,15 @@ export default function HomePage() {
 
   function openView(
     view: ViewId,
-    options: { scrollToTop?: boolean } = {},
+    options: { scrollToTop?: boolean; taskFilter?: TaskFilter } = {},
   ) {
+    const nextTaskFilter =
+      view === "tasks" ? (options.taskFilter ?? "全部") : "全部";
     setActiveView(view);
+    if (view === "tasks") {
+      setTaskFilter(nextTaskFilter);
+      setTaskListQuery("");
+    }
     if (view !== "tasks") {
       setSelectedTaskIds([]);
       setBulkDeleteOpen(false);
@@ -7252,7 +7292,12 @@ export default function HomePage() {
     setInspectedRunTaskId(null);
     setInspectedRunId(null);
     writeWorkspaceRoute(
-      { view, taskId: null, runId: null },
+      {
+        view,
+        taskId: null,
+        runId: null,
+        taskFilter: view === "tasks" ? nextTaskFilter : null,
+      },
       "push",
     );
     if (options.scrollToTop !== false) {
@@ -7261,11 +7306,9 @@ export default function HomePage() {
   }
 
   function openTaskStatus(filter: TaskStatus) {
-    setTaskFilter(filter);
-    setTaskListQuery("");
     setTaskSort("状态优先");
     setSelectedTaskIds([]);
-    openView("tasks");
+    openView("tasks", { taskFilter: filter });
     setNotice(
       taskFilterCounts[filter] > 0
         ? `正在查看 ${taskFilterCounts[filter]} 个${filter}任务`
@@ -7313,13 +7356,20 @@ export default function HomePage() {
   }
 
   function openTask(taskId: string) {
+    const parentTaskFilter =
+      activeView === "tasks" ? taskFilter : "全部";
     setActiveView("tasks");
     setInspectedRunTaskId(null);
     setInspectedRunId(null);
     setSelectedTaskId(taskId);
     setNotificationsOpen(false);
     writeWorkspaceRoute(
-      { view: "tasks", taskId, runId: null },
+      {
+        view: "tasks",
+        taskId,
+        runId: null,
+        taskFilter: parentTaskFilter,
+      },
       "push",
     );
   }
@@ -7331,7 +7381,7 @@ export default function HomePage() {
     setInspectedRunId(runId);
     setNotificationsOpen(false);
     writeWorkspaceRoute(
-      { view: "tasks", taskId, runId },
+      { view: "tasks", taskId, runId, taskFilter },
       "push",
     );
   }
@@ -7352,7 +7402,7 @@ export default function HomePage() {
       setActiveView("tasks");
       setSelectedTaskId(taskId);
       writeWorkspaceRoute(
-        { view: "tasks", taskId, runId: null },
+        { view: "tasks", taskId, runId: null, taskFilter },
         "replace",
       );
     }
@@ -7365,8 +7415,27 @@ export default function HomePage() {
     }
     setSelectedTaskId(null);
     writeWorkspaceRoute(
-      { view: activeView, taskId: null, runId: null },
+      {
+        view: activeView,
+        taskId: null,
+        runId: null,
+        taskFilter: activeView === "tasks" ? taskFilter : null,
+      },
       "replace",
+    );
+  }
+
+  function chooseTaskFilter(filter: TaskFilter) {
+    setTaskFilter(filter);
+    writeWorkspaceRoute(
+      {
+        view: "tasks",
+        taskId: null,
+        runId: null,
+        taskFilter: filter,
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
     );
   }
 
@@ -9066,7 +9135,7 @@ export default function HomePage() {
                     type="button"
                     role="tab"
                     aria-selected={taskFilter === filter}
-                    onClick={() => setTaskFilter(filter)}
+                    onClick={() => chooseTaskFilter(filter)}
                   >
                     <span>{filter}</span>
                     <em>{taskFilterCounts[filter]}</em>
@@ -9125,7 +9194,7 @@ export default function HomePage() {
                     className="task-filter-context"
                     type="button"
                     aria-label={`清除${taskFilter}筛选`}
-                    onClick={() => setTaskFilter("全部")}
+                    onClick={() => chooseTaskFilter("全部")}
                   >
                     <ListChecks size={13} />
                     <span>{taskFilter}</span>
@@ -9325,7 +9394,7 @@ export default function HomePage() {
                       if (taskListQuery.trim()) {
                         setTaskListQuery("");
                       } else {
-                        setTaskFilter("全部");
+                        chooseTaskFilter("全部");
                       }
                     }}
                   >
