@@ -137,6 +137,7 @@ type ConnectorDefinition = {
 };
 type TeamRole = "所有者" | "管理员" | "审批者" | "成员";
 type TeamMemberStatus = "在线" | "离线" | "已邀请";
+type TeamRoleFilter = "全部" | "管理员" | "审批者" | "成员" | "待接受";
 type SettingsDraftTarget = "profile" | "budget" | "invite" | "member";
 const settingsDraftDiscardCopy: Record<
   SettingsDraftTarget,
@@ -576,6 +577,14 @@ const teamRoleDetails: Record<
     permissions: ["查看全部任务", "查看和下载成果", "添加任务备注"],
   },
 };
+const teamSeatLimit = 10;
+const teamRoleFilters: TeamRoleFilter[] = [
+  "全部",
+  "管理员",
+  "审批者",
+  "成员",
+  "待接受",
+];
 const initialTeamMembers: TeamMember[] = [
   {
     id: "member-owner",
@@ -2414,16 +2423,23 @@ export default function HomePage() {
     useState(false);
   const [teamMembers, setTeamMembers] =
     useState<TeamMember[]>(initialTeamMembers);
+  const [teamMemberQuery, setTeamMemberQuery] = useState("");
+  const [teamRoleFilter, setTeamRoleFilter] =
+    useState<TeamRoleFilter>("全部");
   const [teamInviteOpen, setTeamInviteOpen] = useState(false);
   const [selectedTeamMemberId, setSelectedTeamMemberId] =
     useState<string | null>(null);
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<TeamRole>("成员");
+  const [inviteAdminAcknowledged, setInviteAdminAcknowledged] =
+    useState(false);
   const [inviteFormSubmitted, setInviteFormSubmitted] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [memberRoleDraft, setMemberRoleDraft] = useState<TeamRole>("成员");
   const [memberRemoveConfirm, setMemberRemoveConfirm] = useState(false);
+  const [memberRemoveAcknowledged, setMemberRemoveAcknowledged] =
+    useState(false);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const notificationWrapRef = useRef<HTMLDivElement>(null);
@@ -2714,12 +2730,48 @@ export default function HomePage() {
   const selectedConnectorHasIssue = selectedConnectorIssueTasks.length > 0;
   const selectedTeamMember =
     teamMembers.find((member) => member.id === selectedTeamMemberId) ?? null;
+  const normalizedTeamMemberQuery = teamMemberQuery.trim().toLowerCase();
+  const filteredTeamMembers = teamMembers.filter((member) => {
+    const matchesQuery =
+      !normalizedTeamMemberQuery ||
+      `${member.name} ${member.email}`
+        .toLowerCase()
+        .includes(normalizedTeamMemberQuery);
+    const matchesRole =
+      teamRoleFilter === "全部" ||
+      (teamRoleFilter === "待接受"
+        ? member.status === "已邀请"
+        : member.role === teamRoleFilter);
+    return matchesQuery && matchesRole;
+  });
+  const pendingInviteCount = teamMembers.filter(
+    (member) => member.status === "已邀请",
+  ).length;
+  const teamRoleFilterCounts: Record<TeamRoleFilter, number> = {
+    全部: teamMembers.length,
+    管理员: teamMembers.filter((member) => member.role === "管理员").length,
+    审批者: teamMembers.filter((member) => member.role === "审批者").length,
+    成员: teamMembers.filter((member) => member.role === "成员").length,
+    待接受: pendingInviteCount,
+  };
+  const availableSeatCount = Math.max(0, teamSeatLimit - teamMembers.length);
+  const teamSeatLimitReached = availableSeatCount === 0;
   const approverMemberCount = teamMembers.filter((member) =>
     ["所有者", "管理员", "审批者"].includes(member.role),
   ).length;
   const onlineMemberCount = teamMembers.filter(
     (member) => member.status === "在线",
   ).length;
+  const currentMemberPermissions = selectedTeamMember
+    ? teamRoleDetails[selectedTeamMember.role].permissions
+    : [];
+  const draftMemberPermissions = teamRoleDetails[memberRoleDraft].permissions;
+  const gainedMemberPermissions = draftMemberPermissions.filter(
+    (permission) => !currentMemberPermissions.includes(permission),
+  );
+  const lostMemberPermissions = currentMemberPermissions.filter(
+    (permission) => !draftMemberPermissions.includes(permission),
+  );
   const SelectedConnectorIcon = selectedConnector?.icon ?? Link2;
   const connectedConnectorCount = connectorCatalog.filter(
     (connector) => connectorStates[connector.id],
@@ -3194,6 +3246,8 @@ export default function HomePage() {
   }, [inviteEmail, inviteName, teamMembers]);
   const teamInviteFormHasErrors =
     Object.keys(teamInviteFormErrors).length > 0;
+  const inviteNeedsAdminAcknowledgement =
+    inviteRole === "管理员" && !inviteAdminAcknowledged;
   const noticeIsCaution =
     /失败|不能|请先|无效|损坏|已拒绝|离线|无法连接/.test(notice);
   const workspaceSyncHasConflict = Boolean(
@@ -3209,6 +3263,8 @@ export default function HomePage() {
     usageBudgetCanSaveBase && !budgetWorkspaceConflict;
   const memberWorkspaceConflict =
     workspaceSyncNotice?.conflicts.includes("member") ?? false;
+  const memberRoleCanSave =
+    teamMemberRoleDirty && isOnline && !memberWorkspaceConflict;
   const profileWorkspaceConflict =
     workspaceSyncNotice?.conflicts.includes("profile") ?? false;
   const workspaceSyncLabel = workspaceSyncNotice
@@ -4047,7 +4103,7 @@ export default function HomePage() {
 
     function updateVisibleSettingsSection() {
       frame = null;
-      if (settingsSectionScrollTargetRef.current) return;
+      if (settingsSectionScrollTargetRef.current || overlayOpen) return;
       const settingsNavBottom =
         document
           .querySelector(".settings-section-nav")
@@ -4115,7 +4171,7 @@ export default function HomePage() {
       window.removeEventListener("scroll", queueSettingsSectionUpdate);
       window.removeEventListener("resize", queueSettingsSectionUpdate);
     };
-  }, [activeView, tasksReady]);
+  }, [activeView, overlayOpen, tasksReady]);
 
   useEffect(() => {
     if (activeView !== "settings" || window.innerWidth > 680) return;
@@ -4796,6 +4852,7 @@ export default function HomePage() {
           setSettingsDiscardTarget("invite");
         } else {
           setTeamInviteOpen(false);
+          setInviteAdminAcknowledged(false);
           setInviteFormSubmitted(false);
         }
       } else if (activeOverlayKind === "team-member") {
@@ -4804,6 +4861,7 @@ export default function HomePage() {
         } else {
           setSelectedTeamMemberId(null);
           setMemberRemoveConfirm(false);
+          setMemberRemoveAcknowledged(false);
         }
       } else if (activeOverlayKind === "connector") {
         setSelectedConnectorId(null);
@@ -6035,9 +6093,13 @@ export default function HomePage() {
     setTeamMembers(
       backup.members ?? initialTeamMembers.map((member) => ({ ...member })),
     );
+    setTeamMemberQuery("");
+    setTeamRoleFilter("全部");
     setTeamInviteOpen(false);
+    setInviteAdminAcknowledged(false);
     setSelectedTeamMemberId(null);
     setMemberRemoveConfirm(false);
+    setMemberRemoveAcknowledged(false);
     setApprovals(restoredApprovals);
     setApprovalDeferrals(backup.approvalDeferrals ?? {});
     setApprovalClock(Date.now());
@@ -6115,9 +6177,13 @@ export default function HomePage() {
     setConnectorDisconnectConfirm(false);
     setConnectorTestingId(null);
     setTeamMembers(initialTeamMembers.map((member) => ({ ...member })));
+    setTeamMemberQuery("");
+    setTeamRoleFilter("全部");
     setTeamInviteOpen(false);
     setSelectedTeamMemberId(null);
     setMemberRemoveConfirm(false);
+    setMemberRemoveAcknowledged(false);
+    setInviteAdminAcknowledged(false);
     setInviteFormSubmitted(false);
     setApprovals(initialApprovals.map((item) => ({ ...item })));
     setApprovalDeferrals({});
@@ -7767,12 +7833,14 @@ export default function HomePage() {
       setInviteName("");
       setInviteEmail("");
       setInviteRole("成员");
+      setInviteAdminAcknowledged(false);
       setInviteFormSubmitted(false);
       setTeamInviteOpen(false);
     } else if (settingsDiscardTarget === "member") {
       if (selectedTeamMember) setMemberRoleDraft(selectedTeamMember.role);
       setSelectedTeamMemberId(null);
       setMemberRemoveConfirm(false);
+      setMemberRemoveAcknowledged(false);
     }
     setSettingsDiscardTarget(null);
   }
@@ -8128,10 +8196,27 @@ export default function HomePage() {
     setNotice(`${selectedConnector.name}已断开`);
   }
 
+  function preserveTeamSettingsRoute() {
+    settingsSectionRef.current = "team";
+    setSettingsSection("team");
+    writeWorkspaceRoute(
+      {
+        view: "settings",
+        taskId: null,
+        runId: null,
+        settingsSection: "team",
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
+  }
+
   function openTeamInvite() {
+    preserveTeamSettingsRoute();
     setInviteName("");
     setInviteEmail("");
     setInviteRole("成员");
+    setInviteAdminAcknowledged(false);
     setInviteFormSubmitted(false);
     setSettingsDiscardTarget(null);
     setTeamInviteOpen(true);
@@ -8144,6 +8229,7 @@ export default function HomePage() {
       return;
     }
     setTeamInviteOpen(false);
+    setInviteAdminAcknowledged(false);
     setInviteFormSubmitted(false);
   }
 
@@ -8152,6 +8238,14 @@ export default function HomePage() {
     if (inviteSavingRef.current) return;
     setInviteFormSubmitted(true);
     if (teamInviteFormHasErrors) return;
+    if (teamSeatLimitReached) {
+      setNotice("当前工作区席位已用完，请先移除成员或升级方案");
+      return;
+    }
+    if (inviteNeedsAdminAcknowledgement) {
+      setNotice("请先确认管理员将获得的高权限");
+      return;
+    }
     if (
       !requireOnline(
         "设备离线，邀请尚未发送；已填写的姓名、邮箱和角色仍保留在表单中",
@@ -8179,6 +8273,7 @@ export default function HomePage() {
       };
       setTeamMembers((members) => [...members, member]);
       setTeamInviteOpen(false);
+      setInviteAdminAcknowledged(false);
       setInviteFormSubmitted(false);
       recordActivity({
         title: `已邀请团队成员：${member.name}`,
@@ -8195,8 +8290,10 @@ export default function HomePage() {
   }
 
   function openTeamMember(member: TeamMember) {
+    preserveTeamSettingsRoute();
     setMemberRoleDraft(member.role);
     setMemberRemoveConfirm(false);
+    setMemberRemoveAcknowledged(false);
     setSettingsDiscardTarget(null);
     setSelectedTeamMemberId(member.id);
   }
@@ -8208,6 +8305,7 @@ export default function HomePage() {
     }
     setSelectedTeamMemberId(null);
     setMemberRemoveConfirm(false);
+    setMemberRemoveAcknowledged(false);
   }
 
   function saveTeamMemberRole() {
@@ -8273,6 +8371,10 @@ export default function HomePage() {
 
   function confirmRemoveTeamMember() {
     if (!selectedTeamMember || selectedTeamMember.role === "所有者") return;
+    if (!memberRemoveAcknowledged) {
+      setNotice("请先确认该成员会立即失去工作区访问权限");
+      return;
+    }
     if (
       !requireOnline(
         `设备离线，${selectedTeamMember.name}仍保留工作区访问权限；恢复网络后可以移除`,
@@ -8286,6 +8388,7 @@ export default function HomePage() {
     );
     setSelectedTeamMemberId(null);
     setMemberRemoveConfirm(false);
+    setMemberRemoveAcknowledged(false);
     recordActivity({
       title: `团队成员已移除：${removedMember.name}`,
       detail: `${removedMember.email} 已失去当前工作区访问权限。`,
@@ -12354,8 +12457,19 @@ export default function HomePage() {
                 <span>
                   <Users size={18} />
                   <span>
-                    <small>工作区成员</small>
-                    <strong>{teamMembers.length} 位</strong>
+                    <small>席位使用</small>
+                    <strong>
+                      {teamMembers.length} / {teamSeatLimit}
+                    </strong>
+                    <em>{availableSeatCount} 个可用</em>
+                  </span>
+                </span>
+                <span>
+                  <Mail size={18} />
+                  <span>
+                    <small>待接受邀请</small>
+                    <strong>{pendingInviteCount} 位</strong>
+                    <em>{pendingInviteCount ? "已占用席位" : "暂无待处理"}</em>
                   </span>
                 </span>
                 <span>
@@ -12363,6 +12477,7 @@ export default function HomePage() {
                   <span>
                     <small>可以审批</small>
                     <strong>{approverMemberCount} 位</strong>
+                    <em>含所有者与管理员</em>
                   </span>
                 </span>
                 <span>
@@ -12370,14 +12485,51 @@ export default function HomePage() {
                   <span>
                     <small>当前在线</small>
                     <strong>{onlineMemberCount} 位</strong>
+                    <em>状态实时同步</em>
                   </span>
                 </span>
-                <span>
-                  <CheckCircle2 size={18} />
-                  <span>
-                    <small>安全策略</small>
-                    <strong>已生效</strong>
-                  </span>
+              </div>
+
+              <div className="settings-team-toolbar">
+                <label className="settings-team-search">
+                  <Search size={16} />
+                  <input
+                    type="search"
+                    value={teamMemberQuery}
+                    aria-label="搜索团队成员"
+                    placeholder="搜索姓名或邮箱"
+                    onChange={(event) => setTeamMemberQuery(event.target.value)}
+                  />
+                  {teamMemberQuery && (
+                    <button
+                      type="button"
+                      aria-label="清空成员搜索"
+                      onClick={() => setTeamMemberQuery("")}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </label>
+                <div
+                  className="settings-team-filters"
+                  role="group"
+                  aria-label="按角色筛选成员"
+                >
+                  {teamRoleFilters.map((filter) => (
+                    <button
+                      className={teamRoleFilter === filter ? "active" : ""}
+                      type="button"
+                      aria-pressed={teamRoleFilter === filter}
+                      key={filter}
+                      onClick={() => setTeamRoleFilter(filter)}
+                    >
+                      {filter}
+                      <span>{teamRoleFilterCounts[filter]}</span>
+                    </button>
+                  ))}
+                </div>
+                <span className="settings-team-result-count" aria-live="polite">
+                  显示 {filteredTeamMembers.length} 位
                 </span>
               </div>
 
@@ -12390,7 +12542,7 @@ export default function HomePage() {
                   <span>操作</span>
                 </div>
                 <div className="settings-team-list">
-                  {teamMembers.map((member) => (
+                  {filteredTeamMembers.map((member) => (
                     <article className="settings-team-row" key={member.id}>
                       <div className="settings-team-identity">
                         <span className={`settings-team-avatar tone-${member.tone}`}>
@@ -12429,6 +12581,22 @@ export default function HomePage() {
                       </button>
                     </article>
                   ))}
+                  {filteredTeamMembers.length === 0 && (
+                    <div className="settings-team-empty">
+                      <Search size={20} />
+                      <strong>没有符合条件的成员</strong>
+                      <small>换一个姓名、邮箱或角色筛选条件试试。</small>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTeamMemberQuery("");
+                          setTeamRoleFilter("全部");
+                        }}
+                      >
+                        清除筛选
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -12868,6 +13036,27 @@ export default function HomePage() {
               </div>
             </header>
 
+            <div
+              className={`team-invite-seat-status${
+                teamSeatLimitReached ? " is-full" : ""
+              }`}
+              role="status"
+            >
+              <Users size={17} />
+              <span>
+                <small>Team 方案席位</small>
+                <strong>
+                  已使用 {teamMembers.length} / {teamSeatLimit}
+                </strong>
+              </span>
+              <span>
+                <small>邀请后剩余</small>
+                <strong>
+                  {teamSeatLimitReached ? "没有可用席位" : `${availableSeatCount - 1} 个`}
+                </strong>
+              </span>
+            </div>
+
             {!isOnline && (
               <div className="team-network-note" role="status">
                 <Globe2 size={17} />
@@ -12949,9 +13138,11 @@ export default function HomePage() {
                 <select
                   value={inviteRole}
                   disabled={isSendingInvite}
-                  onChange={(event) =>
-                    setInviteRole(event.target.value as TeamRole)
-                  }
+                  onChange={(event) => {
+                    setInviteRole(event.target.value as TeamRole);
+                    setInviteAdminAcknowledged(false);
+                    if (inviteFormSubmitted) setInviteFormSubmitted(false);
+                  }}
                 >
                   {(["管理员", "审批者", "成员"] as TeamRole[]).map((role) => (
                     <option key={role} value={role}>
@@ -12980,10 +13171,41 @@ export default function HomePage() {
               </div>
             </div>
 
-            {inviteFormSubmitted && teamInviteFormHasErrors && (
+            {inviteRole === "管理员" && (
+              <label
+                className={`team-admin-confirm${
+                  inviteAdminAcknowledged ? " is-checked" : ""
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={inviteAdminAcknowledged}
+                  disabled={isSendingInvite}
+                  onChange={(event) =>
+                    setInviteAdminAcknowledged(event.target.checked)
+                  }
+                />
+                <ShieldCheck size={18} />
+                <span>
+                  <strong>确认授予管理员权限</strong>
+                  <small>
+                    管理员可以邀请成员、编辑任务并审批外部操作。
+                  </small>
+                </span>
+              </label>
+            )}
+
+            {inviteFormSubmitted &&
+              (teamInviteFormHasErrors ||
+                inviteNeedsAdminAcknowledgement ||
+                teamSeatLimitReached) && (
               <div className="team-form-error-summary" role="alert">
                 <AlertTriangle size={16} />
-                请先修正上方信息，再发送邀请。
+                {teamSeatLimitReached
+                  ? "当前方案没有可用席位，请先移除成员或升级方案。"
+                  : inviteNeedsAdminAcknowledgement
+                    ? "请先确认管理员将获得的高权限。"
+                    : "请先修正上方信息，再发送邀请。"}
               </div>
             )}
 
@@ -12998,7 +13220,7 @@ export default function HomePage() {
               <button
                 className={`primary${!isOnline ? " is-offline" : ""}`}
                 type="submit"
-                disabled={isSendingInvite}
+                disabled={isSendingInvite || teamSeatLimitReached}
               >
                 {isSendingInvite ? (
                   <LoaderCircle className="is-spinning" size={16} />
@@ -13009,6 +13231,8 @@ export default function HomePage() {
                 )}
                 {isSendingInvite
                   ? "正在发送"
+                  : teamSeatLimitReached
+                    ? "席位已用完"
                   : isOnline
                     ? "发送邀请"
                     : "联网后发送"}
@@ -13068,6 +13292,20 @@ export default function HomePage() {
               </div>
             )}
 
+            {memberWorkspaceConflict &&
+              selectedTeamMember.role !== "所有者" && (
+                <div
+                  className="team-network-note member is-conflict"
+                  role="alert"
+                >
+                  <AlertTriangle size={17} />
+                  <span>
+                    <strong>另一窗口更新了成员角色</strong>
+                    <small>请先处理版本冲突，再保存这里的权限变更。</small>
+                  </span>
+                </div>
+              )}
+
             <div className="team-member-facts">
               <span>
                 <small>当前角色</small>
@@ -13109,19 +13347,59 @@ export default function HomePage() {
                   )}
                 </select>
               </label>
-              <div>
-                <small>{memberRoleDraft}将获得</small>
-                <strong>{teamRoleDetails[memberRoleDraft].summary}</strong>
-                <div>
-                  {teamRoleDetails[memberRoleDraft].permissions.map(
-                    (permission) => (
-                      <span key={permission}>
-                        <Check size={14} />
-                        {permission}
-                      </span>
-                    ),
-                  )}
+              <div
+                className={`team-role-change-panel${
+                  teamMemberRoleDirty ? " has-changes" : ""
+                }`}
+              >
+                <small>权限变更</small>
+                <div className="team-role-change-route">
+                  <span>{selectedTeamMember.role}</span>
+                  <ChevronRight size={15} />
+                  <strong>{memberRoleDraft}</strong>
                 </div>
+                <p>{teamRoleDetails[memberRoleDraft].summary}</p>
+                {teamMemberRoleDirty ? (
+                  <div className="team-role-diff">
+                    <section className="is-gained">
+                      <span>新增权限</span>
+                      {gainedMemberPermissions.length ? (
+                        gainedMemberPermissions.map((permission) => (
+                          <small key={permission}>
+                            <Plus size={13} />
+                            {permission}
+                          </small>
+                        ))
+                      ) : (
+                        <small>
+                          <Check size={13} />
+                          没有新增权限
+                        </small>
+                      )}
+                    </section>
+                    <section className="is-lost">
+                      <span>收回权限</span>
+                      {lostMemberPermissions.length ? (
+                        lostMemberPermissions.map((permission) => (
+                          <small key={permission}>
+                            <X size={13} />
+                            {permission}
+                          </small>
+                        ))
+                      ) : (
+                        <small>
+                          <Check size={13} />
+                          没有收回权限
+                        </small>
+                      )}
+                    </section>
+                  </div>
+                ) : (
+                  <div className="team-role-unchanged">
+                    <CheckCircle2 size={15} />
+                    当前权限保持不变
+                  </div>
+                )}
               </div>
             </div>
 
@@ -13137,25 +13415,69 @@ export default function HomePage() {
 
             {memberRemoveConfirm ? (
               <div className="team-member-remove-confirm" role="alert">
-                <AlertTriangle size={18} />
-                <span>
-                  <strong>移除 {selectedTeamMember.name}？</strong>
-                  <small>该成员会立即失去任务、成果和审批访问权限。</small>
-                </span>
-                <div>
+                <header>
+                  <AlertTriangle size={18} />
+                  <span>
+                    <strong>移除 {selectedTeamMember.name}？</strong>
+                    <small>
+                      {selectedTeamMember.status === "已邀请"
+                        ? "邀请链接会立即失效，并释放 1 个团队席位。"
+                        : "该成员会立即失去当前工作区的全部访问权限。"}
+                    </small>
+                  </span>
+                </header>
+                <div className="team-member-remove-impact">
+                  <span>
+                    <X size={13} />
+                    任务访问
+                  </span>
+                  <span>
+                    <X size={13} />
+                    成果下载
+                  </span>
+                  <span>
+                    <X size={13} />
+                    审批与设置
+                  </span>
+                </div>
+                <label
+                  className={
+                    memberRemoveAcknowledged ? "is-checked" : undefined
+                  }
+                >
+                  <input
+                    type="checkbox"
+                    checked={memberRemoveAcknowledged}
+                    onChange={(event) =>
+                      setMemberRemoveAcknowledged(event.target.checked)
+                    }
+                  />
+                  <span>
+                    我确认移除 <strong>{selectedTeamMember.email}</strong>
+                  </span>
+                </label>
+                <div className="team-member-remove-actions">
                   <button
                     type="button"
                     data-overlay-initial-focus
-                    onClick={() => setMemberRemoveConfirm(false)}
+                    onClick={() => {
+                      setMemberRemoveConfirm(false);
+                      setMemberRemoveAcknowledged(false);
+                    }}
                   >
                     取消
                   </button>
                   <button
                     className={`danger${!isOnline ? " is-offline" : ""}`}
                     type="button"
+                    disabled={!memberRemoveAcknowledged || !isOnline}
                     onClick={confirmRemoveTeamMember}
                   >
-                    {isOnline ? "确认移除" : "联网后移除"}
+                    {!isOnline
+                      ? "联网后移除"
+                      : memberRemoveAcknowledged
+                        ? "确认移除"
+                        : "请先确认"}
                   </button>
                 </div>
               </div>
@@ -13175,7 +13497,10 @@ export default function HomePage() {
                     <button
                       className="remove"
                       type="button"
-                      onClick={() => setMemberRemoveConfirm(true)}
+                      onClick={() => {
+                        setMemberRemoveAcknowledged(false);
+                        setMemberRemoveConfirm(true);
+                      }}
                     >
                       <Trash2 size={15} />
                       移除成员
@@ -13194,14 +13519,23 @@ export default function HomePage() {
                       className={`primary${!isOnline ? " is-offline" : ""}`}
                       type="button"
                       data-overlay-initial-focus
+                      disabled={!memberRoleCanSave}
                       onClick={saveTeamMemberRole}
                     >
-                      {isOnline ? (
+                      {memberRoleCanSave ? (
                         <CheckCircle2 size={15} />
-                      ) : (
+                      ) : !isOnline ? (
                         <Globe2 size={15} />
+                      ) : (
+                        <ShieldCheck size={15} />
                       )}
-                      {isOnline ? "保存角色" : "联网后保存"}
+                      {!isOnline
+                        ? "联网后保存"
+                        : memberWorkspaceConflict
+                          ? "先处理冲突"
+                          : teamMemberRoleDirty
+                            ? `保存为${memberRoleDraft}`
+                            : "角色未更改"}
                     </button>
                   </>
                 )}
