@@ -5688,7 +5688,7 @@ export default function HomePage() {
     try {
       const desktopNotification = new window.Notification(newItem.title, {
         body: newItem.detail,
-        icon: "/unzoo-one-mark.png",
+        icon: "/unzoo-one-mark-v5.png",
         tag: `unzoo-one-${newItem.id}`,
       });
       desktopNotification.onclick = () => {
@@ -8294,7 +8294,7 @@ export default function HomePage() {
       try {
         const confirmation = new window.Notification("Unzoo One 提醒已开启", {
           body: "后续需要你决定的任务会在这里提醒。",
-          icon: "/unzoo-one-mark.png",
+          icon: "/unzoo-one-mark-v5.png",
           tag: "unzoo-one-notifications-enabled",
         });
         window.setTimeout(() => confirmation.close(), 5000);
@@ -9498,7 +9498,7 @@ export default function HomePage() {
       }
 
       const response = await window.fetch(
-        `/unzoo-one-mark.png?network-check=${Date.now()}`,
+        `/unzoo-one-mark-v5.png?network-check=${Date.now()}`,
         { cache: "no-store" },
       );
       if (!response.ok) {
@@ -9770,18 +9770,24 @@ export default function HomePage() {
   return (
     <main className="clarity-shell">
       <aside className="clarity-sidebar" aria-label="主导航">
-        <div className="clarity-brand">
+        <button
+          className="clarity-brand"
+          type="button"
+          aria-label="返回首页"
+          onClick={() => openView("home")}
+        >
           <span className="clarity-brand-mark">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/unzoo-one-mark.png" alt="Unzoo One" />
+            <img src="/unzoo-one-mark-v5.png" alt="Unzoo One" />
           </span>
-          <div>
+          <div className="clarity-brand-copy">
             <strong>
-              unzoo <span>one</span>
+              <span className="clarity-wordmark-name">unzoo</span>
+              <span className="clarity-wordmark-one">one</span>
             </strong>
             <small>可信 AI 执行</small>
           </div>
-        </div>
+        </button>
 
         <nav className="clarity-nav">
           {navItems.map((item) => (
@@ -9821,11 +9827,14 @@ export default function HomePage() {
             aria-label="返回首页"
             onClick={() => openView("home")}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/unzoo-one-mark.png" alt="" />
-            <span>
+            <span className="clarity-mobile-brand-mark">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/unzoo-one-mark-v5.png" alt="" />
+            </span>
+            <span className="clarity-mobile-brand-copy">
               <strong>
-                unzoo <span>one</span>
+                <span className="clarity-wordmark-name">unzoo</span>
+                <span className="clarity-wordmark-one">one</span>
               </strong>
               <small>
                 <i className={systemStatusTone} />
