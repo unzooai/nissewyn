@@ -300,6 +300,14 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /const defaultUsageSettings: UsageSettings/);
   assert.match(page, /function isUsageSettings/);
   assert.match(page, /function openUsageBudget/);
+  assert.match(page, /const \[planCenterOpen, setPlanCenterOpen\]/);
+  assert.match(page, /function openPlanCenter\(\)/);
+  assert.match(page, /function openPlanBudget\(\)/);
+  assert.match(page, /function openPlanMembers\(\)/);
+  assert.match(page, /className="plan-center-dialog"/);
+  assert.match(page, /aria-label="关闭方案中心"/);
+  assert.match(page, /onClick=\{openPlanBudget\}/);
+  assert.match(page, /onClick=\{openPlanMembers\}/);
   assert.match(page, /type SettingsDraftTarget =/);
   assert.match(page, /function requestCloseUsageBudget/);
   assert.match(page, /function discardSettingsDraft/);
@@ -528,6 +536,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.usage-budget-track/);
   assert.match(css, /\.usage-breakdown-list/);
   assert.match(css, /\.usage-budget-dialog/);
+  assert.match(css, /\.plan-center-dialog/);
+  assert.match(css, /\.plan-center-metrics/);
+  assert.match(css, /\.plan-center-actions/);
   assert.match(css, /\.usage-budget-warning/);
   assert.match(css, /\.usage-meter-status/);
   assert.match(css, /\.usage-budget-insights/);

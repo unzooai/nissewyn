@@ -2463,6 +2463,7 @@ export default function HomePage() {
   const [usageSettings, setUsageSettings] =
     useState<UsageSettings>(defaultUsageSettings);
   const [usageBudgetOpen, setUsageBudgetOpen] = useState(false);
+  const [planCenterOpen, setPlanCenterOpen] = useState(false);
   const [usageBudgetDraft, setUsageBudgetDraft] = useState(
     String(defaultUsageSettings.monthlyBudget),
   );
@@ -3225,6 +3226,8 @@ export default function HomePage() {
         ? "artifact-delete"
       : usageBudgetOpen
         ? "usage-budget"
+      : planCenterOpen
+        ? "plan-center"
     : pendingWorkspaceImport
       ? "import"
     : bulkApprovalDecision
@@ -4714,6 +4717,7 @@ export default function HomePage() {
         event.key.toLowerCase() === "k" &&
         !composerOpen &&
         !usageBudgetOpen &&
+        !planCenterOpen &&
         !bulkApprovalDecision &&
         !bulkDeleteOpen &&
         !teamInviteOpen &&
@@ -4765,6 +4769,7 @@ export default function HomePage() {
     rejectedApproval,
     notificationsOpen,
     pendingWorkspaceImport,
+    planCenterOpen,
     searchOpen,
     inspectedRun,
     selectedConnector,
@@ -4893,6 +4898,7 @@ export default function HomePage() {
       "artifact-editor": ".artifact-editor-dialog",
       "artifact-delete": ".artifact-delete-dialog",
       "usage-budget": ".usage-budget-dialog",
+      "plan-center": ".plan-center-dialog",
       import: ".workspace-import-dialog",
       "bulk-approval": ".bulk-approval-dialog",
       "bulk-delete": ".bulk-delete-dialog",
@@ -4966,6 +4972,8 @@ export default function HomePage() {
         } else {
           setUsageBudgetOpen(false);
         }
+      } else if (activeOverlayKind === "plan-center") {
+        setPlanCenterOpen(false);
       } else if (activeOverlayKind === "import") {
         settingsSectionRef.current = "data";
         setSettingsSection("data");
@@ -8072,6 +8080,32 @@ export default function HomePage() {
     setUsagePauseConfirmed(false);
     setSettingsDiscardTarget(null);
     setUsageBudgetOpen(true);
+  }
+
+  function openPlanCenter() {
+    if (
+      !overlayTriggerRef.current &&
+      document.activeElement instanceof HTMLElement
+    ) {
+      overlayTriggerRef.current = document.activeElement;
+    }
+    setSettingsDiscardTarget(null);
+    setWorkspaceMenuOpen(false);
+    setPlanCenterOpen(true);
+  }
+
+  function closePlanCenter() {
+    setPlanCenterOpen(false);
+  }
+
+  function openPlanBudget() {
+    setPlanCenterOpen(false);
+    openUsageBudget();
+  }
+
+  function openPlanMembers() {
+    setPlanCenterOpen(false);
+    openSettingsSection("team");
   }
 
   function openWorkspaceProfile() {
@@ -12873,10 +12907,16 @@ export default function HomePage() {
                   <p>本月额度根据任务执行、连接器调用和本机成果记录实时估算。</p>
                 </div>
                 <div className="settings-usage-heading-actions">
-                  <span className="settings-plan-badge">
+                  <button
+                    className="settings-plan-badge"
+                    type="button"
+                    aria-haspopup="dialog"
+                    aria-expanded={planCenterOpen}
+                    onClick={openPlanCenter}
+                  >
                     <Sparkles size={15} />
                     Team 方案
-                  </span>
+                  </button>
                   <button type="button" onClick={exportUsageReport}>
                     <Download size={15} />
                     导出用量
@@ -16699,6 +16739,165 @@ export default function HomePage() {
                 onClick={discardSettingsDraft}
               >
                 {activeSettingsDiscardCopy.discardLabel}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {planCenterOpen && (
+        <div
+          className="clarity-dialog-backdrop plan-center-backdrop"
+          onMouseDown={closePlanCenter}
+        >
+          <section
+            className="plan-center-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="plan-center-title"
+            aria-describedby="plan-center-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              className="plan-center-close"
+              type="button"
+              aria-label="关闭方案中心"
+              data-overlay-initial-focus
+              onClick={closePlanCenter}
+            >
+              <X size={17} />
+            </button>
+
+            <div className="plan-center-head">
+              <span className="plan-center-mark">
+                <Sparkles size={22} />
+              </span>
+              <span>
+                <span className="plan-center-eyebrow">当前方案</span>
+                <h2 id="plan-center-title">Team 方案</h2>
+                <p id="plan-center-description">
+                  当前工作区的额度、席位和安全能力都在这里汇总，可直接调整预算或管理成员。
+                </p>
+              </span>
+            </div>
+
+            <div className="plan-center-status">
+              <span>
+                <small>本月 AI 额度</small>
+                <strong>
+                  {usedCredits} / {usageSettings.monthlyBudget} 点
+                </strong>
+              </span>
+              <div
+                className="plan-center-progress"
+                role="progressbar"
+                aria-label="Team 方案本月额度使用"
+                aria-valuemin={0}
+                aria-valuemax={usageSettings.monthlyBudget}
+                aria-valuenow={Math.min(
+                  usedCredits,
+                  usageSettings.monthlyBudget,
+                )}
+              >
+                <span style={{ width: `${usageProgressPercent}%` }} />
+              </div>
+              <em>
+                {budgetExceeded
+                  ? "额度已用完"
+                  : budgetAlertReached
+                    ? "接近预算上限"
+                    : `${remainingCredits} 点可用`}
+              </em>
+            </div>
+
+            <div className="plan-center-metrics" aria-label="方案用量概览">
+              <span>
+                <Users size={18} />
+                <small>团队席位</small>
+                <strong>
+                  {teamMembers.length} / {teamSeatLimit}
+                </strong>
+                <em>{availableSeatCount} 个可用</em>
+              </span>
+              <span>
+                <Activity size={18} />
+                <small>连接器健康</small>
+                <strong>
+                  {healthyConnectorCount} / {connectorCatalog.length}
+                </strong>
+                <em>{connectedConnectorCount} 项已连接</em>
+              </span>
+              <span>
+                <ShieldCheck size={18} />
+                <small>到限保护</small>
+                <strong>{usageSettings.pauseAtLimit ? "已开启" : "仅提醒"}</strong>
+                <em>{usageSettings.alertThreshold}% 触发提醒</em>
+              </span>
+              <span>
+                <Clock3 size={18} />
+                <small>额度刷新</small>
+                <strong>8 月 1 日</strong>
+                <em>自动进入新周期</em>
+              </span>
+            </div>
+
+            <div className="plan-center-body">
+              <div className="plan-center-included">
+                <span className="plan-center-section-title">已包含</span>
+                <ul>
+                  <li>
+                    <CheckCircle2 size={17} />
+                    <span>
+                      <strong>审批边界与完整审计</strong>
+                      <small>任何外部发送、权限访问和关键修改都可追溯。</small>
+                    </span>
+                  </li>
+                  <li>
+                    <CheckCircle2 size={17} />
+                    <span>
+                      <strong>工作区备份与恢复</strong>
+                      <small>导入前校验，替换前可先生成本地备份。</small>
+                    </span>
+                  </li>
+                  <li>
+                    <CheckCircle2 size={17} />
+                    <span>
+                      <strong>连接器健康检查</strong>
+                      <small>浏览器、邮件、日历和长期记忆的状态集中展示。</small>
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="plan-center-protection">
+                <span>
+                  <ShieldCheck size={19} />
+                </span>
+                <small>安全策略</small>
+                <strong>
+                  {usageSettings.pauseAtLimit
+                    ? "到限自动保护已开启"
+                    : "到限后仅提醒，不会自动暂停任务"}
+                </strong>
+                <p>
+                  当前提醒线为 {usageSettings.alertThreshold}%；
+                  本月预计消耗 {forecastCredits} 点。
+                </p>
+              </div>
+            </div>
+
+            <div className="plan-center-actions">
+              <button type="button" onClick={exportUsageReport}>
+                <Download size={16} />
+                导出用量
+              </button>
+              <button type="button" onClick={openPlanMembers}>
+                <Users size={16} />
+                管理成员
+              </button>
+              <button className="confirm" type="button" onClick={openPlanBudget}>
+                <Pencil size={16} />
+                调整预算
               </button>
             </div>
           </section>

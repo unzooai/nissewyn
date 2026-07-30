@@ -16590,10 +16590,18 @@ body {
   border-color: #d5e1ee;
   background: #eef5fb;
   color: #3e6e9e;
+  cursor: pointer;
 }
 
 .settings-usage-heading-actions > button {
   cursor: pointer;
+}
+
+.settings-plan-badge:hover,
+.settings-plan-badge:focus-visible {
+  border-color: #8fbdd7;
+  background: #e4f2fa;
+  color: #1f5f88;
 }
 
 .settings-usage-heading-actions > button:hover {
@@ -17614,6 +17622,418 @@ body {
 .usage-budget-actions > button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.plan-center-backdrop {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(41, 135, 216, 0.16), transparent 38%),
+    rgba(15, 23, 42, 0.34);
+}
+
+.plan-center-dialog {
+  position: relative;
+  width: min(760px, calc(100vw - 40px));
+  max-height: calc(100dvh - 40px);
+  padding: 27px 28px 0;
+  overflow-y: auto;
+  border: 1px solid rgba(197, 212, 226, 0.92);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(245, 251, 255, 0.94), rgba(255, 255, 255, 0.98)),
+    #ffffff;
+  color: #243448;
+  box-shadow: 0 30px 90px rgba(31, 41, 55, 0.24);
+  animation: plan-center-enter 180ms ease-out both;
+}
+
+.plan-center-close {
+  position: absolute;
+  top: 17px;
+  right: 17px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #d7e2ea;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #66778a;
+  cursor: pointer;
+}
+
+.plan-center-close:hover,
+.plan-center-close:focus-visible {
+  border-color: #abc0d3;
+  background: #ffffff;
+  color: #25445f;
+}
+
+.plan-center-head {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 13px;
+  padding-right: 48px;
+}
+
+.plan-center-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid #b8ddcf;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #e8f8f2, #eef6ff);
+  color: #0f7a5d;
+}
+
+.plan-center-eyebrow {
+  display: block;
+  color: #16765c;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.plan-center-dialog h2 {
+  margin: 6px 0 0;
+  color: #23384d;
+  font-size: 24px;
+  line-height: 1.24;
+}
+
+.plan-center-dialog p {
+  margin: 7px 0 0;
+  color: #657789;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.plan-center-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.9fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin-top: 23px;
+  padding: 17px;
+  border: 1px solid #c9e2d8;
+  border-radius: 8px;
+  background:
+    linear-gradient(120deg, rgba(229, 247, 240, 0.96), rgba(238, 246, 255, 0.94)),
+    #f4faf8;
+}
+
+.plan-center-status small,
+.plan-center-status strong,
+.plan-center-status em {
+  display: block;
+}
+
+.plan-center-status small {
+  color: #617488;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.plan-center-status strong {
+  margin-top: 4px;
+  color: #20364b;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.plan-center-status em {
+  padding: 7px 9px;
+  border: 1px solid rgba(16, 122, 93, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #16765c;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.plan-center-progress {
+  position: relative;
+  height: 11px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: inset 0 0 0 1px rgba(91, 116, 139, 0.11);
+}
+
+.plan-center-progress > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #14a678, #4d9be8, #f6a05b);
+  transition: width 220ms ease;
+}
+
+.plan-center-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.plan-center-metrics > span {
+  display: grid;
+  gap: 5px;
+  min-height: 126px;
+  padding: 14px;
+  border: 1px solid #dde7ef;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.plan-center-metrics svg {
+  color: #2381bc;
+}
+
+.plan-center-metrics small,
+.plan-center-metrics strong,
+.plan-center-metrics em {
+  display: block;
+}
+
+.plan-center-metrics small {
+  color: #6a7d90;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.plan-center-metrics strong {
+  color: #24384d;
+  font-size: 19px;
+  line-height: 1.22;
+}
+
+.plan-center-metrics em {
+  align-self: end;
+  color: #6a7d90;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.45;
+}
+
+.plan-center-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.42fr) minmax(240px, 0.78fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.plan-center-included,
+.plan-center-protection {
+  border: 1px solid #dde7ef;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.plan-center-included {
+  padding: 16px;
+}
+
+.plan-center-section-title {
+  display: block;
+  color: #536c82;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.plan-center-included ul {
+  display: grid;
+  gap: 12px;
+  margin: 13px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-center-included li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.plan-center-included li > svg {
+  margin-top: 2px;
+  color: #0f9a71;
+}
+
+.plan-center-included strong,
+.plan-center-included small {
+  display: block;
+}
+
+.plan-center-included strong {
+  color: #24384d;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.plan-center-included small {
+  margin-top: 3px;
+  color: #68798b;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.plan-center-protection {
+  padding: 16px;
+  background:
+    linear-gradient(160deg, rgba(33, 113, 185, 0.08), rgba(16, 166, 120, 0.08)),
+    rgba(255, 255, 255, 0.92);
+}
+
+.plan-center-protection > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #bfe1d4;
+  border-radius: 8px;
+  background: #ebf8f3;
+  color: #0f7a5d;
+}
+
+.plan-center-protection small,
+.plan-center-protection strong {
+  display: block;
+}
+
+.plan-center-protection small {
+  margin-top: 18px;
+  color: #5f7488;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.plan-center-protection strong {
+  margin-top: 5px;
+  color: #22374c;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.plan-center-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin: 18px -28px 0;
+  padding: 14px 28px 18px;
+  border-top: 1px solid #e0e8ef;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+}
+
+.plan-center-actions > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #d4e0ea;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #4b6176;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.plan-center-actions > button:hover,
+.plan-center-actions > button:focus-visible {
+  border-color: #a9c4d8;
+  background: #f4f9fc;
+  color: #25445f;
+}
+
+.plan-center-actions > .confirm {
+  border-color: #17775e;
+  background: #17775e;
+  color: #ffffff;
+}
+
+.plan-center-actions > .confirm:hover,
+.plan-center-actions > .confirm:focus-visible {
+  border-color: #0f664f;
+  background: #0f664f;
+  color: #ffffff;
+}
+
+@keyframes plan-center-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 760px) {
+  .plan-center-dialog {
+    width: min(100vw - 24px, 560px);
+    max-height: calc(100dvh - 24px);
+    padding: 22px 18px 0;
+  }
+
+  .plan-center-head {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 11px;
+    padding-right: 40px;
+  }
+
+  .plan-center-mark {
+    width: 42px;
+    height: 42px;
+  }
+
+  .plan-center-dialog h2 {
+    font-size: 21px;
+  }
+
+  .plan-center-status {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 11px;
+    margin-top: 18px;
+  }
+
+  .plan-center-status strong {
+    font-size: 20px;
+  }
+
+  .plan-center-status em {
+    width: fit-content;
+  }
+
+  .plan-center-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .plan-center-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .plan-center-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    margin-right: -18px;
+    margin-left: -18px;
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+}
+
+@media (max-width: 420px) {
+  .plan-center-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .workspace-profile-dialog {
