@@ -392,6 +392,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /className="task-composer-progress"/);
   assert.match(page, /className="task-composer-workspace"/);
   assert.match(page, /className={`task-composer-launch-preview/);
+  assert.match(page, /className="task-template-check"/);
+  assert.match(page, /preserveAspectRatio="xMidYMid meet"/);
   assert.match(page, /!editingTaskId && \(/);
   assert.match(page, /type TaskSchedule =/);
   assert.match(page, /type Weekday =/);
@@ -497,6 +499,9 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(css, /\.task-composer-workspace/);
   assert.match(css, /\.task-composer-launch-preview/);
   assert.match(css, /\.task-composer-definition \.task-template-picker button\.active/);
+  assert.match(css, /\.task-composer-definition \.task-template-picker button\s*\{[\s\S]*grid-template-columns:\s*20px\s+minmax\(0,\s*1fr\)\s+18px/s);
+  assert.match(css, /\.task-template-check/);
+  assert.match(css, /\.signal-chart\s*\{[\s\S]*max-width:\s*420px/s);
   assert.match(css, /\.workspace-sync-actions/);
   assert.match(css, /\.workspace-sync-dismiss/);
   assert.match(css, /\.clarity-sidebar-status > i\.offline/);

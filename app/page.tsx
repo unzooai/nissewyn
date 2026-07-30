@@ -11014,7 +11014,7 @@ export default function HomePage() {
                     <small>处页面变化</small>
                   </div>
                   <div className="signal-chart" aria-hidden="true">
-                    <svg viewBox="0 0 100 50" preserveAspectRatio="none">
+                    <svg viewBox="0 0 100 50" preserveAspectRatio="xMidYMid meet">
                       <path d="M2 13 H98 M2 25 H98 M2 37 H98" />
                       <polyline points={signalPoints} />
                       <circle cx="98" cy="7.68" r="1.8" />
@@ -15712,8 +15712,10 @@ export default function HomePage() {
                           onClick={() => applyTaskTemplate(template)}
                         >
                           <template.icon size={16} />
-                          {template.label}
-                          {activeTaskTemplateId === template.id && <Check size={14} />}
+                          <span>{template.label}</span>
+                          <span className="task-template-check" aria-hidden="true">
+                            {activeTaskTemplateId === template.id && <Check size={14} />}
+                          </span>
                         </button>
                       ))}
                     </div>
