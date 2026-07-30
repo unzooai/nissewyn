@@ -1,27 +1,98 @@
-# Unzoo One
+# vinext-starter
 
-**Your Personal AI Operating System.**
+A clean full-stack starter running on
+[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
+Drizzle support.
 
-Unzoo One 是一个本地优先、可更换大脑、可持续运行、可审计，并能安全操作终端、浏览器和桌面应用的个人数字同事运行时。
+## Prerequisites
 
-核心组合：
+- Node.js `>=22.13.0`
 
-- **Unterm**：任务、会话、大脑路由、权限、审批、记忆、调度、审计与产物。
-- **Unzoo**：浏览器与桌面操作执行器，负责观察、行动、验证与证据。
-- **Codex / Claude / Gemini / OpenCode**：可插拔 AI Brain。
-- **MCP / SDK / ACP**：能力和大脑接入协议。
+## Quick Start
 
-## 产品设计
+```bash
+npm install
+npm run dev
+npm run build
+```
 
-- [整体产品架构与能力审计](docs/product-architecture.md)
+This starter does not use `wrangler.jsonc`.
 
-## 当前阶段
+## Included Shape
 
-项目处于产品架构与核心运行时设计阶段。首个目标是完成：
+- edit site code under `app/`
+- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
+- `vite.config.ts` simulates declared bindings for local development
+- `db/schema.ts` starts intentionally empty
+- `examples/d1/` contains an optional D1 example surface
+- `drizzle.config.ts` supports local migration generation when needed
 
-1. Unterm 真正无头运行。
-2. Codex 与 Claude Brain Adapter。
-3. 持久化 Task Engine。
-4. Unzoo Browser Provider 原生绑定。
-5. 统一 Policy、Approval、Audit 与 Artifact。
+## Workspace Auth Headers
 
+OpenAI workspace sites can read the current user's email from
+`oai-authenticated-user-email`.
+
+SIWC-authenticated workspace sites may also receive
+`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
+`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
+`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
+
+Treat the full name as optional and fall back to email when it is absent:
+
+```tsx
+import { headers } from "next/headers";
+
+export default async function Home() {
+  const requestHeaders = await headers();
+  const email = requestHeaders.get("oai-authenticated-user-email");
+  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
+  const fullName =
+    encodedFullName &&
+    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
+      "percent-encoded-utf-8"
+      ? decodeURIComponent(encodedFullName)
+      : null;
+
+  const displayName = fullName ?? email;
+  // ...
+}
+```
+
+## Optional Dispatch-Owned ChatGPT Sign-In
+
+Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
+optional or required ChatGPT sign-in:
+
+- Use `getChatGPTUser()` for optional signed-in UI.
+- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
+  anonymous visitors through Sign in with ChatGPT.
+- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
+  browser links or actions.
+- Pass a same-origin relative `returnTo` path for the destination after sign-in
+  or sign-out. The helper validates and safely encodes it.
+- Mark protected pages with `export const dynamic = "force-dynamic"` because
+  they depend on per-request identity headers.
+
+Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
+OAuth cookies, and identity header injection. Do not implement app routes for
+those reserved paths. Routes that do not import and call the helper remain
+anonymous-compatible.
+
+SIWC establishes identity only; it does not prove workspace membership. Use the
+Sites hosting platform's access policy controls for workspace-wide restrictions,
+or enforce explicit server-side membership or allowlist checks.
+
+Use SIWC for account pages, user-specific dashboards, saved records, and write
+actions tied to the current ChatGPT user. Leave public content anonymous.
+
+## Useful Commands
+
+- `npm run dev`: start local development
+- `npm run build`: verify the vinext build output
+- `npm test`: build the starter and verify its rendered loading skeleton
+- `npm run db:generate`: generate Drizzle migrations after schema changes
+
+## Learn More
+
+- [vinext Documentation](https://github.com/cloudflare/vinext)
+- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
