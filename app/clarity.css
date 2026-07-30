@@ -6375,14 +6375,14 @@ body {
 
 .task-signal-band {
   margin-top: 0;
-  grid-template-columns: minmax(94px, 0.46fr) minmax(260px, 420px) minmax(
+  grid-template-columns: minmax(100px, 0.52fr) minmax(190px, 260px) minmax(
       108px,
-      0.46fr
+      0.52fr
     );
   justify-content: center;
-  gap: 24px;
-  min-height: 122px;
-  padding: 22px 30px 20px;
+  gap: 28px;
+  min-height: 92px;
+  padding: 14px 30px 13px;
   border-top: 0;
   border-bottom-color: rgba(125, 146, 174, 0.2);
   background: rgba(246, 249, 253, 0.72);
@@ -6390,6 +6390,7 @@ body {
 
 .signal-metric {
   align-self: center;
+  min-width: 0;
 }
 
 .signal-metric > span,
@@ -6410,18 +6411,16 @@ body {
 .signal-chart {
   display: grid;
   align-content: center;
-  gap: 7px;
+  gap: 5px;
   width: 100%;
-  max-width: 420px;
+  max-width: 260px;
   margin: 0 auto;
 }
 
 .signal-chart > svg {
   display: block;
   width: 100%;
-  height: auto;
-  aspect-ratio: 2 / 1;
-  max-height: 76px;
+  height: 42px;
   overflow: visible;
 }
 

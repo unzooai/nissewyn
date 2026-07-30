@@ -11014,7 +11014,7 @@ export default function HomePage() {
                     <small>处页面变化</small>
                   </div>
                   <div className="signal-chart" aria-hidden="true">
-                    <svg viewBox="0 0 100 50" preserveAspectRatio="xMidYMid meet">
+                    <svg viewBox="0 0 100 50" preserveAspectRatio="none">
                       <path d="M2 13 H98 M2 25 H98 M2 37 H98" />
                       <polyline points={signalPoints} />
                       <circle cx="98" cy="7.68" r="1.8" />
