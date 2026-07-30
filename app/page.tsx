@@ -462,6 +462,7 @@ const taskSchedules: TaskSchedule[] = ["仅运行一次", "每天", "每周"];
 const taskDraftRecoveryKey = "unzoo-one-task-draft-recovery";
 const artifactDraftRecoveryKey = "unzoo-one-artifact-draft-recovery";
 const workspaceSyncKey = "unzoo-one-workspace-sync";
+const workspaceLastBackupKey = "unzoo-one-last-backup-at";
 const legacyWorkspaceStorageKeys = [
   "unzoo-one-tasks",
   "unzoo-one-settings",
@@ -475,6 +476,7 @@ const legacyWorkspaceStorageKeys = [
 const workspacePreferenceStorageKeys = [
   "unzoo-one-recent-searches",
   "unzoo-one-read-notifications",
+  workspaceLastBackupKey,
 ] as const;
 const taskDraftRecoveryMaxAge = 7 * 24 * 60 * 60 * 1000;
 const workspaceSyncSectionLabels: Record<WorkspaceSyncSection, string> = {
@@ -715,6 +717,21 @@ function formatDraftSavedAt(savedAt: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(savedAt));
+}
+
+function formatBackupFreshness(savedAt: string | null) {
+  if (!savedAt) return "尚未创建";
+  const savedTime = Date.parse(savedAt);
+  if (Number.isNaN(savedTime)) return "时间未知";
+  const elapsed = Math.max(0, Date.now() - savedTime);
+  if (elapsed < 60 * 1000) return "刚刚";
+  if (elapsed < 60 * 60 * 1000) {
+    return `${Math.floor(elapsed / (60 * 1000))} 分钟前`;
+  }
+  if (elapsed < 24 * 60 * 60 * 1000) {
+    return `${Math.floor(elapsed / (60 * 60 * 1000))} 小时前`;
+  }
+  return formatDraftSavedAt(savedAt);
 }
 
 function getWorkspaceToday() {
@@ -2324,8 +2341,13 @@ export default function HomePage() {
     useState(false);
   const [temporaryModeOpen, setTemporaryModeOpen] = useState(false);
   const [workspaceResetOpen, setWorkspaceResetOpen] = useState(false);
+  const [workspaceResetAcknowledged, setWorkspaceResetAcknowledged] =
+    useState(false);
   const [pendingWorkspaceImport, setPendingWorkspaceImport] =
     useState<PendingWorkspaceImport | null>(null);
+  const [workspaceImportAcknowledged, setWorkspaceImportAcknowledged] =
+    useState(false);
+  const [recoveryBackupCreated, setRecoveryBackupCreated] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
   const [artifacts, setArtifacts] = useState<ArtifactItem[]>(initialArtifacts);
   const [artifactFilter, setArtifactFilter] = useState<ArtifactFilter>("全部");
@@ -2377,6 +2399,9 @@ export default function HomePage() {
   const [workspacePersistenceDetail, setWorkspacePersistenceDetail] =
     useState("");
   const [workspaceLastSavedAt, setWorkspaceLastSavedAt] = useState<
+    string | null
+  >(null);
+  const [lastWorkspaceBackupAt, setLastWorkspaceBackupAt] = useState<
     string | null
   >(null);
   const [workspaceSaveRetryToken, setWorkspaceSaveRetryToken] = useState(0);
@@ -3632,6 +3657,9 @@ export default function HomePage() {
         const savedReadNotifications = window.localStorage.getItem(
           "unzoo-one-read-notifications",
         );
+        const savedLastWorkspaceBackupAt = window.localStorage.getItem(
+          workspaceLastBackupKey,
+        );
         const schemaVersion = Number(
           window.localStorage.getItem("unzoo-one-schema-version") ?? "1",
         );
@@ -3780,6 +3808,13 @@ export default function HomePage() {
             parsedReadNotifications.every((id) => typeof id === "string")
           ) {
             setReadNotificationIds(parsedReadNotifications.slice(0, 30));
+          }
+        }
+        if (savedLastWorkspaceBackupAt) {
+          if (Number.isNaN(Date.parse(savedLastWorkspaceBackupAt))) {
+            window.localStorage.removeItem(workspaceLastBackupKey);
+          } else {
+            setLastWorkspaceBackupAt(savedLastWorkspaceBackupAt);
           }
         }
         window.localStorage.setItem("unzoo-one-schema-version", "11");
@@ -4348,6 +4383,7 @@ export default function HomePage() {
           setWorkspacePersistenceStatus("temporary");
           setWorkspacePersistenceDetail("");
           setWorkspaceLastSavedAt(null);
+          setLastWorkspaceBackupAt(null);
           if (workspaceSaveRetryingRef.current) {
             workspaceSaveRetryingRef.current = false;
             setNotice("本机数据已清理，当前为临时会话");
@@ -4808,7 +4844,21 @@ export default function HomePage() {
           setUsageBudgetOpen(false);
         }
       } else if (activeOverlayKind === "import") {
+        settingsSectionRef.current = "data";
+        setSettingsSection("data");
         setPendingWorkspaceImport(null);
+        setWorkspaceImportAcknowledged(false);
+        setRecoveryBackupCreated(false);
+        writeWorkspaceRoute(
+          {
+            view: "settings",
+            taskId: null,
+            runId: null,
+            settingsSection: "data",
+          },
+          "replace",
+          canReturnToWorkspaceParent(),
+        );
       } else if (activeOverlayKind === "bulk-approval") {
         setBulkApprovalDecision(null);
         setApprovalRejectReason("");
@@ -4827,7 +4877,21 @@ export default function HomePage() {
       } else if (activeOverlayKind === "temporary") {
         setTemporaryModeOpen(false);
       } else if (activeOverlayKind === "reset") {
+        settingsSectionRef.current = "data";
+        setSettingsSection("data");
         setWorkspaceResetOpen(false);
+        setWorkspaceResetAcknowledged(false);
+        setRecoveryBackupCreated(false);
+        writeWorkspaceRoute(
+          {
+            view: "settings",
+            taskId: null,
+            runId: null,
+            settingsSection: "data",
+          },
+          "replace",
+          canReturnToWorkspaceParent(),
+        );
       } else if (activeOverlayKind === "composer") {
         if (taskSavingRef.current || isSavingTask) return;
         if (taskComposerDirty) {
@@ -5389,6 +5453,42 @@ export default function HomePage() {
     usageSettings,
     workspaceProfile,
   ]);
+  const workspaceBackupFreshnessLabel =
+    formatBackupFreshness(lastWorkspaceBackupAt);
+  const workspaceBackupAge = lastWorkspaceBackupAt
+    ? Date.now() - Date.parse(lastWorkspaceBackupAt)
+    : Number.POSITIVE_INFINITY;
+  const workspaceBackupIsFresh =
+    Number.isFinite(workspaceBackupAge) &&
+    workspaceBackupAge <= 7 * 24 * 60 * 60 * 1000;
+  const workspaceAutoSaveReady =
+    settings.local && workspacePersistenceStatus === "saved";
+  const workspaceRecoveryLayerCount =
+    Number(workspaceAutoSaveReady) + Number(Boolean(lastWorkspaceBackupAt)) + 1;
+  const workspaceRecoveryTone =
+    workspacePersistenceStatus === "failed" || !settings.local
+      ? "is-risk"
+      : !lastWorkspaceBackupAt || !workspaceBackupIsFresh
+        ? "is-attention"
+        : "is-ready";
+  const workspaceRecoveryHeadline =
+    workspacePersistenceStatus === "failed"
+      ? "本机保存需要处理，请立即导出紧急备份"
+      : !settings.local
+        ? "当前工作区只在本次会话中保留"
+        : !lastWorkspaceBackupAt
+          ? "自动保存正常，建议创建一份可迁移备份"
+          : !workspaceBackupIsFresh
+            ? "可恢复，但手动备份已经超过 7 天"
+            : "自动保存与手动备份均已就绪";
+  const workspaceRecoveryDetail =
+    workspacePersistenceStatus === "failed"
+      ? workspacePersistenceDetail
+      : !settings.local
+        ? "关闭或刷新页面后无法恢复当前改动，离开前请先导出备份。"
+        : lastWorkspaceBackupAt
+          ? `最近可用备份：${workspaceBackupFreshnessLabel}。导入时会再次校验文件结构。`
+          : "本机保存用于日常恢复，手动备份用于迁移设备或应对浏览器数据被清理。";
   const latestActivity = activityLog[0] ?? initialActivityItems[0];
   const latestArtifact = artifacts[0] ?? null;
   const notificationItems = useMemo<NotificationItem[]>(() => {
@@ -5647,11 +5747,22 @@ export default function HomePage() {
     await copyCurrentViewLink("审计事件链接");
   }
 
+  function rememberWorkspaceBackup(exportedAt: string) {
+    setLastWorkspaceBackupAt(exportedAt);
+    if (!settings.local) return;
+    try {
+      window.localStorage.setItem(workspaceLastBackupKey, exportedAt);
+    } catch {
+      // The downloaded file is still valid even when browser metadata cannot be saved.
+    }
+  }
+
   function exportWorkspace() {
+    const exportedAt = new Date().toISOString();
     const payload: WorkspaceBackup = {
       version: 1,
       product: "Unzoo One",
-      exportedAt: new Date().toISOString(),
+      exportedAt,
       profile: workspaceProfile,
       tasks,
       settings,
@@ -5676,6 +5787,7 @@ export default function HomePage() {
     anchor.click();
     anchor.remove();
     window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+    rememberWorkspaceBackup(exportedAt);
     recordActivity({
       title: "工作区备份已导出",
       detail: `已备份 ${tasks.length} 个任务、${artifacts.length} 个成果、${teamMembers.length} 位成员和 ${activityLog.length} 条运行记录。`,
@@ -6037,16 +6149,73 @@ export default function HomePage() {
     closeArtifactEditor({ clearRecovery: true });
   }
 
+  function preserveDataSettingsRoute() {
+    settingsSectionRef.current = "data";
+    setSettingsSection("data");
+    writeWorkspaceRoute(
+      {
+        view: "settings",
+        taskId: null,
+        runId: null,
+        settingsSection: "data",
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
+  }
+
+  function openWorkspaceImportPicker() {
+    preserveDataSettingsRoute();
+    setWorkspaceImportAcknowledged(false);
+    setRecoveryBackupCreated(false);
+    importInputRef.current?.click();
+  }
+
+  function closeWorkspaceImportPreview() {
+    preserveDataSettingsRoute();
+    setPendingWorkspaceImport(null);
+    setWorkspaceImportAcknowledged(false);
+    setRecoveryBackupCreated(false);
+  }
+
+  function openWorkspaceReset() {
+    preserveDataSettingsRoute();
+    setWorkspaceResetAcknowledged(false);
+    setRecoveryBackupCreated(false);
+    setWorkspaceResetOpen(true);
+  }
+
+  function closeWorkspaceReset() {
+    preserveDataSettingsRoute();
+    setWorkspaceResetOpen(false);
+    setWorkspaceResetAcknowledged(false);
+    setRecoveryBackupCreated(false);
+  }
+
+  function exportWorkspaceFromDataCenter() {
+    preserveDataSettingsRoute();
+    exportWorkspace();
+  }
+
+  function exportRecoveryBackup() {
+    preserveDataSettingsRoute();
+    exportWorkspace();
+    setRecoveryBackupCreated(true);
+  }
+
   async function importWorkspace(event: React.ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const file = input.files?.[0];
     if (!file) return;
 
     try {
+      preserveDataSettingsRoute();
       if (file.size > 2_000_000) {
         throw new Error("Workspace backup is too large");
       }
       const backup = parseWorkspaceBackup(JSON.parse(await file.text()));
+      setWorkspaceImportAcknowledged(false);
+      setRecoveryBackupCreated(false);
       setPendingWorkspaceImport({
         backup,
         fileName: file.name,
@@ -6061,6 +6230,10 @@ export default function HomePage() {
 
   function confirmWorkspaceImport() {
     if (!pendingWorkspaceImport) return;
+    if (!workspaceImportAcknowledged) {
+      setNotice("请先确认当前工作区会被这份备份替换");
+      return;
+    }
     const { backup, fileName } = pendingWorkspaceImport;
     const restoredApprovals = initialApprovals.filter((item) =>
       backup.approvalIds.includes(item.id),
@@ -6131,9 +6304,17 @@ export default function HomePage() {
     setNotificationsOpen(false);
     setWorkspaceLoadWarning("");
     setPendingWorkspaceImport(null);
+    setWorkspaceImportAcknowledged(false);
+    setRecoveryBackupCreated(false);
+    rememberWorkspaceBackup(backup.exportedAt);
     setActiveView("settings");
     writeWorkspaceRoute(
-      { view: "settings", taskId: null, runId: null },
+      {
+        view: "settings",
+        taskId: null,
+        runId: null,
+        settingsSection: "data",
+      },
       "push",
     );
     recordActivity({
@@ -6148,6 +6329,10 @@ export default function HomePage() {
   }
 
   function resetWorkspace() {
+    if (!workspaceResetAcknowledged) {
+      setNotice("请先确认当前工作区会恢复为初始状态");
+      return;
+    }
     setTasks(initialTasks.map((task) => ({ ...task })));
     setArtifacts(initialArtifacts.map((artifact) => ({ ...artifact })));
     closeArtifactEditor({ clearRecovery: true });
@@ -6219,6 +6404,8 @@ export default function HomePage() {
     setTemporaryModeOpen(false);
     setNotificationsOpen(false);
     setWorkspaceResetOpen(false);
+    setWorkspaceResetAcknowledged(false);
+    setRecoveryBackupCreated(false);
     setWorkspaceLoadWarning("");
     recordActivity({
       title: "工作区已恢复初始状态",
@@ -7225,7 +7412,7 @@ export default function HomePage() {
   }
 
   function restoreWorkspaceFromWarning() {
-    importInputRef.current?.click();
+    openWorkspaceImportPicker();
   }
 
   function retryWorkspaceSave() {
@@ -12670,75 +12857,208 @@ export default function HomePage() {
               </label>
             </div>
 
-            <div
-              className="settings-group workspace-data-group"
-              id="settings-data"
-            >
-              <div>
-                <span>数据与恢复</span>
-                <h2>备份或迁移工作区</h2>
-              </div>
-              <div
-                className={`workspace-data-summary ${
-                  settings.local ? "" : "is-temporary"
-                }`}
-              >
-                <span>
-                  {settings.local ? <HardDrive size={18} /> : <Timer size={18} />}
-                </span>
+            <section className="settings-data-center" id="settings-data">
+              <header className="settings-data-heading">
                 <div>
-                  <strong>
-                    {settings.local
-                      ? `约 ${workspaceDataSize} KB 本机数据`
-                      : "当前更改仅保留在本次会话"}
-                  </strong>
-                  <small>
-                    {settings.local
-                      ? "备份包含任务、成果、团队成员、审批状态、运行记录和全部设置。"
-                      : "关闭页面前可以导出备份，或重新开启本机持久保存。"}
-                  </small>
+                  <span>数据安全与恢复</span>
+                  <h2>知道数据保存在哪里，也知道出问题后怎么回来</h2>
+                  <p>本机自动保存用于继续工作，手动备份用于迁移设备和灾难恢复。</p>
+                </div>
+                <button type="button" onClick={exportWorkspaceFromDataCenter}>
+                  <Download size={16} />
+                  创建备份
+                </button>
+              </header>
+
+              <div className="settings-data-status" aria-label="数据保护状态">
+                <span
+                  className={
+                    workspaceAutoSaveReady ? "is-ready" : "is-attention"
+                  }
+                >
+                  <i>
+                    {settings.local ? (
+                      <HardDrive size={17} />
+                    ) : (
+                      <Timer size={17} />
+                    )}
+                  </i>
+                  <span>
+                    <small>本机自动保存</small>
+                    <strong>
+                      {workspacePersistenceStatus === "failed"
+                        ? "保存失败"
+                        : settings.local
+                          ? "已开启"
+                          : "临时会话"}
+                    </strong>
+                    <em>
+                      {workspaceLastSavedLabel
+                        ? `最近保存 ${workspaceLastSavedLabel}`
+                        : settings.local
+                          ? "等待首次保存"
+                          : "关闭后不保留"}
+                    </em>
+                  </span>
+                </span>
+                <span
+                  className={
+                    lastWorkspaceBackupAt ? "is-ready" : "is-attention"
+                  }
+                >
+                  <i>
+                    <Download size={17} />
+                  </i>
+                  <span>
+                    <small>最近可用备份</small>
+                    <strong>{workspaceBackupFreshnessLabel}</strong>
+                    <em>
+                      {lastWorkspaceBackupAt
+                        ? "可迁移至其他设备"
+                        : "建议现在创建"}
+                    </em>
+                  </span>
+                </span>
+                <span>
+                  <i>
+                    <FileJson size={17} />
+                  </i>
+                  <span>
+                    <small>当前数据量</small>
+                    <strong>约 {workspaceDataSize} KB</strong>
+                    <em>
+                      {tasks.length} 个任务 · {artifacts.length} 项成果
+                    </em>
+                  </span>
+                </span>
+                <span className="is-ready">
+                  <i>
+                    <ShieldCheck size={17} />
+                  </i>
+                  <span>
+                    <small>恢复文件校验</small>
+                    <strong>已启用</strong>
+                    <em>仅接受 Unzoo One JSON v1</em>
+                  </span>
+                </span>
+              </div>
+
+              <div className="settings-data-layout">
+                <article
+                  className={`settings-data-readiness ${workspaceRecoveryTone}`}
+                >
+                  <div className="settings-data-readiness-heading">
+                    <span>
+                      {workspaceRecoveryTone === "is-ready" ? (
+                        <CheckCircle2 size={20} />
+                      ) : (
+                        <AlertTriangle size={20} />
+                      )}
+                    </span>
+                    <div>
+                      <small>
+                        恢复准备度 · {workspaceRecoveryLayerCount} / 3
+                      </small>
+                      <h3>{workspaceRecoveryHeadline}</h3>
+                      <p>{workspaceRecoveryDetail}</p>
+                    </div>
+                  </div>
+                  <div
+                    className="settings-data-layers"
+                    aria-label="数据保护层"
+                  >
+                    <span className={workspaceAutoSaveReady ? "active" : ""}>
+                      {workspaceAutoSaveReady ? (
+                        <Check size={14} />
+                      ) : (
+                        <X size={14} />
+                      )}
+                      <span>
+                        <small>第一层</small>
+                        <strong>本机自动保存</strong>
+                      </span>
+                    </span>
+                    <span className={lastWorkspaceBackupAt ? "active" : ""}>
+                      {lastWorkspaceBackupAt ? (
+                        <Check size={14} />
+                      ) : (
+                        <X size={14} />
+                      )}
+                      <span>
+                        <small>第二层</small>
+                        <strong>手动迁移备份</strong>
+                      </span>
+                    </span>
+                    <span className="active">
+                      <Check size={14} />
+                      <span>
+                        <small>第三层</small>
+                        <strong>导入结构校验</strong>
+                      </span>
+                    </span>
+                  </div>
+                </article>
+
+                <div className="settings-data-operations">
+                  <button
+                    type="button"
+                    onClick={exportWorkspaceFromDataCenter}
+                  >
+                    <span className="workspace-data-action-icon export">
+                      <Download size={18} />
+                    </span>
+                    <span>
+                      <small>安全副本</small>
+                      <strong>导出工作区备份</strong>
+                      <em>
+                        {lastWorkspaceBackupAt
+                          ? `上次 ${workspaceBackupFreshnessLabel}`
+                          : "下载完整 JSON 文件"}
+                      </em>
+                    </span>
+                    <ChevronRight size={17} />
+                  </button>
+                  <button type="button" onClick={openWorkspaceImportPicker}>
+                    <span className="workspace-data-action-icon import">
+                      <Upload size={18} />
+                    </span>
+                    <span>
+                      <small>迁移与恢复</small>
+                      <strong>从备份恢复</strong>
+                      <em>先校验，再预览覆盖范围</em>
+                    </span>
+                    <ChevronRight size={17} />
+                  </button>
+                  <button
+                    className="workspace-data-reset"
+                    type="button"
+                    onClick={openWorkspaceReset}
+                  >
+                    <span className="workspace-data-action-icon reset">
+                      <RotateCcw size={18} />
+                    </span>
+                    <span>
+                      <small>危险操作</small>
+                      <strong>恢复初始状态</strong>
+                      <em>清除改动并载入示例工作区</em>
+                    </span>
+                    <ChevronRight size={17} />
+                  </button>
                 </div>
               </div>
-              <div className="workspace-data-actions">
-                <button type="button" onClick={exportWorkspace}>
-                  <span className="workspace-data-action-icon export">
-                    <Download size={18} />
-                  </span>
-                  <span>
-                    <strong>导出工作区备份</strong>
-                    <small>下载一个可随时恢复的 JSON 文件</small>
-                  </span>
-                  <ChevronRight size={17} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => importInputRef.current?.click()}
-                >
-                  <span className="workspace-data-action-icon import">
-                    <Upload size={18} />
-                  </span>
-                  <span>
-                    <strong>从备份恢复</strong>
-                    <small>校验文件后替换当前本机工作区</small>
-                  </span>
-                  <ChevronRight size={17} />
-                </button>
-                <button
-                  className="workspace-data-reset"
-                  type="button"
-                  onClick={() => setWorkspaceResetOpen(true)}
-                >
-                  <span className="workspace-data-action-icon reset">
-                    <RotateCcw size={18} />
-                  </span>
-                  <span>
-                    <strong>恢复初始状态</strong>
-                    <small>清除当前改动并载入示例工作区</small>
-                  </span>
-                  <ChevronRight size={17} />
-                </button>
-              </div>
-            </div>
+
+              <footer className="settings-data-inventory">
+                <span>
+                  <ShieldCheck size={15} />
+                  备份范围
+                </span>
+                <strong>{tasks.length} 个任务</strong>
+                <strong>{artifacts.length} 项成果</strong>
+                <strong>{teamMembers.length} 位成员</strong>
+                <strong>{activityLog.length} 条记录</strong>
+                <small>文件只在当前设备生成，不会上传到外部服务。</small>
+              </footer>
+            </section>
 
             <section
               className="settings-connectors-center"
@@ -16519,7 +16839,7 @@ export default function HomePage() {
       {pendingWorkspaceImport && (
         <div
           className="clarity-dialog-backdrop"
-          onMouseDown={() => setPendingWorkspaceImport(null)}
+          onMouseDown={closeWorkspaceImportPreview}
         >
           <section
             className="workspace-import-dialog"
@@ -16533,7 +16853,7 @@ export default function HomePage() {
               className="workspace-import-close"
               type="button"
               aria-label="关闭备份恢复预览"
-              onClick={() => setPendingWorkspaceImport(null)}
+              onClick={closeWorkspaceImportPreview}
             >
               <X size={17} />
             </button>
@@ -16621,30 +16941,58 @@ export default function HomePage() {
               </span>
             </div>
 
-            <button
-              className="workspace-import-backup"
-              type="button"
-              onClick={exportWorkspace}
+            <label
+              className={`workspace-import-confirm${
+                workspaceImportAcknowledged ? " is-checked" : ""
+              }`}
             >
-              <Download size={16} />
-              先备份当前工作区
+              <input
+                type="checkbox"
+                checked={workspaceImportAcknowledged}
+                onChange={(event) =>
+                  setWorkspaceImportAcknowledged(event.target.checked)
+                }
+              />
+              <ShieldCheck size={17} />
+              <span>
+                <strong>确认替换当前工作区</strong>
+                <small>恢复完成后，只能通过另一份备份找回当前内容。</small>
+              </span>
+            </label>
+
+            <button
+              className={`workspace-import-backup${
+                recoveryBackupCreated ? " is-complete" : ""
+              }`}
+              type="button"
+              onClick={exportRecoveryBackup}
+            >
+              {recoveryBackupCreated ? (
+                <CheckCircle2 size={16} />
+              ) : (
+                <Download size={16} />
+              )}
+              {recoveryBackupCreated
+                ? "当前工作区已备份"
+                : "先备份当前工作区"}
             </button>
 
             <div className="workspace-import-actions">
               <button
                 type="button"
                 data-overlay-initial-focus
-                onClick={() => setPendingWorkspaceImport(null)}
+                onClick={closeWorkspaceImportPreview}
               >
                 取消恢复
               </button>
               <button
                 className="confirm"
                 type="button"
+                disabled={!workspaceImportAcknowledged}
                 onClick={confirmWorkspaceImport}
               >
                 <Upload size={15} />
-                确认并恢复
+                {workspaceImportAcknowledged ? "确认并恢复" : "请先确认"}
               </button>
             </div>
           </section>
@@ -16732,7 +17080,7 @@ export default function HomePage() {
       {workspaceResetOpen && (
         <div
           className="clarity-dialog-backdrop"
-          onMouseDown={() => setWorkspaceResetOpen(false)}
+          onMouseDown={closeWorkspaceReset}
         >
           <section
             className="workspace-reset-dialog"
@@ -16746,7 +17094,7 @@ export default function HomePage() {
               className="workspace-reset-close"
               type="button"
               aria-label="关闭重置确认"
-              onClick={() => setWorkspaceResetOpen(false)}
+              onClick={closeWorkspaceReset}
             >
               <X size={17} />
             </button>
@@ -16764,6 +17112,10 @@ export default function HomePage() {
                 <strong>{tasks.length} 个</strong>
               </span>
               <span>
+                <small>任务成果</small>
+                <strong>{artifacts.length} 项</strong>
+              </span>
+              <span>
                 <small>运行记录</small>
                 <strong>{activityLog.length} 条</strong>
               </span>
@@ -16772,25 +17124,68 @@ export default function HomePage() {
                 <strong>{approvals.length} 件</strong>
               </span>
             </div>
-            <button
-              className="workspace-reset-backup"
-              type="button"
-              onClick={exportWorkspace}
+            <div className="workspace-reset-impact">
+              <span>
+                <X size={13} />
+                当前任务配置
+              </span>
+              <span>
+                <X size={13} />
+                当前成员与权限
+              </span>
+              <span>
+                <X size={13} />
+                当前运行与审计记录
+              </span>
+            </div>
+            <label
+              className={`workspace-reset-confirm${
+                workspaceResetAcknowledged ? " is-checked" : ""
+              }`}
             >
-              <Download size={16} />
-              先导出备份
+              <input
+                type="checkbox"
+                checked={workspaceResetAcknowledged}
+                onChange={(event) =>
+                  setWorkspaceResetAcknowledged(event.target.checked)
+                }
+              />
+              <AlertTriangle size={17} />
+              <span>
+                <strong>我确认恢复为示例工作区</strong>
+                <small>此操作会立即替换当前本机数据。</small>
+              </span>
+            </label>
+            <button
+              className={`workspace-reset-backup${
+                recoveryBackupCreated ? " is-complete" : ""
+              }`}
+              type="button"
+              onClick={exportRecoveryBackup}
+            >
+              {recoveryBackupCreated ? (
+                <CheckCircle2 size={16} />
+              ) : (
+                <Download size={16} />
+              )}
+              {recoveryBackupCreated ? "当前工作区已备份" : "先导出备份"}
             </button>
             <div className="workspace-reset-actions">
               <button
                 type="button"
                 data-overlay-initial-focus
-                onClick={() => setWorkspaceResetOpen(false)}
+                onClick={closeWorkspaceReset}
               >
                 保留当前数据
               </button>
-              <button className="danger" type="button" onClick={resetWorkspace}>
+              <button
+                className="danger"
+                type="button"
+                disabled={!workspaceResetAcknowledged}
+                onClick={resetWorkspace}
+              >
                 <RotateCcw size={15} />
-                确认重置
+                {workspaceResetAcknowledged ? "确认重置" : "请先确认"}
               </button>
             </div>
           </section>
