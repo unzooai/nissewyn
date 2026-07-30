@@ -39,6 +39,7 @@ import {
   Pin,
   Play,
   Plus,
+  RefreshCw,
   RotateCcw,
   Save,
   Search,
@@ -125,11 +126,18 @@ type UsageSettings = {
 };
 type ConnectorId = "browser" | "workspace" | "mail" | "calendar";
 type ConnectorState = Record<ConnectorId, boolean>;
+type ConnectorCheckResult = {
+  checkedAt: string;
+  latency: number;
+};
+type ConnectorCheckState = Record<ConnectorId, ConnectorCheckResult | null>;
 type ConnectorDefinition = {
   id: ConnectorId;
   name: string;
   description: string;
   scope: string;
+  dataFlow: string;
+  credential: string;
   lastUsed: string;
   permissions: string[];
   icon: typeof Globe2;
@@ -510,6 +518,18 @@ const defaultConnectorStates: ConnectorState = {
   mail: true,
   calendar: false,
 };
+const defaultConnectorChecks: ConnectorCheckState = {
+  browser: { checkedAt: "2 分钟前", latency: 184 },
+  workspace: { checkedAt: "8 分钟前", latency: 42 },
+  mail: null,
+  calendar: null,
+};
+const connectorTestLatencies: Record<ConnectorId, number> = {
+  browser: 176,
+  workspace: 38,
+  mail: 214,
+  calendar: 196,
+};
 const connectorErrorCodes: Record<ConnectorId, string[]> = {
   browser: ["BROWSER_AUTH_EXPIRED"],
   workspace: ["WORKSPACE_PERMISSION_REVOKED"],
@@ -522,6 +542,8 @@ const connectorCatalog: ConnectorDefinition[] = [
     name: "Unzoo Browser",
     description: "读取网页、保存截图与提取页面结构",
     scope: "仅限任务指定页面",
+    dataFlow: "外部网页 → 任务上下文",
+    credential: "浏览器会话授权",
     lastUsed: "刚刚 · 跟踪竞品发布动态",
     permissions: ["读取指定网页", "保存页面截图", "使用已授权会话"],
     icon: Globe2,
@@ -532,6 +554,8 @@ const connectorCatalog: ConnectorDefinition[] = [
     name: "本机工作区",
     description: "读取项目文件并写入已批准的成果",
     scope: "仅限当前项目目录",
+    dataFlow: "本机文件 ↔ 任务成果",
+    credential: "设备本机权限",
     lastUsed: "8 分钟前 · 整理本周项目进展",
     permissions: ["读取项目文件", "创建任务成果", "保留版本记录"],
     icon: HardDrive,
@@ -542,6 +566,8 @@ const connectorCatalog: ConnectorDefinition[] = [
     name: "邮件连接器",
     description: "发送已批准的摘要、提醒与报告",
     scope: "发送前必须确认",
+    dataFlow: "审批结果 → 外部收件人",
+    credential: "邮箱 OAuth 授权",
     lastUsed: "等待确认 · 竞品摘要",
     permissions: ["创建邮件草稿", "读取发送状态", "批准后发送邮件"],
     icon: Mail,
@@ -552,6 +578,8 @@ const connectorCatalog: ConnectorDefinition[] = [
     name: "日历连接器",
     description: "读取空闲时间并安排自动任务",
     scope: "仅限空闲与任务日程",
+    dataFlow: "日历忙闲 ↔ 任务计划",
+    credential: "日历 OAuth 授权",
     lastUsed: "尚未使用",
     permissions: ["读取空闲时间", "创建日程提醒", "更新任务时间"],
     icon: CalendarDays,
@@ -2440,11 +2468,18 @@ export default function HomePage() {
   const [connectorStates, setConnectorStates] = useState<ConnectorState>(
     defaultConnectorStates,
   );
+  const [connectorCheckResults, setConnectorCheckResults] =
+    useState<ConnectorCheckState>(defaultConnectorChecks);
   const [selectedConnectorId, setSelectedConnectorId] =
     useState<ConnectorId | null>(null);
   const [connectorTestingId, setConnectorTestingId] =
     useState<ConnectorId | null>(null);
+  const [connectorTestingAll, setConnectorTestingAll] = useState(false);
+  const [connectorAuthorizeAcknowledged, setConnectorAuthorizeAcknowledged] =
+    useState(false);
   const [connectorDisconnectConfirm, setConnectorDisconnectConfirm] =
+    useState(false);
+  const [connectorDisconnectAcknowledged, setConnectorDisconnectAcknowledged] =
     useState(false);
   const [teamMembers, setTeamMembers] =
     useState<TeamMember[]>(initialTeamMembers);
@@ -2753,6 +2788,9 @@ export default function HomePage() {
     ? connectorIssueTasks[selectedConnector.id]
     : [];
   const selectedConnectorHasIssue = selectedConnectorIssueTasks.length > 0;
+  const selectedConnectorCheck = selectedConnector
+    ? connectorCheckResults[selectedConnector.id]
+    : null;
   const selectedTeamMember =
     teamMembers.find((member) => member.id === selectedTeamMemberId) ?? null;
   const normalizedTeamMemberQuery = teamMemberQuery.trim().toLowerCase();
@@ -2808,6 +2846,18 @@ export default function HomePage() {
   ).length;
   const connectorIssueCount = connectorCatalog.filter(
     (connector) => connectorIssueTasks[connector.id].length > 0,
+  ).length;
+  const connectorIssueTaskCount = connectorCatalog.reduce(
+    (count, connector) => count + connectorIssueTasks[connector.id].length,
+    0,
+  );
+  const disconnectedConnectorCount =
+    connectorCatalog.length - connectedConnectorCount;
+  const checkedHealthyConnectorCount = connectorCatalog.filter(
+    (connector) =>
+      connectorStates[connector.id] &&
+      connectorIssueTasks[connector.id].length === 0 &&
+      connectorCheckResults[connector.id] !== null,
   ).length;
   const connectorUsageCounts: Record<ConnectorId, number> = {
     browser: tasks.filter((task) => /^https?:\/\//i.test(task.target)).length,
@@ -4928,8 +4978,22 @@ export default function HomePage() {
           setMemberRemoveAcknowledged(false);
         }
       } else if (activeOverlayKind === "connector") {
+        settingsSectionRef.current = "connectors";
+        setSettingsSection("connectors");
         setSelectedConnectorId(null);
         setConnectorDisconnectConfirm(false);
+        setConnectorDisconnectAcknowledged(false);
+        setConnectorAuthorizeAcknowledged(false);
+        writeWorkspaceRoute(
+          {
+            view: "settings",
+            taskId: null,
+            runId: null,
+            settingsSection: "connectors",
+          },
+          "replace",
+          canReturnToWorkspaceParent(),
+        );
       } else if (activeOverlayKind === "run") {
         if (canReturnToWorkspaceParent()) {
           window.history.back();
@@ -6261,8 +6325,11 @@ export default function HomePage() {
     setUsageBudgetOpen(false);
     setSettingsDiscardTarget(null);
     setConnectorStates(backup.connectors ?? { ...defaultConnectorStates });
+    setConnectorCheckResults({ ...defaultConnectorChecks });
     setSelectedConnectorId(null);
     setConnectorDisconnectConfirm(false);
+    setConnectorDisconnectAcknowledged(false);
+    setConnectorAuthorizeAcknowledged(false);
     setTeamMembers(
       backup.members ?? initialTeamMembers.map((member) => ({ ...member })),
     );
@@ -6358,9 +6425,13 @@ export default function HomePage() {
     setUsagePauseConfirmed(false);
     setSettingsDiscardTarget(null);
     setConnectorStates({ ...defaultConnectorStates });
+    setConnectorCheckResults({ ...defaultConnectorChecks });
     setSelectedConnectorId(null);
     setConnectorDisconnectConfirm(false);
+    setConnectorDisconnectAcknowledged(false);
+    setConnectorAuthorizeAcknowledged(false);
     setConnectorTestingId(null);
+    setConnectorTestingAll(false);
     setTeamMembers(initialTeamMembers.map((member) => ({ ...member })));
     setTeamMemberQuery("");
     setTeamRoleFilter("全部");
@@ -8268,14 +8339,55 @@ export default function HomePage() {
     setNotice("已进入临时会话，关闭页面前可以随时重新开启保存");
   }
 
+  function preserveConnectorSettingsRoute() {
+    settingsSectionRef.current = "connectors";
+    setSettingsSection("connectors");
+    writeWorkspaceRoute(
+      {
+        view: "settings",
+        taskId: null,
+        runId: null,
+        settingsSection: "connectors",
+      },
+      "replace",
+      canReturnToWorkspaceParent(),
+    );
+  }
+
   function openConnector(connectorId: ConnectorId) {
+    preserveConnectorSettingsRoute();
     setConnectorDisconnectConfirm(false);
+    setConnectorDisconnectAcknowledged(false);
+    setConnectorAuthorizeAcknowledged(false);
     setSelectedConnectorId(connectorId);
+  }
+
+  function closeConnector() {
+    preserveConnectorSettingsRoute();
+    setSelectedConnectorId(null);
+    setConnectorDisconnectConfirm(false);
+    setConnectorDisconnectAcknowledged(false);
+    setConnectorAuthorizeAcknowledged(false);
+  }
+
+  function requestConnectorDisconnect() {
+    preserveConnectorSettingsRoute();
+    setConnectorDisconnectAcknowledged(false);
+    setConnectorDisconnectConfirm(true);
+    window.setTimeout(() => {
+      document
+        .querySelector<HTMLElement>(".connector-disconnect-confirm")
+        ?.scrollIntoView({ block: "nearest" });
+    }, 0);
   }
 
   function connectConnector(connectorId: ConnectorId) {
     const connector = connectorCatalog.find((item) => item.id === connectorId);
     if (!connector) return;
+    if (!connectorAuthorizeAcknowledged) {
+      setNotice("请先确认这项连接将获得的权限范围");
+      return;
+    }
     if (
       !requireOnline(
         `设备离线，${connector.name}尚未连接；恢复网络后可以继续授权`,
@@ -8284,7 +8396,15 @@ export default function HomePage() {
       return;
     }
     setConnectorStates((current) => ({ ...current, [connectorId]: true }));
+    setConnectorCheckResults((current) => ({
+      ...current,
+      [connectorId]: {
+        checkedAt: "刚刚",
+        latency: connectorTestLatencies[connectorId],
+      },
+    }));
     setConnectorDisconnectConfirm(false);
+    setConnectorAuthorizeAcknowledged(false);
     recordActivity({
       title: `连接器已授权：${connector.name}`,
       detail: `已启用 ${connector.permissions.join("、")}；授权范围为${connector.scope}。`,
@@ -8297,7 +8417,14 @@ export default function HomePage() {
 
   function testConnector(connectorId: ConnectorId) {
     const connector = connectorCatalog.find((item) => item.id === connectorId);
-    if (!connector || !connectorStates[connectorId] || connectorTestingId) return;
+    if (
+      !connector ||
+      !connectorStates[connectorId] ||
+      connectorTestingId ||
+      connectorTestingAll
+    ) {
+      return;
+    }
     if (
       !requireOnline(
         `设备离线，无法测试${connector.name}；当前授权状态没有改变`,
@@ -8308,6 +8435,13 @@ export default function HomePage() {
     setConnectorTestingId(connectorId);
     window.setTimeout(() => {
       setConnectorTestingId(null);
+      setConnectorCheckResults((current) => ({
+        ...current,
+        [connectorId]: {
+          checkedAt: "刚刚",
+          latency: connectorTestLatencies[connectorId],
+        },
+      }));
       recordActivity({
         title: `连接测试通过：${connector.name}`,
         detail: `连接正常，当前授权范围为${connector.scope}。`,
@@ -8319,10 +8453,63 @@ export default function HomePage() {
     }, 850);
   }
 
+  function testAllConnectors() {
+    if (connectorTestingId || connectorTestingAll) return;
+    preserveConnectorSettingsRoute();
+    const testableConnectors = connectorCatalog.filter(
+      (connector) =>
+        connectorStates[connector.id] &&
+        connectorIssueTasks[connector.id].length === 0,
+    );
+    if (testableConnectors.length === 0) {
+      setNotice("当前没有可以检测的已授权连接");
+      return;
+    }
+    if (
+      !requireOnline("设备离线，无法执行连接检测；当前授权状态没有改变")
+    ) {
+      return;
+    }
+
+    setConnectorTestingAll(true);
+    window.setTimeout(() => {
+      setConnectorCheckResults((current) => {
+        const next = { ...current };
+        testableConnectors.forEach((connector) => {
+          next[connector.id] = {
+            checkedAt: "刚刚",
+            latency: connectorTestLatencies[connector.id],
+          };
+        });
+        return next;
+      });
+      setConnectorTestingAll(false);
+      recordActivity({
+        title: "连接器健康检测已完成",
+        detail: `${testableConnectors.length} 项已授权连接通过身份凭证、权限范围和响应检测；异常授权仍保持安全停止。`,
+        icon: "shield",
+        tone: "green",
+        kind: "系统",
+      });
+      setNotice(`${testableConnectors.length} 项连接检测通过`);
+    }, 1050);
+  }
+
   function reauthorizeConnector(connectorId: ConnectorId) {
     const connector = connectorCatalog.find((item) => item.id === connectorId);
     const impactedTasks = connectorIssueTasks[connectorId];
-    if (!connector || impactedTasks.length === 0 || connectorTestingId) return;
+    if (
+      !connector ||
+      impactedTasks.length === 0 ||
+      connectorTestingId ||
+      connectorTestingAll
+    ) {
+      return;
+    }
+    if (!connectorAuthorizeAcknowledged) {
+      setNotice("请先确认恢复这项连接的权限范围");
+      return;
+    }
     if (
       !requireOnline(
         `设备离线，${connector.name}尚未重新授权；受影响任务仍保持安全停止`,
@@ -8335,6 +8522,13 @@ export default function HomePage() {
     setConnectorTestingId(connectorId);
     window.setTimeout(() => {
       setConnectorStates((current) => ({ ...current, [connectorId]: true }));
+      setConnectorCheckResults((current) => ({
+        ...current,
+        [connectorId]: {
+          checkedAt: "刚刚",
+          latency: connectorTestLatencies[connectorId],
+        },
+      }));
       setTasks((items) =>
         items.map((task) =>
           impactedTaskIds.has(task.id)
@@ -8348,6 +8542,7 @@ export default function HomePage() {
         ),
       );
       setConnectorTestingId(null);
+      setConnectorAuthorizeAcknowledged(false);
       recordActivity({
         title: `连接器已重新授权：${connector.name}`,
         detail: `授权验证通过，${impactedTasks.length} 个受影响任务已准备好重新运行；系统仍会保留原始失败记录。`,
@@ -8363,16 +8558,28 @@ export default function HomePage() {
   function openConnectorAffectedTask(taskId: string) {
     setSelectedConnectorId(null);
     setConnectorDisconnectConfirm(false);
+    setConnectorDisconnectAcknowledged(false);
+    setConnectorAuthorizeAcknowledged(false);
     openTask(taskId);
   }
 
   function confirmDisconnectConnector() {
     if (!selectedConnector) return;
+    if (!connectorDisconnectAcknowledged) {
+      setNotice("请先确认后续任务将无法继续使用这项能力");
+      return;
+    }
     setConnectorStates((current) => ({
       ...current,
       [selectedConnector.id]: false,
     }));
+    setConnectorCheckResults((current) => ({
+      ...current,
+      [selectedConnector.id]: null,
+    }));
     setConnectorDisconnectConfirm(false);
+    setConnectorDisconnectAcknowledged(false);
+    setConnectorAuthorizeAcknowledged(false);
     recordActivity({
       title: `连接器已断开：${selectedConnector.name}`,
       detail: "后续任务不会再使用这项能力，历史运行记录仍会保留。",
@@ -13070,21 +13277,95 @@ export default function HomePage() {
                   <h2>AI 当前可以使用这些工具</h2>
                   <p>查看每项能力的授权范围、使用状态，并随时测试或断开连接。</p>
                 </div>
-                <span
-                  className={`settings-connectors-state ${
-                    connectorIssueCount > 0 ? "is-attention" : ""
-                  }`}
-                >
-                  {connectorIssueCount > 0 ? (
-                    <AlertTriangle size={16} />
-                  ) : (
-                    <Link2 size={16} />
-                  )}
-                  {connectorIssueCount > 0
-                    ? `${connectorIssueCount} 项需要处理 · ${healthyConnectorCount} / ${connectorCatalog.length} 可用`
-                    : `${healthyConnectorCount} / ${connectorCatalog.length} 项可用`}
-                </span>
+                <div className="settings-connectors-heading-actions">
+                  <span
+                    className={`settings-connectors-state ${
+                      connectorIssueCount > 0 ? "is-attention" : ""
+                    }`}
+                  >
+                    {connectorIssueCount > 0 ? (
+                      <AlertTriangle size={16} />
+                    ) : (
+                      <Link2 size={16} />
+                    )}
+                    {connectorIssueCount > 0
+                      ? `${connectorIssueCount} 项需要处理`
+                      : "全部连接正常"}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={
+                      connectorTestingAll ||
+                      connectorTestingId !== null ||
+                      healthyConnectorCount === 0
+                    }
+                    aria-busy={connectorTestingAll}
+                    onClick={testAllConnectors}
+                  >
+                    {connectorTestingAll ? (
+                      <LoaderCircle className="is-spinning" size={15} />
+                    ) : (
+                      <RefreshCw size={15} />
+                    )}
+                    {connectorTestingAll ? "正在检测" : "检测全部"}
+                  </button>
+                </div>
               </header>
+
+              <div
+                className="settings-connectors-summary"
+                aria-label="连接器运行状态"
+              >
+                <span className="is-ready">
+                  <i>
+                    <CheckCircle2 size={17} />
+                  </i>
+                  <span>
+                    <small>当前可用</small>
+                    <strong>
+                      {healthyConnectorCount} / {connectorCatalog.length}
+                    </strong>
+                  </span>
+                </span>
+                <span className={connectorIssueCount > 0 ? "is-risk" : ""}>
+                  <i>
+                    <AlertTriangle size={17} />
+                  </i>
+                  <span>
+                    <small>授权异常</small>
+                    <strong>{connectorIssueCount} 项</strong>
+                  </span>
+                </span>
+                <span>
+                  <i>
+                    <Link2 size={17} />
+                  </i>
+                  <span>
+                    <small>等待授权</small>
+                    <strong>{disconnectedConnectorCount} 项</strong>
+                  </span>
+                </span>
+                <span className={connectorIssueTaskCount > 0 ? "is-risk" : ""}>
+                  <i>
+                    <Pause size={17} />
+                  </i>
+                  <span>
+                    <small>安全停止任务</small>
+                    <strong>{connectorIssueTaskCount} 个</strong>
+                  </span>
+                </span>
+                <span>
+                  <i>
+                    <Activity size={17} />
+                  </i>
+                  <span>
+                    <small>已有检测结果</small>
+                    <strong>
+                      {checkedHealthyConnectorCount} / {healthyConnectorCount}
+                    </strong>
+                  </span>
+                </span>
+              </div>
 
               <div className="settings-connector-grid">
                 {connectorCatalog.map((connector) => {
@@ -13093,6 +13374,10 @@ export default function HomePage() {
                   const usageCount = connectorUsageCounts[connector.id];
                   const issueTasks = connectorIssueTasks[connector.id];
                   const hasIssue = issueTasks.length > 0;
+                  const checkResult = connectorCheckResults[connector.id];
+                  const isChecking =
+                    connectorTestingId === connector.id ||
+                    (connectorTestingAll && connected && !hasIssue);
                   return (
                     <article
                       className={`settings-connector-card tone-${connector.tone} ${
@@ -13137,17 +13422,33 @@ export default function HomePage() {
                           </strong>
                         </span>
                         <span>
-                          <small>关联任务</small>
-                          <strong>{usageCount} 个</strong>
+                          <small>数据流向</small>
+                          <strong>
+                            {connected ? connector.dataFlow : "尚未建立数据流"}
+                          </strong>
+                        </span>
+                        <span>
+                          <small>最近检测</small>
+                          <strong>
+                            {hasIssue
+                              ? "检测失败"
+                              : !connected
+                                ? "等待连接"
+                                : isChecking
+                                  ? "正在检测"
+                                  : checkResult
+                                    ? `${checkResult.checkedAt} · ${checkResult.latency} ms`
+                                    : "尚未检测"}
+                          </strong>
                         </span>
                       </div>
                       <div className="settings-connector-footer">
                         <small>
                           {hasIssue
-                            ? `${issueTasks[0].title} 已安全停止`
+                            ? `${usageCount} 个任务关联 · ${issueTasks[0].title} 已停止`
                             : connected
-                              ? connector.lastUsed
-                              : "连接后才会用于任务"}
+                              ? `${usageCount} 个任务关联 · ${connector.lastUsed}`
+                              : `${usageCount} 个任务可使用 · 连接后才会调用`}
                         </small>
                         <button
                           type="button"
@@ -13868,10 +14169,7 @@ export default function HomePage() {
       {selectedConnector && (
         <div
           className="clarity-dialog-backdrop connector-detail-backdrop"
-          onMouseDown={() => {
-            setSelectedConnectorId(null);
-            setConnectorDisconnectConfirm(false);
-          }}
+          onMouseDown={closeConnector}
         >
           <section
             className={`connector-detail-dialog tone-${selectedConnector.tone} ${
@@ -13887,13 +14185,8 @@ export default function HomePage() {
               className="connector-detail-close"
               type="button"
               aria-label="关闭连接器管理"
-              data-overlay-initial-focus={
-                selectedConnectorHasIssue ? true : undefined
-              }
-              onClick={() => {
-                setSelectedConnectorId(null);
-                setConnectorDisconnectConfirm(false);
-              }}
+              data-overlay-initial-focus
+              onClick={closeConnector}
             >
               <X size={17} />
             </button>
@@ -13956,7 +14249,22 @@ export default function HomePage() {
                     ? selectedConnectorIssueTasks[0]?.updated
                     : connectorStates[selectedConnector.id]
                     ? selectedConnector.lastUsed
-                    : "尚未使用"}
+                  : "尚未使用"}
+                </strong>
+              </span>
+              <span>
+                <small>连接检测</small>
+                <strong>
+                  {selectedConnectorHasIssue
+                    ? "未通过 · 需要修复"
+                    : !connectorStates[selectedConnector.id]
+                      ? "授权后自动检测"
+                      : connectorTestingId === selectedConnector.id ||
+                          connectorTestingAll
+                        ? "正在检测"
+                        : selectedConnectorCheck
+                          ? `${selectedConnectorCheck.checkedAt} · ${selectedConnectorCheck.latency} ms`
+                          : "尚未检测"}
                 </strong>
               </span>
             </div>
@@ -13998,6 +14306,125 @@ export default function HomePage() {
               </section>
             )}
 
+            <section
+              className={`connector-health-check ${
+                selectedConnectorHasIssue
+                  ? "is-risk"
+                  : connectorStates[selectedConnector.id]
+                    ? "is-ready"
+                    : "is-idle"
+              }`}
+              aria-label="连接健康检查"
+            >
+              <header>
+                <div>
+                  <span>连接健康检查</span>
+                  <strong>
+                    {selectedConnectorHasIssue
+                      ? "凭证失效，外部调用已被阻止"
+                      : connectorStates[selectedConnector.id]
+                        ? connectorTestingId === selectedConnector.id ||
+                          connectorTestingAll
+                          ? "正在验证身份、权限和响应"
+                          : "身份、权限和服务响应均正常"
+                        : "完成授权后会自动执行三项检测"}
+                  </strong>
+                </div>
+                <em>
+                  {selectedConnectorHasIssue
+                    ? "1 项失败"
+                    : connectorStates[selectedConnector.id]
+                      ? "3 / 3 通过"
+                      : "等待授权"}
+                </em>
+              </header>
+              <div>
+                <span
+                  className={
+                    selectedConnectorHasIssue
+                      ? "is-failed"
+                      : connectorStates[selectedConnector.id]
+                        ? "is-passed"
+                        : ""
+                  }
+                >
+                  {selectedConnectorHasIssue ? (
+                    <X size={14} />
+                  ) : connectorStates[selectedConnector.id] ? (
+                    <Check size={14} />
+                  ) : (
+                    <Timer size={14} />
+                  )}
+                  <span>
+                    <small>身份凭证</small>
+                    <strong>
+                      {selectedConnectorHasIssue
+                        ? "已失效"
+                        : connectorStates[selectedConnector.id]
+                          ? selectedConnector.credential
+                          : "尚未验证"}
+                    </strong>
+                  </span>
+                </span>
+                <span
+                  className={
+                    connectorStates[selectedConnector.id] &&
+                    !selectedConnectorHasIssue
+                      ? "is-passed"
+                      : ""
+                  }
+                >
+                  {connectorStates[selectedConnector.id] &&
+                  !selectedConnectorHasIssue ? (
+                    <Check size={14} />
+                  ) : (
+                    <Timer size={14} />
+                  )}
+                  <span>
+                    <small>权限范围</small>
+                    <strong>
+                      {selectedConnectorHasIssue
+                        ? "等待重新确认"
+                        : connectorStates[selectedConnector.id]
+                          ? "与任务范围一致"
+                          : "连接时确认"}
+                    </strong>
+                  </span>
+                </span>
+                <span
+                  className={
+                    connectorStates[selectedConnector.id] &&
+                    !selectedConnectorHasIssue
+                      ? "is-passed"
+                      : selectedConnectorHasIssue
+                        ? "is-protected"
+                        : ""
+                  }
+                >
+                  {connectorStates[selectedConnector.id] &&
+                  !selectedConnectorHasIssue ? (
+                    <Check size={14} />
+                  ) : selectedConnectorHasIssue ? (
+                    <ShieldCheck size={14} />
+                  ) : (
+                    <Timer size={14} />
+                  )}
+                  <span>
+                    <small>服务响应</small>
+                    <strong>
+                      {selectedConnectorHasIssue
+                        ? "任务已安全停止"
+                        : connectorStates[selectedConnector.id]
+                          ? selectedConnectorCheck
+                            ? `${selectedConnectorCheck.latency} ms`
+                            : "可正常调用"
+                          : "尚未检测"}
+                    </strong>
+                  </span>
+                </span>
+              </div>
+            </section>
+
             <div className="connector-permission-section">
               <div>
                 <span>权限范围</span>
@@ -14026,27 +14453,83 @@ export default function HomePage() {
               </span>
             </div>
 
+            {(selectedConnectorHasIssue ||
+              !connectorStates[selectedConnector.id]) && (
+              <label
+                className={`connector-authorize-confirm${
+                  connectorAuthorizeAcknowledged ? " is-checked" : ""
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={connectorAuthorizeAcknowledged}
+                  disabled={
+                    connectorTestingId !== null || connectorTestingAll
+                  }
+                  onChange={(event) =>
+                    setConnectorAuthorizeAcknowledged(event.target.checked)
+                  }
+                />
+                <ShieldCheck size={18} />
+                <span>
+                  <strong>
+                    {selectedConnectorHasIssue
+                      ? "确认恢复上述权限范围"
+                      : "确认授予上述权限范围"}
+                  </strong>
+                  <small>
+                    仅允许当前列出的操作，新的权限会再次请求你的确认。
+                  </small>
+                </span>
+              </label>
+            )}
+
             {connectorDisconnectConfirm ? (
               <div className="connector-disconnect-confirm" role="alert">
                 <AlertTriangle size={18} />
                 <span>
                   <strong>确认断开 {selectedConnector.name}？</strong>
-                  <small>后续任务将停止使用这项能力，历史记录不会被删除。</small>
+                  <small>
+                    {connectorUsageCounts[selectedConnector.id]} 个关联任务将无法继续使用这项能力，历史记录不会被删除。
+                  </small>
                 </span>
-                <div>
+                <label
+                  className={`connector-disconnect-ack${
+                    connectorDisconnectAcknowledged ? " is-checked" : ""
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    data-overlay-initial-focus
+                    checked={connectorDisconnectAcknowledged}
+                    onChange={(event) =>
+                      setConnectorDisconnectAcknowledged(event.target.checked)
+                    }
+                  />
+                  <span>
+                    <strong>我确认后续任务会失去这项能力</strong>
+                    <small>断开后可以重新授权，已有审计记录会继续保留。</small>
+                  </span>
+                </label>
+                <div className="connector-disconnect-actions">
                   <button
                     type="button"
-                    data-overlay-initial-focus
-                    onClick={() => setConnectorDisconnectConfirm(false)}
+                    onClick={() => {
+                      setConnectorDisconnectConfirm(false);
+                      setConnectorDisconnectAcknowledged(false);
+                    }}
                   >
                     取消
                   </button>
                   <button
                     className="danger"
                     type="button"
+                    disabled={!connectorDisconnectAcknowledged}
                     onClick={confirmDisconnectConnector}
                   >
-                    确认断开
+                    {connectorDisconnectAcknowledged
+                      ? "确认断开"
+                      : "请先确认"}
                   </button>
                 </div>
               </div>
@@ -14057,29 +14540,38 @@ export default function HomePage() {
                     <button
                       className="disconnect"
                       type="button"
-                      onClick={() => setConnectorDisconnectConfirm(true)}
+                      onClick={requestConnectorDisconnect}
                     >
                       断开连接
                     </button>
                     <button
                       className="primary reauthorize"
                       type="button"
-                      disabled={connectorTestingId !== null}
+                      disabled={
+                        connectorTestingId !== null ||
+                        connectorTestingAll ||
+                        !connectorAuthorizeAcknowledged
+                      }
                       aria-busy={
-                        connectorTestingId === selectedConnector.id
+                        connectorTestingId === selectedConnector.id ||
+                        connectorTestingAll
                       }
                       onClick={() =>
                         reauthorizeConnector(selectedConnector.id)
                       }
                     >
-                      {connectorTestingId === selectedConnector.id ? (
+                      {connectorTestingId === selectedConnector.id ||
+                      connectorTestingAll ? (
                         <LoaderCircle className="is-spinning" size={16} />
                       ) : (
                         <RotateCcw size={16} />
                       )}
-                      {connectorTestingId === selectedConnector.id
+                      {connectorTestingId === selectedConnector.id ||
+                      connectorTestingAll
                         ? "正在重新授权"
-                        : "重新授权"}
+                        : connectorAuthorizeAcknowledged
+                          ? "重新授权"
+                          : "请先确认权限"}
                     </button>
                   </>
                 ) : connectorStates[selectedConnector.id] ? (
@@ -14087,7 +14579,7 @@ export default function HomePage() {
                     <button
                       className="disconnect"
                       type="button"
-                      onClick={() => setConnectorDisconnectConfirm(true)}
+                      onClick={requestConnectorDisconnect}
                     >
                       断开连接
                     </button>
@@ -14095,16 +14587,23 @@ export default function HomePage() {
                       className="primary"
                       type="button"
                       data-overlay-initial-focus
-                      disabled={connectorTestingId !== null}
-                      aria-busy={connectorTestingId === selectedConnector.id}
+                      disabled={
+                        connectorTestingId !== null || connectorTestingAll
+                      }
+                      aria-busy={
+                        connectorTestingId === selectedConnector.id ||
+                        connectorTestingAll
+                      }
                       onClick={() => testConnector(selectedConnector.id)}
                     >
-                      {connectorTestingId === selectedConnector.id ? (
+                      {connectorTestingId === selectedConnector.id ||
+                      connectorTestingAll ? (
                         <LoaderCircle className="is-spinning" size={16} />
                       ) : (
                         <CheckCircle2 size={16} />
                       )}
-                      {connectorTestingId === selectedConnector.id
+                      {connectorTestingId === selectedConnector.id ||
+                      connectorTestingAll
                         ? "正在测试"
                         : "测试连接"}
                     </button>
@@ -14121,10 +14620,16 @@ export default function HomePage() {
                       className="primary"
                       type="button"
                       data-overlay-initial-focus
+                      disabled={
+                        connectorTestingAll ||
+                        !connectorAuthorizeAcknowledged
+                      }
                       onClick={() => connectConnector(selectedConnector.id)}
                     >
                       <Link2 size={16} />
-                      连接并授权
+                      {connectorAuthorizeAcknowledged
+                        ? "连接并授权"
+                        : "请先确认权限"}
                     </button>
                   </>
                 )}
