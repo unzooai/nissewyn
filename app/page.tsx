@@ -72,6 +72,7 @@ type SettingsSectionId =
   | "data"
   | "connectors"
   | "security";
+type OnboardingStepId = "profile" | "connectors" | "security" | "task";
 type WorkspaceRoute = {
   view: ViewId;
   taskId: string | null;
@@ -471,6 +472,7 @@ const taskDraftRecoveryKey = "unzoo-one-task-draft-recovery";
 const artifactDraftRecoveryKey = "unzoo-one-artifact-draft-recovery";
 const workspaceSyncKey = "unzoo-one-workspace-sync";
 const workspaceLastBackupKey = "unzoo-one-last-backup-at";
+const onboardingPreferenceKey = "unzoo-one-onboarding-dismissed";
 const legacyWorkspaceStorageKeys = [
   "unzoo-one-tasks",
   "unzoo-one-settings",
@@ -485,6 +487,7 @@ const workspacePreferenceStorageKeys = [
   "unzoo-one-recent-searches",
   "unzoo-one-read-notifications",
   workspaceLastBackupKey,
+  onboardingPreferenceKey,
 ] as const;
 const taskDraftRecoveryMaxAge = 7 * 24 * 60 * 60 * 1000;
 const workspaceSyncSectionLabels: Record<WorkspaceSyncSection, string> = {
@@ -1924,6 +1927,7 @@ const initialTasks: TaskItem[] = [
     ],
   },
 ];
+const demoTaskIds = new Set(initialTasks.map((task) => task.id));
 
 const initialApprovals: ApprovalItem[] = [
   {
@@ -2235,6 +2239,7 @@ const taskTemplates: Array<{
   title: string;
   description: string;
   target: string;
+  targetHint: string;
   schedule: TaskSchedule;
   scheduleTime: string;
   scheduleDay: Weekday;
@@ -2245,7 +2250,8 @@ const taskTemplates: Array<{
     label: "网页监控",
     title: "跟踪产品页面变化",
     description: "检查页面内容变化，只保留有意义的更新并生成摘要。",
-    target: "https://example.com/product",
+    target: "",
+    targetHint: "粘贴要监控的网页地址",
     schedule: "每天",
     scheduleTime: "09:00",
     scheduleDay: "周一",
@@ -2256,7 +2262,8 @@ const taskTemplates: Array<{
     label: "深度研究",
     title: "研究一个新主题",
     description: "从可信来源收集信息，交叉验证后整理成结构化结论。",
-    target: "输入主题或资料来源",
+    target: "",
+    targetHint: "输入研究主题、网页或资料库",
     schedule: "仅运行一次",
     scheduleTime: "09:00",
     scheduleDay: "周一",
@@ -2267,7 +2274,8 @@ const taskTemplates: Array<{
     label: "自动周报",
     title: "生成团队每周进展",
     description: "汇总本周项目文件和工作记录，生成可直接发送的周报草稿。",
-    target: "本地项目工作区",
+    target: "",
+    targetHint: "选择项目文件夹或工作区",
     schedule: "每周",
     scheduleTime: "17:30",
     scheduleDay: "周五",
@@ -2348,6 +2356,7 @@ export default function HomePage() {
   const [notificationFilter, setNotificationFilter] =
     useState<NotificationFilter>("全部");
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [taskDraftBaseline, setTaskDraftBaseline] =
@@ -2859,6 +2868,56 @@ export default function HomePage() {
       connectorIssueTasks[connector.id].length === 0 &&
       connectorCheckResults[connector.id] !== null,
   ).length;
+  const onboardingSteps: Array<{
+    id: OnboardingStepId;
+    label: string;
+    description: string;
+    actionLabel: string;
+    complete: boolean;
+    icon: typeof Building2;
+  }> = [
+    {
+      id: "profile",
+      label: "命名工作区",
+      description: "让团队知道这里负责什么工作",
+      actionLabel: "设置资料",
+      complete:
+        workspaceProfile.name !== defaultWorkspaceProfile.name ||
+        workspaceProfile.description !== defaultWorkspaceProfile.description,
+      icon: Building2,
+    },
+    {
+      id: "connectors",
+      label: "检查能力连接",
+      description: `${healthyConnectorCount} 项连接可以安全使用`,
+      actionLabel: "检查连接",
+      complete: healthyConnectorCount >= 2,
+      icon: Link2,
+    },
+    {
+      id: "security",
+      label: "保留审批边界",
+      description: settings.approval
+        ? "敏感操作会先等待确认"
+        : "当前允许已授权操作自动执行",
+      actionLabel: "检查安全",
+      complete: settings.approval,
+      icon: ShieldCheck,
+    },
+    {
+      id: "task",
+      label: "创建真实任务",
+      description: "示例任务不会替代你的真实配置",
+      actionLabel: "新建任务",
+      complete: tasks.some((task) => !demoTaskIds.has(task.id)),
+      icon: Sparkles,
+    },
+  ];
+  const onboardingCompletedCount = onboardingSteps.filter(
+    (step) => step.complete,
+  ).length;
+  const nextOnboardingStep =
+    onboardingSteps.find((step) => !step.complete) ?? null;
   const connectorUsageCounts: Record<ConnectorId, number> = {
     browser: tasks.filter((task) => /^https?:\/\//i.test(task.target)).length,
     workspace: tasks.filter((task) => !/^https?:\/\//i.test(task.target)).length,
@@ -3261,7 +3320,7 @@ export default function HomePage() {
   const taskScheduleReady = !taskFormErrors.scheduleTime;
   const taskComposerReadyCount =
     Number(taskDefinitionReady) + Number(taskScheduleReady) + 1;
-  const activeTaskTemplateId = editingTaskId
+  const activeTaskTemplate = editingTaskId
     ? null
     : taskTemplates.find(
         (template) =>
@@ -3271,7 +3330,8 @@ export default function HomePage() {
           template.schedule === taskSchedule &&
           template.scheduleTime === taskScheduleTime &&
           template.scheduleDay === taskScheduleDay,
-      )?.id ?? null;
+      ) ?? null;
+  const activeTaskTemplateId = activeTaskTemplate?.id ?? null;
   const taskComposerDirty = Boolean(
     composerOpen &&
       taskDraftBaseline &&
@@ -3463,6 +3523,19 @@ export default function HomePage() {
           ? window.Notification.permission
           : "unsupported",
       );
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        setOnboardingDismissed(
+          window.localStorage.getItem(onboardingPreferenceKey) === "true",
+        );
+      } catch {
+        setOnboardingDismissed(false);
+      }
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -5688,7 +5761,7 @@ export default function HomePage() {
     try {
       const desktopNotification = new window.Notification(newItem.title, {
         body: newItem.detail,
-        icon: "/unzoo-one-mark-v5.png",
+        icon: "/unzoo-one-mark-v6.png",
         tag: `unzoo-one-${newItem.id}`,
       });
       desktopNotification.onclick = () => {
@@ -6477,6 +6550,7 @@ export default function HomePage() {
     setWorkspaceResetOpen(false);
     setWorkspaceResetAcknowledged(false);
     setRecoveryBackupCreated(false);
+    setOnboardingDismissed(false);
     setWorkspaceLoadWarning("");
     recordActivity({
       title: "工作区已恢复初始状态",
@@ -7302,10 +7376,10 @@ export default function HomePage() {
 
   function beginCreateTask() {
     const draft: TaskDraftSnapshot = {
-      name: "跟踪产品页面变化",
-      target: "https://example.com/product",
-      description: "检查页面内容变化，只保留有意义的更新并生成摘要。",
-      schedule: "每天",
+      name: "",
+      target: "",
+      description: "",
+      schedule: "仅运行一次",
       scheduleTime: "09:00",
       scheduleDay: "周一",
       approval: settings.approval,
@@ -8294,7 +8368,7 @@ export default function HomePage() {
       try {
         const confirmation = new window.Notification("Unzoo One 提醒已开启", {
           body: "后续需要你决定的任务会在这里提醒。",
-          icon: "/unzoo-one-mark-v5.png",
+          icon: "/unzoo-one-mark-v6.png",
           tag: "unzoo-one-notifications-enabled",
         });
         window.setTimeout(() => confirmation.close(), 5000);
@@ -9085,6 +9159,63 @@ export default function HomePage() {
     openSettingsSection(section);
   }
 
+  function setOnboardingPreference(dismissed: boolean) {
+    setOnboardingDismissed(dismissed);
+    try {
+      if (dismissed) {
+        window.localStorage.setItem(onboardingPreferenceKey, "true");
+      } else {
+        window.localStorage.removeItem(onboardingPreferenceKey);
+      }
+    } catch {
+      // The guide still works for the current session when storage is unavailable.
+    }
+  }
+
+  function dismissOnboarding(completed = false) {
+    setOnboardingPreference(true);
+    setNotice(
+      completed
+        ? "首次设置已完成，工作区可以开始正式使用"
+        : "首次设置已收起，可从工作区菜单重新打开",
+    );
+  }
+
+  function openOnboarding() {
+    setWorkspaceMenuOpen(false);
+    setOnboardingPreference(false);
+    openView("home");
+    window.setTimeout(() => {
+      document
+        .getElementById("workspace-onboarding")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 180);
+  }
+
+  function runOnboardingStep(step: OnboardingStepId) {
+    if (step === "profile") {
+      openWorkspaceProfile();
+      return;
+    }
+    if (step === "connectors") {
+      openSettingsSection("connectors");
+      return;
+    }
+    if (step === "security") {
+      openSettingsSection("security");
+      return;
+    }
+    beginCreateTask();
+  }
+
+  function continueOnboarding() {
+    if (nextOnboardingStep) {
+      runOnboardingStep(nextOnboardingStep.id);
+      return;
+    }
+    dismissOnboarding(true);
+  }
+
   function openWorkspaceBudget() {
     openView("settings", {
       scrollToTop: false,
@@ -9498,7 +9629,7 @@ export default function HomePage() {
       }
 
       const response = await window.fetch(
-        `/unzoo-one-mark-v5.png?network-check=${Date.now()}`,
+        `/unzoo-one-mark-v6.png?network-check=${Date.now()}`,
         { cache: "no-store" },
       );
       if (!response.ok) {
@@ -9778,12 +9909,12 @@ export default function HomePage() {
         >
           <span className="clarity-brand-mark">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/unzoo-one-mark-v5.png" alt="Unzoo One" />
+            <img src="/unzoo-one-mark-v6.png" alt="Unzoo One" />
           </span>
           <div className="clarity-brand-copy">
             <strong>
-              <span className="clarity-wordmark-name">unzoo</span>
-              <span className="clarity-wordmark-one">one</span>
+              <span className="clarity-wordmark-name">Unzoo</span>
+              <span className="clarity-wordmark-one">One</span>
             </strong>
             <small>可信 AI 执行</small>
           </div>
@@ -9829,12 +9960,12 @@ export default function HomePage() {
           >
             <span className="clarity-mobile-brand-mark">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/unzoo-one-mark-v5.png" alt="" />
+              <img src="/unzoo-one-mark-v6.png" alt="" />
             </span>
             <span className="clarity-mobile-brand-copy">
               <strong>
-                <span className="clarity-wordmark-name">unzoo</span>
-                <span className="clarity-wordmark-one">one</span>
+                <span className="clarity-wordmark-name">Unzoo</span>
+                <span className="clarity-wordmark-one">One</span>
               </strong>
               <small>
                 <i className={systemStatusTone} />
@@ -10330,6 +10461,16 @@ export default function HomePage() {
                       </span>
                       <ChevronRight size={15} />
                     </button>
+                    <button type="button" onClick={openOnboarding}>
+                      <span className="tone-blue">
+                        <ListChecks size={17} />
+                      </span>
+                      <span>
+                        <strong>首次设置</strong>
+                        <small>{onboardingCompletedCount}/4 项已完成</small>
+                      </span>
+                      <ChevronRight size={15} />
+                    </button>
                     <button type="button" onClick={exportWorkspaceFromMenu}>
                       <span className="tone-slate">
                         <Download size={17} />
@@ -10622,6 +10763,118 @@ export default function HomePage() {
 
         {activeView === "home" && (
           <section className="home-view">
+            {tasksReady && !onboardingDismissed && (
+              <section
+                className={`workspace-onboarding${
+                  onboardingCompletedCount === onboardingSteps.length
+                    ? " is-complete"
+                    : ""
+                }`}
+                id="workspace-onboarding"
+                aria-labelledby="workspace-onboarding-title"
+              >
+                <div className="workspace-onboarding-intro">
+                  <header>
+                    <span>首次设置 · 示例工作区</span>
+                    <strong>
+                      {onboardingCompletedCount}/{onboardingSteps.length} 已完成
+                    </strong>
+                  </header>
+                  <button
+                    className="workspace-onboarding-dismiss"
+                    type="button"
+                    aria-label="关闭首次设置"
+                    onClick={() => dismissOnboarding()}
+                  >
+                    <X size={16} />
+                  </button>
+                  <h2 id="workspace-onboarding-title">
+                    把这里变成你的 AI 工作区
+                  </h2>
+                  <p>
+                    当前任务用于展示产品能力。完成下面的设置，再运行属于你的真实任务。
+                  </p>
+                  <div
+                    className="workspace-onboarding-progress"
+                    role="progressbar"
+                    aria-label="首次设置进度"
+                    aria-valuemin={0}
+                    aria-valuemax={onboardingSteps.length}
+                    aria-valuenow={onboardingCompletedCount}
+                  >
+                    <i
+                      style={{
+                        width: `${
+                          (onboardingCompletedCount / onboardingSteps.length) *
+                          100
+                        }%`,
+                      }}
+                    />
+                  </div>
+                  <div className="workspace-onboarding-actions">
+                    <button
+                      className="primary"
+                      type="button"
+                      onClick={continueOnboarding}
+                    >
+                      {nextOnboardingStep ? (
+                        <>
+                          {nextOnboardingStep.actionLabel}
+                          <ChevronRight size={15} />
+                        </>
+                      ) : (
+                        <>
+                          <Check size={15} />
+                          完成设置
+                        </>
+                      )}
+                    </button>
+                    <button type="button" onClick={() => dismissOnboarding()}>
+                      稍后处理
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  className="workspace-onboarding-steps"
+                  aria-label="首次设置步骤"
+                >
+                  {onboardingSteps.map((step) => {
+                    const StepIcon = step.icon;
+                    const isNext = nextOnboardingStep?.id === step.id;
+                    return (
+                      <button
+                        className={`${step.complete ? "is-complete" : ""}${
+                          isNext ? " is-next" : ""
+                        }`}
+                        key={step.id}
+                        type="button"
+                        aria-label={`${step.label}，${
+                          step.complete ? "已完成" : step.actionLabel
+                        }`}
+                        onClick={() => runOnboardingStep(step.id)}
+                      >
+                        <span>
+                          {step.complete ? (
+                            <Check size={16} />
+                          ) : (
+                            <StepIcon size={16} />
+                          )}
+                        </span>
+                        <span>
+                          <strong>{step.label}</strong>
+                          <small>{step.description}</small>
+                        </span>
+                        <em>{step.complete ? "已完成" : step.actionLabel}</em>
+                        <ChevronRight size={15} />
+                      </button>
+                    );
+                  })}
+                </div>
+
+              </section>
+            )}
+
             <div className="home-summary" aria-label="今日概览">
               <button
                 className="summary-running"
@@ -15467,7 +15720,10 @@ export default function HomePage() {
                           : undefined
                       }
                       value={taskTarget}
-                      placeholder="网页、文件夹或资料库"
+                      placeholder={
+                        activeTaskTemplate?.targetHint ??
+                        "网页、文件夹或资料库"
+                      }
                       onChange={(event) => setTaskTarget(event.target.value)}
                     />
                     {taskFormSubmitted && taskFormErrors.target && (

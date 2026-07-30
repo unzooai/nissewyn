@@ -38,31 +38,48 @@ test("server-renders the Unzoo One task console", async () => {
   assert.match(html, /需要你处理/);
   assert.match(html, /你交给 Unzoo One 的工作/);
   assert.match(html, /ai-core-premium\.webp/);
-  assert.match(html, /unzoo-one-mark-v5\.png/);
+  assert.match(html, /unzoo-one-mark-v6\.png/);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/);
 });
 
 test("keeps commercial task interactions and accessibility in source", async () => {
-  const [page, css, layout, packageJson, brandMark, brandFavicon] =
+  const [page, css, layout, packageJson, brandSvg, brandMark, brandFavicon] =
     await Promise.all([
       readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/clarity.css", import.meta.url), "utf8"),
       readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
       readFile(new URL("../package.json", import.meta.url), "utf8"),
-      readFile(new URL("../public/unzoo-one-mark-v5.png", import.meta.url)),
-      readFile(new URL("../public/unzoo-favicon-v5.png", import.meta.url)),
+      readFile(new URL("../public/unzoo-one-mark-v6.svg", import.meta.url), "utf8"),
+      readFile(new URL("../public/unzoo-one-mark-v6.png", import.meta.url)),
+      readFile(new URL("../public/unzoo-favicon-v6.png", import.meta.url)),
     ]);
 
   assert.match(page, /clarity-wordmark-name/);
   assert.match(page, /clarity-wordmark-one/);
   assert.match(page, /clarity-mobile-brand-mark/);
   assert.match(page, /className="clarity-brand"[\s\S]*aria-label="返回首页"/);
+  assert.match(page, /const onboardingPreferenceKey =/);
+  assert.match(page, /type OnboardingStepId =/);
+  assert.match(page, /const onboardingSteps:/);
+  assert.match(page, /function openOnboarding\(\)/);
+  assert.match(page, /function continueOnboarding\(\)/);
+  assert.match(page, /id="workspace-onboarding"/);
+  assert.match(page, /className="workspace-onboarding-steps"/);
+  assert.match(page, /name: "",[\s\S]*target: "",[\s\S]*description: ""/);
+  assert.match(page, /targetHint: "粘贴要监控的网页地址"/);
+  assert.match(page, /activeTaskTemplate\?\.targetHint/);
+  assert.match(brandSvg, /viewBox="12 12 104 104"/);
+  assert.match(brandSvg, /#356dff/);
+  assert.match(brandSvg, /#16b889/);
   assert.equal(brandMark.subarray(1, 4).toString("ascii"), "PNG");
   assert.ok(brandMark.length > 10_000);
   assert.equal(brandFavicon.subarray(1, 4).toString("ascii"), "PNG");
-  assert.ok(brandFavicon.length > 4_000);
-  assert.match(layout, /unzoo-favicon-v5\.png/);
-  assert.match(css, /Brand identity v5/);
+  assert.ok(brandFavicon.length > 1_000);
+  assert.match(layout, /unzoo-favicon-v6\.png/);
+  assert.match(css, /Brand identity v6/);
+  assert.match(css, /\.workspace-onboarding/);
+  assert.match(css, /\.workspace-onboarding-progress/);
+  assert.match(css, /\.workspace-onboarding-steps/);
   assert.match(page, /const taskFilters: TaskFilter\[\]/);
   assert.match(page, /type WorkspacePersistenceStatus =/);
   assert.match(page, /const legacyWorkspaceStorageKeys =/);
@@ -360,7 +377,8 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /selectedTaskActivity\.map/);
   assert.match(page, /activityTaskId/);
   assert.match(page, /const taskTemplates:/);
-  assert.match(page, /const activeTaskTemplateId = editingTaskId/);
+  assert.match(page, /const activeTaskTemplate = editingTaskId/);
+  assert.match(page, /const activeTaskTemplateId = activeTaskTemplate/);
   assert.match(page, /const taskComposerReadyCount =/);
   assert.match(page, /function focusTaskComposerSection/);
   assert.match(page, /className="task-composer-progress"/);
