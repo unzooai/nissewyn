@@ -212,19 +212,19 @@ import {
   connectorCatalog,
   connectorErrorCodes,
   connectorTestLatencies,
-  defaultConnectorStates,
   demoTaskIds,
-  initialActivityItems,
-  initialApprovals,
-  initialArtifacts,
-  initialTasks,
-  initialTeamMembers,
   runSteps,
   signalPoints,
   taskTemplates,
   teamRoleDetails,
   teamSeatLimit,
 } from "./data/mock";
+import { getProvider } from "./lib/provider-mock";
+
+// 组件不再直接读 mock：首屏种子和出厂数据都从 provider 拿，换实现时这里不用动。
+const workspaceProvider = getProvider();
+const workspaceSeed = workspaceProvider.snapshot();
+const workspaceDefaults = workspaceProvider.defaults();
 
 const teamRoleFilters: TeamRoleFilter[] = [
   "全部",
@@ -1431,12 +1431,12 @@ export default function HomePage() {
   );
   const [isCheckingNetwork, setIsCheckingNetwork] = useState(false);
   const [selectedStep, setSelectedStep] = useState("analyze");
-  const [approvals, setApprovals] = useState(initialApprovals);
+  const [approvals, setApprovals] = useState(workspaceSeed.approvals);
   const [approvalDeferrals, setApprovalDeferrals] =
     useState<ApprovalDeferrals>({});
   const [approvalClock, setApprovalClock] = useState(() => Date.now());
   const [approvalSnoozeId, setApprovalSnoozeId] = useState<string | null>(null);
-  const [selectedApprovalId, setSelectedApprovalId] = useState(initialApprovals[0].id);
+  const [selectedApprovalId, setSelectedApprovalId] = useState(workspaceSeed.approvals[0].id);
   const [approvalListQuery, setApprovalListQuery] = useState("");
   const [approvalRiskFilter, setApprovalRiskFilter] =
     useState<ApprovalRiskFilter>("全部");
@@ -1446,13 +1446,13 @@ export default function HomePage() {
   const [approvalRejectReason, setApprovalRejectReason] = useState("");
   const [approvalRejectSnapshot, setApprovalRejectSnapshot] =
     useState<ApprovalRejectSnapshot | null>(null);
-  const [activityLog, setActivityLog] = useState<ActivityItem[]>(initialActivityItems);
+  const [activityLog, setActivityLog] = useState<ActivityItem[]>(workspaceSeed.activity);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("全部");
   const [activityTaskId, setActivityTaskId] = useState<string | null>(null);
   const [activityListQuery, setActivityListQuery] = useState("");
   const [activitySort, setActivitySort] = useState<ActivitySort>("最新优先");
   const [selectedActivityId, setSelectedActivityId] = useState(
-    initialActivityItems[0].id,
+    workspaceSeed.activity[0].id,
   );
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
@@ -1500,14 +1500,14 @@ export default function HomePage() {
   const [workspaceImportAcknowledged, setWorkspaceImportAcknowledged] =
     useState(false);
   const [recoveryBackupCreated, setRecoveryBackupCreated] = useState(false);
-  const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
-  const [artifacts, setArtifacts] = useState<ArtifactItem[]>(initialArtifacts);
+  const [tasks, setTasks] = useState<TaskItem[]>(workspaceSeed.tasks);
+  const [artifacts, setArtifacts] = useState<ArtifactItem[]>(workspaceSeed.artifacts);
   const [artifactFilter, setArtifactFilter] = useState<ArtifactFilter>("全部");
   const [artifactTaskId, setArtifactTaskId] = useState<string | null>(null);
   const [artifactListQuery, setArtifactListQuery] = useState("");
   const [artifactSort, setArtifactSort] = useState<ArtifactSort>("最近更新");
   const [selectedArtifactId, setSelectedArtifactId] = useState(
-    initialArtifacts[0].id,
+    workspaceSeed.artifacts[0].id,
   );
   const [editingArtifactId, setEditingArtifactId] = useState<string | null>(
     null,
@@ -1591,7 +1591,7 @@ export default function HomePage() {
   const [settingsDiscardTarget, setSettingsDiscardTarget] =
     useState<SettingsDraftTarget | null>(null);
   const [connectorStates, setConnectorStates] = useState<ConnectorState>(
-    defaultConnectorStates,
+    workspaceSeed.connectors,
   );
   const [connectorCheckResults, setConnectorCheckResults] =
     useState<ConnectorCheckState>(defaultConnectorChecks);
@@ -1607,7 +1607,7 @@ export default function HomePage() {
   const [connectorDisconnectAcknowledged, setConnectorDisconnectAcknowledged] =
     useState(false);
   const [teamMembers, setTeamMembers] =
-    useState<TeamMember[]>(initialTeamMembers);
+    useState<TeamMember[]>(workspaceSeed.members);
   const [teamMemberQuery, setTeamMemberQuery] = useState("");
   const [teamRoleFilter, setTeamRoleFilter] =
     useState<TeamRoleFilter>("全部");
@@ -2375,7 +2375,7 @@ export default function HomePage() {
                   ? "task"
                   : null;
   const overlayOpen = activeOverlayKind !== null;
-  const primaryTask = tasks.find((task) => task.id === "competitor") ?? initialTasks[0];
+  const primaryTask = tasks.find((task) => task.id === "competitor") ?? workspaceDefaults.tasks[0];
   const activityTask = tasks.find((task) => task.id === activityTaskId) ?? null;
   const selectedTaskActivity = selectedTask
     ? activityLog.filter((item) => item.taskId === selectedTask.id).slice(0, 3)
@@ -2541,7 +2541,7 @@ export default function HomePage() {
     options: { preserveProfileDraft?: boolean } = {},
   ) {
     const signature = workspaceSyncSignature(snapshot);
-    const nextApprovals = initialApprovals.filter((approval) =>
+    const nextApprovals = workspaceDefaults.approvals.filter((approval) =>
       snapshot.approvalIds.includes(approval.id),
     );
     const nextTaskIds = new Set(snapshot.tasks.map((task) => task.id));
@@ -2990,7 +2990,7 @@ export default function HomePage() {
         if (savedApprovalIds) {
           const approvalIds = JSON.parse(savedApprovalIds);
           if (Array.isArray(approvalIds)) {
-            const pendingApprovals = initialApprovals.filter((item) =>
+            const pendingApprovals = workspaceDefaults.approvals.filter((item) =>
               approvalIds.includes(item.id),
             );
             setApprovals(pendingApprovals);
@@ -4749,7 +4749,7 @@ export default function HomePage() {
         : lastWorkspaceBackupAt
           ? `最近可用备份：${workspaceBackupFreshnessLabel}。导入时会再次校验文件结构。`
           : "本机保存用于日常恢复，手动备份用于迁移设备或应对浏览器数据被清理。";
-  const latestActivity = activityLog[0] ?? initialActivityItems[0];
+  const latestActivity = activityLog[0] ?? workspaceDefaults.activity[0];
   const latestArtifact = artifacts[0] ?? null;
   const notificationItems = useMemo<NotificationItem[]>(() => {
     const items: NotificationItem[] = [];
@@ -5495,12 +5495,12 @@ export default function HomePage() {
       return;
     }
     const { backup, fileName } = pendingWorkspaceImport;
-    const restoredApprovals = initialApprovals.filter((item) =>
+    const restoredApprovals = workspaceDefaults.approvals.filter((item) =>
       backup.approvalIds.includes(item.id),
     );
     const restoredPrimary =
       backup.tasks.find((task) => task.id === "competitor") ?? backup.tasks[0];
-    const restoredArtifacts = backup.artifacts ?? initialArtifacts;
+    const restoredArtifacts = backup.artifacts ?? workspaceDefaults.artifacts;
 
     setTasks(backup.tasks);
     setArtifacts(restoredArtifacts);
@@ -5520,14 +5520,14 @@ export default function HomePage() {
     setUsageSettings(backup.usage ?? { ...defaultUsageSettings });
     setUsageBudgetOpen(false);
     setSettingsDiscardTarget(null);
-    setConnectorStates(backup.connectors ?? { ...defaultConnectorStates });
+    setConnectorStates(backup.connectors ?? workspaceDefaults.connectors);
     setConnectorCheckResults({ ...defaultConnectorChecks });
     setSelectedConnectorId(null);
     setConnectorDisconnectConfirm(false);
     setConnectorDisconnectAcknowledged(false);
     setConnectorAuthorizeAcknowledged(false);
     setTeamMembers(
-      backup.members ?? initialTeamMembers.map((member) => ({ ...member })),
+      backup.members ?? workspaceDefaults.members,
     );
     setTeamMemberQuery("");
     setTeamRoleFilter("全部");
@@ -5582,7 +5582,7 @@ export default function HomePage() {
     );
     recordActivity({
       title: "工作区备份已恢复",
-      detail: `已从“${fileName}”恢复 ${backup.tasks.length} 个任务、${restoredArtifacts.length} 个成果、${(backup.members ?? initialTeamMembers).length} 位成员和 ${backup.activity.length} 条运行记录。`,
+      detail: `已从“${fileName}”恢复 ${backup.tasks.length} 个任务、${restoredArtifacts.length} 个成果、${(backup.members ?? workspaceDefaults.members).length} 位成员和 ${backup.activity.length} 条运行记录。`,
       icon: "activity",
       tone: "green",
       kind: "系统",
@@ -5596,15 +5596,16 @@ export default function HomePage() {
       setNotice("请先确认当前工作区会恢复为初始状态");
       return;
     }
-    setTasks(initialTasks.map((task) => ({ ...task })));
-    setArtifacts(initialArtifacts.map((artifact) => ({ ...artifact })));
+    const factory = workspaceProvider.reset();
+    setTasks(factory.tasks);
+    setArtifacts(factory.artifacts);
     closeArtifactEditor({ clearRecovery: true });
     closeComposer({ clearRecovery: true });
     setArtifactTaskId(null);
     setArtifactFilter("全部");
     setArtifactListQuery("");
     setArtifactSort("最近更新");
-    setSelectedArtifactId(initialArtifacts[0].id);
+    setSelectedArtifactId(factory.artifacts[0].id);
     setArtifactDeleteId(null);
     setArtifactDeleteSnapshot(null);
     setSettings({ ...defaultSettings });
@@ -5620,7 +5621,7 @@ export default function HomePage() {
     setUsagePauseDraft(defaultUsageSettings.pauseAtLimit);
     setUsagePauseConfirmed(false);
     setSettingsDiscardTarget(null);
-    setConnectorStates({ ...defaultConnectorStates });
+    setConnectorStates(factory.connectors);
     setConnectorCheckResults({ ...defaultConnectorChecks });
     setSelectedConnectorId(null);
     setConnectorDisconnectConfirm(false);
@@ -5628,7 +5629,7 @@ export default function HomePage() {
     setConnectorAuthorizeAcknowledged(false);
     setConnectorTestingId(null);
     setConnectorTestingAll(false);
-    setTeamMembers(initialTeamMembers.map((member) => ({ ...member })));
+    setTeamMembers(factory.members);
     setTeamMemberQuery("");
     setTeamRoleFilter("全部");
     setTeamInviteOpen(false);
@@ -5637,18 +5638,18 @@ export default function HomePage() {
     setMemberRemoveAcknowledged(false);
     setInviteAdminAcknowledged(false);
     setInviteFormSubmitted(false);
-    setApprovals(initialApprovals.map((item) => ({ ...item })));
+    setApprovals(factory.approvals);
     setApprovalDeferrals({});
     setApprovalClock(Date.now());
     setApprovalSnoozeId(null);
-    setSelectedApprovalId(initialApprovals[0].id);
+    setSelectedApprovalId(factory.approvals[0].id);
     setApprovalListQuery("");
     setApprovalRiskFilter("全部");
     setSelectedApprovalIds([]);
     setBulkApprovalDecision(null);
     setApprovalRejectReason("");
     setApprovalRejectSnapshot(null);
-    setActivityLog(initialActivityItems.map((item) => ({ ...item })));
+    setActivityLog(factory.activity);
     setIsRunning(true);
     setSelectedStep("analyze");
     setTaskFilter("全部");
@@ -5659,7 +5660,7 @@ export default function HomePage() {
     setActivityTaskId(null);
     setActivityListQuery("");
     setActivitySort("最新优先");
-    setSelectedActivityId(initialActivityItems[0].id);
+    setSelectedActivityId(factory.activity[0].id);
     setRecentSearchKeys([]);
     setReadNotificationIds([]);
     setNotificationFilter("全部");
@@ -16985,7 +16986,7 @@ export default function HomePage() {
               <span>
                 <small>成果</small>
                 <strong>
-                  {(pendingWorkspaceImport.backup.artifacts ?? initialArtifacts).length}
+                  {(pendingWorkspaceImport.backup.artifacts ?? workspaceDefaults.artifacts).length}
                 </strong>
               </span>
               <span>
@@ -16996,7 +16997,7 @@ export default function HomePage() {
                 <small>待确认</small>
                 <strong>
                   {
-                    initialApprovals.filter((item) =>
+                    workspaceDefaults.approvals.filter((item) =>
                       pendingWorkspaceImport.backup.approvalIds.includes(item.id),
                     ).length
                   }
@@ -17014,7 +17015,7 @@ export default function HomePage() {
                 <small>恢复后</small>
                 <strong>
                   {pendingWorkspaceImport.backup.tasks.length} 个任务 ·{" "}
-                  {(pendingWorkspaceImport.backup.artifacts ?? initialArtifacts).length}
+                  {(pendingWorkspaceImport.backup.artifacts ?? workspaceDefaults.artifacts).length}
                   {" "}项成果
                 </strong>
               </span>

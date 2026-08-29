@@ -35,6 +35,7 @@ import type {
   TaskPort,
   TeamPort,
   WorkspaceProvider,
+  WorkspaceSnapshot,
 } from "./provider";
 
 /** 高风险动作的关键词。policy.check 的 mock 判据，真实实现走 unterm 的策略引擎。 */
@@ -244,6 +245,40 @@ export function createMockProvider(): WorkspaceProvider {
     },
   };
 
+  function snapshot(): WorkspaceSnapshot {
+    return {
+      tasks: clone(tasks),
+      approvals: approvals.slice(),
+      artifacts: clone(artifacts),
+      activity: clone(activity),
+      members: clone(members),
+      connectors: { ...connectors },
+    };
+  }
+
+  function defaults(): WorkspaceSnapshot {
+    return {
+      tasks: clone(initialTasks),
+      approvals: initialApprovals.slice(),
+      artifacts: clone(initialArtifacts),
+      activity: clone(initialActivityItems),
+      members: clone(initialTeamMembers),
+      connectors: { ...defaultConnectorStates },
+    };
+  }
+
+  function reset(): WorkspaceSnapshot {
+    const factory = defaults();
+    tasks = factory.tasks;
+    approvals = factory.approvals;
+    artifacts = factory.artifacts;
+    activity = factory.activity;
+    members = factory.members;
+    Object.assign(connectors, factory.connectors);
+    leases.length = 0;
+    return snapshot();
+  }
+
   return {
     tasks: taskPort,
     approvals: approvalPort,
@@ -252,6 +287,9 @@ export function createMockProvider(): WorkspaceProvider {
     connectors: connectorPort,
     policy: policyPort,
     team: teamPort,
+    snapshot,
+    defaults,
+    reset,
   };
 }
 

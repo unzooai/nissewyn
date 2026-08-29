@@ -129,6 +129,19 @@ export interface TeamPort {
   remove(id: string): Promise<void>;
 }
 
+/**
+ * 首屏种子。控制台是 SSR 渲染的，首屏必须同步拿到数据，改成异步加载会让
+ * 首屏空白、既有的渲染断言也会失败。真实实现由 server component 预取后注入。
+ */
+export type WorkspaceSnapshot = {
+  tasks: TaskItem[];
+  approvals: ApprovalItem[];
+  artifacts: ArtifactItem[];
+  activity: ActivityItem[];
+  members: TeamMember[];
+  connectors: Record<ConnectorId, boolean>;
+};
+
 export interface WorkspaceProvider {
   tasks: TaskPort;
   approvals: ApprovalPort;
@@ -137,4 +150,15 @@ export interface WorkspaceProvider {
   connectors: ConnectorPort;
   policy: PolicyPort;
   team: TeamPort;
+  /** 当前状态的同步快照，用于初始化组件 state。 */
+  snapshot(): WorkspaceSnapshot;
+  /**
+   * 出厂数据，纯读、无副作用。
+   *
+   * 恢复备份和读取本地缓存时只存了 id，要回到完整实体得从全集里按 id 捞，
+   * 而当时的"当前状态"可能已经出队或被改过，所以这份不能用 snapshot() 顶替。
+   */
+  defaults(): WorkspaceSnapshot;
+  /** 丢弃全部改动，回到出厂状态并返回它。"重置工作区"走这里。 */
+  reset(): WorkspaceSnapshot;
 }
