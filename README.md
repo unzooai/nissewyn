@@ -46,3 +46,20 @@ Unzoo One 是一个本地优先、可更换大脑、可持续运行、可审计�
 5. 统一 Policy、Approval、Audit 与 Artifact。
 6. Ask / Work / Code / Automate 四种任务入口。
 7. 统一 Approval Inbox、MCP Connector 导入和首批邮件/日历/消息连接。
+
+## Web 控制台（`app/`）
+
+仓库内置 Unzoo One 的 Web 控制台原型（来自 codex 前端线），技术栈为
+Next.js 16 + React 19 + [vinext](https://github.com/cloudflare/vinext)，运行在
+Cloudflare Worker 上，可选 D1 / R2 绑定。
+
+```bash
+npm install     # 依赖锁定在 package-lock.json
+npm run dev     # 本地开发
+npm run build   # 验证 vinext 构建产物
+npm test        # 构建 + 渲染骨架测试
+npm run lint
+```
+
+脚手架细节、ChatGPT 登录（SIWC）与 D1 迁移说明见
+[Web 控制台脚手架说明](docs/web-console-setup.md)。
