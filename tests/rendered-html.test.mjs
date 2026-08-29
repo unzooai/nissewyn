@@ -43,9 +43,13 @@ test("server-renders the Unzoo One task console", async () => {
 });
 
 test("keeps commercial task interactions and accessibility in source", async () => {
-  const [page, css, layout, packageJson, brandSvg, brandMark, brandFavicon] =
+  // 领域类型和演示数据已经拆到 app/types.ts 与 app/data/mock.ts，
+  // 这里断言的是"源码里有"，所以三个文件拼起来一起看。
+  const [pageEntry, pageTypes, pageMock, css, layout, packageJson, brandSvg, brandMark, brandFavicon] =
     await Promise.all([
       readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/types.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/data/mock.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/clarity.css", import.meta.url), "utf8"),
       readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
       readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -53,6 +57,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
       readFile(new URL("../public/unzoo-one-mark-v6.png", import.meta.url)),
       readFile(new URL("../public/unzoo-favicon-v6.png", import.meta.url)),
     ]);
+  const page = [pageEntry, pageTypes, pageMock].join("\n");
 
   assert.match(page, /clarity-wordmark-name/);
   assert.match(page, /clarity-wordmark-one/);

@@ -202,12 +202,6 @@ const defaultUsageSettings: UsageSettings = {
   alertThreshold: 75,
   pauseAtLimit: true,
 };
-const defaultConnectorStates: ConnectorState = {
-  browser: true,
-  workspace: true,
-  mail: true,
-  calendar: false,
-};
 const defaultConnectorChecks: ConnectorCheckState = {
   browser: { checkedAt: "2 分钟前", latency: 184 },
   workspace: { checkedAt: "8 分钟前", latency: 42 },
@@ -218,6 +212,7 @@ import {
   connectorCatalog,
   connectorErrorCodes,
   connectorTestLatencies,
+  defaultConnectorStates,
   demoTaskIds,
   initialActivityItems,
   initialApprovals,

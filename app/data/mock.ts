@@ -1,5 +1,6 @@
 import { Brain, CalendarDays, FileText, Globe2, HardDrive, Mail, Send, Sparkles } from "lucide-react";
 import type {
+  ConnectorState,
   ActivityItem,
   ApprovalItem,
   ArtifactItem,
@@ -610,3 +611,10 @@ export const taskTemplates: Array<{
     icon: FileText,
   },
 ];
+
+export const defaultConnectorStates: ConnectorState = {
+  browser: true,
+  workspace: true,
+  mail: true,
+  calendar: false,
+};
