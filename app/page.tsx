@@ -57,97 +57,83 @@ import {
   X,
 } from "lucide-react";
 
-type ViewId =
-  | "home"
-  | "tasks"
-  | "approvals"
-  | "artifacts"
-  | "activity"
-  | "settings";
-type SettingsSectionId =
-  | "overview"
-  | "usage"
-  | "team"
-  | "preferences"
-  | "data"
-  | "connectors"
-  | "security";
-type OnboardingStepId = "profile" | "connectors" | "security" | "task";
-type WorkspaceRoute = {
-  view: ViewId;
-  taskId: string | null;
-  runId: string | null;
-  artifactId?: string | null;
-  approvalId?: string | null;
-  activityId?: string | null;
-  activityTaskId?: string | null;
-  taskFilter?: TaskFilter | null;
-  approvalFilter?: ApprovalRiskFilter | null;
-  activityFilter?: ActivityFilter | null;
-  settingsSection?: SettingsSectionId | null;
-};
-type WorkspaceHistoryState = {
-  unzooOne: true;
-  route: WorkspaceRoute;
-  canPop: boolean;
-};
-type TaskStatus = "运行中" | "待确认" | "失败" | "已完成" | "已暂停";
-type TaskFilter = "全部" | TaskStatus;
-type TaskSort = "状态优先" | "进度最高" | "名称";
-type TaskSchedule = "仅运行一次" | "每天" | "每周";
-type Weekday = "周一" | "周二" | "周三" | "周四" | "周五" | "周六" | "周日";
-type TaskRunStatus = "运行中" | "成功" | "失败" | "已取消";
-type ArtifactType = "报告" | "数据" | "证据" | "草稿";
-type ArtifactFilter = "全部" | ArtifactType | "重点";
-type ArtifactSort = "最近更新" | "重点优先" | "文件名";
-type ArtifactStatus = "已完成" | "草稿" | "已修订";
-type SettingsState = {
-  approval: boolean;
-  local: boolean;
-  notifications: boolean;
-};
-type WorkspaceProfile = {
-  name: string;
-  description: string;
-};
-type WorkspaceProfileFormErrors = Partial<
-  Record<"name" | "description", string>
->;
-type DesktopNotificationPermission =
-  | "checking"
-  | "unsupported"
-  | "default"
-  | "granted"
-  | "denied";
-type BudgetAlertThreshold = 50 | 75 | 90;
-type UsageSettings = {
-  monthlyBudget: number;
-  alertThreshold: BudgetAlertThreshold;
-  pauseAtLimit: boolean;
-};
-type ConnectorId = "browser" | "workspace" | "mail" | "calendar";
-type ConnectorState = Record<ConnectorId, boolean>;
-type ConnectorCheckResult = {
-  checkedAt: string;
-  latency: number;
-};
-type ConnectorCheckState = Record<ConnectorId, ConnectorCheckResult | null>;
-type ConnectorDefinition = {
-  id: ConnectorId;
-  name: string;
-  description: string;
-  scope: string;
-  dataFlow: string;
-  credential: string;
-  lastUsed: string;
-  permissions: string[];
-  icon: typeof Globe2;
-  tone: "blue" | "green" | "amber" | "violet";
-};
-type TeamRole = "所有者" | "管理员" | "审批者" | "成员";
-type TeamMemberStatus = "在线" | "离线" | "已邀请";
-type TeamRoleFilter = "全部" | "管理员" | "审批者" | "成员" | "待接受";
-type SettingsDraftTarget = "profile" | "budget" | "invite" | "member";
+import type {
+  ActivityFilter,
+  ActivityIconKey,
+  ActivityItem,
+  ActivityKind,
+  ActivitySort,
+  ActivityTone,
+  ApprovalDeferrals,
+  ApprovalItem,
+  ApprovalRejectSnapshot,
+  ApprovalRisk,
+  ApprovalRiskFilter,
+  ApprovalSnoozePreset,
+  ArtifactDeleteSnapshot,
+  ArtifactDraftRecovery,
+  ArtifactDraftSnapshot,
+  ArtifactFilter,
+  ArtifactFormErrors,
+  ArtifactItem,
+  ArtifactRevision,
+  ArtifactSort,
+  ArtifactStatus,
+  ArtifactTable,
+  ArtifactType,
+  BudgetAlertThreshold,
+  BulkApprovalDecision,
+  ConnectorCheckResult,
+  ConnectorCheckState,
+  ConnectorDefinition,
+  ConnectorId,
+  ConnectorState,
+  DesktopNotificationPermission,
+  NotificationFilter,
+  NotificationItem,
+  NotificationTarget,
+  OnboardingStepId,
+  PendingWorkspaceImport,
+  SearchResult,
+  SearchResultKind,
+  SearchResultSection,
+  SettingsDraftTarget,
+  SettingsSectionId,
+  SettingsState,
+  TaskDeleteSnapshot,
+  TaskDraftRecovery,
+  TaskDraftSnapshot,
+  TaskFilter,
+  TaskFormErrors,
+  TaskItem,
+  TaskRun,
+  TaskRunStage,
+  TaskRunStageStatus,
+  TaskRunStatus,
+  TaskSchedule,
+  TaskSort,
+  TaskStatus,
+  TeamInviteFormErrors,
+  TeamMember,
+  TeamMemberStatus,
+  TeamRole,
+  TeamRoleFilter,
+  UsageSettings,
+  ViewId,
+  Weekday,
+  WorkspaceBackup,
+  WorkspaceHistoryState,
+  WorkspacePersistenceStatus,
+  WorkspaceProfile,
+  WorkspaceProfileFormErrors,
+  WorkspaceRoute,
+  WorkspaceSyncConflict,
+  WorkspaceSyncData,
+  WorkspaceSyncNotice,
+  WorkspaceSyncSection,
+  WorkspaceSyncSnapshot,
+} from "./types";
+
 const settingsDraftDiscardCopy: Record<
   SettingsDraftTarget,
   { eyebrow: string; title: string; description: string; discardLabel: string }
@@ -177,295 +163,6 @@ const settingsDraftDiscardCopy: Record<
     discardLabel: "放弃修改",
   },
 };
-type TeamMember = {
-  id: string;
-  name: string;
-  email: string;
-  role: TeamRole;
-  status: TeamMemberStatus;
-  avatar: string;
-  tone: "blue" | "green" | "amber" | "violet";
-  lastActive: string;
-};
-type TeamInviteFormErrors = Partial<Record<"name" | "email", string>>;
-type TaskDeleteSnapshot = {
-  tasks: TaskItem[];
-  artifacts: ArtifactItem[];
-  activity: ActivityItem[];
-  approvals: ApprovalItem[];
-  approvalDeferrals: ApprovalDeferrals;
-  selectedTaskIds: string[];
-  selectedApprovalId: string;
-  selectedApprovalIds: string[];
-  activityTaskId: string | null;
-  artifactTaskId: string | null;
-  restoreTaskId: string | null;
-  isRunning: boolean;
-  deletedCount: number;
-};
-type ArtifactDeleteSnapshot = {
-  artifact: ArtifactItem;
-  index: number;
-};
-type ApprovalRejectSnapshot = {
-  tasks: TaskItem[];
-  approvals: ApprovalItem[];
-  approvalDeferrals: ApprovalDeferrals;
-  approvalRiskFilter: ApprovalRiskFilter;
-  selectedApprovalId: string;
-  selectedApprovalIds: string[];
-  rejectedCount: number;
-  isRunning: boolean;
-};
-type WorkspaceBackup = {
-  version: 1;
-  product: "Unzoo One";
-  exportedAt: string;
-  profile?: WorkspaceProfile;
-  tasks: TaskItem[];
-  settings: SettingsState;
-  usage?: UsageSettings;
-  connectors?: ConnectorState;
-  members?: TeamMember[];
-  approvalIds: string[];
-  approvalDeferrals?: ApprovalDeferrals;
-  activity: ActivityItem[];
-  artifacts?: ArtifactItem[];
-};
-type WorkspaceSyncSection =
-  | "profile"
-  | "tasks"
-  | "approvals"
-  | "artifacts"
-  | "activity"
-  | "settings"
-  | "usage"
-  | "connectors"
-  | "team";
-type WorkspaceSyncConflict =
-  | "profile"
-  | "task"
-  | "artifact"
-  | "budget"
-  | "member";
-type WorkspaceSyncData = {
-  profile: WorkspaceProfile;
-  tasks: TaskItem[];
-  settings: SettingsState;
-  usage: UsageSettings;
-  connectors: ConnectorState;
-  members: TeamMember[];
-  approvalIds: string[];
-  approvalDeferrals: ApprovalDeferrals;
-  activity: ActivityItem[];
-  artifacts: ArtifactItem[];
-};
-type WorkspaceSyncSnapshot = WorkspaceSyncData & {
-  version: 1;
-  source: string;
-  updatedAt: string;
-};
-type WorkspaceSyncNotice = {
-  id: string;
-  sections: WorkspaceSyncSection[];
-  conflicts: WorkspaceSyncConflict[];
-};
-type WorkspacePersistenceStatus =
-  | "saved"
-  | "retrying"
-  | "failed"
-  | "temporary";
-type PendingWorkspaceImport = {
-  backup: WorkspaceBackup;
-  fileName: string;
-  fileSize: number;
-};
-type ApprovalRisk = "低风险" | "中风险" | "高风险";
-type ApprovalRiskFilter = "全部" | ApprovalRisk | "稍后";
-type ApprovalSnoozePreset = "15m" | "1h" | "tomorrow";
-type ApprovalDeferrals = Record<string, string>;
-type BulkApprovalDecision = "approve" | "reject";
-type ActivityKind = "任务" | "审批" | "系统";
-type ActivityFilter = "全部" | ActivityKind;
-type ActivitySort = "最新优先" | "最早优先";
-type ActivityTone = "blue" | "violet" | "green" | "amber" | "red" | "neutral";
-type ActivityIconKey =
-  | "activity"
-  | "brain"
-  | "clock"
-  | "copy"
-  | "file"
-  | "globe"
-  | "settings"
-  | "shield"
-  | "sparkles"
-  | "trash";
-type SearchResultKind = "task" | "artifact" | "view" | "action";
-type SearchResultSection = {
-  id: string;
-  label: string;
-  results: SearchResult[];
-  canClear?: boolean;
-};
-type NotificationFilter = "全部" | "未读";
-type NotificationTarget = "approvals" | "activity" | "artifact" | "task";
-type NotificationItem = {
-  id: string;
-  title: string;
-  detail: string;
-  meta: string;
-  target: NotificationTarget;
-  targetId?: string;
-  icon: typeof Bell;
-  tone: "amber" | "blue" | "green" | "red";
-};
-type TaskFormErrors = Partial<
-  Record<"name" | "target" | "description" | "scheduleTime", string>
->;
-type TaskDraftSnapshot = {
-  name: string;
-  target: string;
-  description: string;
-  schedule: TaskSchedule;
-  scheduleTime: string;
-  scheduleDay: Weekday;
-  approval: boolean;
-};
-type TaskDraftRecovery = {
-  version: 1;
-  savedAt: string;
-  editingTaskId: string | null;
-  draft: TaskDraftSnapshot;
-  baseline: TaskDraftSnapshot;
-};
-type ArtifactDraftSnapshot = {
-  title: string;
-  filename: string;
-  content: string;
-};
-type ArtifactDraftRecovery = {
-  version: 1;
-  savedAt: string;
-  artifactId: string;
-  baseVersion: number;
-  draft: ArtifactDraftSnapshot;
-};
-type ArtifactFormErrors = Partial<
-  Record<"title" | "filename" | "content", string>
->;
-
-type ActivityItem = {
-  id: string;
-  time: string;
-  createdAt: string;
-  title: string;
-  detail: string;
-  icon: ActivityIconKey;
-  tone: ActivityTone;
-  kind: ActivityKind;
-  taskId?: string;
-};
-
-type TaskRun = {
-  id: string;
-  status: TaskRunStatus;
-  startedAt: string;
-  durationSeconds?: number;
-  summary: string;
-  errorCode?: string;
-  errorMessage?: string;
-};
-
-type TaskRunStageStatus = "成功" | "失败" | "运行中" | "已取消" | "已跳过";
-type TaskRunStage = {
-  id: string;
-  title: string;
-  detail: string;
-  status: TaskRunStageStatus;
-};
-
-type TaskItem = {
-  id: string;
-  title: string;
-  description: string;
-  target: string;
-  status: TaskStatus;
-  progress: number;
-  updated: string;
-  schedule?: TaskSchedule;
-  scheduleTime?: string;
-  scheduleDay?: Weekday;
-  requiresApproval?: boolean;
-  pinned?: boolean;
-  runs?: TaskRun[];
-  lastError?: string;
-  errorCode?: string;
-  retryCount?: number;
-};
-
-type ArtifactTable = {
-  columns: string[];
-  rows: string[][];
-};
-
-type ArtifactRevision = {
-  version: number;
-  title: string;
-  filename: string;
-  content: string;
-  createdAt: string;
-  editor: string;
-};
-
-type ArtifactItem = {
-  id: string;
-  taskId: string;
-  title: string;
-  filename: string;
-  description: string;
-  type: ArtifactType;
-  status: ArtifactStatus;
-  format: string;
-  sizeKb: number;
-  updated: string;
-  createdAt: string;
-  content: string;
-  highlights: string[];
-  table?: ArtifactTable;
-  evidenceCount?: number;
-  starred?: boolean;
-  version?: number;
-  editedAt?: string;
-  editedBy?: string;
-  revisions?: ArtifactRevision[];
-};
-
-type ApprovalItem = {
-  id: string;
-  taskId: string;
-  title: string;
-  reason: string;
-  impact: string;
-  action: string;
-  target: string;
-  scope: string;
-  risk: ApprovalRisk;
-  requestedAt: string;
-  expiresAt: string;
-  policy: string;
-  icon: typeof Send;
-};
-
-type SearchResult = {
-  key: string;
-  kind: SearchResultKind;
-  id: string;
-  title: string;
-  description: string;
-  meta: string;
-  icon: typeof Search;
-};
-
 const weekdays: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 const taskSchedules: TaskSchedule[] = ["仅运行一次", "每天", "每周"];
 const taskDraftRecoveryKey = "unzoo-one-task-draft-recovery";
