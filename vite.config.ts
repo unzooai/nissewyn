@@ -1,7 +1,33 @@
+import { readFileSync } from "node:fs";
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { sites } from "./build/sites-vite-plugin";
+
+/**
+ * 本地开发用的变量。这个脚手架不走 wrangler.jsonc，所以 .dev.vars 不会被
+ * 自动加载，这里读进来注入成 Worker 的 vars。
+ *
+ * 目前只用于 UNTERM_TOKEN（本机 unterm 的访问令牌，见 app/api/unterm）。
+ * .dev.vars 在 .gitignore 里，令牌不进仓库。
+ */
+function readDevVars(): Record<string, string> {
+  try {
+    return Object.fromEntries(
+      readFileSync(".dev.vars", "utf8")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith("#"))
+        .map((line) => {
+          const at = line.indexOf("=");
+          return [line.slice(0, at).trim(), line.slice(at + 1).trim()];
+        })
+        .filter(([key]) => key),
+    );
+  } catch {
+    return {};
+  }
+}
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -14,6 +40,7 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
+  vars: readDevVars(),
   d1_databases: d1
     ? [
         {

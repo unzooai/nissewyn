@@ -42,6 +42,8 @@ export async function GET() {
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
     }),
     probe("unzoo CDP", "http://127.0.0.1:9222/json/version"),
+    probe("unterm HTTP", "http://127.0.0.1:19877/"),
+    probe("unterm localhost", "http://localhost:19877/"),
   ]);
 
   return Response.json(
