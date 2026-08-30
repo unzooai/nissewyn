@@ -130,6 +130,60 @@ export interface PolicyPort {
   set(rules: Record<string, unknown>): Promise<void>;
 }
 
+/** 能驱动的 brain。和 unterm agent manifest 里的 id 对齐。 */
+export type BrainId = "claude-code" | "codex-cli";
+
+/**
+ * brain 吐出的一条事件。字段是 unterm 那边 BrainEvent 的形状，原样带过来
+ * 而不是先归一化：任务详情页要按 event 的类型分别渲染，早早压平反而丢信息。
+ */
+export type BrainEvent = {
+  event: string;
+  at: string;
+  taskId?: string;
+  runId?: string;
+  stepId?: string;
+  /** error 和 output.delta 带的文字。 */
+  message?: string;
+  /** turn.started 带的模型名。 */
+  model?: string;
+};
+
+export type BrainSession = {
+  sessionId: string;
+  agent: BrainId;
+  adapter: string;
+};
+
+export type BrainStatus = {
+  state: "running" | "finished" | "failed" | string;
+  turns: number;
+  usage: { inputTokens: number; outputTokens: number; cachedInputTokens: number };
+};
+
+/**
+ * 跑一个 brain。
+ *
+ * 只给 agent id 和提示词，不给命令行 —— 命令由 unterm 从 manifest 解析，
+ * 页面这侧决定不了跑什么。taskId / runId / stepId 会挂到每一条事件上，
+ * 任务详情页据此把事件归到对应的运行和步骤。
+ */
+export interface BrainPort {
+  start(input: {
+    agent: BrainId;
+    prompt: string;
+    taskId: string;
+    runId: string;
+    stepId: string;
+  }): Promise<BrainSession>;
+  /** 从 cursor 之后取事件，返回下一个 cursor。断了能从上次的位置续。 */
+  events(sessionId: string, cursor: number): Promise<{ cursor: number; events: BrainEvent[] }>;
+  status(sessionId: string): Promise<BrainStatus>;
+  /** 停掉它和它启动的一切。 */
+  interrupt(sessionId: string, graceMs?: number): Promise<void>;
+  close(sessionId: string): Promise<{ exitCode: number; reason?: string }>;
+}
+
 export interface TeamPort {
   list(): Promise<TeamMember[]>;
   /** 和 tasks.create 一样，id 由调用方给，避免本地和后端各拿一个 id。 */
@@ -159,6 +213,7 @@ export interface WorkspaceProvider {
   connectors: ConnectorPort;
   policy: PolicyPort;
   team: TeamPort;
+  brain: BrainPort;
   /** 当前状态的同步快照，用于初始化组件 state。 */
   snapshot(): WorkspaceSnapshot;
   /**

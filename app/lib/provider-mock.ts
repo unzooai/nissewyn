@@ -28,6 +28,8 @@ import type {
   ApprovalDecision,
   ApprovalPort,
   ArtifactPort,
+  BrainEvent,
+  BrainPort,
   CapabilityLease,
   ConnectorPort,
   PolicyPort,
@@ -246,6 +248,58 @@ export function createMockProvider(): WorkspaceProvider {
     },
   };
 
+  /**
+   * 演示用的 brain。按真实事件的顺序和形状放出来，让任务详情页在没有本机
+   * unterm 时也有东西可渲染 —— 云端演示版走的就是这条。
+   */
+  const brainSessions = new Map<string, { events: BrainEvent[]; startedAt: number }>();
+
+  const brainPort: BrainPort = {
+    async start({ agent, prompt, taskId, runId, stepId }) {
+      const sessionId = nextId("ags");
+      const at = new Date().toISOString();
+      const ids = { taskId, runId, stepId };
+      brainSessions.set(sessionId, {
+        startedAt: Date.now(),
+        events: [
+          { event: "session.started", at, ...ids },
+          { event: "turn.started", at, model: agent === "claude-code" ? "claude-opus-5" : "gpt-5-codex", ...ids },
+          { event: "output.delta", at, message: `收到：${prompt.slice(0, 40)}`, ...ids },
+          { event: "usage", at, ...ids },
+          { event: "turn.ended", at, ...ids },
+        ],
+      });
+      return { sessionId, agent, adapter: agent === "claude-code" ? "claude" : "codex" };
+    },
+    async events(sessionId, cursor) {
+      const session = brainSessions.get(sessionId);
+      if (!session) throw new Error(`会话不存在: ${sessionId}`);
+      // 按经过的时间逐条放出来，让界面看到的是流式而不是一次到齐。
+      const available = Math.min(
+        session.events.length,
+        Math.floor((Date.now() - session.startedAt) / 400) + 1,
+      );
+      return { cursor: available, events: session.events.slice(cursor, available) };
+    },
+    async status(sessionId) {
+      const session = brainSessions.get(sessionId);
+      if (!session) throw new Error(`会话不存在: ${sessionId}`);
+      const done = Date.now() - session.startedAt > session.events.length * 400;
+      return {
+        state: done ? "finished" : "running",
+        turns: done ? 1 : 0,
+        usage: { inputTokens: done ? 1200 : 0, outputTokens: done ? 340 : 0, cachedInputTokens: 0 },
+      };
+    },
+    async interrupt(sessionId) {
+      brainSessions.delete(sessionId);
+    },
+    async close(sessionId) {
+      const existed = brainSessions.delete(sessionId);
+      return existed ? { exitCode: 0 } : { exitCode: 1, reason: "会话已经结束" };
+    },
+  };
+
   function snapshot(): WorkspaceSnapshot {
     return {
       tasks: clone(tasks),
@@ -288,6 +342,7 @@ export function createMockProvider(): WorkspaceProvider {
     connectors: connectorPort,
     policy: policyPort,
     team: teamPort,
+    brain: brainPort,
     snapshot,
     defaults,
     reset,

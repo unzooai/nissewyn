@@ -39,6 +39,47 @@ function nowLabel(): string {
 }
 
 /**
+ * unterm 的 API 要 Bearer token，token 从同源的 /bootstrap.json 取一次。
+ * 和 unterm 自己的设置页是同一套：控制台由 unterm 托管时同源，不用配置。
+ *
+ * 取不到就说明这份控制台不是 unterm 在托管（云端演示版，或者本机没起
+ * unterm），调用方据此落回 mock。
+ */
+let untermToken: Promise<string> | null = null;
+
+function authToken(): Promise<string> {
+  if (!untermToken) {
+    untermToken = fetch("/bootstrap.json")
+      .then((response) => {
+        if (!response.ok) throw new Error(`bootstrap.json 返回 ${response.status}`);
+        return response.json() as Promise<{ auth_token?: string }>;
+      })
+      .then((body) => {
+        if (!body.auth_token) throw new Error("bootstrap.json 里没有 auth_token");
+        return body.auth_token;
+      })
+      .catch((error: unknown) => {
+        // 下次调用重新试，别把一次失败缓存成永久失败。
+        untermToken = null;
+        throw error;
+      });
+  }
+  return untermToken;
+}
+
+async function callUnterm<T>(path: string, payload: Record<string, unknown>): Promise<T> {
+  const token = await authToken();
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const body = (await response.json()) as T & { error?: string };
+  if (!response.ok || body?.error) throw new Error(body?.error ?? `unterm 返回 ${response.status}`);
+  return body;
+}
+
+/**
  * 包一层真实后端。能接的方法走本机服务，接不了或失败的落回 fallback，
  * 这样任何一块后端没起来，控制台仍然是完整可用的。
  */
@@ -47,6 +88,94 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
 
   return {
     ...fallback,
+
+    /**
+     * 真的跑一个 brain。这条只在 unterm 托管这份控制台时通 —— 别处拿不到
+     * /bootstrap.json，start 会抛错，任务详情页据此退回演示事件。
+     *
+     * 只有 start 会落回 fallback。会话一旦真的起来了，后续的
+     * events / status / close 就必须打在同一个后端上，悄悄换成 mock 只会
+     * 让界面显示一段根本没发生过的事。
+     */
+    brain: {
+      async start(input) {
+        if (!inBrowser) return fallback.brain.start(input);
+        try {
+          const data = await callUnterm<{ agent: string; adapter: string; session: { session_id: string } }>(
+            "/api/agent/start",
+            {
+              agent: input.agent,
+              prompt: input.prompt,
+              task_id: input.taskId,
+              run_id: input.runId,
+              step_id: input.stepId,
+            },
+          );
+          return {
+            sessionId: data.session.session_id,
+            agent: input.agent,
+            adapter: data.adapter,
+          };
+        } catch {
+          return fallback.brain.start(input);
+        }
+      },
+
+      async events(sessionId, cursor) {
+        if (!sessionId.startsWith("ags_")) return fallback.brain.events(sessionId, cursor);
+        const data = await callUnterm<{ cursor: number; events: Array<Record<string, unknown>> }>(
+          "/api/agent/events",
+          { session_id: sessionId, cursor },
+        );
+        return {
+          cursor: data.cursor,
+          events: (data.events ?? []).map((raw) => ({
+            event: String(raw.event ?? ""),
+            at: String(raw.at ?? ""),
+            taskId: raw.task_id as string | undefined,
+            runId: raw.run_id as string | undefined,
+            stepId: raw.step_id as string | undefined,
+            message: raw.message as string | undefined,
+            model: raw.model as string | undefined,
+          })),
+        };
+      },
+
+      async status(sessionId) {
+        if (!sessionId.startsWith("ags_")) return fallback.brain.status(sessionId);
+        const data = await callUnterm<{
+          state: string;
+          turns?: number;
+          usage?: { input_tokens?: number; output_tokens?: number; cached_input_tokens?: number };
+        }>("/api/agent/status", { session_id: sessionId });
+        return {
+          state: data.state,
+          turns: data.turns ?? 0,
+          usage: {
+            inputTokens: data.usage?.input_tokens ?? 0,
+            outputTokens: data.usage?.output_tokens ?? 0,
+            cachedInputTokens: data.usage?.cached_input_tokens ?? 0,
+          },
+        };
+      },
+
+      async interrupt(sessionId, graceMs) {
+        if (!sessionId.startsWith("ags_")) return fallback.brain.interrupt(sessionId, graceMs);
+        await callUnterm("/api/agent/interrupt", {
+          session_id: sessionId,
+          ...(graceMs === undefined ? {} : { grace_ms: graceMs }),
+        });
+      },
+
+      async close(sessionId) {
+        if (!sessionId.startsWith("ags_")) return fallback.brain.close(sessionId);
+        const data = await callUnterm<{ exit_code?: number; reason?: string }>("/api/agent/close", {
+          session_id: sessionId,
+        });
+        return { exitCode: data.exit_code ?? 0, reason: data.reason ?? undefined };
+      },
+    },
+
     connectors: {
       ...fallback.connectors,
 

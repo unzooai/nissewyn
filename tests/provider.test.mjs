@@ -187,3 +187,62 @@ test("重置：改完再重置能回到出厂，且不影响 defaults", async ()
   assert.equal(after.connectors.calendar, factoryBefore.connectors.calendar);
   assert.equal(p.defaults().tasks.length, factoryBefore.tasks.length, "defaults 始终是出厂数据");
 });
+
+test("brain：跑一轮，事件按游标推进，状态收敛到 finished", async () => {
+  const p = createMockProvider();
+  const session = await p.brain.start({
+    agent: "claude-code",
+    prompt: "汇总今天的竞品变化",
+    taskId: "task-brain-1",
+    runId: "run-brain-1",
+    stepId: "step-brain-1",
+  });
+  assert.match(session.sessionId, /^ags-/);
+  assert.equal(session.adapter, "claude", "claude-code 走 claude 适配器");
+
+  // 第一批事件立刻可读，游标随之前进。
+  const first = await p.brain.events(session.sessionId, 0);
+  assert.ok(first.events.length > 0, "开局就该有 session.started");
+  assert.equal(first.events[0].event, "session.started");
+  assert.equal(first.events[0].taskId, "task-brain-1", "id 挂在每条事件上");
+  assert.equal(first.events[0].runId, "run-brain-1");
+  assert.equal(first.events[0].stepId, "step-brain-1");
+
+  // 同一个游标再读一次不会重复拿到已读的事件。
+  const again = await p.brain.events(session.sessionId, first.cursor);
+  assert.equal(again.events.length, 0);
+  assert.equal(again.cursor, first.cursor);
+
+  await new Promise((r) => setTimeout(r, 2200));
+  const rest = await p.brain.events(session.sessionId, first.cursor);
+  const kinds = rest.events.map((e) => e.event);
+  assert.ok(kinds.includes("turn.started"), "拿到 turn.started");
+  const turn = rest.events.find((e) => e.event === "turn.started");
+  assert.ok(turn.model, "turn.started 带模型名");
+
+  const status = await p.brain.status(session.sessionId);
+  assert.equal(status.state, "finished");
+  assert.equal(status.turns, 1);
+  assert.ok(status.usage.inputTokens > 0, "用量有数");
+
+  const closed = await p.brain.close(session.sessionId);
+  assert.equal(closed.exitCode, 0);
+});
+
+test("brain：会话不存在时明确报错，不是静默返回空", async () => {
+  const p = createMockProvider();
+  await assert.rejects(() => p.brain.events("ags-nope", 0), /会话不存在/);
+  await assert.rejects(() => p.brain.status("ags-nope"), /会话不存在/);
+  const closed = await p.brain.close("ags-nope");
+  assert.equal(closed.exitCode, 1, "关一个不存在的会话是失败，不是成功");
+});
+
+test("brain：中断后会话就没了", async () => {
+  const p = createMockProvider();
+  const s = await p.brain.start({
+    agent: "codex-cli", prompt: "x", taskId: "t", runId: "r", stepId: "s",
+  });
+  assert.equal(s.adapter, "codex");
+  await p.brain.interrupt(s.sessionId);
+  await assert.rejects(() => p.brain.status(s.sessionId), /会话不存在/);
+});
