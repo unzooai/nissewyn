@@ -219,10 +219,10 @@ import {
   teamRoleDetails,
   teamSeatLimit,
 } from "./data/mock";
-import { getProvider } from "./lib/provider-mock";
+import { getWorkspaceProvider } from "./lib/workspace-provider";
 
 // 组件不再直接读 mock：首屏种子和出厂数据都从 provider 拿，换实现时这里不用动。
-const workspaceProvider = getProvider();
+const workspaceProvider = getWorkspaceProvider();
 const workspaceSeed = workspaceProvider.snapshot();
 const workspaceDefaults = workspaceProvider.defaults();
 
@@ -7728,24 +7728,34 @@ export default function HomePage() {
       return;
     }
     setConnectorTestingId(connectorId);
-    window.setTimeout(() => {
-      setConnectorTestingId(null);
-      setConnectorCheckResults((current) => ({
-        ...current,
-        [connectorId]: {
-          checkedAt: "刚刚",
-          latency: connectorTestLatencies[connectorId],
-        },
-      }));
-      recordActivity({
-        title: `连接测试通过：${connector.name}`,
-        detail: `连接正常，当前授权范围为${connector.scope}。`,
-        icon: "settings",
-        tone: "green",
-        kind: "系统",
+    // 真的去问后端。本机 unzoo 在跑就是真实往返延迟，没起来则由 provider
+    // 落回演示值，界面表现一致。
+    void workspaceProvider.connectors
+      .diagnose(connectorId)
+      .then((result) => {
+        setConnectorTestingId(null);
+        setConnectorCheckResults((current) => ({ ...current, [connectorId]: result }));
+        recordActivity({
+          title: `连接测试通过：${connector.name}`,
+          detail: `连接正常，往返 ${result.latency} ms，当前授权范围为${connector.scope}。`,
+          icon: "settings",
+          tone: "green",
+          kind: "系统",
+        });
+        setNotice(`${connector.name}连接正常，往返 ${result.latency} ms`);
+      })
+      .catch((error: unknown) => {
+        setConnectorTestingId(null);
+        const detail = error instanceof Error ? error.message : String(error);
+        recordActivity({
+          title: `连接测试失败：${connector.name}`,
+          detail,
+          icon: "settings",
+          tone: "red",
+          kind: "系统",
+        });
+        setNotice(`${connector.name}连接测试失败：${detail}`);
       });
-      setNotice(`${connector.name}连接正常`);
-    }, 850);
   }
 
   function testAllConnectors() {
@@ -7767,27 +7777,44 @@ export default function HomePage() {
     }
 
     setConnectorTestingAll(true);
-    window.setTimeout(() => {
-      setConnectorCheckResults((current) => {
-        const next = { ...current };
-        testableConnectors.forEach((connector) => {
-          next[connector.id] = {
-            checkedAt: "刚刚",
-            latency: connectorTestLatencies[connector.id],
-          };
+    void Promise.all(
+      testableConnectors.map((connector) =>
+        workspaceProvider.connectors
+          .diagnose(connector.id)
+          .then((result) => [connector.id, result] as const),
+      ),
+    )
+      .then((entries) => {
+        setConnectorCheckResults((current) => {
+          const next = { ...current };
+          entries.forEach(([id, result]) => {
+            next[id] = result;
+          });
+          return next;
         });
-        return next;
+        setConnectorTestingAll(false);
+        const slowest = Math.max(...entries.map(([, result]) => result.latency));
+        recordActivity({
+          title: "连接器健康检测已完成",
+          detail: `${testableConnectors.length} 项已授权连接通过身份凭证、权限范围和响应检测，最慢一项往返 ${slowest} ms；异常授权仍保持安全停止。`,
+          icon: "shield",
+          tone: "green",
+          kind: "系统",
+        });
+        setNotice(`${testableConnectors.length} 项连接检测通过`);
+      })
+      .catch((error: unknown) => {
+        setConnectorTestingAll(false);
+        const detail = error instanceof Error ? error.message : String(error);
+        recordActivity({
+          title: "连接器健康检测失败",
+          detail,
+          icon: "shield",
+          tone: "red",
+          kind: "系统",
+        });
+        setNotice(`连接检测失败：${detail}`);
       });
-      setConnectorTestingAll(false);
-      recordActivity({
-        title: "连接器健康检测已完成",
-        detail: `${testableConnectors.length} 项已授权连接通过身份凭证、权限范围和响应检测；异常授权仍保持安全停止。`,
-        icon: "shield",
-        tone: "green",
-        kind: "系统",
-      });
-      setNotice(`${testableConnectors.length} 项连接检测通过`);
-    }, 1050);
   }
 
   function reauthorizeConnector(connectorId: ConnectorId) {

@@ -293,16 +293,3 @@ export function createMockProvider(): WorkspaceProvider {
     reset,
   };
 }
-
-let current: WorkspaceProvider | null = null;
-
-/** 当前生效的实现。接真实后端时改这里，组件不用动。 */
-export function getProvider(): WorkspaceProvider {
-  if (!current) current = createMockProvider();
-  return current;
-}
-
-/** 测试用：换掉实现或重置内存状态。 */
-export function setProvider(provider: WorkspaceProvider | null): void {
-  current = provider;
-}
