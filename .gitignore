@@ -43,3 +43,4 @@ next-env.d.ts
 .gstack/
 .test-build/
 .dev.vars
+tsconfig.tsbuildinfo
