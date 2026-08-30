@@ -72,7 +72,8 @@ export function createMockProvider(): WorkspaceProvider {
       return found ? clone(found) : null;
     },
     async create(draft) {
-      const task: TaskItem = { ...clone(draft), id: nextId("task"), progress: 0, updated: nowLabel() };
+      if (tasks.some((t) => t.id === draft.id)) throw new Error(`任务 id 已存在: ${draft.id}`);
+      const task: TaskItem = { progress: 0, ...clone(draft), updated: nowLabel() };
       tasks = [task, ...tasks];
       return clone(task);
     },
@@ -177,6 +178,15 @@ export function createMockProvider(): WorkspaceProvider {
     async list() {
       return { ...connectors };
     },
+    async connect(id) {
+      connectors[id] = true;
+    },
+    async disconnect(id) {
+      connectors[id] = false;
+      for (const lease of leases) {
+        if (lease.capability === id && lease.status === "active") lease.status = "revoked";
+      }
+    },
     async diagnose(id): Promise<ConnectorCheckResult> {
       return { checkedAt: nowLabel(), latency: connectorTestLatencies[id] };
     },
@@ -220,18 +230,9 @@ export function createMockProvider(): WorkspaceProvider {
     async list() {
       return clone(members);
     },
-    async invite(name, email, role) {
-      const member: TeamMember = {
-        id: nextId("member"),
-        name,
-        email,
-        role,
-        status: "已邀请",
-        avatar: name.slice(0, 1),
-        tone: "blue",
-        lastActive: "尚未接受邀请",
-      };
-      members = [...members, member];
+    async invite(member) {
+      if (members.some((m) => m.id === member.id)) throw new Error(`成员 id 已存在: ${member.id}`);
+      members = [...members, clone(member)];
       return clone(member);
     },
     async updateRole(id, role) {

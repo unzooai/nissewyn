@@ -4905,6 +4905,22 @@ export default function HomePage() {
     tasksReady,
   ]);
 
+  /**
+   * 把已经在界面上生效的改动同步给后端。
+   *
+   * 界面走乐观更新：本地 state 先改，用户立刻看到结果，provider 在后台执行
+   * 真实操作。mock 实现不会失败，接上 unterm / unzoo 之后会。
+   *
+   * 失败时只提示，不自动把界面改回去：撤销逻辑带快照，回滚可能和用户的后续
+   * 操作打架，把不一致说清楚比偷偷改掉更诚实。
+   */
+  function syncBackend(op: Promise<unknown>, action: string) {
+    void op.catch((error: unknown) => {
+      const detail = error instanceof Error ? error.message : String(error);
+      setNotice(`${action}没有同步到后台：${detail}`);
+    });
+  }
+
   function recordActivity(
     item: Omit<ActivityItem, "id" | "time" | "createdAt">,
   ) {
@@ -5113,6 +5129,10 @@ export default function HomePage() {
 
   function toggleArtifactStar(artifact: ArtifactItem) {
     const nextStarred = !artifact.starred;
+    syncBackend(
+      workspaceProvider.artifacts.update(artifact.id, { starred: nextStarred }),
+      nextStarred ? "标记重点" : "取消重点",
+    );
     setArtifacts((items) =>
       items.map((item) =>
         item.id === artifact.id ? { ...item, starred: nextStarred } : item,
@@ -5141,6 +5161,7 @@ export default function HomePage() {
       artifact,
       index: Math.max(0, artifactIndex),
     });
+    syncBackend(workspaceProvider.artifacts.remove(artifact.id), "删除成果");
     setArtifacts((items) => items.filter((item) => item.id !== artifact.id));
     const nextArtifactId =
       nextVisibleArtifact?.id ?? nextWorkspaceArtifact?.id ?? "";
@@ -5376,6 +5397,19 @@ export default function HomePage() {
       new TextEncoder().encode(normalizedContent).byteLength / 1024,
     );
 
+    syncBackend(
+      workspaceProvider.artifacts.update(editingArtifact.id, {
+        title: normalizedTitle,
+        filename: normalizedFilename,
+        content: normalizedContent,
+        sizeKb: nextSizeKb,
+        editedAt: now.toISOString(),
+        editedBy: "刘一帆",
+        version: nextVersion,
+        revisions: nextRevisions,
+      }),
+      "保存成果",
+    );
     setArtifacts((items) =>
       items.map((artifact) =>
         artifact.id === editingArtifact.id
@@ -5987,6 +6021,10 @@ export default function HomePage() {
       affectedTaskIds.has("competitor") &&
       tasks.find((task) => task.id === "competitor")?.status === "待确认";
 
+    syncBackend(
+      workspaceProvider.approvals.decideMany([...approvedIds], { kind: "approve" }),
+      "批量批准",
+    );
     setApprovals((items) =>
       items.filter((approval) => !approvedIds.has(approval.id)),
     );
@@ -6095,6 +6133,10 @@ export default function HomePage() {
     const nextApproval = getNextApprovalAfterRemoving(rejectedIds);
 
     stageApprovalRejectUndo(rejected.length);
+    syncBackend(
+      workspaceProvider.approvals.decideMany([...rejectedIds], { kind: "reject", reason }),
+      "拒绝操作",
+    );
     setApprovals((items) =>
       items.filter((approval) => !rejectedIds.has(approval.id)),
     );
@@ -6183,6 +6225,10 @@ export default function HomePage() {
     }
     const nextApproval = approvals.find(
       (item) => item.id !== approved.id,
+    );
+    syncBackend(
+      workspaceProvider.approvals.decide(approved.id, { kind: "approve" }),
+      "批准操作",
     );
     setApprovals((items) => items.filter((item) => item.id !== approved.id));
     removeApprovalDeferrals(new Set([approved.id]));
@@ -6382,6 +6428,18 @@ export default function HomePage() {
       if (editingTaskId) {
         const task = tasks.find((item) => item.id === editingTaskId);
         if (!task) return;
+        syncBackend(
+          workspaceProvider.tasks.update(editingTaskId, {
+            title: taskName.trim(),
+            description: taskDescription.trim(),
+            target: taskTarget.trim(),
+            schedule: taskSchedule,
+            scheduleTime: taskSchedule === "仅运行一次" ? undefined : taskScheduleTime,
+            scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
+            requiresApproval: taskApproval,
+          }),
+          "修改任务",
+        );
         setTasks((items) =>
           items.map((item) =>
             item.id === editingTaskId
@@ -6450,6 +6508,7 @@ export default function HomePage() {
             ]
           : [],
       };
+      syncBackend(workspaceProvider.tasks.create(newTask), "新建任务");
       setTasks((items) => [newTask, ...items]);
       setTaskFilter("全部");
       setSelectedTaskIds([]);
@@ -6828,6 +6887,7 @@ export default function HomePage() {
       errorCode: undefined,
       retryCount: 0,
     };
+    syncBackend(workspaceProvider.tasks.create(duplicate), "复制任务");
     setTasks((items) => [duplicate, ...items]);
     setSelectedTaskId(duplicate.id);
     writeWorkspaceRoute(
@@ -6888,6 +6948,8 @@ export default function HomePage() {
       (approval) => approval.taskId !== deletingTaskId,
     );
     stageTaskDeleteUndo(1, deletingTaskId);
+    // provider 的 remove 会连带清掉这个任务的成果和待审批，和下面的本地更新一致。
+    syncBackend(workspaceProvider.tasks.remove(deletingTaskId), "删除任务");
     setTasks((items) => items.filter((item) => item.id !== deletingTask.id));
     setArtifacts((items) =>
       items.filter((artifact) => artifact.taskId !== deletingTask.id),
@@ -6974,6 +7036,10 @@ export default function HomePage() {
           : task,
       ),
     );
+    syncBackend(
+      Promise.all([...targetIds].map((id) => workspaceProvider.tasks.pause(id))),
+      "批量暂停",
+    );
     if (targetIds.has("competitor")) setIsRunning(false);
     setSelectedTaskIds([]);
     recordActivity({
@@ -7043,6 +7109,10 @@ export default function HomePage() {
             }
           : task,
       ),
+    );
+    syncBackend(
+      Promise.all([...targetIds].map((id) => workspaceProvider.tasks.resume(id))),
+      "批量继续",
     );
     if (targetIds.has("competitor")) setIsRunning(true);
     setSelectedTaskIds([]);
@@ -7619,6 +7689,7 @@ export default function HomePage() {
     ) {
       return;
     }
+    syncBackend(workspaceProvider.connectors.connect(connectorId), "连接器授权");
     setConnectorStates((current) => ({ ...current, [connectorId]: true }));
     setConnectorCheckResults((current) => ({
       ...current,
@@ -7745,7 +7816,8 @@ export default function HomePage() {
     const impactedTaskIds = new Set(impactedTasks.map((task) => task.id));
     setConnectorTestingId(connectorId);
     window.setTimeout(() => {
-      setConnectorStates((current) => ({ ...current, [connectorId]: true }));
+      syncBackend(workspaceProvider.connectors.connect(connectorId), "连接器授权");
+    setConnectorStates((current) => ({ ...current, [connectorId]: true }));
       setConnectorCheckResults((current) => ({
         ...current,
         [connectorId]: {
@@ -7793,6 +7865,10 @@ export default function HomePage() {
       setNotice("请先确认后续任务将无法继续使用这项能力");
       return;
     }
+    syncBackend(
+      workspaceProvider.connectors.disconnect(selectedConnector.id),
+      "断开连接器",
+    );
     setConnectorStates((current) => ({
       ...current,
       [selectedConnector.id]: false,
@@ -7889,6 +7965,7 @@ export default function HomePage() {
         tone: tones[teamMembers.length % tones.length],
         lastActive: "邀请刚刚发送",
       };
+      syncBackend(workspaceProvider.team.invite(member), "邀请成员");
       setTeamMembers((members) => [...members, member]);
       setTeamInviteOpen(false);
       setInviteAdminAcknowledged(false);
@@ -7944,6 +8021,10 @@ export default function HomePage() {
       return;
     }
     const previousRole = selectedTeamMember.role;
+    syncBackend(
+      workspaceProvider.team.updateRole(selectedTeamMember.id, memberRoleDraft),
+      "修改成员角色",
+    );
     setTeamMembers((members) =>
       members.map((member) =>
         member.id === selectedTeamMember.id
@@ -8001,6 +8082,7 @@ export default function HomePage() {
       return;
     }
     const removedMember = selectedTeamMember;
+    syncBackend(workspaceProvider.team.remove(removedMember.id), "移除成员");
     setTeamMembers((members) =>
       members.filter((member) => member.id !== removedMember.id),
     );

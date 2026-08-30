@@ -70,7 +70,11 @@ export type PolicyVerdict = {
 export interface TaskPort {
   list(): Promise<TaskItem[]>;
   get(id: string): Promise<TaskItem | null>;
-  create(draft: Omit<TaskItem, "id" | "updated" | "progress">): Promise<TaskItem>;
+  /**
+   * id 由调用方给。本地优先：离线也能建任务，联网后按同一个 id 对账，
+   * 免得界面拿着本地 id、后端拿着另一个 id，后续操作全对不上。
+   */
+  create(draft: Omit<TaskItem, "updated" | "progress"> & { progress?: number }): Promise<TaskItem>;
   update(id: string, patch: Partial<TaskItem>): Promise<TaskItem>;
   remove(id: string): Promise<void>;
   pause(id: string): Promise<TaskItem>;
@@ -109,6 +113,10 @@ export interface ActivityPort {
 
 export interface ConnectorPort {
   list(): Promise<Record<ConnectorId, boolean>>;
+  /** 授权接入。租约是实现细节，界面上就是一个开关。 */
+  connect(id: ConnectorId): Promise<void>;
+  /** 断开并撤销这个连接器持有的全部租约。 */
+  disconnect(id: ConnectorId): Promise<void>;
   /** unterm provider.diagnose。返回连通性和延迟，失败时带错误码。 */
   diagnose(id: ConnectorId): Promise<ConnectorCheckResult>;
   leases(): Promise<CapabilityLease[]>;
@@ -124,7 +132,8 @@ export interface PolicyPort {
 
 export interface TeamPort {
   list(): Promise<TeamMember[]>;
-  invite(name: string, email: string, role: TeamMember["role"]): Promise<TeamMember>;
+  /** 和 tasks.create 一样，id 由调用方给，避免本地和后端各拿一个 id。 */
+  invite(member: TeamMember): Promise<TeamMember>;
   updateRole(id: string, role: TeamMember["role"]): Promise<TeamMember>;
   remove(id: string): Promise<void>;
 }

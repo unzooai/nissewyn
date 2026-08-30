@@ -9,14 +9,21 @@ test("任务：列出、创建、改状态、删除", async () => {
   assert.ok(before.length > 0, "mock 应该有初始任务");
 
   const created = await p.tasks.create({
+    id: "task-contract-1",
     title: "契约测试任务",
     description: "验证 create 返回完整实体",
     target: "example.com",
     status: "运行中",
   });
-  assert.match(created.id, /^task-/);
+  assert.equal(created.id, "task-contract-1", "id 由调用方决定");
   assert.equal(created.progress, 0);
   assert.equal((await p.tasks.list()).length, before.length + 1);
+
+  await assert.rejects(
+    () => p.tasks.create({ id: "task-contract-1", title: "重复", description: "", target: "", status: "运行中" }),
+    /已存在/,
+    "同一个 id 不能建两次",
+  );
 
   const paused = await p.tasks.pause(created.id);
   assert.equal(paused.status, "已暂停");
@@ -117,7 +124,17 @@ test("连接器：诊断返回延迟", async () => {
 test("团队：邀请的成员处于待接受状态", async () => {
   const p = createMockProvider();
   const before = await p.team.list();
-  const member = await p.team.invite("张三", "zhangsan@unzoo.local", "成员");
+  const member = await p.team.invite({
+    id: "member-contract-1",
+    name: "张三",
+    email: "zhangsan@unzoo.local",
+    role: "成员",
+    status: "已邀请",
+    avatar: "张",
+    tone: "blue",
+    lastActive: "邀请刚刚发送",
+  });
+  assert.equal(member.id, "member-contract-1", "id 由调用方决定");
   assert.equal(member.status, "已邀请");
   assert.equal((await p.team.list()).length, before.length + 1);
 
@@ -142,4 +159,31 @@ test("返回的是副本，改它不会污染 provider 内部状态", async () =
   tasks[0].title = "被外部改掉了";
   const again = await p.tasks.list();
   assert.notEqual(again[0].title, "被外部改掉了");
+});
+
+test("连接器：连接和断开会改开关，断开撤销该连接器的租约", async () => {
+  const p = createMockProvider();
+  await p.connectors.connect("calendar");
+  assert.equal((await p.connectors.list()).calendar, true);
+
+  const lease = await p.connectors.acquire("calendar", "只读日程", 600);
+  assert.equal(lease.status, "active");
+
+  await p.connectors.disconnect("calendar");
+  assert.equal((await p.connectors.list()).calendar, false);
+  const leases = await p.connectors.leases();
+  assert.equal(leases.find((l) => l.id === lease.id).status, "revoked");
+});
+
+test("重置：改完再重置能回到出厂，且不影响 defaults", async () => {
+  const p = createMockProvider();
+  const factoryBefore = p.defaults();
+  await p.tasks.remove((await p.tasks.list())[0].id);
+  await p.connectors.connect("calendar");
+  assert.notEqual((await p.tasks.list()).length, factoryBefore.tasks.length);
+
+  const after = p.reset();
+  assert.equal(after.tasks.length, factoryBefore.tasks.length);
+  assert.equal(after.connectors.calendar, factoryBefore.connectors.calendar);
+  assert.equal(p.defaults().tasks.length, factoryBefore.tasks.length, "defaults 始终是出厂数据");
 });
