@@ -14,6 +14,11 @@ import type { NextConfig } from "next";
  */
 const isStaticTarget = process.env.UNZOO_ONE_TARGET === "static";
 
+/**
+ * 不设 basePath：vinext 的预渲染在 basePath 下只导出得到 404。导出的 HTML
+ * 因此用绝对路径引资源（/assets/…），由 unterm 那边兜住 —— 它的设置页走
+ * /static/，两边不撞。
+ */
 const nextConfig: NextConfig = {
   ...(isStaticTarget ? { output: "export" as const } : {}),
 };

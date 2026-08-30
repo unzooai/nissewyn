@@ -61,5 +61,43 @@ npm test        # 构建 + 渲染骨架测试
 npm run lint
 ```
 
+### 两个构建目标
+
+| 命令 | 产物 | 用途 |
+| --- | --- | --- |
+| `npm run build` | `dist/server`（Worker） | 云端演示版，SSR + API routes，数据走内存 mock |
+| `npm run build:static` | `dist/client`（静态文件） | 本地版，交给 unterm 托管 |
+
+静态版是预渲染的完整首屏，不是白屏 SPA。
+
+### 交给 unterm 托管
+
+unterm 0.71 起，`unterm-settings` 的 HTTP 服务（固定端口 19877）可以直接托管
+这套静态产物：
+
+```bash
+npm run build:static
+# 开发时把 unterm 指向产物目录，改完前端刷新浏览器即可
+UNTERM_CONSOLE_DIR=D:/code/unzoo-one/dist/client unterm
+# 然后访问 http://127.0.0.1:19877/console/
+```
+
+安装版会把产物放在 `<unterm 安装目录>/console`，不需要设环境变量。
+
+同源之后控制台直接调 unterm 的 `/api/*`：页面加载时先取一次
+`/bootstrap.json` 拿 auth token，后续请求带 Bearer，和 unterm 自己的设置页
+是同一套机制。这条路下本仓库的 `app/api/*` 代理不参与，也不用配置令牌。
+
+### 数据从哪来
+
+组件只依赖 `app/lib/provider.ts` 的契约，实现在 `app/lib/workspace-provider.ts`
+里选：
+
+- `provider-mock.ts` — 内存数据，云端演示和离线兜底都用它
+- `provider-live.ts` — 真实后端，能接的走本机 unzoo / unterm，接不上自动
+  落回 mock
+
+所以云端和本地跑的是同一份代码，区别只在于有多少数据是真的。
+
 脚手架细节、ChatGPT 登录（SIWC）与 D1 迁移说明见
 [Web 控制台脚手架说明](docs/web-console-setup.md)。
