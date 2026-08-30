@@ -219,6 +219,7 @@ import {
   teamRoleDetails,
   teamSeatLimit,
 } from "./data/mock";
+import type { BrainEvent } from "./lib/provider";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
 
 // 组件不再直接读 mock：首屏种子和出厂数据都从 provider 拿，换实现时这里不用动。
@@ -8967,6 +8968,149 @@ export default function HomePage() {
     }
   }
 
+  /**
+   * 把一次运行真的交给 brain。
+   *
+   * 界面已经乐观地把任务标成运行中了，这里做的是让那个状态名副其实：
+   * 起一个会话，按游标把事件读回来，写进这次运行的摘要和运行记录，
+   * 结束时按真实结果收尾。
+   *
+   * 本机没有 unterm 时 provider 会落回演示实现，事件的形状一样，所以
+   * 这段代码不需要区分两种情况。
+   */
+  async function driveBrainRun(task: TaskItem, runId: string) {
+    const stepId = `${runId}-step-1`;
+    const prompt = [task.title, task.description, task.target && `目标：${task.target}`]
+      .filter(Boolean)
+      .join("\n");
+
+    const patchRun = (patch: Partial<TaskRun>) => {
+      setTasks((items) =>
+        items.map((item) =>
+          item.id === task.id
+            ? {
+                ...item,
+                runs: (item.runs ?? []).map((run) =>
+                  run.id === runId ? { ...run, ...patch } : run,
+                ),
+              }
+            : item,
+        ),
+      );
+    };
+
+    let session: Awaited<ReturnType<typeof workspaceProvider.brain.start>>;
+    try {
+      session = await workspaceProvider.brain.start({
+        agent: "claude-code",
+        prompt,
+        taskId: task.id,
+        runId,
+        stepId,
+      });
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : String(error);
+      patchRun({ status: "失败", summary: `没能启动 brain：${detail}` });
+      setTasks((items) =>
+        items.map((item) =>
+          item.id === task.id
+            ? { ...item, status: "失败", lastError: detail, updated: "刚刚失败" }
+            : item,
+        ),
+      );
+      return;
+    }
+
+    recordActivity({
+      title: `已交给 ${session.adapter}：${task.title}`,
+      detail: `会话 ${session.sessionId} 开始运行，事件会挂在这次运行下。`,
+      icon: "brain",
+      tone: "blue",
+      kind: "任务",
+      taskId: task.id,
+    });
+
+    // 轮询而不是长连接：unterm 的事件接口本来就是游标式的，而且断了能续。
+    // 上限挡住 brain 卡死的情况，别让页面无限转下去。
+    const maxPolls = 240;
+    let cursor = 0;
+    let lastText = "";
+    let failure: string | null = null;
+
+    for (let poll = 0; poll < maxPolls; poll++) {
+      await new Promise((resolve) => window.setTimeout(resolve, 700));
+      let events: BrainEvent[] = [];
+      try {
+        const batch = await workspaceProvider.brain.events(session.sessionId, cursor);
+        cursor = batch.cursor;
+        events = batch.events;
+      } catch (error: unknown) {
+        failure = error instanceof Error ? error.message : String(error);
+        break;
+      }
+
+      for (const item of events) {
+        if (item.event === "turn.started" && item.model) {
+          patchRun({ summary: `${session.adapter} · ${item.model} 正在处理` });
+        } else if (item.event === "output.delta" && item.message) {
+          lastText = item.message;
+          patchRun({ summary: item.message.slice(0, 120) });
+        } else if (item.event === "error" && item.message) {
+          failure = item.message;
+        }
+      }
+
+      let state = "running";
+      let usage = { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 };
+      try {
+        const status = await workspaceProvider.brain.status(session.sessionId);
+        state = status.state;
+        usage = status.usage;
+      } catch {
+        // 状态读不到就继续读事件，下一轮再问。
+      }
+      if (state === "running") continue;
+
+      const ok = state === "finished" && !failure;
+      const spent = usage.inputTokens + usage.outputTokens;
+      patchRun({
+        status: ok ? "成功" : "失败",
+        summary: ok ? lastText.slice(0, 120) || "运行完成" : (failure ?? "运行失败"),
+        errorMessage: ok ? undefined : (failure ?? undefined),
+      });
+      setTasks((items) =>
+        items.map((item) =>
+          item.id === task.id
+            ? {
+                ...item,
+                status: ok ? "已完成" : "失败",
+                progress: ok ? 100 : item.progress,
+                updated: ok ? "刚刚完成" : "刚刚失败",
+                lastError: ok ? undefined : (failure ?? undefined),
+              }
+            : item,
+        ),
+      );
+      recordActivity({
+        title: ok ? `任务已完成：${task.title}` : `任务失败：${task.title}`,
+        detail: ok
+          ? `${session.adapter} 用了 ${spent} 个 token。`
+          : (failure ?? "brain 没有给出结果。"),
+        icon: ok ? "sparkles" : "shield",
+        tone: ok ? "green" : "red",
+        kind: "任务",
+        taskId: task.id,
+      });
+      break;
+    }
+
+    try {
+      await workspaceProvider.brain.close(session.sessionId);
+    } catch {
+      // 关不掉不影响界面，会话那头有自己的收尾。
+    }
+  }
+
   function retryTask(task: TaskItem) {
     if (
       !requireOnline(
@@ -9001,6 +9145,7 @@ export default function HomePage() {
       ),
     );
     if (task.id === "competitor") setIsRunning(true);
+    void driveBrainRun(task, nextRun.id);
     recordActivity({
       title: `任务已重新运行：${task.title}`,
       detail: `重试 #${(task.retryCount ?? 0) + 1} 已启动；系统会先验证连接器授权，再从安全检查点继续。`,
