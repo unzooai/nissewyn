@@ -1,0 +1,17 @@
+{
+  "schema": "common/error.schema.json",
+  "reason": "错误码前缀不在约定分类里。调用方按 code 分支，前缀必须稳定。",
+  "instance": {
+    "error": {
+      "code": "browser.weird_failure",
+      "message": "Unzoo provider did not respond within 5000ms",
+      "user_message": "浏览器组件已离线，任务会在连接恢复后继续。",
+      "retryable": true,
+      "retry_after_ms": 5000,
+      "details": {
+        "provider_id": "provider_unzoo_local"
+      },
+      "correlation_id": "corr_7f31c0"
+    }
+  }
+}

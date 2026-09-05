@@ -1,0 +1,44 @@
+{
+  "schema": "security/policy-decision.schema.json",
+  "reason": "判定为 allow，原因却是 requires_approval。放行必须说清楚凭什么放行。",
+  "instance": {
+    "schema_version": "policy_decision.v0",
+    "tool_call_id": "call_01JBQ8XG9Z2T7S4A5RXYJ8BE6F",
+    "decision": "allow",
+    "risk": "external_side_effect",
+    "reason_code": "requires_approval",
+    "reason_detail": "表单提交会在对方系统留下记录，interactive 模式下每次都要问。",
+    "matched_grant_id": null,
+    "created_approval_id": "approval_01JBQ8XGA03V8T5B6SYZK9CF7G",
+    "evaluated_rules": [
+      {
+        "stage": "schema_validation",
+        "outcome": "pass"
+      },
+      {
+        "stage": "risk_resolution",
+        "outcome": "pass",
+        "note": "manifest 声明为 external_side_effect"
+      },
+      {
+        "stage": "resource_resolution",
+        "outcome": "pass",
+        "note": "pricing.example.com 在 Workspace 范围内"
+      },
+      {
+        "stage": "hard_deny",
+        "outcome": "pass"
+      },
+      {
+        "stage": "grant_match",
+        "outcome": "fail",
+        "note": "没有覆盖这个域名的活动 Grant"
+      },
+      {
+        "stage": "task_policy",
+        "outcome": "pass"
+      }
+    ],
+    "decided_at": "2026-09-03T02:11:30Z"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "task/run.schema.json",
+  "reason": "失败不给 error。只说失败不说为什么，用户和 reconcile 都没法往下走。",
+  "instance": {
+    "schema_version": "run.v0",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "attempt": 1,
+    "trigger": {
+      "type": "user",
+      "ref": null
+    },
+    "state": "failed",
+    "brain_thread_ids": [
+      "thread_01JBQ8XGG69B4A1H2ZEFS5JN3P"
+    ],
+    "started_at": "2026-09-03T02:10:01Z",
+    "finished_at": "2026-09-03T02:13:10Z",
+    "result_summary": null,
+    "usage": {
+      "input_tokens": 8421,
+      "output_tokens": 1330,
+      "cached_input_tokens": 6100
+    },
+    "error": null
+  }
+}

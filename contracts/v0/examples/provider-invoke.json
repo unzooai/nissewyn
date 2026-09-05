@@ -1,0 +1,58 @@
+{
+  "schema_version": "provider_invoke.v0",
+  "method": "invoke",
+  "action_id": "action_01JBQ8XGC25X0W7D8VABN1EH9J",
+  "tool_call_id": "call_01JBQ8XG9Z2T7S4A5RXYJ8BE6F",
+  "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+  "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+  "step_id": "step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D",
+  "tool": "browser.submit_form",
+  "arguments": {
+    "url": "https://pricing.example.com/quote",
+    "fields": {
+      "seats": "25",
+      "plan": "team"
+    }
+  },
+  "arguments_hash": "3f2a1c9e3f2a1c9e3f2a1c9e3f2a1c9e3f2a1c9e3f2a1c9e3f2a1c9e3f2a1c9e",
+  "idempotency_key": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A/step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D/submit-quote-1",
+  "grant": {
+    "schema_version": "grant.v0",
+    "grant_id": "grant_01JBQ8XGB14W9V6C7TZAM0DG8H",
+    "subject": "brain:thread_01JBQ8XGG69B4A1H2ZEFS5JN3P",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "provider_id": "provider_unzoo_local",
+    "capabilities": [
+      "browser.read",
+      "browser.act"
+    ],
+    "resources": {
+      "browser": {
+        "profiles": [
+          "profile_work"
+        ],
+        "domains": [
+          "pricing.example.com"
+        ],
+        "access": [
+          "read",
+          "act"
+        ],
+        "cookie_access": false
+      }
+    },
+    "risk_ceiling": "external_side_effect",
+    "constraints": {
+      "max_calls": 1,
+      "single_use": true,
+      "external_commit": true,
+      "bound_tool_call_id": "call_01JBQ8XG9Z2T7S4A5RXYJ8BE6F"
+    },
+    "issued_from_approval": "approval_01JBQ8XGA03V8T5B6SYZK9CF7G",
+    "issued_at": "2026-09-03T02:12:05Z",
+    "expires_at": "2026-09-03T02:42:05Z",
+    "revoked_at": null
+  },
+  "deadline_ms": 60000,
+  "evidence_policy": "before_after"
+}

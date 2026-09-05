@@ -1,0 +1,40 @@
+{
+  "schema": "security/capability-grant.schema.json",
+  "reason": "destructive 的 Grant 不是一次性、也没绑定具体 ToolCall，等于签了一张长期删除许可。",
+  "instance": {
+    "schema_version": "grant.v0",
+    "grant_id": "grant_01JBQ8XGB14W9V6C7TZAM0DG8H",
+    "subject": "brain:thread_01JBQ8XGG69B4A1H2ZEFS5JN3P",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "provider_id": "provider_unzoo_local",
+    "capabilities": [
+      "browser.read",
+      "browser.act"
+    ],
+    "resources": {
+      "browser": {
+        "profiles": [
+          "profile_work"
+        ],
+        "domains": [
+          "pricing.example.com"
+        ],
+        "access": [
+          "read",
+          "act"
+        ],
+        "cookie_access": false
+      }
+    },
+    "risk_ceiling": "destructive",
+    "constraints": {
+      "max_calls": 20,
+      "single_use": false,
+      "external_commit": true
+    },
+    "issued_from_approval": "approval_01JBQ8XGA03V8T5B6SYZK9CF7G",
+    "issued_at": "2026-09-03T02:12:05Z",
+    "expires_at": "2026-09-03T02:42:05Z",
+    "revoked_at": null
+  }
+}

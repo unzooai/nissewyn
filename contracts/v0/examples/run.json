@@ -1,0 +1,23 @@
+{
+  "schema_version": "run.v0",
+  "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+  "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+  "attempt": 1,
+  "trigger": {
+    "type": "user",
+    "ref": null
+  },
+  "state": "running",
+  "brain_thread_ids": [
+    "thread_01JBQ8XGG69B4A1H2ZEFS5JN3P"
+  ],
+  "started_at": "2026-09-03T02:10:01Z",
+  "finished_at": null,
+  "result_summary": null,
+  "usage": {
+    "input_tokens": 8421,
+    "output_tokens": 1330,
+    "cached_input_tokens": 6100
+  },
+  "error": null
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/workspace/workspace.schema.json",
+  "title": "Workspace",
+  "description": "任务的工作上下文与隔离边界（ONE-C025）。Task 引用 Workspace，Grant 的资源范围不得越出 Workspace 的 roots。",
+
+  "type": "object",
+  "required": [
+    "schema_version",
+    "workspace_id",
+    "name",
+    "isolation",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "workspace.v0" },
+    "workspace_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/workspace_id"
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string" },
+
+    "roots": {
+      "description": "Workspace 能触达的文件根。已 canonicalize 的绝对路径。",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+
+    "isolation": {
+      "description": "shared 允许与其他 Workspace 共用 Profile 和凭证；strict 不允许，跨 Workspace 引用一律拒绝。",
+      "enum": ["shared", "strict"]
+    },
+
+    "profile_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/profile_id"
+      }
+    },
+
+    "default_sensitivity": {
+      "description": "这个 Workspace 产出的数据默认级别，参与外发决策。",
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/sensitivity",
+      "default": "internal"
+    },
+
+    "created_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    }
+  },
+
+  "allOf": [
+    {
+      "$comment": "strict 隔离必须自带 roots，否则无从判断越界。",
+      "if": { "properties": { "isolation": { "const": "strict" } }, "required": ["isolation"] },
+      "then": { "required": ["roots"], "properties": { "roots": { "minItems": 1 } } }
+    }
+  ]
+}

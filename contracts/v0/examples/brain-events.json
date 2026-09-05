@@ -1,0 +1,84 @@
+{
+  "cursor": 6,
+  "events": [
+    {
+      "schema_version": "brain_event.v0",
+      "event": "session.started",
+      "at": "2026-09-03T02:10:01Z",
+      "session_id": "ags_7f31c0",
+      "cursor": 1,
+      "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+      "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+      "adapter": "codex_cli"
+    },
+    {
+      "schema_version": "brain_event.v0",
+      "event": "turn.started",
+      "at": "2026-09-03T02:10:02Z",
+      "session_id": "ags_7f31c0",
+      "cursor": 2,
+      "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+      "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+      "step_id": "step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D",
+      "turn_id": "turn_01JBQ8XGH70C5B2J3AFGT6KP4Q",
+      "model": "gpt-5-codex"
+    },
+    {
+      "schema_version": "brain_event.v0",
+      "event": "output.delta",
+      "at": "2026-09-03T02:10:02Z",
+      "session_id": "ags_7f31c0",
+      "cursor": 3,
+      "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+      "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+      "step_id": "step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D",
+      "message": "已经拿到三档价格，"
+    },
+    {
+      "schema_version": "brain_event.v0",
+      "event": "tool_call.requested",
+      "at": "2026-09-03T02:11:30Z",
+      "session_id": "ags_7f31c0",
+      "cursor": 4,
+      "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+      "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+      "step_id": "step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D",
+      "tool_call": {
+        "tool": "browser.submit_form",
+        "arguments": {
+          "url": "https://pricing.example.com/quote",
+          "fields": {
+            "seats": "25",
+            "plan": "team"
+          }
+        },
+        "external_call_id": "fc_012"
+      }
+    },
+    {
+      "schema_version": "brain_event.v0",
+      "event": "usage.updated",
+      "at": "2026-09-03T02:11:30Z",
+      "session_id": "ags_7f31c0",
+      "cursor": 5,
+      "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+      "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+      "usage": {
+        "input_tokens": 8421,
+        "output_tokens": 1330,
+        "cached_input_tokens": 6100
+      }
+    },
+    {
+      "schema_version": "brain_event.v0",
+      "event": "turn.completed",
+      "at": "2026-09-03T02:11:30Z",
+      "session_id": "ags_7f31c0",
+      "cursor": 6,
+      "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+      "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+      "turn_id": "turn_01JBQ8XGH70C5B2J3AFGT6KP4Q",
+      "state": "finished"
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/task/task.schema.json",
+  "title": "Task",
+  "description": "用户目标。One Core 是 Task 的唯一事实来源；UI 不自行推导权威状态。",
+
+  "type": "object",
+  "required": [
+    "schema_version",
+    "task_id",
+    "title",
+    "goal",
+    "mode",
+    "state",
+    "created_by",
+    "permission_mode",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "task.v0" },
+    "task_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/task_id"
+    },
+    "title": {
+      "description": "面向用户的短标题。可由 Brain 生成，但不是权威描述。",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "goal": {
+      "description": "完整用户输入，原样保存，不做摘要覆盖。",
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "description": "四个产品入口，见 mvp-product-spec.md。",
+      "enum": ["ask", "work", "code", "automate"]
+    },
+    "state": { "$ref": "#/$defs/task_state" },
+    "created_by": { "type": "string", "minLength": 1 },
+
+    "workspace_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/workspace_id"
+      }
+    },
+    "profile_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/profile_id"
+      }
+    },
+
+    "preferred_brain": {
+      "description": "auto 表示由 Brain Router 决定。",
+      "type": "string",
+      "minLength": 1,
+      "default": "auto"
+    },
+    "permission_mode": {
+      "description": "见 security-and-trust-model.md §9。产品入口不提供无边界 full_auto。",
+      "enum": ["ask", "plan", "interactive", "scoped_auto", "custom"]
+    },
+
+    "automation_id": {
+      "description": "由 Automation 触发时回指。",
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/automation_id"
+    },
+
+    "budget": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/budget"
+    },
+
+    "active_run_id": {
+      "description": "当前活动 Run。默认最多一个；Automation 的并发策略可以放开。",
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/run_id" },
+        { "type": "null" }
+      ]
+    },
+
+    "created_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    }
+  },
+
+  "allOf": [
+    {
+      "$comment": "终态不能挂活动 Run。要继续干活就开新 Run，不是把终态改回去。",
+      "if": {
+        "properties": { "state": { "$ref": "#/$defs/terminal_task_state" } },
+        "required": ["state"]
+      },
+      "then": { "properties": { "active_run_id": { "type": "null" } } }
+    },
+    {
+      "$comment": "由 Automation 触发的 Task 必须回指来源，否则 Run History 和 Attention Route 找不到归属。",
+      "if": { "properties": { "mode": { "const": "automate" } }, "required": ["mode"] },
+      "then": { "required": ["automation_id"] }
+    }
+  ],
+
+  "$defs": {
+    "task_state": {
+      "description": "draft → queued → planning → running，中途可进入各种等待，最终收敛到终态。",
+      "enum": [
+        "draft",
+        "queued",
+        "planning",
+        "running",
+        "waiting_approval",
+        "waiting_human",
+        "waiting_provider",
+        "paused",
+        "cancelling",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "interrupted"
+      ]
+    },
+    "terminal_task_state": {
+      "$comment": "interrupted 不是终态——它可以创建恢复 Run。",
+      "enum": ["succeeded", "failed", "cancelled"]
+    }
+  }
+}

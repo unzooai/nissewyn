@@ -1,0 +1,17 @@
+{
+  "schema": "common/error.schema.json",
+  "reason": "不可重试却给了重试间隔，调用方会照着睡一觉再撞一次墙。",
+  "instance": {
+    "error": {
+      "code": "provider.offline",
+      "message": "Unzoo provider did not respond within 5000ms",
+      "user_message": "浏览器组件已离线，任务会在连接恢复后继续。",
+      "retryable": false,
+      "retry_after_ms": 5000,
+      "details": {
+        "provider_id": "provider_unzoo_local"
+      },
+      "correlation_id": "corr_7f31c0"
+    }
+  }
+}

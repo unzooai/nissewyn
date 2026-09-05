@@ -1,0 +1,43 @@
+{
+  "schema_version": "brain_adapter.v0",
+  "adapter_id": "codex_cli",
+  "name": "Codex CLI",
+  "provider": "openai",
+  "transport": "cli_jsonl",
+  "protocol_versions": [
+    "brain.v0"
+  ],
+  "launch": {
+    "argv": [
+      "codex",
+      "exec",
+      "--json"
+    ],
+    "cwd": "D:/work/research",
+    "env_allowlist": [
+      "PATH",
+      "HOME",
+      "OPENAI_BASE_URL"
+    ]
+  },
+  "models": [
+    {
+      "model_id": "gpt-5-codex",
+      "context_window": 400000,
+      "default": true
+    },
+    {
+      "model_id": "gpt-5-codex-mini",
+      "context_window": 200000
+    }
+  ],
+  "capabilities": {
+    "streaming": true,
+    "tool_calls": true,
+    "interrupt": true,
+    "resume": true,
+    "reasoning_summary": true,
+    "vision": false
+  },
+  "credential_ref": "secret://brain/openai/default"
+}

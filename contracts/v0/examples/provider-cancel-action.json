@@ -1,0 +1,6 @@
+{
+  "schema_version": "provider_invoke.v0",
+  "method": "cancel_action",
+  "action_id": "action_01JBQ8XGC25X0W7D8VABN1EH9J",
+  "grace_ms": 2000
+}

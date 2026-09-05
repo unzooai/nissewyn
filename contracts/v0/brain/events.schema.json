@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/brain/events.schema.json",
+  "title": "Brain 事件流",
+  "description": "Adapter 归一化之后的事件。按游标拉取：cursor 单调递增、不重不漏。每条都带 task/run/step，调用方据此把事件归到对应的运行和步骤。",
+
+  "$ref": "#/$defs/brain_event",
+
+  "$defs": {
+    "brain_event_type": {
+      "enum": [
+        "session.started",
+        "turn.started",
+        "output.delta",
+        "reasoning.summary",
+        "tool_call.requested",
+        "tool_call.result",
+        "usage.updated",
+        "turn.completed",
+        "session.closed",
+        "error"
+      ]
+    },
+
+    "brain_event": {
+      "type": "object",
+      "required": ["schema_version", "event", "at", "session_id", "cursor"],
+      "properties": {
+        "schema_version": { "const": "brain_event.v0" },
+
+        "event": { "$ref": "#/$defs/brain_event_type" },
+
+        "at": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+        },
+
+        "session_id": {
+          "description": "Adapter 会话。一个会话对应一个 BrainThread。",
+          "type": "string",
+          "minLength": 1
+        },
+        "cursor": {
+          "description": "会话内单调递增。断线后带上次的 cursor 补拉。",
+          "type": "integer",
+          "minimum": 0
+        },
+
+        "task_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/task_id"
+        },
+        "run_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/run_id"
+        },
+        "step_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/step_id"
+        },
+        "turn_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/turn_id"
+        },
+
+        "model": { "type": "string" },
+        "adapter": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/slug"
+        },
+
+        "message": {
+          "description": "output.delta 的增量文本，或 reasoning.summary 的摘要。不放原始隐藏推理。",
+          "type": "string"
+        },
+
+        "tool_call": {
+          "description": "tool_call.requested 携带。这只是 Brain 的请求，不是授权——Core 收到后照样过 Policy。",
+          "type": "object",
+          "required": ["tool", "arguments"],
+          "properties": {
+            "tool": { "type": "string", "minLength": 1 },
+            "arguments": { "type": "object" },
+            "external_call_id": { "type": "string" }
+          }
+        },
+
+        "usage": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/usage"
+        },
+
+        "state": {
+          "description": "session.closed 和 turn.completed 的收敛状态。",
+          "enum": ["running", "finished", "interrupted", "failed"]
+        },
+        "exit_code": { "type": "integer" },
+
+        "error": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/error.schema.json#/$defs/error_body"
+        }
+      },
+
+      "allOf": [
+        {
+          "if": { "properties": { "event": { "const": "output.delta" } }, "required": ["event"] },
+          "then": { "required": ["message"] }
+        },
+        {
+          "if": { "properties": { "event": { "const": "turn.started" } }, "required": ["event"] },
+          "then": { "required": ["model", "turn_id"] }
+        },
+        {
+          "if": {
+            "properties": { "event": { "const": "tool_call.requested" } },
+            "required": ["event"]
+          },
+          "then": { "required": ["tool_call"] }
+        },
+        {
+          "if": { "properties": { "event": { "const": "usage.updated" } }, "required": ["event"] },
+          "then": { "required": ["usage"] }
+        },
+        {
+          "$comment": "错了必须给结构化 error。只发一句自由文本，上层没法分支也没法归因。",
+          "if": { "properties": { "event": { "const": "error" } }, "required": ["event"] },
+          "then": { "required": ["error"] }
+        },
+        {
+          "if": { "properties": { "event": { "const": "session.closed" } }, "required": ["event"] },
+          "then": {
+            "required": ["state"],
+            "properties": { "state": { "enum": ["finished", "interrupted", "failed"] } }
+          }
+        }
+      ]
+    },
+
+    "brain_event_page": {
+      "description": "GET/POST events 的返回。cursor 是下一次该带的值。",
+      "type": "object",
+      "required": ["cursor", "events"],
+      "properties": {
+        "cursor": { "type": "integer", "minimum": 0 },
+        "events": { "type": "array", "items": { "$ref": "#/$defs/brain_event" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "security/risk.schema.json",
+  "reason": "financial 工具声明成 auto 放行。这一档必须每次二次确认。",
+  "instance": {
+    "risk": "financial",
+    "side_effect": "external",
+    "resource_scopes": [
+      "browser"
+    ],
+    "sensitive_inputs": [
+      "fields.email",
+      "fields.phone"
+    ],
+    "reversible": false,
+    "approval_mode": "auto",
+    "evidence_policy": "before_after"
+  }
+}

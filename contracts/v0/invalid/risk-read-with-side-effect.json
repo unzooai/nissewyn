@@ -1,0 +1,18 @@
+{
+  "schema": "security/risk.schema.json",
+  "reason": "声明成 read 却说会改外部状态。工具的风险声明本身就是错的。",
+  "instance": {
+    "risk": "read",
+    "side_effect": "external",
+    "resource_scopes": [
+      "browser"
+    ],
+    "sensitive_inputs": [
+      "fields.email",
+      "fields.phone"
+    ],
+    "reversible": false,
+    "approval_mode": "auto",
+    "evidence_policy": "before_after"
+  }
+}

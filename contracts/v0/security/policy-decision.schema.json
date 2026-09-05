@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/security/policy-decision.schema.json",
+  "title": "PolicyDecision",
+  "description": "Policy Gateway 的一次判定结果。必须能向用户解释为什么允许、为什么要问、为什么拒绝——「决策解释测试」验的就是这个对象。",
+
+  "type": "object",
+  "required": ["schema_version", "tool_call_id", "decision", "risk", "reason_code", "decided_at"],
+  "properties": {
+    "schema_version": { "const": "policy_decision.v0" },
+    "tool_call_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/tool_call_id"
+    },
+
+    "decision": { "enum": ["allow", "ask", "deny"] },
+
+    "risk": {
+      "$ref": "https://contracts.unzoo.ai/v0/security/risk.schema.json#/$defs/risk_level"
+    },
+
+    "reason_code": {
+      "description": "稳定原因码。UI 的解释文案按它查表，不解析自由文本。",
+      "enum": [
+        "auto_read",
+        "matched_grant",
+        "task_policy",
+        "user_policy",
+        "requires_approval",
+        "risk_above_grant_ceiling",
+        "resource_out_of_scope",
+        "hard_deny_secure_desktop",
+        "hard_deny_blocked_target",
+        "hard_deny_revoked_client",
+        "hard_deny_expired_grant",
+        "hard_deny_invalid_signature",
+        "hard_deny_unknown_destructive_tool",
+        "budget_exceeded",
+        "safe_mode"
+      ]
+    },
+
+    "reason_detail": {
+      "description": "面向用户的补充说明。可变，不作为分支依据。",
+      "type": "string"
+    },
+
+    "matched_grant_id": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/grant_id" },
+        { "type": "null" }
+      ]
+    },
+    "created_approval_id": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/approval_id" },
+        { "type": "null" }
+      ]
+    },
+
+    "evaluated_rules": {
+      "description": "命中的规则轨迹，按 §8 的顺序记录，用于回放一次判定。",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stage", "outcome"],
+        "properties": {
+          "stage": {
+            "enum": [
+              "schema_validation",
+              "risk_resolution",
+              "resource_resolution",
+              "hard_deny",
+              "grant_match",
+              "task_policy",
+              "user_policy"
+            ]
+          },
+          "outcome": { "enum": ["pass", "fail", "skip"] },
+          "note": { "type": "string" }
+        }
+      }
+    },
+
+    "decided_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    }
+  },
+
+  "allOf": [
+    {
+      "$comment": "allow 必须说清楚凭什么放行：要么是自动读，要么命中了某份 Grant。",
+      "if": { "properties": { "decision": { "const": "allow" } }, "required": ["decision"] },
+      "then": {
+        "properties": { "reason_code": { "enum": ["auto_read", "matched_grant", "task_policy", "user_policy"] } }
+      }
+    },
+    {
+      "$comment": "命中 Grant 就得指出是哪一份，否则事后无法审计。",
+      "if": { "properties": { "reason_code": { "const": "matched_grant" } }, "required": ["reason_code"] },
+      "then": {
+        "required": ["matched_grant_id"],
+        "properties": {
+          "matched_grant_id": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/grant_id"
+          }
+        }
+      }
+    },
+    {
+      "$comment": "ask 必须真的创建了 Approval，否则用户看不到任何东西，任务就卡死在这。",
+      "if": { "properties": { "decision": { "const": "ask" } }, "required": ["decision"] },
+      "then": {
+        "required": ["created_approval_id"],
+        "properties": {
+          "created_approval_id": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/approval_id"
+          }
+        }
+      }
+    },
+    {
+      "$comment": "auto_read 只能给 read。这条是「Read 工具不能自行假定 Read」的另一面。",
+      "if": { "properties": { "reason_code": { "const": "auto_read" } }, "required": ["reason_code"] },
+      "then": { "properties": { "risk": { "const": "read" } } }
+    }
+  ]
+}

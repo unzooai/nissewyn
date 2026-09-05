@@ -18,6 +18,7 @@ Unzoo One 是一个本地优先、可更换大脑、可持续运行、可审计�
 - [MVP 产品规格](docs/mvp-product-spec.md)
 - [产品体验、页面与异常状态规格](docs/product-experience-spec.md)
 - [核心领域模型与协议契约](docs/domain-model-and-contracts.md)
+- [`contracts/v0` 跨仓库 JSON Schema](contracts/v0/README.md)（三仓库唯一事实来源）
 - [安全与信任模型](docs/security-and-trust-model.md)
 - [Connector、Skill 与生态规范](docs/connectors-skills-and-ecosystem.md)
 - [分发、数据与运行保障](docs/distribution-data-and-operations.md)

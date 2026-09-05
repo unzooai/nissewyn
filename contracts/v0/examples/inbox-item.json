@@ -1,0 +1,19 @@
+{
+  "schema_version": "inbox_item.v0",
+  "inbox_item_id": "inbox_01JBQ8XGJ81D6C3K4BGHV7MQ5R",
+  "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+  "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+  "kind": "approval",
+  "source_ref": "approval_01JBQ8XGA03V8T5B6SYZK9CF7G",
+  "state": "resolved",
+  "attention_route": "desktop",
+  "deliveries": [
+    {
+      "transport": "desktop",
+      "state": "delivered",
+      "at": "2026-09-03T02:11:30Z"
+    }
+  ],
+  "created_at": "2026-09-03T02:11:30Z",
+  "resolved_at": "2026-09-03T02:12:05Z"
+}

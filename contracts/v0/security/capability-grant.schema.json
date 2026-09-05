@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/security/capability-grant.schema.json",
+  "title": "CapabilityGrant",
+  "description": "Policy 签发的最小权限凭据。Brain 不能签发 Grant。Grant 不能扩大它所依据的 Approval 的范围，Provider 必须独立校验。",
+
+  "type": "object",
+  "required": [
+    "schema_version",
+    "grant_id",
+    "subject",
+    "task_id",
+    "provider_id",
+    "capabilities",
+    "resources",
+    "risk_ceiling",
+    "issued_at",
+    "expires_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "grant.v0" },
+    "grant_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/grant_id"
+    },
+
+    "subject": {
+      "description": "被授权者。形如 brain:thread_x 或 automation:automation_x。默认 Task-scoped。",
+      "type": "string",
+      "pattern": "^(brain|automation|user):[A-Za-z0-9_]+$"
+    },
+
+    "task_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/task_id"
+    },
+    "provider_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/provider_id"
+    },
+
+    "capabilities": {
+      "description": "Provider manifest 里声明过的能力名。",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+
+    "resources": {
+      "$ref": "https://contracts.unzoo.ai/v0/workspace/capability-scope.schema.json#/$defs/capability_scope"
+    },
+
+    "risk_ceiling": {
+      "description": "这份 Grant 最高能授权到哪一档。超过就必须重新审批。",
+      "$ref": "https://contracts.unzoo.ai/v0/security/risk.schema.json#/$defs/risk_level"
+    },
+
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "max_calls": { "type": "integer", "minimum": 1 },
+        "single_use": {
+          "description": "用一次即失效。高风险 Grant 必须为 true。",
+          "type": "boolean",
+          "default": false
+        },
+        "external_commit": {
+          "description": "是否允许把改动提交到外部系统。",
+          "type": "boolean",
+          "default": false
+        },
+        "bound_tool_call_id": {
+          "description": "绑定到唯一一次 ToolCall。allow_once 签发的 Grant 必须绑。",
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/tool_call_id"
+        }
+      }
+    },
+
+    "issued_from_approval": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/approval_id" },
+        { "type": "null" }
+      ]
+    },
+
+    "issued_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    },
+    "expires_at": {
+      "description": "必须有过期时间。没有 TTL 的 Grant 等于永久授权。",
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    },
+    "revoked_at": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp" },
+        { "type": "null" }
+      ]
+    }
+  },
+
+  "allOf": [
+    {
+      "$comment": "§11：高风险不签发长期 Grant——必须一次性、绑定到具体 ToolCall、且来自一次明确的 Approval。",
+      "if": {
+        "properties": {
+          "risk_ceiling": {
+            "$ref": "https://contracts.unzoo.ai/v0/security/risk.schema.json#/$defs/high_risk_level"
+          }
+        },
+        "required": ["risk_ceiling"]
+      },
+      "then": {
+        "required": ["constraints", "issued_from_approval"],
+        "properties": {
+          "constraints": {
+            "required": ["single_use", "bound_tool_call_id"],
+            "properties": {
+              "single_use": { "const": true },
+              "max_calls": { "const": 1 }
+            }
+          },
+          "issued_from_approval": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/approval_id"
+          }
+        }
+      }
+    },
+    {
+      "$comment": "read 之外的一切都得有人批过。自动放行只能发生在 read。",
+      "if": {
+        "properties": { "risk_ceiling": { "not": { "const": "read" } } },
+        "required": ["risk_ceiling"]
+      },
+      "then": {
+        "required": ["issued_from_approval"],
+        "properties": {
+          "issued_from_approval": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/approval_id"
+          }
+        }
+      }
+    }
+  ],
+
+  "$comment": "「Grant 范围 ⊆ Approval 范围」是包含关系判断，JSON Schema 表达不了，由 Policy Gateway 在签发时校验、Provider 在执行时复验。见 README「schema 管不到的规则」。"
+}

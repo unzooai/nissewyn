@@ -6,9 +6,9 @@
 
 ## 1. 设计规则
 
-1. Unterm Core 是 Task、Approval、Grant、Event、Artifact 的唯一事实来源。
+1. **One Core** 是 Task、Approval、Grant、Event、Artifact 的唯一事实来源（归属修订 2026-08-06：原为 Unterm Core，见 `unzoo-one#2`）。
 2. Unzoo One UI 不自行推导权威状态。
-3. Provider 只拥有自身 Action 的执行状态。
+3. Provider（Unterm Terminal、Unzoo Browser/Computer、Connector）只拥有自身 Action 的执行状态与服务于自身独立使用的局部持久化，不对外充当全局真相。
 4. Brain 不直接获得凭证，也不能签发 Grant。
 5. 每个副作用调用必须具备稳定 Idempotency Key。
 6. 所有对象使用不可变 ID。
@@ -257,7 +257,7 @@ requested
   "summary": "...",
   "resource_preview": {},
   "content_preview": {},
-  "allowed_decisions": ["allow_once", "allow_for_automation", "deny"],
+  "allowed_decisions": ["allow_once", "allow_for_task", "deny"],
   "state": "pending",
   "expires_at": "...",
   "resolved_by": null,
@@ -271,12 +271,19 @@ requested
 pending → allowed | denied | expired | cancelled
 ```
 
+`allowed_decisions` 的完整取值见安全与信任模型 §11：`allow_once`、`allow_for_task`、
+`allow_exact_for_automation`、`deny`。Financial / Destructive / Credential 只能给
+`allow_once` 和 `deny`。
+
 规则：
 
 - 只能解决一次。
 - 第一响应者胜出。
 - `allowed` 不等于已执行。
 - Approval 只能授权请求中已展示的具体动作。
+- Approval 保存 canonical payload（tool、arguments hash、risk、resources、
+  content preview hash、task/run/step、expires_at）。UI 展示的内容必须由它生成，
+  Provider 执行前重算 hash 比对。
 
 ## 9. CapabilityGrant
 
@@ -288,14 +295,18 @@ pending → allowed | denied | expired | cancelled
   "task_id": "task_...",
   "provider_id": "provider_unzoo_local",
   "capabilities": ["browser.read", "browser.act"],
+  "risk_ceiling": "external_side_effect",
   "resources": {
-    "profiles": ["profile_work"],
-    "domains": ["github.com"],
-    "paths": [],
-    "windows": []
+    "browser": {
+      "profiles": ["profile_work"],
+      "domains": ["github.com"],
+      "access": ["read", "act"],
+      "cookie_access": false
+    }
   },
   "constraints": {
     "max_calls": 20,
+    "single_use": false,
     "external_commit": false
   },
   "issued_from_approval": "approval_...",
@@ -305,12 +316,19 @@ pending → allowed | denied | expired | cancelled
 }
 ```
 
+`resources` 采用安全与信任模型 §10 的分类型范围（`files` / `terminal` / `browser` /
+`desktop` / `connector`）。Grant、Approval 的 canonical payload 和 Provider 的执行前
+校验共用这一份定义——分开写就无法判断有没有越界。
+
 规则：
 
 - 默认 Task-scoped。
+- 必须有 `expires_at`。没有 TTL 的 Grant 等于永久授权。
 - Provider 必须独立校验 Grant。
 - Grant 不能扩大 Approval 范围。
-- Financial/Destructive 不签发长期 Grant。
+- Financial/Destructive/Credential 不签发长期 Grant：必须一次性、绑定到具体 ToolCall、
+  且来自一次明确 Approval。
+- `read` 之外的 Grant 一律要有对应 Approval。
 - Automation Standing Grant 绑定 exact tool + target。
 
 ## 10. Provider 与 Action
@@ -620,23 +638,28 @@ internal.*
 
 ## 19. 契约交付物
 
-下一步生成：
+已建成（2026-09-03，ONE-C001 / `unzoo-one#3`）：
 
 ```text
 contracts/v0/
-  task/
-  brain/
-  provider/
-  security/
-  artifact/
-  automation/
-  events/
+  common/      primitives、error
+  task/        task、run、step、tool-call、approval、inbox-item
+  brain/       adapter、thread、events
+  provider/    manifest、invoke、action-result
+  security/    risk、capability-grant、policy-decision
+  workspace/   workspace、capability-scope
+  artifact/    artifact
+  automation/  automation
+  events/      envelope
+  examples/    每个 schema 的示例 + 一次完整任务的事件流
+  invalid/     反例固件
+  README.md、CHANGELOG.md
 ```
 
-每个目录包含：
+兼容性测试在 `tests/contracts.test.mjs`，`npm run test:contracts` 跑：编译全部 schema、
+示例必须通过、反例必须被拒绝。
 
-- JSON Schema。
-- 示例。
-- Invalid fixtures。
-- Compatibility tests。
-- Changelog。
+本文档与 schema 不一致时以 schema 为准。用法、版本策略，以及「schema 表达不了、由代码
+保证」的那批规则，见 [`contracts/v0/README.md`](../contracts/v0/README.md)。
+
+尚未冻结——冻结需要三仓库共同评审（M0 退出标准）。

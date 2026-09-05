@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/artifact/artifact.schema.json",
+  "title": "Artifact",
+  "description": "任务产出的元数据。数据与元数据分离：这里只有描述和引用，内容通过 /v0/artifacts/{id}/content 取，取的时候重新校验访问权限。Evidence 是 Artifact 的一种。",
+
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "task_id",
+    "kind",
+    "name",
+    "uri",
+    "mime_type",
+    "size",
+    "sha256",
+    "sensitivity",
+    "created_by",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "artifact.v0" },
+    "artifact_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/artifact_id"
+    },
+    "task_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/task_id"
+    },
+    "run_id": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/run_id" },
+        { "type": "null" }
+      ]
+    },
+    "step_id": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/step_id" },
+        { "type": "null" }
+      ]
+    },
+
+    "kind": {
+      "enum": ["document", "data", "evidence", "draft", "screenshot", "recording", "diff", "export"]
+    },
+
+    "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "uri": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/artifact_uri"
+    },
+    "mime_type": { "type": "string", "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$" },
+    "size": { "type": "integer", "minimum": 0 },
+    "sha256": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/sha256"
+    },
+
+    "sensitivity": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/sensitivity"
+    },
+
+    "created_by": {
+      "description": "形如 tool_call:call_x、brain:thread_x、user:user_local。",
+      "type": "string",
+      "pattern": "^(tool_call|brain|user|automation|system):[A-Za-z0-9_]+$"
+    },
+
+    "validation": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": { "enum": ["pending", "passed", "failed", "skipped"] },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "ok"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "ok": { "type": "boolean" },
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+
+    "redacted": {
+      "description": "证据类 Artifact 是否已按字段脱敏。截图和 before/after 默认要脱。",
+      "type": "boolean"
+    },
+
+    "retention": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/retention"
+    },
+
+    "created_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    }
+  },
+
+  "allOf": [
+    {
+      "$comment": "截图默认 Private——它可能拍到任何东西。",
+      "if": { "properties": { "kind": { "const": "screenshot" } }, "required": ["kind"] },
+      "then": { "properties": { "sensitivity": { "enum": ["private", "secret"] } } }
+    },
+    {
+      "$comment": "证据类必须说明脱敏做没做过，不能留空让下游猜。",
+      "if": {
+        "properties": { "kind": { "enum": ["evidence", "screenshot", "recording"] } },
+        "required": ["kind"]
+      },
+      "then": { "required": ["redacted"] }
+    },
+    {
+      "$comment": "Secret 级别的东西不该成为可导出的 Artifact。",
+      "if": {
+        "properties": { "sensitivity": { "const": "secret" } },
+        "required": ["sensitivity"]
+      },
+      "then": { "properties": { "kind": { "not": { "enum": ["export", "document"] } } } }
+    }
+  ]
+}

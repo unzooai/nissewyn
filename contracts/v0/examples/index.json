@@ -1,0 +1,101 @@
+{
+  "$comment": "示例清单。tests/contracts.test.mjs 按它逐条校验，并断言每个 schema 至少有一个示例。新增 schema 必须在这里补一条，否则测试红。",
+  "cases": [
+    {
+      "file": "task.json",
+      "schema": "task/task.schema.json"
+    },
+    {
+      "file": "run.json",
+      "schema": "task/run.schema.json"
+    },
+    {
+      "file": "step.json",
+      "schema": "task/step.schema.json"
+    },
+    {
+      "file": "tool-call.json",
+      "schema": "task/tool-call.schema.json"
+    },
+    {
+      "file": "approval.json",
+      "schema": "task/approval.schema.json"
+    },
+    {
+      "file": "inbox-item.json",
+      "schema": "task/inbox-item.schema.json"
+    },
+    {
+      "file": "workspace.json",
+      "schema": "workspace/workspace.schema.json"
+    },
+    {
+      "file": "capability-scope.json",
+      "schema": "workspace/capability-scope.schema.json"
+    },
+    {
+      "file": "risk-declaration.json",
+      "schema": "security/risk.schema.json"
+    },
+    {
+      "file": "capability-grant.json",
+      "schema": "security/capability-grant.schema.json"
+    },
+    {
+      "file": "policy-decision.json",
+      "schema": "security/policy-decision.schema.json"
+    },
+    {
+      "file": "provider-manifest.json",
+      "schema": "provider/manifest.schema.json"
+    },
+    {
+      "file": "provider-invoke.json",
+      "schema": "provider/invoke.schema.json"
+    },
+    {
+      "file": "provider-get-action.json",
+      "schema": "provider/invoke.schema.json"
+    },
+    {
+      "file": "provider-cancel-action.json",
+      "schema": "provider/invoke.schema.json"
+    },
+    {
+      "file": "action-result.json",
+      "schema": "provider/action-result.schema.json"
+    },
+    {
+      "file": "brain-adapter.json",
+      "schema": "brain/adapter.schema.json"
+    },
+    {
+      "file": "brain-thread.json",
+      "schema": "brain/thread.schema.json"
+    },
+    {
+      "file": "brain-turn.json",
+      "schema": "brain/thread.schema.json#/$defs/brain_turn"
+    },
+    {
+      "file": "brain-events.json",
+      "schema": "brain/events.schema.json#/$defs/brain_event_page"
+    },
+    {
+      "file": "artifact.json",
+      "schema": "artifact/artifact.schema.json"
+    },
+    {
+      "file": "automation.json",
+      "schema": "automation/automation.schema.json"
+    },
+    {
+      "file": "error.json",
+      "schema": "common/error.schema.json"
+    }
+  ],
+  "event_stream": {
+    "file": "task-event-stream.json",
+    "schema": "events/envelope.schema.json"
+  }
+}

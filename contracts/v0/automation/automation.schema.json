@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/automation/automation.schema.json",
+  "title": "Automation",
+  "description": "长期运行的任务定义。默认一个 Automation 对应一个长期 Task，每次触发产生独立 Run。无人值守只改变 Attention Route，不提高 Autonomy Policy。",
+
+  "type": "object",
+  "required": [
+    "schema_version",
+    "automation_id",
+    "title",
+    "instructions",
+    "trigger",
+    "concurrency_policy",
+    "misfire_policy",
+    "notification_route",
+    "enabled",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "automation.v0" },
+    "automation_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/automation_id"
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "instructions": { "type": "string", "minLength": 1 },
+
+    "trigger": { "$ref": "#/$defs/trigger" },
+
+    "brain_policy": {
+      "type": "object",
+      "properties": {
+        "preferred_brain": { "type": "string" },
+        "fallback_brain": { "type": "string" },
+        "max_cost_usd_per_run": { "type": "number", "minimum": 0 }
+      }
+    },
+
+    "workspace_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/workspace_id"
+      }
+    },
+    "profile_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/profile_id"
+      }
+    },
+
+    "standing_grants": {
+      "description": "常驻授权。只能绑定到确切的 tool + target，且不得覆盖高风险动作——那些每次都要人。",
+      "type": "array",
+      "items": { "$ref": "#/$defs/standing_grant" }
+    },
+
+    "notification_route": {
+      "type": "object",
+      "required": ["attention_route"],
+      "properties": {
+        "attention_route": { "enum": ["default", "desktop", "mobile", "email", "silent"] },
+        "notify_on": {
+          "type": "array",
+          "items": { "enum": ["approval", "failure", "success", "never"] },
+          "uniqueItems": true
+        }
+      }
+    },
+
+    "budget": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/budget"
+    },
+
+    "concurrency_policy": { "enum": ["skip_if_running", "queue", "allow_parallel"] },
+    "misfire_policy": { "enum": ["run_once", "run_all", "skip"] },
+
+    "enabled": { "type": "boolean" },
+
+    "task_id": {
+      "description": "这个 Automation 的长期 Task。首次触发时创建。",
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/task_id" },
+        { "type": "null" }
+      ]
+    },
+
+    "created_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    }
+  },
+
+  "$defs": {
+    "trigger": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["schedule", "webhook", "connector_event", "manual"] },
+        "cron": { "type": "string", "minLength": 1 },
+        "timezone": { "type": "string", "minLength": 1 },
+        "source": { "type": "string" },
+        "filter": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "$comment": "定时触发必须同时给出 cron 和时区。只给 cron 的话，跨夏令时会漂。",
+          "if": { "properties": { "type": { "const": "schedule" } }, "required": ["type"] },
+          "then": { "required": ["cron", "timezone"] }
+        },
+        {
+          "if": {
+            "properties": { "type": { "enum": ["webhook", "connector_event"] } },
+            "required": ["type"]
+          },
+          "then": { "required": ["source"] }
+        }
+      ]
+    },
+
+    "standing_grant": {
+      "type": "object",
+      "required": ["provider_id", "tool", "targets", "risk_ceiling"],
+      "properties": {
+        "provider_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/provider_id"
+        },
+        "tool": { "type": "string", "minLength": 1 },
+        "targets": {
+          "description": "确切目标，不接受通配。",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "risk_ceiling": {
+          "$ref": "https://contracts.unzoo.ai/v0/security/risk.schema.json#/$defs/risk_level"
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "§11：credential/financial/destructive 不支持长期 Allow，因此不能出现在 standing_grants 里。",
+          "not": {
+            "properties": {
+              "risk_ceiling": {
+                "$ref": "https://contracts.unzoo.ai/v0/security/risk.schema.json#/$defs/high_risk_level"
+              }
+            },
+            "required": ["risk_ceiling"]
+          }
+        }
+      ]
+    }
+  }
+}

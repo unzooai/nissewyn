@@ -1,0 +1,19 @@
+{
+  "schema_version": "brain_thread.v0",
+  "thread_id": "thread_01JBQ8XGG69B4A1H2ZEFS5JN3P",
+  "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+  "adapter": "codex_cli",
+  "provider": "openai",
+  "model": "gpt-5-codex",
+  "external_thread_id": "ags_7f31c0",
+  "state": "active",
+  "snapshot_ref": null,
+  "supersedes_thread_id": null,
+  "usage": {
+    "input_tokens": 8421,
+    "output_tokens": 1330,
+    "cached_input_tokens": 6100
+  },
+  "created_at": "2026-09-03T02:10:01Z",
+  "closed_at": null
+}

@@ -731,7 +731,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   );
   assert.ok(Math.min(...pixelFontSizes) >= 11);
   assert.match(layout, /AI 任务操作系统/);
-  assert.match(packageJson, /"test": "npm run build && node --test/);
+  assert.match(packageJson, /"test": "npm run test:contracts && npm run build && node --test/);
 
   await assert.rejects(access(new URL("app/_sites-preview", templateRoot)));
 });

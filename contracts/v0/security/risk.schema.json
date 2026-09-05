@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/security/risk.schema.json",
+  "title": "风险等级与工具风险声明",
+  "description": "对应 security-and-trust-model.md §7。工具不声明就没有默认 read——未声明的第三方工具按 external_side_effect 处理，这条规则在 Core 里实现，schema 只保证声明是完整的。",
+
+  "$ref": "#/$defs/tool_risk_declaration",
+
+  "$defs": {
+    "risk_level": {
+      "description": "read 自动；local_mutation 首次或按范围审批；exec 精确命令审批；external_side_effect 提交前审批；credential_access 每次明确审批；financial 与 destructive 每次二次确认。",
+      "enum": [
+        "read",
+        "local_mutation",
+        "exec",
+        "external_side_effect",
+        "credential_access",
+        "financial",
+        "destructive"
+      ]
+    },
+
+    "high_risk_level": {
+      "$comment": "不允许长期 Allow 的那一档，见 §11。",
+      "enum": ["credential_access", "financial", "destructive"]
+    },
+
+    "approval_mode": {
+      "description": "auto 不问；first_use 首次问；scoped 只在 Grant 范围内自动；per_call 每次问；per_call_double_confirm 每次问且需二次确认。",
+      "enum": ["auto", "first_use", "scoped", "per_call", "per_call_double_confirm"]
+    },
+
+    "evidence_policy": {
+      "description": "动作要留什么证据。before_after 用于会改变外部状态的动作。",
+      "enum": ["none", "result_only", "after", "before_after"]
+    },
+
+    "tool_risk_declaration": {
+      "description": "Provider manifest 里每个工具必须带的七个字段。少一个就不允许注册。",
+      "type": "object",
+      "required": [
+        "risk",
+        "side_effect",
+        "resource_scopes",
+        "sensitive_inputs",
+        "reversible",
+        "approval_mode",
+        "evidence_policy"
+      ],
+      "properties": {
+        "risk": { "$ref": "#/$defs/risk_level" },
+        "side_effect": {
+          "description": "这个工具会改变什么。risk 为 read 时必须为 none。",
+          "enum": ["none", "local", "external"]
+        },
+        "resource_scopes": {
+          "description": "这个工具需要哪几类资源范围，取值是 capability-scope 的键。",
+          "type": "array",
+          "items": { "enum": ["files", "terminal", "browser", "desktop", "connector"] },
+          "uniqueItems": true
+        },
+        "sensitive_inputs": {
+          "description": "哪些参数字段可能含敏感数据，日志和证据里按字段脱敏。",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "reversible": { "type": "boolean" },
+        "approval_mode": { "$ref": "#/$defs/approval_mode" },
+        "evidence_policy": { "$ref": "#/$defs/evidence_policy" }
+      },
+
+      "allOf": [
+        {
+          "$comment": "read 不能有副作用。声明成 read 又说会改外部状态的工具，是声明本身有问题。",
+          "if": { "properties": { "risk": { "const": "read" } }, "required": ["risk"] },
+          "then": { "properties": { "side_effect": { "const": "none" } } }
+        },
+        {
+          "$comment": "§11：credential/financial/destructive 不支持长期 Allow，所以不能声明成自动或按范围放行。",
+          "if": {
+            "properties": { "risk": { "$ref": "#/$defs/high_risk_level" } },
+            "required": ["risk"]
+          },
+          "then": {
+            "properties": {
+              "approval_mode": { "enum": ["per_call", "per_call_double_confirm"] }
+            }
+          }
+        },
+        {
+          "$comment": "financial 和 destructive 必须二次确认。",
+          "if": {
+            "properties": { "risk": { "enum": ["financial", "destructive"] } },
+            "required": ["risk"]
+          },
+          "then": {
+            "properties": { "approval_mode": { "const": "per_call_double_confirm" } }
+          }
+        },
+        {
+          "$comment": "不可逆的动作必须留 before/after，否则事后无从对账。",
+          "if": { "properties": { "reversible": { "const": false } }, "required": ["reversible"] },
+          "then": { "properties": { "evidence_policy": { "const": "before_after" } } }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/events/envelope.schema.json",
+  "title": "Event Envelope",
+  "description": "Core 对外的统一事件信封。每个 Task 有单调 sequence；客户端按 event_id 去重，断线后按 cursor 补拉。大 payload 放 Artifact 引用，不内联。",
+
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_id",
+    "sequence",
+    "type",
+    "aggregate_type",
+    "aggregate_id",
+    "task_id",
+    "actor",
+    "timestamp"
+  ],
+  "properties": {
+    "schema_version": { "const": "event.v0" },
+
+    "event_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/event_id"
+    },
+    "sequence": {
+      "description": "Task 内单调递增，从 1 开始。不同 Task 之间不可比。",
+      "type": "integer",
+      "minimum": 1
+    },
+
+    "type": { "$ref": "#/$defs/event_type" },
+
+    "aggregate_type": {
+      "enum": [
+        "task",
+        "run",
+        "step",
+        "tool_call",
+        "approval",
+        "grant",
+        "artifact",
+        "provider",
+        "inbox",
+        "brain_thread"
+      ]
+    },
+    "aggregate_id": { "type": "string", "minLength": 1 },
+
+    "task_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/task_id"
+    },
+    "run_id": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/run_id" },
+        { "type": "null" }
+      ]
+    },
+
+    "actor": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/actor"
+    },
+
+    "timestamp": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    },
+
+    "data": {
+      "description": "事件负载。形状随 type 变化，由对应对象的 schema 约束。",
+      "type": "object"
+    },
+
+    "prev_hash": {
+      "description": "审计 hash chain 的上一环。checkpoint 和导出校验靠它。",
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/sha256"
+    }
+  },
+
+  "allOf": [
+    {
+      "$comment": "aggregate_type 和 aggregate_id 的前缀必须对得上，否则事件回放会挂到错误的对象上。",
+      "if": { "properties": { "aggregate_type": { "const": "task" } }, "required": ["aggregate_type"] },
+      "then": {
+        "properties": {
+          "aggregate_id": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/task_id"
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "aggregate_type": { "const": "run" } }, "required": ["aggregate_type"] },
+      "then": {
+        "properties": {
+          "aggregate_id": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/run_id"
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "aggregate_type": { "const": "step" } }, "required": ["aggregate_type"] },
+      "then": {
+        "properties": {
+          "aggregate_id": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/step_id"
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "aggregate_type": { "const": "tool_call" } }, "required": ["aggregate_type"] },
+      "then": {
+        "properties": {
+          "aggregate_id": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/tool_call_id"
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "aggregate_type": { "const": "approval" } }, "required": ["aggregate_type"] },
+      "then": {
+        "properties": {
+          "aggregate_id": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/approval_id"
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "aggregate_type": { "const": "artifact" } }, "required": ["aggregate_type"] },
+      "then": {
+        "properties": {
+          "aggregate_id": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/artifact_id"
+          }
+        }
+      }
+    }
+  ],
+
+  "$defs": {
+    "event_type": {
+      "description": "v0 的核心事件集合。新增事件是向后兼容的变更；删除或改名不是。",
+      "enum": [
+        "task.created",
+        "task.state_changed",
+        "run.started",
+        "run.completed",
+        "step.created",
+        "step.state_changed",
+        "brain.message_delta",
+        "brain.summary",
+        "tool_call.requested",
+        "tool_call.authorized",
+        "tool_call.dispatched",
+        "tool_call.succeeded",
+        "tool_call.failed",
+        "approval.requested",
+        "approval.resolved",
+        "grant.issued",
+        "grant.revoked",
+        "provider.state_changed",
+        "artifact.created",
+        "inbox.created",
+        "inbox.resolved"
+      ]
+    }
+  }
+}

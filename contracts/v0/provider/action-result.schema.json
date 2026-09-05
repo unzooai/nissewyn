@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/provider/action-result.schema.json",
+  "title": "ActionResult",
+  "description": "Provider 回报的一次动作结果。Event 至少一次投递，Core 按 action_id 去重。",
+
+  "type": "object",
+  "required": ["schema_version", "action_id", "tool_call_id", "ok", "state", "started_at"],
+  "properties": {
+    "schema_version": { "const": "action_result.v0" },
+
+    "action_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/action_id"
+    },
+    "tool_call_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/tool_call_id"
+    },
+
+    "ok": { "type": "boolean" },
+
+    "state": {
+      "description": "verified 表示动作做完并且验证过了；executed 表示做完但没验证；unknown 表示 Provider 自己也不确定发生没发生。",
+      "enum": ["accepted", "executing", "executed", "verified", "failed", "cancelled", "unknown"]
+    },
+
+    "error_code": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/error.schema.json#/$defs/error_code" },
+        { "type": "null" }
+      ]
+    },
+    "error": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/error.schema.json#/$defs/error_body" },
+        { "type": "null" }
+      ]
+    },
+    "retry_hint": {
+      "oneOf": [
+        { "enum": ["retry", "retry_after", "do_not_retry", "reconcile_first"] },
+        { "type": "null" }
+      ]
+    },
+
+    "result": { "type": "object" },
+
+    "evidence": {
+      "description": "before/after 是 Artifact 引用，不是内联数据。",
+      "type": "object",
+      "properties": {
+        "before": {
+          "type": "array",
+          "items": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/artifact_id"
+          }
+        },
+        "after": {
+          "type": "array",
+          "items": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/artifact_id"
+          }
+        },
+        "diff": { "type": "object" }
+      }
+    },
+
+    "started_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    },
+    "finished_at": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp" },
+        { "type": "null" }
+      ]
+    }
+  },
+
+  "allOf": [
+    {
+      "$comment": "ok 和 state 不能自相矛盾。",
+      "if": { "properties": { "ok": { "const": true } }, "required": ["ok"] },
+      "then": { "properties": { "state": { "enum": ["accepted", "executing", "executed", "verified"] } } }
+    },
+    {
+      "$comment": "失败必须给稳定 error_code，调用方按 code 分支。",
+      "if": { "properties": { "state": { "const": "failed" } }, "required": ["state"] },
+      "then": {
+        "required": ["error_code"],
+        "properties": {
+          "error_code": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/error.schema.json#/$defs/error_code"
+          }
+        }
+      }
+    },
+    {
+      "$comment": "unknown 一律先 reconcile。放任自动重试就是重复产生外部副作用。",
+      "if": { "properties": { "state": { "const": "unknown" } }, "required": ["state"] },
+      "then": {
+        "required": ["retry_hint"],
+        "properties": { "retry_hint": { "const": "reconcile_first" } }
+      }
+    },
+    {
+      "$comment": "已完成的动作必须有结束时间。",
+      "if": {
+        "properties": { "state": { "enum": ["executed", "verified", "failed", "cancelled"] } },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["finished_at"],
+        "properties": {
+          "finished_at": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+          }
+        }
+      }
+    }
+  ]
+}

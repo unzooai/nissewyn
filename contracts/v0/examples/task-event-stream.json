@@ -1,0 +1,411 @@
+[
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000001",
+    "sequence": 1,
+    "type": "task.created",
+    "aggregate_type": "task",
+    "aggregate_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": null,
+    "actor": {
+      "type": "user",
+      "id": "user_local"
+    },
+    "timestamp": "2026-09-03T02:10:00Z",
+    "data": {
+      "title": "调研竞品定价并生成报告",
+      "mode": "work"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000002",
+    "sequence": 2,
+    "type": "run.started",
+    "aggregate_type": "run",
+    "aggregate_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:10:01Z",
+    "data": {
+      "attempt": 1
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000003",
+    "sequence": 3,
+    "type": "step.created",
+    "aggregate_type": "step",
+    "aggregate_id": "step_01JBQ8XG6W9Q4P1X2NTVF5YB3C",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "brain",
+      "id": "thread_01JBQ8XGG69B4A1H2ZEFS5JN3P"
+    },
+    "timestamp": "2026-09-03T02:10:01Z",
+    "data": {
+      "title": "确认要对比的价格维度"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000004",
+    "sequence": 4,
+    "type": "step.created",
+    "aggregate_type": "step",
+    "aggregate_id": "step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "brain",
+      "id": "thread_01JBQ8XGG69B4A1H2ZEFS5JN3P"
+    },
+    "timestamp": "2026-09-03T02:10:01Z",
+    "data": {
+      "title": "读取竞品价格页面"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000005",
+    "sequence": 5,
+    "type": "step.created",
+    "aggregate_type": "step",
+    "aggregate_id": "step_01JBQ8XG8Y1S6R3Z4QWXH7AD5E",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "brain",
+      "id": "thread_01JBQ8XGG69B4A1H2ZEFS5JN3P"
+    },
+    "timestamp": "2026-09-03T02:10:01Z",
+    "data": {
+      "title": "写成一页对比报告"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000006",
+    "sequence": 6,
+    "type": "step.state_changed",
+    "aggregate_type": "step",
+    "aggregate_id": "step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:10:02Z",
+    "data": {
+      "from": "planned",
+      "to": "running"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000007",
+    "sequence": 7,
+    "type": "brain.message_delta",
+    "aggregate_type": "brain_thread",
+    "aggregate_id": "thread_01JBQ8XGG69B4A1H2ZEFS5JN3P",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "brain",
+      "id": "thread_01JBQ8XGG69B4A1H2ZEFS5JN3P"
+    },
+    "timestamp": "2026-09-03T02:10:02Z",
+    "data": {
+      "text": "已经拿到三档价格，"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000008",
+    "sequence": 8,
+    "type": "tool_call.requested",
+    "aggregate_type": "tool_call",
+    "aggregate_id": "call_01JBQ8XG9Z2T7S4A5RXYJ8BE6F",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "brain",
+      "id": "thread_01JBQ8XGG69B4A1H2ZEFS5JN3P"
+    },
+    "timestamp": "2026-09-03T02:11:30Z",
+    "data": {
+      "tool": "browser.submit_form",
+      "risk": "external_side_effect"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000009",
+    "sequence": 9,
+    "type": "approval.requested",
+    "aggregate_type": "approval",
+    "aggregate_id": "approval_01JBQ8XGA03V8T5B6SYZK9CF7G",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:11:30Z",
+    "data": {
+      "kind": "external_side_effect",
+      "expires_at": "2026-09-03T02:26:30Z"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000010",
+    "sequence": 10,
+    "type": "inbox.created",
+    "aggregate_type": "inbox",
+    "aggregate_id": "inbox_01JBQ8XGJ81D6C3K4BGHV7MQ5R",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:11:30Z",
+    "data": {
+      "kind": "approval",
+      "attention_route": "desktop"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000011",
+    "sequence": 11,
+    "type": "approval.resolved",
+    "aggregate_type": "approval",
+    "aggregate_id": "approval_01JBQ8XGA03V8T5B6SYZK9CF7G",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "user",
+      "id": "user_local"
+    },
+    "timestamp": "2026-09-03T02:12:05Z",
+    "data": {
+      "resolution": "allow_once"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000012",
+    "sequence": 12,
+    "type": "inbox.resolved",
+    "aggregate_type": "inbox",
+    "aggregate_id": "inbox_01JBQ8XGJ81D6C3K4BGHV7MQ5R",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:12:05Z",
+    "data": {
+      "state": "resolved"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000013",
+    "sequence": 13,
+    "type": "grant.issued",
+    "aggregate_type": "grant",
+    "aggregate_id": "grant_01JBQ8XGB14W9V6C7TZAM0DG8H",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:12:05Z",
+    "data": {
+      "risk_ceiling": "external_side_effect",
+      "single_use": true
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000014",
+    "sequence": 14,
+    "type": "tool_call.authorized",
+    "aggregate_type": "tool_call",
+    "aggregate_id": "call_01JBQ8XG9Z2T7S4A5RXYJ8BE6F",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:12:05Z",
+    "data": {
+      "grant_id": "grant_01JBQ8XGB14W9V6C7TZAM0DG8H"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000015",
+    "sequence": 15,
+    "type": "tool_call.dispatched",
+    "aggregate_type": "tool_call",
+    "aggregate_id": "call_01JBQ8XG9Z2T7S4A5RXYJ8BE6F",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:12:06Z",
+    "data": {
+      "action_id": "action_01JBQ8XGC25X0W7D8VABN1EH9J",
+      "provider_id": "provider_unzoo_local"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000016",
+    "sequence": 16,
+    "type": "artifact.created",
+    "aggregate_type": "artifact",
+    "aggregate_id": "artifact_01JBQ8XGE47Z2Y9F0XCDQ3GK1M",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "provider",
+      "id": "provider_unzoo_local"
+    },
+    "timestamp": "2026-09-03T02:12:06Z",
+    "data": {
+      "kind": "screenshot",
+      "role": "before"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000017",
+    "sequence": 17,
+    "type": "artifact.created",
+    "aggregate_type": "artifact",
+    "aggregate_id": "artifact_01JBQ8XGF58A3Z0G1YDER4HM2N",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "provider",
+      "id": "provider_unzoo_local"
+    },
+    "timestamp": "2026-09-03T02:12:44Z",
+    "data": {
+      "kind": "screenshot",
+      "role": "after"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000018",
+    "sequence": 18,
+    "type": "tool_call.succeeded",
+    "aggregate_type": "tool_call",
+    "aggregate_id": "call_01JBQ8XG9Z2T7S4A5RXYJ8BE6F",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "provider",
+      "id": "provider_unzoo_local"
+    },
+    "timestamp": "2026-09-03T02:12:44Z",
+    "data": {
+      "state": "verified",
+      "confirmation_id": "Q-88213"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000019",
+    "sequence": 19,
+    "type": "step.state_changed",
+    "aggregate_type": "step",
+    "aggregate_id": "step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:12:44Z",
+    "data": {
+      "from": "waiting_approval",
+      "to": "succeeded"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000020",
+    "sequence": 20,
+    "type": "artifact.created",
+    "aggregate_type": "artifact",
+    "aggregate_id": "artifact_01JBQ8XGD36Y1X8E9WBCP2FJ0K",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:13:10Z",
+    "data": {
+      "kind": "document",
+      "name": "competitive-pricing.md"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000021",
+    "sequence": 21,
+    "type": "run.completed",
+    "aggregate_type": "run",
+    "aggregate_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:13:10Z",
+    "data": {
+      "state": "succeeded"
+    }
+  },
+  {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000022",
+    "sequence": 22,
+    "type": "task.state_changed",
+    "aggregate_type": "task",
+    "aggregate_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": null,
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:13:10Z",
+    "data": {
+      "from": "running",
+      "to": "succeeded"
+    }
+  }
+]

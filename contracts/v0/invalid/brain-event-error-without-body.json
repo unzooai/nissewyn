@@ -1,0 +1,12 @@
+{
+  "schema": "brain/events.schema.json#/$defs/brain_event",
+  "reason": "error 事件只有一句自由文本，没有结构化 error，上层没法分支也没法归因。",
+  "instance": {
+    "schema_version": "brain_event.v0",
+    "event": "error",
+    "at": "2026-09-03T02:11:30Z",
+    "session_id": "ags_7f31c0",
+    "cursor": 7,
+    "message": "something went wrong"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema": "workspace/capability-scope.schema.json",
+  "reason": "Connector 给了写权限却没有确切目标，可以发给任何人。",
+  "instance": {
+    "connector": {
+      "account": "slack:workspace-1",
+      "access": [
+        "read",
+        "write"
+      ]
+    }
+  }
+}

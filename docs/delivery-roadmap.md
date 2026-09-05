@@ -4,46 +4,66 @@
 > 日期：2026-07-26
 > 规划方式：以验收门槛推进，不以日期掩盖未完成能力
 
+> **归属修订 2026-08-06**：原划分把控制平面能力全部指派给 Unterm。已纠正为
+> 「Unzoo One 是唯一控制平面，Unterm 与 Unzoo 是同级 Provider」。
+> 见 `unzoo-one#2`、`unterm#20`、`unzoo#73`。
+
 ## 1. 仓库职责
 
 ### `unzooai/unzoo-one`
 
-负责：
+负责（**唯一控制平面**）：
 
-- 产品规格和跨仓库 Architecture Decision。
+- 产品规格和跨仓库 Architecture Decision，以及 `contracts/v0` 契约的定义与冻结。
+- `one-core` 自有常驻运行时。
+- Task Engine、Policy/Approval/Grant/Inbox、Provider Registry、Workspace、Artifact Registry、Brain Router、Scheduler、Memory。
 - Unzoo One Desktop / Web 产品体验。
-- 安装、绑定和版本兼容矩阵。
+- 一体化安装、Supervisor、绑定和版本兼容矩阵。
 - 端到端测试与发布清单。
-- 产品文档和整合发行。
 
 不负责：
 
-- 重复实现 Task Engine。
-- 重复实现浏览器自动化。
-- 在 UI 层直接启动 Brain CLI 绕过 Unterm。
-- 保存另一份权限、审批或审计真相。
+- 重复实现浏览器自动化或终端本体。
+- 在 UI 层直接启动 Brain CLI 绕过 one-core。
+- 替 Provider 做它自己那一层的执行闸门（纵深防御的另一层由 Provider 各自实现）。
+
+对应 Issue：`unzoo-one#2`（Epic）、`#3`–`#13`、
+[#14 timestamp pattern 放宽](https://github.com/unzooai/unzoo-one/issues/14)（`contracts/v0` 冻结前处理）。
 
 ### `zhitongblog/unterm`
 
-负责：
+负责（**Terminal Provider**，同时是独立终端产品）：
 
-- Headless Core。
-- Task Engine。
-- Brain Adapter。
-- Policy / Approval。
-- Provider Registry。
-- Audit / Artifact。
+- 终端本体：PTY、Session、Screen、Scrollback、Recording、Capture。
+- Headless Core：终端不随 GUI 生死。
+- Terminal Action Gateway：本地执行闸门，不信任调用方。
+- 终端内 Agent 会话的结构化事件流。
+- Provider 契约被动面：manifest、lease 校验、task context 贯穿、cancel、evidence。
+- 自身的持久化动作日志。
+
+不负责：通用 Task 引擎、Provider Registry、Workspace 模型、Artifact Registry、
+Memory/Scheduler/Connector/Model Router、三进程 Supervisor。
+
+**Unterm 为可选组件**——不需要终端的用户可以不安装。
 
 对应 Issue：
 
+- [#24 0.60 parity gate（唯一前置）](https://github.com/zhitongblog/unterm/issues/24)
 - [#12 True Headless Core](https://github.com/zhitongblog/unterm/issues/12)
-- [#13 Brain Adapter](https://github.com/zhitongblog/unterm/issues/13)
-- [#14 Task Engine](https://github.com/zhitongblog/unterm/issues/14)
-- [#15 Policy & Approval](https://github.com/zhitongblog/unterm/issues/15)
-- [#16 PTY 授权旁路](https://github.com/zhitongblog/unterm/issues/16)
-- [#17 Provider Registry](https://github.com/zhitongblog/unterm/issues/17)
-- [#18 Audit & Artifact](https://github.com/zhitongblog/unterm/issues/18)
+- [#13 终端内 Agent 事件流](https://github.com/zhitongblog/unterm/issues/13)
+- [#15 Terminal Action Gateway](https://github.com/zhitongblog/unterm/issues/15)
+- [#16 PTY 授权旁路](https://github.com/zhitongblog/unterm/issues/16)（已完成）
+- [#18 Terminal 动作日志](https://github.com/zhitongblog/unterm/issues/18)
+- [#22 Managed Agent 约束](https://github.com/zhitongblog/unterm/issues/22)
+- [#26 Path Scope 强制](https://github.com/zhitongblog/unterm/issues/26)
+- [#27 Provider Manifest / Lease](https://github.com/zhitongblog/unterm/issues/27)
+- [#28 可被托管的运行时契约](https://github.com/zhitongblog/unterm/issues/28)
+- [#30 contracts/v0 一致性缺口](https://github.com/zhitongblog/unterm/issues/30)（2026-09-04 新开，
+  拿 schema 逐条对照 0.71.0 代码之后剩下的差异；第 0 项是控制平面归属，阻塞其余）
 - [#20 总 Epic](https://github.com/zhitongblog/unterm/issues/20)
+
+已迁往本仓库并关闭：#14 → `unzoo-one#5`、#17 → `unzoo-one#7`、
+#19 → `unzoo-one#13`、#21 → `unzoo-one#9`、#23 → `unzoo-one#12`。
 
 ### `unzooai/unzoo`
 
@@ -93,11 +113,11 @@
 
 范围：
 
-- Unterm Headless Core。
-- SQLite Task Engine。
-- Codex CLI JSONL Adapter。
-- 统一 PTY Policy。
-- Persistent Audit 最小实现。
+- `one-core` 常驻运行时（One）。
+- SQLite Task Engine（One）。
+- Codex CLI JSONL Adapter（One 的 Brain Router + Unterm 的终端内 Agent 事件流）。
+- 两层授权最小实现：One 的 Policy Gateway + Unterm 的本地闸门。
+- Persistent Audit 最小实现（One 的证据链 + Unterm 的动作日志）。
 
 退出标准：
 
@@ -111,7 +131,7 @@
 
 目标：
 
-- 跑通 Unterm Core 到 Unzoo Browser Provider 的完整授权链。
+- 跑通 one-core 到 Unzoo Browser Provider 的完整授权链，**不依赖 Unterm**。
 
 范围：
 
@@ -123,7 +143,8 @@
 
 退出标准：
 
-- [ ] Unterm 自动发现和绑定 Unzoo。
+- [ ] one-core 自动发现和绑定 Unzoo。
+- [ ] 未安装 Unterm 时链路仍完整。
 - [ ] 完成“网页调研并生成报告”。
 - [ ] Provider 离线在 5 秒内反映到 Task。
 - [ ] Cancel 能停止 Workflow/CUA。
@@ -209,54 +230,59 @@
 
 | ID | 优先级 | 仓库 | 工作项 | 依赖 | 验收产物 |
 |---|---|---|---|---|---|
-| ONE-C001 | P0-Blocker | unzoo-one | 冻结跨仓库对象和错误 schema | 无 | `contracts/v0` |
-| ONE-C002 | P0-Blocker | unterm | 修复 PTY 授权旁路 | 无 | #16 测试通过 |
-| ONE-C003 | P0 | unterm | Headless Core 最小服务 | C001 | 无 GUI CLI demo |
-| ONE-C004 | P0 | unterm | SQLite Task Engine | C001,C003 | 重启恢复测试 |
-| ONE-C005 | P0 | unterm | Codex JSONL Adapter | C001,C003 | Brain event demo |
-| ONE-C006 | P0 | unterm | Claude Adapter | C001,C003 | Brain event demo |
-| ONE-C007 | P0 | unterm | Policy/Approval v0 | C001,C004 | 决策解释测试 |
+| ONE-C001 | P0-Blocker | unzoo-one | 冻结跨仓库对象和错误 schema（`unzoo-one#3`） | 无 | `contracts/v0` |
+| ONE-C002 | P0-Blocker | unterm | 修复 PTY 授权旁路（`unterm#16`） | 无 | 已完成 |
+| ONE-C003 | P0 | unzoo-one | **one-core 常驻运行时**（`unzoo-one#4`） | C001 | 无 UI 的 CLI demo |
+| ONE-C004 | P0 | unzoo-one | SQLite Task Engine（`unzoo-one#5`） | C001,C003 | 重启恢复测试 |
+| ONE-C005 | P0 | unzoo-one | Brain Router + Codex Adapter（`unzoo-one#10`） | C001,C003 | Brain event demo |
+| ONE-C006 | P0 | unzoo-one | Claude Adapter（`unzoo-one#10`） | C001,C003 | Brain event demo |
+| ONE-C007 | P0 | unzoo-one | Policy/Approval v0（`unzoo-one#6`） | C001,C004 | 决策解释测试 |
 | ONE-C008 | P0 | unzoo | Structured Risk Metadata | C001 | Tool manifest |
 | ONE-C009 | P0 | unzoo | Local Client Identity/Lease | C001 | 认证测试 |
-| ONE-C010 | P0 | unterm | Provider Registry v0 | C001,C004 | Provider demo |
-| ONE-C011 | P0 | unzoo | Unterm Native Binding | C009,C010 | 绑定自检 |
-| ONE-C012 | P0 | unterm | Audit/Artifact v0 | C004,C007 | 证据包 |
+| ONE-C010 | P0 | unzoo-one | Provider Registry v0（`unzoo-one#7`） | C001,C004 | Provider demo |
+| ONE-C011 | P0 | unzoo | Orchestrator Binding（绑定对象改为 One） | C009,C010 | 绑定自检 |
+| ONE-C012 | P0 | unzoo-one | Artifact Registry 与证据链 v0（`unzoo-one#8`） | C004,C007 | 证据包 |
+| ONE-C023 | P0 | unterm | 0.60 终端 parity gate（`unterm#24` 阶段 A） | 无 | parity 台账 |
+| ONE-C024 | P0 | unterm | Terminal Provider 化（`unterm#15`/`#26`/`#27`） | C001,C023 | Provider Contract Suite |
+| ONE-C025 | P0 | unzoo-one | Workspace Context & Isolation（`unzoo-one#9`） | C004,C007 | 隔离与穿越测试 |
+| ONE-C026 | P0 | unzoo-one | Tool Routing 决策（`unzoo-one#11`） | C007,C010 | 旁路测试 |
+| ONE-C027 | P0 | unzoo-one | Supervisor 与一体化安装（`unzoo-one#12`） | C003,C010 | 安装/升级/回滚 E2E |
 | ONE-C013 | P0 | unzoo-one | First-run onboarding | C003,C011 | 5 分钟首个 Artifact |
 | ONE-C014 | P0 | unzoo-one | Task Composer/Detail | C004,C005 | 四条主链路 |
 | ONE-C015 | P0 | unzoo-one | Approval Inbox | C007 | 审批测试 |
 | ONE-C016 | P0 | unzoo-one | Artifact Center | C012 | 打开/导出测试 |
 | ONE-C017 | P0 | unzoo-one | Diagnostics | C003,C011 | 诊断包 |
 | ONE-C018 | P0 | unzoo-one | 端到端测试套件 | C013-C017 | Alpha Gate |
-| ONE-C019 | P0 | unterm | Automation 与 Attention Routing v0 | C004,C007 | 场景 D |
+| ONE-C019 | P0 | unzoo-one | Automation 与 Attention Routing v0 | C004,C007 | 场景 D |
 | ONE-C020 | P0 | unzoo-one | MCP Connector 导入与 Gallery | C010 | Connector demo |
 | ONE-C021 | P0 | unzoo-one | GitHub + 邮件/日历 + 双向消息验证 | C020 | Connector E2E |
 | ONE-C022 | P0 | unzoo-one | Ask/Work/Code/Automate 入口预设 | C014,C019 | 四入口 UX |
 | ONE-C101 | P1 | unzoo | Desktop Observation | M3 | #66 |
 | ONE-C102 | P1 | unzoo | Secure Desktop Input | C101 | #67 |
-| ONE-C103 | P1 | unterm | Memory/Trigger/Connector | M3 | #19 |
+| ONE-C103 | P1 | unzoo-one | Memory/Trigger/Connector/Model Router（`unzoo-one#13`） | M3 | 平台能力验收 |
 
 ## 4. 跨仓库契约清单
 
-M0 建议建立：
+已建成（2026-09-03）。布局按版本分根，不是按域分版本——每个对象自带
+`schema_version`，整个 v0 一起升级：
 
 ```text
-contracts/
-  task/v0/
-    task.schema.json
-    event.schema.json
-    approval.schema.json
-    artifact.schema.json
-  brain/v0/
-    adapter.schema.json
-    events.schema.json
-  provider/v0/
-    manifest.schema.json
-    invoke.schema.json
-    action-result.schema.json
-  security/v0/
-    risk.schema.json
-    capability-grant.schema.json
+contracts/v0/
+  common/      primitives.schema.json、error.schema.json
+  task/        task、run、step、tool-call、approval、inbox-item
+  brain/       adapter、thread、events
+  provider/    manifest、invoke、action-result
+  security/    risk、capability-grant、policy-decision
+  workspace/   workspace、capability-scope
+  artifact/    artifact
+  automation/  automation
+  events/      envelope
+  examples/    示例 + 一次完整任务的事件流
+  invalid/     反例固件
 ```
+
+用法和版本策略见 [`contracts/v0/README.md`](../contracts/v0/README.md)，
+校验跑 `npm run test:contracts`。
 
 契约原则：
 
@@ -331,9 +357,12 @@ contracts/
 
 按顺序执行：
 
-1. 在本仓库增加 `contracts/v0`。
-2. 完成 Task、Brain、Provider、Risk 四组 schema。
-3. 用静态 mock 写一个完整任务事件样例。
-4. 在 Unterm 实现 #16，再开始 Headless Core。
-5. 在 Unzoo 实现 #68/#69，为 Binding 打基础。
-6. 用 CLI 完成 M1/M2 后再实现完整产品 UI。
+1. ~~在本仓库增加 `contracts/v0`（`unzoo-one#3`，P0-Blocker）。~~ 2026-09-03 完成。
+2. ~~完成 Task、Brain、Provider、Risk、Workspace scope、Error 六组 schema~~ 已完成；
+   **三仓库共同评审冻结待办**——这是 M0 剩下的唯一一件事。
+3. ~~用静态 mock 写一个完整任务事件样例。~~ 见
+   `contracts/v0/examples/task-event-stream.json`（22 条事件，从创建到产物）。
+4. 建立 `one-core` 骨架（`unzoo-one#4`）：认证 IPC、single-instance、SQLite、事件 cursor。
+5. 先接 Unzoo Browser Provider 跑通场景 A（不依赖终端），验证边界成立。
+6. Unterm 完成 `unterm#24` 阶段 A 后，按 `unterm#27` 作为 Terminal Provider 接入。
+7. 用 CLI 完成 M1/M2 后再实现完整产品 UI。

@@ -1,0 +1,20 @@
+{
+  "schema_version": "step.v0",
+  "step_id": "step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D",
+  "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+  "sequence": 1,
+  "title": "读取竞品价格页面",
+  "description": "打开定价页，取三档套餐的价格和包含项。",
+  "state": "waiting_approval",
+  "provider_hint": "provider_unzoo_local",
+  "depends_on": [
+    "step_01JBQ8XG6W9Q4P1X2NTVF5YB3C"
+  ],
+  "supersedes": null,
+  "retry_policy": {
+    "max_attempts": 2,
+    "backoff_ms": 3000
+  },
+  "started_at": "2026-09-03T02:10:02Z",
+  "finished_at": null
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "brain_turn.v0",
+  "turn_id": "turn_01JBQ8XGH70C5B2J3AFGT6KP4Q",
+  "thread_id": "thread_01JBQ8XGG69B4A1H2ZEFS5JN3P",
+  "input_ref": "读取竞品价格页面",
+  "state": "completed",
+  "summary": "取到三档价格，需要提交询价表单才能拿到 25 席位的报价。",
+  "usage": {
+    "input_tokens": 3120,
+    "output_tokens": 480,
+    "cached_input_tokens": 2900
+  },
+  "started_at": "2026-09-03T02:10:02Z",
+  "finished_at": "2026-09-03T02:11:30Z"
+}
