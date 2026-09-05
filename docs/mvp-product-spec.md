@@ -16,8 +16,8 @@ Unzoo One 是面向个人用户的本地 AI 工作台。用户只需要描述目
 
 Unzoo One 不是新的通用 Agent 框架，也不复制 Unterm 和 Unzoo 已有能力：
 
-- **Unzoo One** 负责产品体验、安装绑定、版本契约和整体验收。
-- **Unterm Core** 负责全局任务、大脑、权限、审批、审计和产物。
+- **Unzoo One** 是唯一控制平面：产品体验、`one-core` 运行时、全局任务、大脑路由、权限、审批、审计、产物、安装绑定与版本契约。
+- **Unterm** 是 Terminal Provider：PTY、会话、终端内 Agent 与本地执行闸门（可选组件，纯浏览器任务不需要）。
 - **Unzoo** 负责浏览器观察、执行、Profile 和动作证据。
 - **Brain Provider** 负责推理和规划，不持有最终权限。
 

@@ -40,7 +40,8 @@
 |---|---|
 | Local user | 最终授权者 |
 | Unzoo One Desktop | 受信 UI Client，不是策略权威 |
-| Unterm Core | 控制平面和策略权威 |
+| One Core | 控制平面和策略权威（归属修订 2026-08-06，原为 Unterm Core） |
+| Unterm Terminal Provider | 受限执行器；自持本地执行闸门，不信任调用方 |
 | Brain Adapter | 不可信建议者 |
 | Brain/Model | 不可信内容处理器 |
 | Unzoo Provider | 受限执行器 |

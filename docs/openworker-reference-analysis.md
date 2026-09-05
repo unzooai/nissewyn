@@ -359,8 +359,9 @@ OpenWorker：
 ### Unzoo One 学习方式
 
 - Unzoo One Desktop 是薄客户端。
-- Unterm Core 是唯一控制平面。
+- **One Core 是唯一控制平面**（归属修订 2026-08-06，原写作 Unterm Core）。
 - Unzoo daemon 是 Browser/Computer Provider。
+- Unterm 是 Terminal Provider，且为可选组件。
 - Installer 负责版本矩阵、安装、更新、回滚和自检。
 - UI 测试继续区分 hermetic mock 与 live integration。
 
