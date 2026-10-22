@@ -1,0 +1,22 @@
+{
+  "name": "unzoo-one-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Unzoo One 的常驻运行时：任务、事件、授权与 Provider 编排的唯一事实来源。",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "cli": "node src/cli.ts",
+    "test": "node --test \"tests/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "typescript": "5.9.3"
+  }
+}

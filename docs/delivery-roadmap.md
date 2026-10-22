@@ -121,8 +121,10 @@ Memory/Scheduler/Connector/Model Router、三进程 Supervisor。
 
 退出标准：
 
-- [ ] GUI 未启动时可创建并完成代码任务。
-- [ ] Core 重启后任务不会消失。
+- [ ] GUI 未启动时可创建并完成代码任务。（能创建、能跑完一次 Run，但还没有 Brain，
+      所以「完成代码任务」这半条不算数）
+- [x] Core 重启后任务不会消失。（`one-core/tests/persistence.test.ts`：关掉再打开，
+      任务、Run、事件都在，序号接着往下走，链跨重启仍然接得上）
 - [ ] Cancel 能中断 Brain 与 PTY。
 - [ ] 重复 idempotency key 不重复执行命令。
 - [ ] #16 权限旁路关闭。
@@ -232,7 +234,7 @@ Memory/Scheduler/Connector/Model Router、三进程 Supervisor。
 |---|---|---|---|---|---|
 | ONE-C001 | P0-Blocker | unzoo-one | 冻结跨仓库对象和错误 schema（`unzoo-one#3`） | 无 | `contracts/v0` |
 | ONE-C002 | P0-Blocker | unterm | 修复 PTY 授权旁路（`unterm#16`） | 无 | 已完成 |
-| ONE-C003 | P0 | unzoo-one | **one-core 常驻运行时**（`unzoo-one#4`） | C001 | 无 UI 的 CLI demo |
+| ONE-C003 | P0 | unzoo-one | **one-core 常驻运行时**（`unzoo-one#4`） | C001 | 骨架已完成：`one-core/`，`npm run cli demo` |
 | ONE-C004 | P0 | unzoo-one | SQLite Task Engine（`unzoo-one#5`） | C001,C003 | 重启恢复测试 |
 | ONE-C005 | P0 | unzoo-one | Brain Router + Codex Adapter（`unzoo-one#10`） | C001,C003 | Brain event demo |
 | ONE-C006 | P0 | unzoo-one | Claude Adapter（`unzoo-one#10`） | C001,C003 | Brain event demo |
@@ -362,7 +364,9 @@ contracts/v0/
    **三仓库共同评审冻结待办**——这是 M0 剩下的唯一一件事。
 3. ~~用静态 mock 写一个完整任务事件样例。~~ 见
    `contracts/v0/examples/task-event-stream.json`（22 条事件，从创建到产物）。
-4. 建立 `one-core` 骨架（`unzoo-one#4`）：认证 IPC、single-instance、SQLite、事件 cursor。
+4. ~~建立 `one-core` 骨架（`unzoo-one#4`）：认证 IPC、single-instance、SQLite、事件 cursor。~~
+   2026-09-05 完成，见 [`one-core/README.md`](../one-core/README.md)。四件事都落地了，
+   `npm run cli demo` 是 ONE-C003 的验收物；Brain、Provider、Policy 还没接。
 5. 先接 Unzoo Browser Provider 跑通场景 A（不依赖终端），验证边界成立。
 6. Unterm 完成 `unterm#24` 阶段 A 后，按 `unterm#27` 作为 Terminal Provider 接入。
 7. 用 CLI 完成 M1/M2 后再实现完整产品 UI。

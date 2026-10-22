@@ -4,7 +4,7 @@
     {
       "schema_version": "brain_event.v0",
       "event": "session.started",
-      "at": "2026-09-03T02:10:01Z",
+      "at": "2026-09-03T02:10:01+00:00",
       "session_id": "ags_7f31c0",
       "cursor": 1,
       "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
@@ -14,7 +14,7 @@
     {
       "schema_version": "brain_event.v0",
       "event": "turn.started",
-      "at": "2026-09-03T02:10:02Z",
+      "at": "2026-09-03T02:10:02+00:00",
       "session_id": "ags_7f31c0",
       "cursor": 2,
       "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
@@ -26,7 +26,7 @@
     {
       "schema_version": "brain_event.v0",
       "event": "output.delta",
-      "at": "2026-09-03T02:10:02Z",
+      "at": "2026-09-03T02:10:02+00:00",
       "session_id": "ags_7f31c0",
       "cursor": 3,
       "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
@@ -37,7 +37,7 @@
     {
       "schema_version": "brain_event.v0",
       "event": "tool_call.requested",
-      "at": "2026-09-03T02:11:30Z",
+      "at": "2026-09-03T02:11:30+00:00",
       "session_id": "ags_7f31c0",
       "cursor": 4,
       "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
@@ -58,7 +58,7 @@
     {
       "schema_version": "brain_event.v0",
       "event": "usage.updated",
-      "at": "2026-09-03T02:11:30Z",
+      "at": "2026-09-03T02:11:30+00:00",
       "session_id": "ags_7f31c0",
       "cursor": 5,
       "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
@@ -72,7 +72,7 @@
     {
       "schema_version": "brain_event.v0",
       "event": "turn.completed",
-      "at": "2026-09-03T02:11:30Z",
+      "at": "2026-09-03T02:11:30+00:00",
       "session_id": "ags_7f31c0",
       "cursor": 6,
       "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",

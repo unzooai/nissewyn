@@ -145,6 +145,11 @@
       "name": "event-aggregate-id-mismatch.json",
       "schema": "events/envelope.schema.json",
       "reason": "aggregate_type 是 approval，aggregate_id 却是个 task。事件回放会挂到错误的对象上。"
+    },
+    {
+      "name": "timestamp-unknown-offset.json",
+      "schema": "task/task.schema.json",
+      "reason": "时间用了 -00:00。RFC 3339 里它表示「偏移未知」而不是 UTC，正是「所有时间必须是 UTC」这条规则要挡的东西——放宽到接受 +00:00 时不能把它一起放进来。"
     }
   ]
 }
