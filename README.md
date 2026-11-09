@@ -49,6 +49,16 @@ Unzoo One 是一个本地优先、可更换大脑、可持续运行、可审计�
 6. Ask / Work / Code / Automate 四种任务入口。
 7. 统一 Approval Inbox、MCP Connector 导入和首批邮件/日历/消息连接。
 
+## Unterm 源码（`unterm/`）
+
+Unterm 的完整源码（Rust，基于 WezTerm）已并入本仓库的 `unterm/` 目录，Unzoo One
+直接从源码构建终端能力，用户不需要再单独下载安装 Unterm。
+
+- 并入方式：`git subtree --squash`，上游为 `zhitongblog/unterm` 的 `master`。
+- 许可：MIT，版权与第三方许可见 [NOTICE.md](NOTICE.md)。
+- 构建：`cd unterm && cargo build --release`（需要 Rust 工具链）。
+- 同步上游：见 [NOTICE.md](NOTICE.md#与上游同步)。
+
 ## Web 控制台（`app/`）
 
 仓库内置 Unzoo One 的 Web 控制台原型（来自 codex 前端线），技术栈为
