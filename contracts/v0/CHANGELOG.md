@@ -3,6 +3,27 @@
 版本策略：新增可选字段、新增事件类型、放宽约束 —— 向后兼容，记在这里即可。
 删字段、改语义、收窄枚举、改必填 —— 破坏兼容，必须升 major 并开新目录。
 
+## 2026-11-09 — Brain 事件新增 `approval.requested` / `approval.resolved`（向后兼容：新增）
+
+无头运行的 agent 不再只能「预先放行或跳过权限」：Brain 在执行某个工具前停下来问宿主，
+宿主答复后才继续。这两个事件把这次问答放进同一条事件流。
+
+- `approval.requested`：必须带 `approval.request_id` 和 `approval.tool_call{tool, arguments}`。
+  只说「有东西想执行」而不说是什么，就不是审批，是盲签（反例
+  `invalid/brain-approval-requested-without-tool.json`）
+- `approval.resolved`：必须带 `request_id` 和 `decision`（`allow_once` / `deny`，沿用
+  task/approval 的词——这里只答复这一次调用，不授予更大范围）。`deny` 必须带 `message`，
+  它会作为工具错误交给模型（反例 `invalid/brain-approval-denied-without-message.json`）
+- `interrupt`：拒绝时一并结束本轮。实测 Claude 被拒后会立刻换一个命令再问，一次拒绝
+  不够；带上它，本轮以 `interrupted` 结束
+- `decided_by`：`caller` 或 `unterm`（会话关闭时仍未答复，由宿主代为拒绝）
+- `examples/brain-events.json` 增加一问一答
+
+实现：unterm 的托管会话（`agent_session.start` 带 `hosted: true`，答复用
+`agent_session.decide`）。真实 Claude Code 2.1.319 端到端：放行写文件 → 文件写出；
+同一进程追问一轮；拒绝并中断 → 文件未写、本轮 100ms 内以 interrupted 结束。
+两段会话共 23 条事件用本目录的 schema 校验全部通过。
+
 ## 2026-11-09 — `turn.started` 的 `model` 改为可选（向后兼容：放宽）
 
 `codex exec --json` 的 `turn.started` 不带模型名，有的 CLI 要到这一轮后面才报。
