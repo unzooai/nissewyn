@@ -65,9 +65,14 @@ async function status(): Promise<void> {
   out({ lock: held, endpoint: core.endpoint, health });
 }
 
+// 和 store.ts 的 TERMINAL 保持一致。CLI 只走 HTTP，不直接引用存储层。
+const TERMINAL_STATES = new Set(["succeeded", "failed", "cancelled"]);
+
 async function demo(): Promise<void> {
   out("— 建任务 —");
-  const created = await call<{ task: { task_id: string; state: string } }>(
+  const created = await call<{
+    task: { task_id: string; state: string; active_run_id: string | null };
+  }>(
     "POST",
     "/v0/tasks",
     {
@@ -82,19 +87,32 @@ async function demo(): Promise<void> {
   const taskId = created.task.task_id;
   out(`  ${taskId}  state=${created.task.state}`);
 
-  out("— 开跑 —");
-  const started = await call<{ run: { run_id: string; attempt: number } }>(
-    "POST",
-    `/v0/tasks/${taskId}/start`,
-  );
-  out(`  ${started.run.run_id}  attempt=${started.run.attempt}`);
+  // 幂等键命中时拿回的是上一次 demo 建的那个任务，它可能已经跑完，也可能停在半路
+  // （上一次在开跑和收尾之间被打断）。按它现在的状态接着走，而不是从头再来——
+  // 对终态任务再 start 会被 Core 以 task.terminal 拒绝，那是对的，demo 不该去撞它。
+  if (TERMINAL_STATES.has(created.task.state)) {
+    out(`  幂等键命中：这是上一次 demo 建的任务，已是终态，跳过开跑和收尾。`);
+  } else {
+    if (created.task.active_run_id) {
+      out("— 开跑 —");
+      out(`  已有活动 Run ${created.task.active_run_id}（上一次被打断），直接收尾。`);
+    } else {
+      out("— 开跑 —");
+      const started = await call<{ run: { run_id: string; attempt: number } }>(
+        "POST",
+        `/v0/tasks/${taskId}/start`,
+      );
+      out(`  ${started.run.run_id}  attempt=${started.run.attempt}`);
+    }
 
-  out("— 收尾 —");
-  const finished = await call<{ task: { state: string } }>("POST", `/v0/tasks/${taskId}/finish`, {
-    outcome: "succeeded",
-    summary: "三档价格已对比，报告已生成。",
-  });
-  out(`  task state=${finished.task.state}`);
+    out("— 收尾 —");
+    const finished = await call<{ task: { state: string } }>(
+      "POST",
+      `/v0/tasks/${taskId}/finish`,
+      { outcome: "succeeded", summary: "三档价格已对比，报告已生成。" },
+    );
+    out(`  task state=${finished.task.state}`);
+  }
 
   out("— 按 cursor 读事件 —");
   let cursor = 0;
