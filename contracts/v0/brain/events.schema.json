@@ -104,7 +104,8 @@
         },
         {
           "if": { "properties": { "event": { "const": "turn.started" } }, "required": ["event"] },
-          "then": { "required": ["model", "turn_id"] }
+          "$comment": "model 不强制：codex exec --json 的 turn.started 不带模型，有的 CLI 要到后面才报。宁可缺省，也不让实现填一个假值。",
+          "then": { "required": ["turn_id"] }
         },
         {
           "if": {

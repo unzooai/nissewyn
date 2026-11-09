@@ -3,6 +3,18 @@
 版本策略：新增可选字段、新增事件类型、放宽约束 —— 向后兼容，记在这里即可。
 删字段、改语义、收窄枚举、改必填 —— 破坏兼容，必须升 major 并开新目录。
 
+## 2026-11-09 — `turn.started` 的 `model` 改为可选（向后兼容：放宽）
+
+`codex exec --json` 的 `turn.started` 不带模型名，有的 CLI 要到这一轮后面才报。
+原来要求 `model` 必填，实现只能填 `"unknown"` 之类的假值，比缺省更糟——它看起来像
+真的。现在 `turn.started` 只要求 `turn_id`；`model` 出现时仍须是字符串。
+
+unterm 的会话层（`unterm/unterm-services/src/agent_session.rs`）已按 v0 输出：
+`schema_version: "brain_event.v0"`、生成 `turn_…` id 并贯穿整轮、
+`tool_call.requested` 用嵌套的 `tool_call`、`turn.completed` / `session.closed`
+用契约的 `state`、`error` 带结构化 `error`。一次真实会话的 10 条事件已用本目录
+的 schema 逐条校验通过。
+
 ## 2026-11-09 — Brain 事件 `output.delta` 改用 `stream` + `text`（**破坏兼容，冻结前**）
 
 对应 `unzoo-one#15`，来自 `zhitongblog/unterm#30` 第 3 项。unterm 源码已并入本仓库
