@@ -1,0 +1,12 @@
+{
+  "schema": "brain/events.schema.json#/$defs/brain_event",
+  "reason": "output.delta 不带 stream。消费方分不清这段是对用户说的话还是推理，要么全展示把推理漏给用户，要么全藏掉丢了回答。",
+  "instance": {
+    "schema_version": "brain_event.v0",
+    "event": "output.delta",
+    "at": "2026-09-03T02:10:02+00:00",
+    "session_id": "ags_7f31c0",
+    "cursor": 3,
+    "text": "已经拿到三档价格，"
+  }
+}
