@@ -12,7 +12,6 @@
         "session.started",
         "turn.started",
         "output.delta",
-        "reasoning.summary",
         "tool_call.requested",
         "tool_call.result",
         "usage.updated",
@@ -63,8 +62,12 @@
           "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/slug"
         },
 
-        "message": {
-          "description": "output.delta 的增量文本，或 reasoning.summary 的摘要。不放原始隐藏推理。",
+        "stream": {
+          "description": "output.delta 属于哪条流。assistant 是模型对用户说的话，reasoning 是模型愿意展示的推理文本（不是原始隐藏推理）。两者在一个 turn 内交错到达，放在同一条事件序列里，消费方不需要再按时间缝合；不想展示推理就按 stream 过滤。",
+          "enum": ["assistant", "reasoning"]
+        },
+        "text": {
+          "description": "output.delta 的增量文本。字段名与 unterm 的实际输出、Core 事件信封 brain.message_delta 的 data.text 一致。",
           "type": "string"
         },
 
@@ -97,7 +100,7 @@
       "allOf": [
         {
           "if": { "properties": { "event": { "const": "output.delta" } }, "required": ["event"] },
-          "then": { "required": ["message"] }
+          "then": { "required": ["stream", "text"] }
         },
         {
           "if": { "properties": { "event": { "const": "turn.started" } }, "required": ["event"] },

@@ -32,7 +32,8 @@
       "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
       "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
       "step_id": "step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D",
-      "message": "已经拿到三档价格，"
+      "stream": "assistant",
+      "text": "已经拿到三档价格，"
     },
     {
       "schema_version": "brain_event.v0",

@@ -3,6 +3,26 @@
 版本策略：新增可选字段、新增事件类型、放宽约束 —— 向后兼容，记在这里即可。
 删字段、改语义、收窄枚举、改必填 —— 破坏兼容，必须升 major 并开新目录。
 
+## 2026-11-09 — Brain 事件 `output.delta` 改用 `stream` + `text`（**破坏兼容，冻结前**）
+
+对应 `unzoo-one#15`，来自 `zhitongblog/unterm#30` 第 3 项。unterm 源码已并入本仓库
+`unterm/`，契约以 unterm 的实际输出为准。
+
+- `output.delta` 新增必填 `stream`，取值 `assistant` / `reasoning`
+- 增量文本字段 `message` 改名为 `text`，与 unterm 的输出、以及 Core 事件信封
+  `brain.message_delta` 的 `data.text` 一致；`output.delta` 现在要求 `stream` 和 `text`
+- 从 `brain_event_type` 移除 `reasoning.summary`：推理和回答是同一条流的增量、在一个
+  turn 内交错到达，拆成两种事件会丢掉它们的相对顺序。推理改走 `output.delta` +
+  `stream: reasoning`，不想展示就按 `stream` 过滤
+- 新增反例 `invalid/brain-output-delta-without-stream.json`、
+  `invalid/brain-reasoning-summary-event.json`
+
+按版本策略，收窄枚举和改字段名都属于破坏兼容，本应升 major。这次直接改 v0，
+**只因为 v0 还没冻结**（M0 的三仓库评审尚未发生）。冻结之后同类改动必须开 `contracts/v1`。
+
+`brain/adapter.schema.json` 的能力位 `reasoning_summary` 保留不动：它描述的是
+「Adapter 能否提供可展示的推理文本」，和事件类型叫什么无关。
+
 ## 2026-09-08 — timestamp 接受 `+00:00`（向后兼容：放宽）
 
 `common/primitives.schema.json` 的 `timestamp` 原来只收字面 `Z`。unterm 用
