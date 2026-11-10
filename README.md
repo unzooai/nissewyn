@@ -32,7 +32,7 @@ Unzoo One 是一个本地优先、可更换大脑、可持续运行、可审计�
 - [C1 产品设计系统](docs/c1-product-design-system.md)
 - [关键页面与状态蓝图](docs/key-screen-blueprints.md)
 - [打开 C1 产品设计预览](brand/c1/product-design-preview.html)
-- [运行 C1 桌面 UI 原型](apps/desktop-ui/README.md)
+- [Unzoo One 桌面客户端与安装包](apps/unzoo-one/README.md)
 - [桌面 UI 实现状态与接入 Backlog](docs/ui-prototype-implementation.md)
 - [超级工作台 Context、角色与执行治理](docs/super-workbench-context-and-governance.md)
 - [打开品牌与 UI 预览](brand/preview.html)

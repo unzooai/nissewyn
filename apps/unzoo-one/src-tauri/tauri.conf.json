@@ -25,12 +25,39 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["msi"],
+    "targets": [
+      "msi"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.ico"
-    ]
+    ],
+    "resources": {
+      "payload/unterm.exe": "unterm.exe",
+      "payload/unterm-cli.exe": "unterm-cli.exe",
+      "payload/unterm-core.exe": "unterm-core.exe",
+      "payload/conpty.dll": "conpty.dll",
+      "payload/OpenConsole.exe": "OpenConsole.exe",
+      "payload/libEGL.dll": "libEGL.dll",
+      "payload/libGLESv2.dll": "libGLESv2.dll",
+      "payload/mesa/opengl32.dll": "mesa/opengl32.dll",
+      "payload/defaults/unterm.conf": "defaults/unterm.conf",
+      "payload/assets/fonts/SymbolsNerdFontMono-Regular.ttf": "assets/fonts/SymbolsNerdFontMono-Regular.ttf",
+      "payload/assets/fonts/NotoColorEmoji.ttf": "assets/fonts/NotoColorEmoji.ttf",
+      "payload/assets/fonts/JetBrainsMono-Regular.ttf": "assets/fonts/JetBrainsMono-Regular.ttf"
+    },
+    "publisher": "Unzoo",
+    "shortDescription": "Unzoo One — the AI task workspace",
+    "longDescription": "Run, approve and track AI agent tasks on your own computer. Every tool call asks you first.",
+    "windows": {
+      "wix": {
+        "language": [
+          "en-US",
+          "zh-CN"
+        ]
+      }
+    }
   }
 }

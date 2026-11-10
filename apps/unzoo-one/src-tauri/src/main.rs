@@ -71,19 +71,7 @@ fn live(discovery: &Discovery) -> Option<CoreConnection> {
 /// The Core's program: named explicitly, next to this one (an install), or
 /// the runtime's own build (developing).
 fn core_program() -> Option<PathBuf> {
-    let name = if cfg!(windows) { "unterm-core.exe" } else { "unterm-core" };
-    if let Some(path) = std::env::var_os("UNZOO_CORE_EXE").map(PathBuf::from) {
-        return path.is_file().then_some(path);
-    }
-    let beside = std::env::current_exe().ok()?.parent()?.join(name);
-    if beside.is_file() {
-        return Some(beside);
-    }
-    let runtime = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../unterm/target");
-    ["debug", "release"]
-        .iter()
-        .map(|profile| runtime.join(profile).join(name))
-        .find(|path| path.is_file())
+    sibling_program("unterm-core", "UNZOO_CORE_EXE")
 }
 
 fn start_core(program: &PathBuf) -> std::io::Result<()> {
@@ -146,6 +134,38 @@ fn pid_alive(pid: u32) -> bool {
         || Command::new("kill").args(["-0", &pid.to_string()]).status().map(|s| s.success()).unwrap_or(false)
 }
 
+/// A program that ships next to this one (an install), or the runtime's own
+/// build (developing). `env` names an override.
+fn sibling_program(stem: &str, env: &str) -> Option<PathBuf> {
+    let name = if cfg!(windows) { format!("{stem}.exe") } else { stem.to_string() };
+    if let Some(path) = std::env::var_os(env).map(PathBuf::from) {
+        return path.is_file().then_some(path);
+    }
+    let beside = std::env::current_exe().ok()?.parent()?.join(&name);
+    if beside.is_file() {
+        return Some(beside);
+    }
+    let runtime = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../unterm/target");
+    ["release", "debug"]
+        .iter()
+        .map(|profile| runtime.join(profile).join(&name))
+        .find(|path| path.is_file())
+}
+
+/// Open the terminal: another client of the same Core, so its sessions and
+/// the agent runs it shows are the ones Unzoo One knows about.
+#[tauri::command]
+fn open_terminal() -> Result<(), String> {
+    let program = sibling_program("unterm", "UNZOO_TERMINAL_EXE")
+        .ok_or("The terminal is missing. Please reinstall Unzoo One.")?;
+    Command::new(&program)
+        // Its windows are Unzoo One's: the terminal is a feature of this app.
+        .env("UNTERM_PRODUCT_NAME", "Unzoo One")
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("The terminal could not start: {e}"))
+}
+
 /// The connection, found once and kept; asked again only after a failure,
 /// so a Core that is still starting is waited for rather than given up on.
 struct Connection(Mutex<Option<CoreConnection>>);
@@ -180,7 +200,7 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![core_connection])
+        .invoke_handler(tauri::generate_handler![core_connection, open_terminal])
         .run(tauri::generate_context!())
         .expect("Unzoo One could not start");
 }
