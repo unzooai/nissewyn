@@ -173,7 +173,7 @@ export function AgentRunPanel({
           <span>
             <strong>常设规则</strong>
             <small>
-              命中的工具调用不再进收件箱，直接放行或拒绝。只有人能定规则；放行规则不会匹配拼接命令（&&、|、重定向）。
+              命中的工具调用不再进收件箱，直接放行或拒绝。只有人能定规则；放行规则不会匹配拼接命令（&、|、;、重定向）。各家的命令行工具（Bash、PowerShell、shell、run_command）算同一个，写哪个都对它们全部生效。
             </small>
           </span>
           <button type="button" aria-label="刷新规则" title="刷新规则" onClick={() => void reload()} disabled={loading}>
