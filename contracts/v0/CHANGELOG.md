@@ -24,6 +24,11 @@
 同一进程追问一轮；拒绝并中断 → 文件未写、本轮 100ms 内以 interrupted 结束。
 两段会话共 23 条事件用本目录的 schema 校验全部通过。
 
+OpenCode 走 ACP（`opencode acp`，unterm 把 bash/edit/webfetch 设为询问——OpenCode 默认全放行，
+不改就永远不会来问）。经无头 Core + MCP 桥接实测：放行写文件、追问一轮、拒绝并中断
+（0.31s 以 interrupted 结束）、未答复即关闭（代拒并中断），55 条事件校验全部通过。
+ACP 的答复只是选项、不带文字，所以对 OpenCode 来说 `deny` 的 `message` 只记录在案、到不了模型。
+
 ## 2026-11-09 — `turn.started` 的 `model` 改为可选（向后兼容：放宽）
 
 `codex exec --json` 的 `turn.started` 不带模型名，有的 CLI 要到这一轮后面才报。
