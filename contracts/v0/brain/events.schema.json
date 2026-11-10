@@ -120,8 +120,13 @@
               "type": "boolean"
             },
             "decided_by": {
-              "description": "caller：调用方答复；unterm：会话关闭时仍未答复，由宿主代为拒绝。",
-              "enum": ["caller", "unterm"]
+              "description": "caller：调用方答复；unterm：会话关闭时仍未答复，由宿主代为拒绝；policy：命中工作区里一条预先定下的规则，没有打扰任何人。",
+              "enum": ["caller", "unterm", "policy"]
+            },
+            "rule_id": {
+              "description": "decided_by 为 policy 时必填：命中的是哪条规则。自动决定必须能追溯到某个人定下的某条规则。",
+              "type": "string",
+              "minLength": 1
             }
           }
         },
@@ -180,6 +185,10 @@
               {
                 "if": { "properties": { "approval": { "properties": { "decision": { "const": "deny" } } } } },
                 "then": { "properties": { "approval": { "required": ["message"] } } }
+              },
+              {
+                "if": { "properties": { "approval": { "properties": { "decided_by": { "const": "policy" } }, "required": ["decided_by"] } } },
+                "then": { "properties": { "approval": { "required": ["rule_id"] } } }
               }
             ]
           }

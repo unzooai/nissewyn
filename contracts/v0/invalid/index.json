@@ -170,6 +170,11 @@
       "name": "brain-approval-denied-without-message.json",
       "schema": "brain/events.schema.json#/$defs/brain_event",
       "reason": "拒绝了却不给理由。模型只能从这条消息知道为什么停下；没有理由，它会猜，或者换个工具绕过去再试。"
+    },
+    {
+      "name": "brain-approval-policy-without-rule.json",
+      "schema": "brain/events.schema.json#/$defs/brain_event",
+      "reason": "策略自动放行，却说不出是哪条规则。自动决定没有人在场，能追溯的只有规则本身；没有 rule_id，这次放行就无从审计。"
     }
   ]
 }

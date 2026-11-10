@@ -1,5 +1,5 @@
 {
-  "cursor": 8,
+  "cursor": 10,
   "events": [
     {
       "schema_version": "brain_event.v0",
@@ -115,6 +115,42 @@
         "decision": "deny",
         "message": "not on this machine",
         "decided_by": "caller"
+      }
+    },
+    {
+      "schema_version": "brain_event.v0",
+      "session_id": "ags_7f31c0",
+      "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+      "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+      "step_id": "step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D",
+      "event": "approval.requested",
+      "at": "2026-09-03T02:12:02+00:00",
+      "cursor": 9,
+      "approval": {
+        "request_id": "a332",
+        "tool_call": {
+          "tool": "Bash",
+          "arguments": {
+            "command": "cargo test --workspace"
+          }
+        },
+        "description": "Run the test suite"
+      }
+    },
+    {
+      "schema_version": "brain_event.v0",
+      "session_id": "ags_7f31c0",
+      "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+      "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+      "step_id": "step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D",
+      "event": "approval.resolved",
+      "at": "2026-09-03T02:12:02+00:00",
+      "cursor": 10,
+      "approval": {
+        "request_id": "a332",
+        "decision": "allow_once",
+        "decided_by": "policy",
+        "rule_id": "rule_01JBQ9A2C4E6G8J0K2M4P6R8T0"
       }
     }
   ]

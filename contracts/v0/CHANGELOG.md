@@ -3,6 +3,24 @@
 版本策略：新增可选字段、新增事件类型、放宽约束 —— 向后兼容，记在这里即可。
 删字段、改语义、收窄枚举、改必填 —— 破坏兼容，必须升 major 并开新目录。
 
+## 2026-11-10 — `approval.decided_by` 新增 `policy`，并带 `rule_id`（向后兼容：新增）
+
+托管会话的审批可以由工作区里一条预先定下的规则直接答复，不打扰任何人：允许
+`cargo test`、永远拒绝 `git push --force` 之类。每次都问会把人训练成不看就点
+「允许」，规则把注意力留给真正需要判断的那几次。
+
+- `decided_by` 增加 `policy`
+- 新增 `rule_id`；`decided_by` 为 `policy` 时必填——自动决定没有人在场，能追溯的
+  只有规则本身（反例 `invalid/brain-approval-policy-without-rule.json`）
+- `examples/brain-events.json` 增加一条由规则放行的问答
+
+实现（unterm `agent_policy`）：规则只能由人定——控制台 REST，或答复时带
+`remember`；没有任何 MCP 方法能加规则，否则 agent 就能自己批准自己。带命令前缀
+的放行规则绝不匹配拼接命令（`&&`、`;`、`|`、重定向、命令替换），拒绝规则则连
+拼接命令的各段一起看。真实 Claude Code 实测：控制台勾「记住」批准一次，同一工作区
+再跑同一条命令时以 `decided_by: policy` 自动放行、不进收件箱；拒绝规则命中则拒绝
+并结束本轮。导出事件按本目录 schema 校验全部通过。
+
 ## 2026-11-09 — Brain 事件新增 `approval.requested` / `approval.resolved`（向后兼容：新增）
 
 无头运行的 agent 不再只能「预先放行或跳过权限」：Brain 在执行某个工具前停下来问宿主，
