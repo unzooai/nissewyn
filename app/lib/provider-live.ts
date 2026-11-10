@@ -28,6 +28,8 @@ import {
   toBrainEvent,
   type RawAgentRule,
 } from "./brain-events";
+import { parseAgentRunSettings } from "./agent-run-settings";
+import type { RuntimeRun, RuntimeTask } from "./runtime-tasks";
 import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
@@ -300,6 +302,50 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
     },
 
     /** 常设规则只存在 unterm 那边；控制台不归它托管时用演示实现。 */
+    runtime: {
+      async available() {
+        if (!inBrowser) return false;
+        try {
+          await getUnterm("/api/console/tasks");
+          return true;
+        } catch {
+          // 老版本 unterm 没有这个接口，或者根本不是 unterm 托管的控制台。
+          return false;
+        }
+      },
+      async list() {
+        const data = await getUnterm<{ tasks?: RuntimeTask[] }>("/api/console/tasks");
+        return data.tasks ?? [];
+      },
+      async put(task) {
+        await callUnterm("/api/console/tasks/put", task);
+      },
+      async remove(id) {
+        await callUnterm("/api/console/tasks/delete", { id });
+      },
+      async run({ taskId, runId, prompt, continueFrom }) {
+        const data = await callUnterm<{ run: RuntimeRun }>("/api/console/tasks/run", {
+          task_id: taskId,
+          ...(runId ? { run_id: runId } : {}),
+          ...(prompt ? { prompt } : {}),
+          ...(continueFrom ? { continue_from: continueFrom } : {}),
+        });
+        return data.run;
+      },
+      async stop(taskId) {
+        const data = await callUnterm<{ stopped?: boolean }>("/api/console/tasks/stop", { task_id: taskId });
+        return data.stopped === true;
+      },
+      async settings() {
+        const data = await getUnterm<{ settings: Record<string, unknown> }>("/api/console/run-settings");
+        return parseAgentRunSettings(JSON.stringify(data.settings));
+      },
+      async saveSettings(settings) {
+        const data = await callUnterm<{ settings: Record<string, unknown> }>("/api/console/run-settings", settings);
+        return parseAgentRunSettings(JSON.stringify(data.settings));
+      },
+    },
+
     agentRules: {
       async list() {
         if (!inBrowser) return fallback.agentRules.list();

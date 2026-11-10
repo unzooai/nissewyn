@@ -35,6 +35,8 @@
  * 真实后端不会返回图标，接的时候由 UI 层按 action 或 risk 映射。
  */
 
+import type { AgentRunSettings } from "./agent-run-settings";
+import type { RuntimeRun, RuntimeTask, RuntimeTaskPut } from "./runtime-tasks";
 import type {
   ActivityItem,
   ApprovalItem,
@@ -303,6 +305,25 @@ export type WorkspaceSnapshot = {
   connectors: Record<ConnectorId, boolean>;
 };
 
+/**
+ * 装好的 Unzoo One 里，任务归本机运行时（unterm）管：它存任务、跑任务、
+ * 按计划定时跑，页面关了也照样。云端演示版没有运行时，available() 为 false，
+ * 页面退回本地演示。
+ */
+export interface RuntimeTaskPort {
+  available(): Promise<boolean>;
+  list(): Promise<RuntimeTask[]>;
+  put(task: RuntimeTaskPut): Promise<void>;
+  remove(id: string): Promise<void>;
+  /** 跑一次。continueFrom：接着那个会话原来的对话说。 */
+  run(input: { taskId: string; runId?: string; prompt?: string; continueFrom?: string }): Promise<RuntimeRun>;
+  /** 停掉正在跑的那次。没有在跑的返回 false。 */
+  stop(taskId: string): Promise<boolean>;
+  /** 运行时跑任务用的设置：交给哪个 agent、在哪个目录、是否受管。 */
+  settings(): Promise<AgentRunSettings>;
+  saveSettings(settings: AgentRunSettings): Promise<AgentRunSettings>;
+}
+
 export interface WorkspaceProvider {
   tasks: TaskPort;
   approvals: ApprovalPort;
@@ -313,6 +334,7 @@ export interface WorkspaceProvider {
   team: TeamPort;
   brain: BrainPort;
   agentRules: AgentRulePort;
+  runtime: RuntimeTaskPort;
   /** 当前状态的同步快照，用于初始化组件 state。 */
   snapshot(): WorkspaceSnapshot;
   /**

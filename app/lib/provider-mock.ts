@@ -414,6 +414,33 @@ export function createMockProvider(): WorkspaceProvider {
     policy: policyPort,
     team: teamPort,
     brain: brainPort,
+    runtime: {
+      // 演示版没有本机运行时：任务留在页面里，由页面自己演示运行。
+      async available() {
+        return false;
+      },
+      async list() {
+        return [];
+      },
+      async put() {
+        throw new Error("演示版没有本机运行时");
+      },
+      async remove() {
+        throw new Error("演示版没有本机运行时");
+      },
+      async run() {
+        throw new Error("演示版没有本机运行时");
+      },
+      async stop() {
+        return false;
+      },
+      async settings() {
+        throw new Error("演示版没有本机运行时");
+      },
+      async saveSettings() {
+        throw new Error("演示版没有本机运行时");
+      },
+    },
     agentRules: agentRulePort,
     snapshot,
     defaults,

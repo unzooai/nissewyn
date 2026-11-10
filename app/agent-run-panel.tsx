@@ -8,7 +8,7 @@ import {
   writeAgentRunSettings,
   type AgentRunSettings,
 } from "./lib/agent-run-settings";
-import type { AgentRule, AgentRulePort, BrainAgent, BrainPort } from "./lib/provider";
+import type { AgentRule, AgentRulePort, BrainAgent, BrainPort, RuntimeTaskPort } from "./lib/provider";
 
 /**
  * 设置 › 智能体：任务交给 agent 时在哪个目录跑、是否受管，以及托管会话的
@@ -19,10 +19,16 @@ import type { AgentRule, AgentRulePort, BrainAgent, BrainPort } from "./lib/prov
 export function AgentRunPanel({
   rules: rulePort,
   brain,
+  runtime,
   notify,
 }: {
   rules: AgentRulePort;
   brain: Pick<BrainPort, "agents">;
+  /**
+   * 有本机运行时就存在运行时里：定时任务在没有页面的时候也要知道交给谁、
+   * 在哪个目录跑。没有（演示版）就存在这个浏览器里。
+   */
+  runtime?: Pick<RuntimeTaskPort, "settings" | "saveSettings"> | null;
   notify: (message: string) => void;
 }) {
   const [settings, setSettings] = useState<AgentRunSettings>({ ...defaultAgentRunSettings });
@@ -41,10 +47,29 @@ export function AgentRunPanel({
 
   // 存储只在浏览器里有，挂载后再读，免得和服务端渲染的首屏对不上。
   useEffect(() => {
+    if (runtime) {
+      let live = true;
+      runtime
+        .settings()
+        .then((stored) => {
+          if (!live) return;
+          setSettings(stored);
+          setCwdDraft(stored.cwd);
+        })
+        .catch((error: unknown) => {
+          if (live) notify(`读不到运行设置：${error instanceof Error ? error.message : String(error)}`);
+        });
+      return () => {
+        live = false;
+      };
+    }
     const stored = readAgentRunSettings();
     setSettings(stored);
     setCwdDraft(stored.cwd);
-  }, []);
+    return undefined;
+    // notify 每次渲染都是新的，不该触发重读。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runtime]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -85,6 +110,23 @@ export function AgentRunPanel({
   const chosen = agents?.find((agent) => agent.id === settings.agent);
 
   function save(next: AgentRunSettings, message: string) {
+    if (runtime) {
+      const previous = settings;
+      setSettings(next);
+      runtime
+        .saveSettings(next)
+        .then((saved) => {
+          setSettings(saved);
+          setCwdDraft(saved.cwd);
+          notify(message);
+        })
+        .catch((error: unknown) => {
+          setSettings(previous);
+          setCwdDraft(previous.cwd);
+          notify(`没有保存：${error instanceof Error ? error.message : String(error)}`);
+        });
+      return;
+    }
     setSettings(next);
     notify(writeAgentRunSettings(next) ? message : `${message}（这个浏览器不能保存设置，刷新后会恢复默认）`);
   }

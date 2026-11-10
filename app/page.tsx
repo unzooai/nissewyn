@@ -223,7 +223,15 @@ import {
 import type { BrainEvent } from "./lib/provider";
 import { brainModeFor, readAgentRunSettings } from "./lib/agent-run-settings";
 import { turnOutcome } from "./lib/brain-events";
+import {
+  anyRunning,
+  mergeRuntimeTasks,
+  promptOf,
+  putSignature,
+  toRuntimePut,
+} from "./lib/runtime-tasks";
 import { AgentRunPanel } from "./agent-run-panel";
+import { RuntimeFocusCard } from "./runtime-focus";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
 import { isAgentApprovalId, reconcileAgentApprovals } from "./lib/agent-approvals";
 
@@ -1535,6 +1543,13 @@ export default function HomePage() {
     useState(false);
   const [recoveryBackupCreated, setRecoveryBackupCreated] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>(workspaceSeed.tasks);
+  /**
+   * 装好的产品里任务归本机运行时（unterm）管。null：还没探测完。
+   * true：任务从运行时读、改动推给运行时、运行由运行时启动和收尾。
+   */
+  const [runtimeMode, setRuntimeMode] = useState<boolean | null>(null);
+  const runtimeSent = useRef(new Map<string, string>());
+  const runtimeRemoved = useRef(new Set<string>());
   const [artifacts, setArtifacts] = useState<ArtifactItem[]>(workspaceSeed.artifacts);
   const [artifactFilter, setArtifactFilter] = useState<ArtifactFilter>("全部");
   const [artifactTaskId, setArtifactTaskId] = useState<string | null>(null);
@@ -1732,6 +1747,7 @@ export default function HomePage() {
         minute: "2-digit",
       }).format(new Date(workspaceLastSavedAt))
     : "";
+  const runningTaskTotal = tasks.filter((task) => task.status === "运行中").length;
   const systemStatusTone =
     workspacePersistenceStatus === "failed"
       ? "storage-failed"
@@ -1739,7 +1755,7 @@ export default function HomePage() {
         ? "storage-retrying"
         : !isOnline
           ? "offline"
-          : isRunning
+          : runtimeMode || isRunning
             ? "online"
             : "paused";
   const systemStatusLabel =
@@ -1749,9 +1765,13 @@ export default function HomePage() {
         ? "正在重试保存"
         : !isOnline
           ? "设备当前离线"
-          : isRunning
-            ? "系统运行正常"
-            : "自动运行已暂停";
+          : runtimeMode
+            ? runningTaskTotal > 0
+              ? `${runningTaskTotal} 个任务在运行`
+              : "本机运行时已连接"
+            : isRunning
+              ? "系统运行正常"
+              : "自动运行已暂停";
   const systemStatusDetail =
     workspacePersistenceStatus === "failed"
       ? "请重试或导出紧急备份"
@@ -9038,13 +9058,13 @@ export default function HomePage() {
     runId: string,
     continueFrom?: { sessionId: string; prompt: string },
   ) {
+    if (runtimeMode) {
+      await runOnRuntime(task, runId, continueFrom);
+      return;
+    }
     const stepId = `${runId}-step-1`;
     const startedAtMs = Date.now();
-    const prompt =
-      continueFrom?.prompt ??
-      [task.title, task.description, task.target && `目标：${task.target}`]
-        .filter(Boolean)
-        .join("\n");
+    const prompt = continueFrom?.prompt ?? promptOf(task);
 
     const patchRun = (patch: Partial<TaskRun>) => {
       setTasks((items) =>
@@ -9278,6 +9298,148 @@ export default function HomePage() {
   useEffect(() => {
     if (!tasksReady || reattachedBrainRuns.current) return;
     reattachedBrainRuns.current = true;
+    void (async () => {
+      if (await workspaceProvider.runtime.available()) {
+        await adoptRuntime();
+        return;
+      }
+      setRuntimeMode(false);
+      reattachLocalRuns();
+    })();
+    // 只在任务读好后跑一次。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasksReady]);
+
+  /**
+   * 换成运行时里的任务。演示用的任务、审批、成果不再出现：装好的产品从空
+   * 白开始。运行时里还一个任务都没有、页面上却有用户自己建的，就是从只存
+   * 在浏览器里的旧版升级上来的，把它们搬过去。
+   */
+  async function adoptRuntime() {
+    let remote = [] as Awaited<ReturnType<typeof workspaceProvider.runtime.list>>;
+    try {
+      remote = await workspaceProvider.runtime.list();
+    } catch (error) {
+      setNotice(`读不到本机运行时里的任务：${error instanceof Error ? error.message : String(error)}`);
+      setRuntimeMode(false);
+      reattachLocalRuns();
+      return;
+    }
+    const demoTaskIds = new Set(workspaceDefaults.tasks.map((task) => task.id));
+    const mine = tasks.filter((task) => !demoTaskIds.has(task.id));
+    if (remote.length === 0 && mine.length > 0) {
+      for (const task of mine) {
+        try {
+          await workspaceProvider.runtime.put(toRuntimePut(task));
+          runtimeSent.current.set(task.id, putSignature(task));
+        } catch {
+          // 留给镜像下一次再推。
+        }
+      }
+      remote = await workspaceProvider.runtime.list().catch(() => remote);
+    }
+    // 搬家失败（运行时里还是空的）就先用页面上的，镜像会接着推。
+    const merged = remote.length ? mergeRuntimeTasks([], remote) : mine;
+    for (const task of merged) runtimeSent.current.set(task.id, putSignature(task));
+    setTasks(merged);
+    const demoApprovalIds = new Set(workspaceDefaults.approvals.map((item) => item.id));
+    setApprovals((items) => items.filter((item) => !demoApprovalIds.has(item.id)));
+    const demoArtifactIds = new Set(workspaceDefaults.artifacts.map((item) => item.id));
+    setArtifacts((items) => items.filter((item) => !demoArtifactIds.has(item.id)));
+    const demoActivityIds = new Set(workspaceDefaults.activity.map((item) => item.id));
+    setActivityLog((items) => items.filter((item) => !demoActivityIds.has(item.id)));
+    setIsRunning(false);
+    setRuntimeMode(true);
+  }
+
+  /** 交给运行时跑：先把任务最新的样子推过去，再让它起一次运行。 */
+  async function runOnRuntime(
+    task: TaskItem,
+    runId: string,
+    continueFrom?: { sessionId: string; prompt: string },
+  ) {
+    try {
+      const current = tasks.find((item) => item.id === task.id) ?? task;
+      await workspaceProvider.runtime.put(toRuntimePut(current));
+      runtimeSent.current.set(task.id, putSignature(current));
+      await workspaceProvider.runtime.run({
+        taskId: task.id,
+        runId,
+        prompt: continueFrom?.prompt,
+        continueFrom: continueFrom?.sessionId,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setTasks((items) =>
+        items.map((item) =>
+          item.id === task.id
+            ? {
+                ...item,
+                status: "失败",
+                lastError: message,
+                runs: (item.runs ?? []).map((run) =>
+                  run.id === runId
+                    ? { ...run, status: "失败", summary: message, errorMessage: message }
+                    : run,
+                ),
+              }
+            : item,
+        ),
+      );
+      setNotice(`任务没能开始：${message}`);
+    }
+    void refreshFromRuntime();
+  }
+
+  async function refreshFromRuntime() {
+    try {
+      const remote = await workspaceProvider.runtime.list();
+      setTasks((items) =>
+        mergeRuntimeTasks(items, remote, Date.now(), runtimeRemoved.current),
+      );
+    } catch {
+      // 下一轮再试。
+    }
+  }
+
+  // 页面上对任务的改动推给运行时：只推变了的，删掉的也删掉。
+  useEffect(() => {
+    if (!runtimeMode) return;
+    const present = new Set(tasks.map((task) => task.id));
+    for (const task of tasks) {
+      const signature = putSignature(task);
+      if (runtimeSent.current.get(task.id) === signature) continue;
+      runtimeSent.current.set(task.id, signature);
+      workspaceProvider.runtime.put(toRuntimePut(task)).catch((error: unknown) => {
+        runtimeSent.current.delete(task.id);
+        setNotice(`任务没有保存到本机运行时：${error instanceof Error ? error.message : String(error)}`);
+      });
+    }
+    for (const id of [...runtimeSent.current.keys()]) {
+      if (present.has(id)) continue;
+      runtimeSent.current.delete(id);
+      runtimeRemoved.current.add(id);
+      workspaceProvider.runtime
+        .remove(id)
+        .catch(() => {
+          // 已经不在了也算删掉。
+        })
+        .finally(() => runtimeRemoved.current.delete(id));
+    }
+  }, [runtimeMode, tasks]);
+
+  // 运行记录和任务状态从运行时读回来：有任务在跑时两秒一次，平时十五秒，
+  // 定时任务自己跑起来了也能看见。
+  const tasksRunning = anyRunning(tasks);
+  useEffect(() => {
+    if (!runtimeMode) return;
+    const timer = window.setInterval(() => void refreshFromRuntime(), tasksRunning ? 2_000 : 15_000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runtimeMode, tasksRunning]);
+
+  /** 没有运行时（演示版）：把还在"运行中"、又有会话的运行重新接上。 */
+  function reattachLocalRuns() {
     for (const task of tasks) {
       for (const run of task.runs ?? []) {
         if (run.status !== "运行中" || !run.sessionId?.startsWith("ags_")) continue;
@@ -9290,9 +9452,7 @@ export default function HomePage() {
         );
       }
     }
-    // 只在任务读好后跑一次；之后的运行由 driveBrainRun 自己跟。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasksReady]);
+  }
 
   /** 接着这次运行原来的对话，再说一句：作为一次新的运行记下来。 */
   function continueRunConversation(task: TaskItem, run: TaskRun, prompt: string) {
@@ -9407,7 +9567,11 @@ export default function HomePage() {
     const nextStatus: TaskStatus =
       task.status === "运行中" ? "已暂停" : "运行中";
     // 暂停一个真在跑的 agent：停掉它这一轮，别让它在"已暂停"的任务里继续干活。
-    if (task.status === "运行中") {
+    if (task.status === "运行中" && runtimeMode) {
+      workspaceProvider.runtime.stop(task.id).catch((error: unknown) => {
+        setNotice(`没能停下智能体：${error instanceof Error ? error.message : String(error)}`);
+      });
+    } else if (task.status === "运行中") {
       const current = tasks.find((item) => item.id === task.id) ?? task;
       const live = current.runs?.find(
         (run) => run.status === "运行中" && run.sessionId,
@@ -10563,152 +10727,162 @@ export default function HomePage() {
             </div>
 
             <div className="home-focus-grid">
-              <section className="active-task-panel" aria-label="正在运行的任务">
-                <div className="task-ai-hero">
-                  <div className="task-ai-copy">
-                    <div className="focus-panel-heading">
-                      <div>
-                        <span>
-                          {formatTaskSchedule(primaryTask)} ·{" "}
-                          {isRunning ? "正在运行" : "已暂停"}
+              {runtimeMode ? (
+                <RuntimeFocusCard
+                  tasks={tasks}
+                  schedule={formatTaskSchedule}
+                  onOpen={openTask}
+                  onToggle={updateTaskStatus}
+                  onCreate={beginCreateTask}
+                />
+              ) : (
+                <section className="active-task-panel" aria-label="正在运行的任务">
+                  <div className="task-ai-hero">
+                    <div className="task-ai-copy">
+                      <div className="focus-panel-heading">
+                        <div>
+                          <span>
+                            {formatTaskSchedule(primaryTask)} ·{" "}
+                            {isRunning ? "正在运行" : "已暂停"}
+                          </span>
+                          <strong>{primaryTask.title}</strong>
+                        </div>
+                        <span className={`live-state ${isRunning ? "" : "paused"}`}>
+                          <i />
+                          {isRunning ? "运行中" : "已暂停"}
                         </span>
-                        <strong>{primaryTask.title}</strong>
                       </div>
-                      <span className={`live-state ${isRunning ? "" : "paused"}`}>
+
+                      <p className="task-purpose">
+                        {primaryTask.description}
+                      </p>
+
+                      <div className="task-ai-context" aria-label="AI 当前状态">
+                        <span><Brain size={15} /> Codex 推理</span>
                         <i />
-                        {isRunning ? "运行中" : "已暂停"}
-                      </span>
+                        <span><ShieldCheck size={15} /> 可审计执行</span>
+                      </div>
                     </div>
 
-                    <p className="task-purpose">
-                      {primaryTask.description}
-                    </p>
-
-                    <div className="task-ai-context" aria-label="AI 当前状态">
-                      <span><Brain size={15} /> Codex 推理</span>
-                      <i />
-                      <span><ShieldCheck size={15} /> 可审计执行</span>
+                    <div className="task-ai-visual" aria-label="AI 正在整合网页证据">
+                      {/* The source WebP is already optimized; vinext has no Next image proxy. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/ai-core-premium.webp" alt="" aria-hidden="true" />
+                      <span className="task-ai-visual-status">
+                        <Sparkles size={15} />
+                        <span>
+                          <small>AI 引擎实况</small>
+                          <strong>正在整合 12 份页面证据</strong>
+                        </span>
+                      </span>
                     </div>
                   </div>
 
-                  <div className="task-ai-visual" aria-label="AI 正在整合网页证据">
-                    {/* The source WebP is already optimized; vinext has no Next image proxy. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/ai-core-premium.webp" alt="" aria-hidden="true" />
-                    <span className="task-ai-visual-status">
-                      <Sparkles size={15} />
+                  <div className="task-signal-band" aria-label="今日任务信号">
+                    <div className="signal-metric">
+                      <span>今天发现</span>
+                      <strong>4</strong>
+                      <small>处页面变化</small>
+                    </div>
+                    <div className="signal-chart" aria-hidden="true">
+                      <svg viewBox="0 0 100 50" preserveAspectRatio="none">
+                        <path d="M2 13 H98 M2 25 H98 M2 37 H98" />
+                        <polyline points={signalPoints} />
+                        <circle cx="98" cy="7.68" r="1.8" />
+                      </svg>
                       <span>
-                        <small>AI 引擎实况</small>
-                        <strong>正在整合 12 份页面证据</strong>
+                        <small>09:00</small>
+                        <small>现在</small>
                       </span>
-                    </span>
+                    </div>
+                    <div className="signal-metric">
+                      <span>保存证据</span>
+                      <strong>12</strong>
+                      <small>张页面截图</small>
+                    </div>
                   </div>
-                </div>
 
-                <div className="task-signal-band" aria-label="今日任务信号">
-                  <div className="signal-metric">
-                    <span>今天发现</span>
-                    <strong>4</strong>
-                    <small>处页面变化</small>
-                  </div>
-                  <div className="signal-chart" aria-hidden="true">
-                    <svg viewBox="0 0 100 50" preserveAspectRatio="none">
-                      <path d="M2 13 H98 M2 25 H98 M2 37 H98" />
-                      <polyline points={signalPoints} />
-                      <circle cx="98" cy="7.68" r="1.8" />
-                    </svg>
+                  <div className="simple-progress">
+                    <div>
+                      <span>已完成 2 / 3 步</span>
+                      <strong>{isRunning ? `${primaryTask.progress}%` : "暂停"}</strong>
+                    </div>
                     <span>
-                      <small>09:00</small>
-                      <small>现在</small>
+                      <i
+                        className={isRunning ? "moving" : ""}
+                        style={{ width: `${primaryTask.progress}%` }}
+                      />
                     </span>
                   </div>
-                  <div className="signal-metric">
-                    <span>保存证据</span>
-                    <strong>12</strong>
-                    <small>张页面截图</small>
-                  </div>
-                </div>
 
-                <div className="simple-progress">
-                  <div>
-                    <span>已完成 2 / 3 步</span>
-                    <strong>{isRunning ? `${primaryTask.progress}%` : "暂停"}</strong>
+                  <div className="plain-steps">
+                    {runSteps.map((step, index) => (
+                      <button
+                        className={`${selectedStep === step.id ? "selected" : ""} step-${step.id}`}
+                        key={step.id}
+                        type="button"
+                        onClick={() => setSelectedStep(step.id)}
+                      >
+                        <span className="plain-step-marker">
+                          {index === 0 ? <Check size={15} /> : <step.icon size={16} />}
+                        </span>
+                        <span>
+                          <strong>{step.title}</strong>
+                          <small>{step.description}</small>
+                        </span>
+                        <em>{step.id === "analyze" && !isRunning ? "已暂停" : step.status}</em>
+                        <ChevronRight size={16} />
+                      </button>
+                    ))}
                   </div>
-                  <span>
-                    <i
-                      className={isRunning ? "moving" : ""}
-                      style={{ width: `${primaryTask.progress}%` }}
-                    />
-                  </span>
-                </div>
 
-                <div className="plain-steps">
-                  {runSteps.map((step, index) => (
-                    <button
-                      className={`${selectedStep === step.id ? "selected" : ""} step-${step.id}`}
-                      key={step.id}
-                      type="button"
-                      onClick={() => setSelectedStep(step.id)}
-                    >
-                      <span className="plain-step-marker">
-                        {index === 0 ? <Check size={15} /> : <step.icon size={16} />}
-                      </span>
-                      <span>
-                        <strong>{step.title}</strong>
-                        <small>{step.description}</small>
-                      </span>
-                      <em>{step.id === "analyze" && !isRunning ? "已暂停" : step.status}</em>
-                      <ChevronRight size={16} />
-                    </button>
-                  ))}
-                </div>
-
-                <div className="current-work">
-                  <div className="current-work-icon">
-                    {selectedStep === "collect" && <Globe2 size={19} />}
-                    {selectedStep === "analyze" && <Sparkles size={19} />}
-                    {selectedStep === "send" && <Mail size={19} />}
-                  </div>
-                  <div>
-                    <span>当前查看</span>
-                    <strong>
-                      {runSteps.find((step) => step.id === selectedStep)?.title}
-                    </strong>
-                    <small>
-                      {selectedStep === "collect" && "网页已经检查完成，截图和页面内容均已保存。"}
-                      {selectedStep === "analyze" && "正在提取真正有意义的变化，预计还需要 2 分钟。"}
-                      {selectedStep === "send" && "摘要已经准备好，确认收件人后才能发送。"}
-                    </small>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={togglePrimaryTask}
-                  >
-                    {isRunning ? <Pause size={15} /> : <Play size={15} />}
-                    {isRunning ? "暂停" : "继续"}
-                  </button>
-                </div>
-
-                <footer className="task-tools">
-                  <span>本次使用</span>
-                  <span><Globe2 size={14} /> 浏览器</span>
-                  <span><Brain size={14} /> Codex</span>
-                  <span><Mail size={14} /> 邮件</span>
-                  <div className="task-tools-actions">
+                  <div className="current-work">
+                    <div className="current-work-icon">
+                      {selectedStep === "collect" && <Globe2 size={19} />}
+                      {selectedStep === "analyze" && <Sparkles size={19} />}
+                      {selectedStep === "send" && <Mail size={19} />}
+                    </div>
+                    <div>
+                      <span>当前查看</span>
+                      <strong>
+                        {runSteps.find((step) => step.id === selectedStep)?.title}
+                      </strong>
+                      <small>
+                        {selectedStep === "collect" && "网页已经检查完成，截图和页面内容均已保存。"}
+                        {selectedStep === "analyze" && "正在提取真正有意义的变化，预计还需要 2 分钟。"}
+                        {selectedStep === "send" && "摘要已经准备好，确认收件人后才能发送。"}
+                      </small>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => openTaskArtifacts(primaryTask.id)}
+                      onClick={togglePrimaryTask}
                     >
-                      <Files size={14} />
-                      查看成果
-                    </button>
-                    <button type="button" onClick={() => openView("activity")}>
-                      完整记录
-                      <ChevronRight size={14} />
+                      {isRunning ? <Pause size={15} /> : <Play size={15} />}
+                      {isRunning ? "暂停" : "继续"}
                     </button>
                   </div>
-                </footer>
-              </section>
+
+                  <footer className="task-tools">
+                    <span>本次使用</span>
+                    <span><Globe2 size={14} /> 浏览器</span>
+                    <span><Brain size={14} /> Codex</span>
+                    <span><Mail size={14} /> 邮件</span>
+                    <div className="task-tools-actions">
+                      <button
+                        type="button"
+                        onClick={() => openTaskArtifacts(primaryTask.id)}
+                      >
+                        <Files size={14} />
+                        查看成果
+                      </button>
+                      <button type="button" onClick={() => openView("activity")}>
+                        完整记录
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </footer>
+                </section>
+              )}
 
               <aside className="needs-action-panel" aria-label="需要你确认">
                 <div className="attention-heading">
@@ -12985,6 +13159,7 @@ export default function HomePage() {
             <AgentRunPanel
               rules={workspaceProvider.agentRules}
               brain={workspaceProvider.brain}
+              runtime={runtimeMode ? workspaceProvider.runtime : null}
               notify={setNotice}
             />
 
