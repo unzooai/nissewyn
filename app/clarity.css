@@ -4121,6 +4121,37 @@ textarea:focus-visible {
   margin-top: 28px;
 }
 
+/* 托管审批的"记住"：批准按钮上方一行，不抢主操作的注意力。 */
+.approval-remember {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  /* 与 .approval-detail-actions 的左右边距对齐（28px）。 */
+  margin: 20px 28px 0;
+  color: var(--clarity-ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.approval-remember input {
+  margin-top: 2px;
+  accent-color: var(--clarity-blue);
+}
+
+.approval-remember span {
+  display: grid;
+  gap: 2px;
+}
+
+.approval-remember small {
+  color: var(--clarity-muted);
+  font-size: 11px;
+}
+
+.approval-remember + .approval-detail-actions {
+  margin-top: 12px;
+}
+
 .empty-view {
   grid-column: 1 / -1;
   display: grid;

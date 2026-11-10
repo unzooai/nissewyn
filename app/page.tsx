@@ -221,7 +221,7 @@ import {
 } from "./data/mock";
 import type { BrainEvent } from "./lib/provider";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
-import { reconcileAgentApprovals } from "./lib/agent-approvals";
+import { isAgentApprovalId, reconcileAgentApprovals } from "./lib/agent-approvals";
 
 // 组件不再直接读 mock：首屏种子和出厂数据都从 provider 拿，换实现时这里不用动。
 const workspaceProvider = getWorkspaceProvider();
@@ -1434,6 +1434,8 @@ export default function HomePage() {
   const [isCheckingNetwork, setIsCheckingNetwork] = useState(false);
   const [selectedStep, setSelectedStep] = useState("analyze");
   const [approvals, setApprovals] = useState(workspaceSeed.approvals);
+  // 托管审批的"记住"勾选，记的是勾在哪一条上：换一条看就自然不算数。
+  const [rememberApprovalId, setRememberApprovalId] = useState<string | null>(null);
   // 托管会话的审批：agent 执行工具前停下来问，问题从 unterm 轮询进收件箱。
   // 只增删托管审批（id 以 agent: 开头），本地队列里的其它审批不受影响。
   useEffect(() => {
@@ -6248,9 +6250,13 @@ export default function HomePage() {
       (item) => item.id !== approved.id,
     );
     syncBackend(
-      workspaceProvider.approvals.decide(approved.id, { kind: "approve" }),
+      workspaceProvider.approvals.decide(approved.id, {
+        kind: "approve",
+        remember: rememberApprovalId === approved.id && isAgentApprovalId(approved.id),
+      }),
       "批准操作",
     );
+    setRememberApprovalId(null);
     setApprovals((items) => items.filter((item) => item.id !== approved.id));
     removeApprovalDeferrals(new Set([approved.id]));
     replaceApprovalSelection(nextApproval);
@@ -11379,6 +11385,24 @@ export default function HomePage() {
                       </div>
                     </div>
 
+                    {isAgentApprovalId(selectedApproval.id) &&
+                    !selectedApprovalIsDeferred ? (
+                      <label className="approval-remember">
+                        <input
+                          type="checkbox"
+                          checked={rememberApprovalId === selectedApproval.id}
+                          onChange={(event) =>
+                            setRememberApprovalId(
+                              event.target.checked ? selectedApproval.id : null,
+                            )
+                          }
+                        />
+                        <span>
+                          以后在这个项目里自动批准这条命令
+                          <small>只限同一工具、同一条命令；拼接命令不会被记住</small>
+                        </span>
+                      </label>
+                    ) : null}
                     <div
                       className={`approval-detail-actions ${
                         selectedApprovalIsDeferred ? "is-deferred" : ""

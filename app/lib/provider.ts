@@ -47,7 +47,11 @@ import type {
 
 /** 审批决定。拒绝需要给出理由，会写进审计记录。 */
 export type ApprovalDecision =
-  | { kind: "approve" }
+  /**
+   * remember：只对托管会话的审批有效——把这次批准记成本项目的规则，同一个
+   * 工具、同一条命令下次不再询问。拼接命令（&&、|、重定向…）unterm 不会记。
+   */
+  | { kind: "approve"; remember?: boolean }
   | { kind: "reject"; reason: string };
 
 /** 能力租约。unterm provider.acquire 和 unzoo lease_request 的公共形状。 */

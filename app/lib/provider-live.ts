@@ -96,6 +96,7 @@ async function decideAgentApproval(id: string, decision: ApprovalDecision): Prom
       session_id: parsed.sessionId,
       request_id: parsed.requestId,
       allow: decision.kind === "approve",
+      ...(decision.kind === "approve" && decision.remember ? { remember: true } : {}),
       // 控制台的拒绝 = 拒绝并停止这一轮：不停的话 agent 往往换个命令再问一遍。
       ...(decision.kind === "reject" ? { message: decision.reason, interrupt: true } : {}),
     });
