@@ -246,3 +246,38 @@ test("brain：中断后会话就没了", async () => {
   await p.brain.interrupt(s.sessionId);
   await assert.rejects(() => p.brain.status(s.sessionId), /会话不存在/);
 });
+
+test("brain：续接沿用原来的对话，没有可接的对话就报错", async () => {
+  const p = createMockProvider();
+  const first = await p.brain.start({
+    agent: "claude-code", prompt: "记住 banana", taskId: "t", runId: "r1", stepId: "s1", mode: "governed",
+  });
+  const next = await p.brain.resume({
+    sessionId: first.sessionId, prompt: "刚才让你记住什么", taskId: "t", runId: "r2", stepId: "s2",
+  });
+  assert.notEqual(next.sessionId, first.sessionId, "续接是一个新会话");
+  await new Promise((r) => setTimeout(r, 2200));
+  const { events } = await p.brain.events(next.sessionId, 0);
+  const said = events.filter((e) => e.event === "output.delta").map((e) => e.message).join("");
+  assert.match(said, /记住 banana/, "接上了原来的对话");
+  assert.ok(events.every((e) => e.runId === "r2"), "事件挂在新的运行上");
+  assert.equal(events.at(-1).event, "turn.completed");
+  await assert.rejects(
+    () => p.brain.resume({ sessionId: "ags-nope", prompt: "x", taskId: "t", runId: "r", stepId: "s" }),
+    /没有可以接着的对话/,
+  );
+});
+
+test("常设规则：加、列、删；删不存在的报错", async () => {
+  const p = createMockProvider();
+  assert.deepEqual((await p.agentRules.list()).rules, []);
+  const rule = await p.agentRules.add({ tool: " Bash ", decision: "deny", commandPrefix: "git push", workspace: "" });
+  assert.equal(rule.tool, "Bash");
+  assert.equal(rule.workspace, undefined, "空工作区当作所有工作区");
+  assert.equal(rule.createdBy, "console");
+  assert.equal((await p.agentRules.list()).rules.length, 1);
+  await p.agentRules.remove(rule.id);
+  assert.equal((await p.agentRules.list()).rules.length, 0);
+  await assert.rejects(() => p.agentRules.remove(rule.id), /没有这条规则/);
+  await assert.rejects(() => p.agentRules.add({ tool: "  ", decision: "allow" }), /哪个工具/);
+});

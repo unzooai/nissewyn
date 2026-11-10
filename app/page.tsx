@@ -47,6 +47,7 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  Bot,
   Star,
   Table2,
   Timer,
@@ -220,6 +221,9 @@ import {
   teamSeatLimit,
 } from "./data/mock";
 import type { BrainEvent } from "./lib/provider";
+import { brainModeFor, readAgentRunSettings } from "./lib/agent-run-settings";
+import { turnOutcome } from "./lib/brain-events";
+import { AgentRunPanel } from "./agent-run-panel";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
 import { isAgentApprovalId, reconcileAgentApprovals } from "./lib/agent-approvals";
 
@@ -511,7 +515,8 @@ function isTaskRun(value: unknown): value is TaskRun {
         run.durationSeconds >= 0)) &&
     typeof run.summary === "string" &&
     (run.errorCode === undefined || typeof run.errorCode === "string") &&
-    (run.errorMessage === undefined || typeof run.errorMessage === "string")
+    (run.errorMessage === undefined || typeof run.errorMessage === "string") &&
+    (run.sessionId === undefined || typeof run.sessionId === "string")
   );
 }
 
@@ -1053,6 +1058,12 @@ const settingsSections: Array<{
     icon: Settings2,
   },
   {
+    id: "agents",
+    label: "智能体",
+    description: "工作目录与规则",
+    icon: Bot,
+  },
+  {
     id: "data",
     label: "数据",
     description: "备份与恢复",
@@ -1566,6 +1577,7 @@ export default function HomePage() {
     useState<string | null>(null);
   const [inspectedRunId, setInspectedRunId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [runContinuePrompt, setRunContinuePrompt] = useState("");
   const [workspaceSyncNotice, setWorkspaceSyncNotice] =
     useState<WorkspaceSyncNotice | null>(null);
   const [workspaceLoadWarning, setWorkspaceLoadWarning] = useState("");
@@ -6543,6 +6555,8 @@ export default function HomePage() {
       };
       syncBackend(workspaceProvider.tasks.create(newTask), "新建任务");
       setTasks((items) => [newTask, ...items]);
+      const firstRun = newTask.runs?.[0];
+      if (firstRun) void driveBrainRun(newTask, firstRun.id);
       setTaskFilter("全部");
       setSelectedTaskIds([]);
       setActiveView("tasks");
@@ -9007,14 +9021,27 @@ export default function HomePage() {
    * 起一个会话，按游标把事件读回来，写进这次运行的摘要和运行记录，
    * 结束时按真实结果收尾。
    *
+   * 会话是托管的（设置里开了受管就是受管）：agent 每次要用工具都先停下来，
+   * 请求进收件箱等人批。所以这里没有固定的轮数上限——等人批准的时间不算
+   * agent 卡住，只在长时间既没有新事件、也没有待批的审批时才放弃。
+   *
+   * continueFrom：接着那次运行的会话原来的对话说 prompt 这句话。
+   *
    * 本机没有 unterm 时 provider 会落回演示实现，事件的形状一样，所以
    * 这段代码不需要区分两种情况。
    */
-  async function driveBrainRun(task: TaskItem, runId: string) {
+  async function driveBrainRun(
+    task: TaskItem,
+    runId: string,
+    continueFrom?: { sessionId: string; prompt: string },
+  ) {
     const stepId = `${runId}-step-1`;
-    const prompt = [task.title, task.description, task.target && `目标：${task.target}`]
-      .filter(Boolean)
-      .join("\n");
+    const startedAtMs = Date.now();
+    const prompt =
+      continueFrom?.prompt ??
+      [task.title, task.description, task.target && `目标：${task.target}`]
+        .filter(Boolean)
+        .join("\n");
 
     const patchRun = (patch: Partial<TaskRun>) => {
       setTasks((items) =>
@@ -9031,18 +9058,31 @@ export default function HomePage() {
       );
     };
 
+    const runSettings = readAgentRunSettings();
+    const agent = "claude-code" as const;
     let session: Awaited<ReturnType<typeof workspaceProvider.brain.start>>;
     try {
-      session = await workspaceProvider.brain.start({
-        agent: "claude-code",
-        prompt,
-        taskId: task.id,
-        runId,
-        stepId,
-      });
+      session = continueFrom
+        ? await workspaceProvider.brain.resume({
+            sessionId: continueFrom.sessionId,
+            prompt,
+            taskId: task.id,
+            runId,
+            stepId,
+          })
+        : await workspaceProvider.brain.start({
+            agent,
+            prompt,
+            taskId: task.id,
+            runId,
+            stepId,
+            mode: brainModeFor(agent, runSettings),
+            cwd: runSettings.cwd || undefined,
+          });
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
-      patchRun({ status: "失败", summary: `没能启动 brain：${detail}` });
+      const what = continueFrom ? "没能接上原来的对话" : "没能启动 brain";
+      patchRun({ status: "失败", summary: `${what}：${detail}`, errorMessage: detail });
       setTasks((items) =>
         items.map((item) =>
           item.id === task.id
@@ -9052,24 +9092,64 @@ export default function HomePage() {
       );
       return;
     }
+    patchRun({ sessionId: session.sessionId });
 
     recordActivity({
-      title: `已交给 ${session.adapter}：${task.title}`,
-      detail: `会话 ${session.sessionId} 开始运行，事件会挂在这次运行下。`,
+      title: continueFrom
+        ? `已接着原来的对话：${task.title}`
+        : `已交给 ${session.adapter}：${task.title}`,
+      detail: continueFrom
+        ? `会话 ${session.sessionId} 接着 ${continueFrom.sessionId} 的对话继续。`
+        : `会话 ${session.sessionId} 开始运行${
+            session.hosted ? "，每次使用工具前都会先进收件箱等你确认" : ""
+          }。`,
       icon: "brain",
       tone: "blue",
       kind: "任务",
       taskId: task.id,
     });
 
-    // 轮询而不是长连接：unterm 的事件接口本来就是游标式的，而且断了能续。
-    // 上限挡住 brain 卡死的情况，别让页面无限转下去。
-    const maxPolls = 240;
-    let cursor = 0;
-    let lastText = "";
-    let failure: string | null = null;
+    await followBrainSession(task, runId, session, startedAtMs);
+  }
 
-    for (let poll = 0; poll < maxPolls; poll++) {
+  /**
+   * 跟着一个已经起来的会话，直到这一轮结束，再按结果给运行记录收尾。
+   *
+   * 和 driveBrainRun 分开，是因为页面会刷新：刷新后正在跑的运行要重新接上
+   * （reattachBrainRuns），否则会话早就跑完了，运行记录还一直停在"运行中"。
+   * 事件从游标 0 重放，所以重新接上的和一直跟着的结果一样。
+   */
+  async function followBrainSession(
+    task: TaskItem,
+    runId: string,
+    session: { sessionId: string; adapter: string },
+    startedAtMs: number,
+  ) {
+    const patchRun = (patch: Partial<TaskRun>) => {
+      setTasks((items) =>
+        items.map((item) =>
+          item.id === task.id
+            ? {
+                ...item,
+                runs: (item.runs ?? []).map((run) =>
+                  run.id === runId ? { ...run, ...patch } : run,
+                ),
+              }
+            : item,
+        ),
+      );
+    };
+
+    // 轮询而不是长连接：unterm 的事件接口本来就是游标式的，而且断了能续。
+    // 闲置上限挡住 brain 卡死的情况；等人批准的时候不算闲置。
+    const idleLimitMs = 10 * 60 * 1000;
+    let lastProgress = Date.now();
+    let cursor = 0;
+    let assistantText = "";
+    let failure: string | null = null;
+    let endedState: string | null = null;
+
+    for (;;) {
       await new Promise((resolve) => window.setTimeout(resolve, 700));
       let events: BrainEvent[] = [];
       try {
@@ -9077,16 +9157,32 @@ export default function HomePage() {
         cursor = batch.cursor;
         events = batch.events;
       } catch (error: unknown) {
-        failure = error instanceof Error ? error.message : String(error);
-        break;
+        // 会话已经不在内存里了（关掉了，或 unterm 重启过）：unterm 的任务库
+        // 里还记着它怎么结束的，按那个收尾；连这个也没有才算失败。
+        const ended = await workspaceProvider.brain
+          .status(session.sessionId)
+          .catch(() => null);
+        if (ended && ended.state !== "running") {
+          endedState = ended.state;
+        } else {
+          failure = error instanceof Error ? error.message : String(error);
+        }
       }
+      if (events.length > 0) lastProgress = Date.now();
 
       for (const item of events) {
         if (item.event === "turn.started" && item.model) {
           patchRun({ summary: `${session.adapter} · ${item.model} 正在处理` });
-        } else if (item.event === "output.delta" && item.message) {
-          lastText = item.message;
-          patchRun({ summary: item.message.slice(0, 120) });
+        } else if (
+          item.event === "output.delta" &&
+          item.message &&
+          item.stream !== "reasoning"
+        ) {
+          // output.delta 是增量：拼起来才是它说的话。
+          assistantText += item.message;
+          patchRun({ summary: assistantText.slice(-120) });
+        } else if (item.event === "approval.requested") {
+          patchRun({ summary: "等你在收件箱确认一次工具调用" });
         } else if (item.event === "error" && item.message) {
           failure = item.message;
         }
@@ -9094,42 +9190,69 @@ export default function HomePage() {
 
       let state = "running";
       let usage = { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 };
-      try {
+      if (failure || endedState) {
+        state = endedState === "exited" ? "finished" : (endedState ?? "failed");
+      } else try {
         const status = await workspaceProvider.brain.status(session.sessionId);
         state = status.state;
         usage = status.usage;
+        if ((status.pendingApprovals ?? 0) > 0) lastProgress = Date.now();
       } catch {
         // 状态读不到就继续读事件，下一轮再问。
       }
-      if (state === "running") continue;
+
+      // 托管会话一轮结束后进程还在等下一句，状态一直是 running：
+      // 这一轮完没完看 turn.completed。
+      const turn = turnOutcome(events);
+      if (turn.done) state = turn.state ?? "finished";
+      if (state === "running") {
+        if (Date.now() - lastProgress <= idleLimitMs) continue;
+        failure = "智能体十分钟没有任何进展，已停止等待";
+        try {
+          await workspaceProvider.brain.interrupt(session.sessionId);
+        } catch {
+          // 停不掉也照样收尾，close 会再处理一次。
+        }
+        state = "failed";
+      }
 
       const ok = state === "finished" && !failure;
+      const stopped = state === "interrupted" && !failure;
       const spent = usage.inputTokens + usage.outputTokens;
+      const outcome = ok
+        ? assistantText.trim().slice(-120) ||
+          (endedState ? "运行已结束（结果在页面关闭期间产生）" : "运行完成")
+        : stopped
+          ? "这一轮已停止（你拒绝了一次工具调用，或者暂停了任务）"
+          : (failure ?? "运行失败");
       patchRun({
-        status: ok ? "成功" : "失败",
-        summary: ok ? lastText.slice(0, 120) || "运行完成" : (failure ?? "运行失败"),
-        errorMessage: ok ? undefined : (failure ?? undefined),
+        status: ok ? "成功" : stopped ? "已取消" : "失败",
+        durationSeconds: Math.max(1, Math.round((Date.now() - startedAtMs) / 1000)),
+        summary: outcome,
+        errorMessage: ok || stopped ? undefined : (failure ?? undefined),
       });
       setTasks((items) =>
         items.map((item) =>
           item.id === task.id
             ? {
                 ...item,
-                status: ok ? "已完成" : "失败",
+                status: ok ? "已完成" : stopped ? "已暂停" : "失败",
                 progress: ok ? 100 : item.progress,
-                updated: ok ? "刚刚完成" : "刚刚失败",
-                lastError: ok ? undefined : (failure ?? undefined),
+                updated: ok ? "刚刚完成" : stopped ? "刚刚停止" : "刚刚失败",
+                lastError: ok || stopped ? undefined : (failure ?? undefined),
               }
             : item,
         ),
       );
       recordActivity({
-        title: ok ? `任务已完成：${task.title}` : `任务失败：${task.title}`,
-        detail: ok
-          ? `${session.adapter} 用了 ${spent} 个 token。`
-          : (failure ?? "brain 没有给出结果。"),
+        title: ok
+          ? `任务已完成：${task.title}`
+          : stopped
+            ? `任务已停止：${task.title}`
+            : `任务失败：${task.title}`,
+        detail: ok ? `${session.adapter} 用了 ${spent} 个 token。` : outcome,
         icon: ok ? "sparkles" : "shield",
-        tone: ok ? "green" : "red",
+        tone: ok ? "green" : stopped ? "blue" : "red",
         kind: "任务",
         taskId: task.id,
       });
@@ -9137,10 +9260,66 @@ export default function HomePage() {
     }
 
     try {
+      // 关掉进程；对话本身留在 CLI 那边，之后"继续对话"能接回来。
       await workspaceProvider.brain.close(session.sessionId);
     } catch {
       // 关不掉不影响界面，会话那头有自己的收尾。
     }
+  }
+
+  /**
+   * 页面打开时，把还在"运行中"、又有会话的运行重新接上。
+   * 只在 unterm 托管的控制台里有意义：演示会话不跨页面。
+   */
+  const reattachedBrainRuns = useRef(false);
+  useEffect(() => {
+    if (!tasksReady || reattachedBrainRuns.current) return;
+    reattachedBrainRuns.current = true;
+    for (const task of tasks) {
+      for (const run of task.runs ?? []) {
+        if (run.status !== "运行中" || !run.sessionId?.startsWith("ags_")) continue;
+        const startedAtMs = Date.parse(run.startedAt) || Date.now();
+        void followBrainSession(
+          task,
+          run.id,
+          { sessionId: run.sessionId, adapter: "智能体" },
+          startedAtMs,
+        );
+      }
+    }
+    // 只在任务读好后跑一次；之后的运行由 driveBrainRun 自己跟。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasksReady]);
+
+  /** 接着这次运行原来的对话，再说一句：作为一次新的运行记下来。 */
+  function continueRunConversation(task: TaskItem, run: TaskRun, prompt: string) {
+    const text = prompt.trim();
+    const sessionId = run.sessionId;
+    if (!sessionId || !text) return false;
+    if (!requireOnline(`设备离线，暂时不能继续“${task.title}”的对话`)) return false;
+    if (!requireBudgetCapacity(`继续任务“${task.title}”的对话`)) return false;
+    const nextRun: TaskRun = {
+      id: `run-${task.id}-${Date.now()}`,
+      status: "运行中",
+      startedAt: new Date().toISOString(),
+      summary: `接着上次的对话：${text.slice(0, 80)}`,
+    };
+    setTasks((items) =>
+      items.map((item) =>
+        item.id === task.id
+          ? {
+              ...item,
+              status: "运行中",
+              updated: "刚刚继续",
+              lastError: undefined,
+              errorCode: undefined,
+              runs: [nextRun, ...(item.runs ?? [])].slice(0, 12),
+            }
+          : item,
+      ),
+    );
+    void driveBrainRun(task, nextRun.id, { sessionId, prompt: text });
+    return true;
   }
 
   function retryTask(task: TaskItem) {
@@ -9224,8 +9403,21 @@ export default function HomePage() {
 
     const nextStatus: TaskStatus =
       task.status === "运行中" ? "已暂停" : "运行中";
+    // 暂停一个真在跑的 agent：停掉它这一轮，别让它在"已暂停"的任务里继续干活。
+    if (task.status === "运行中") {
+      const current = tasks.find((item) => item.id === task.id) ?? task;
+      const live = current.runs?.find(
+        (run) => run.status === "运行中" && run.sessionId,
+      );
+      if (live?.sessionId) {
+        workspaceProvider.brain.interrupt(live.sessionId).catch(() => {
+          // 会话可能刚好自己结束了；driveBrainRun 那边会照常收尾。
+        });
+      }
+    }
     const nextProgress =
       task.status === "已完成" ? Math.max(3, Math.min(task.progress, 12)) : task.progress;
+    const nextRunId = `run-${task.id}-${Date.now()}`;
 
     setTasks((items) =>
       items.map((item) =>
@@ -9239,7 +9431,7 @@ export default function HomePage() {
                 nextStatus === "运行中"
                   ? [
                       {
-                        id: `run-${task.id}-${Date.now()}`,
+                        id: nextRunId,
                         status: "运行中" as const,
                         startedAt: new Date().toISOString(),
                         summary:
@@ -9261,6 +9453,7 @@ export default function HomePage() {
     if (task.id === "competitor") {
       setIsRunning(nextStatus === "运行中");
     }
+    if (nextStatus === "运行中") void driveBrainRun(task, nextRunId);
 
     recordActivity({
       title: `${nextStatus === "已暂停" ? "任务已暂停" : "任务已继续"}：${task.title}`,
@@ -12786,6 +12979,8 @@ export default function HomePage() {
               </label>
             </div>
 
+            <AgentRunPanel rules={workspaceProvider.agentRules} notify={setNotice} />
+
             <section className="settings-data-center" id="settings-data">
               <header className="settings-data-heading">
                 <div>
@@ -14522,6 +14717,52 @@ export default function HomePage() {
                 </span>
               </div>
             </section>
+
+            {inspectedRun.sessionId &&
+              inspectedRun.status !== "运行中" &&
+              inspectedRunTask.status !== "运行中" && (
+                <form
+                  className="run-detail-continue"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (
+                      continueRunConversation(
+                        inspectedRunTask,
+                        inspectedRun,
+                        runContinuePrompt,
+                      )
+                    ) {
+                      setRunContinuePrompt("");
+                      dismissRunDetail();
+                      openTask(inspectedRunTask.id);
+                    }
+                  }}
+                >
+                  <label htmlFor="run-continue-input">
+                    <strong>继续对话</strong>
+                    <small>
+                      接着这次运行的对话再说一句。智能体记得之前做过什么，Unterm 重启过也一样。
+                    </small>
+                  </label>
+                  <div>
+                    <textarea
+                      id="run-continue-input"
+                      rows={2}
+                      value={runContinuePrompt}
+                      placeholder="比如：把刚才的结果整理成表格"
+                      onChange={(event) => setRunContinuePrompt(event.target.value)}
+                    />
+                    <button
+                      className="primary"
+                      type="submit"
+                      disabled={!runContinuePrompt.trim()}
+                    >
+                      <Send size={15} />
+                      继续
+                    </button>
+                  </div>
+                </form>
+              )}
 
             <footer className="run-detail-actions">
               <button

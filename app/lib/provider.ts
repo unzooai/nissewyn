@@ -157,19 +157,40 @@ export type BrainEvent = {
   stepId?: string;
   /** error 和 output.delta 带的文字。 */
   message?: string;
+  /** output.delta 属于哪条流：assistant 是对用户说的话，reasoning 是推理文本。 */
+  stream?: "assistant" | "reasoning";
   /** turn.started 带的模型名。 */
   model?: string;
+  /** turn.completed / session.closed 的收敛状态。 */
+  state?: string;
 };
+
+/**
+ * 怎么跑这个 brain。
+ *
+ * - governed（受管）：CLI 自己的 shell 和联网工具关掉，命令只能经 Unterm
+ *   执行；每个工具调用都先进收件箱等人批。只有 Claude Code 支持。
+ * - hosted（托管）：CLI 照常用自己的工具，但每次调用都先进收件箱。
+ * - headless：一问一答，不经收件箱。旧行为，只给不支持托管的场合留着。
+ */
+export type BrainMode = "governed" | "hosted" | "headless";
 
 export type BrainSession = {
   sessionId: string;
   agent: BrainId;
   adapter: string;
+  /**
+   * 托管会话一轮结束后进程还在，等下一句话：会话状态一直是 running，
+   * 这一轮结束要看 turn.completed 事件，不能等 status。
+   */
+  hosted?: boolean;
 };
 
 export type BrainStatus = {
   state: "running" | "finished" | "failed" | string;
   turns: number;
+  /** 托管会话里正等人答复的审批数：agent 这时是在等人，不是在干活。 */
+  pendingApprovals?: number;
   usage: { inputTokens: number; outputTokens: number; cachedInputTokens: number };
 };
 
@@ -187,6 +208,22 @@ export interface BrainPort {
     taskId: string;
     runId: string;
     stepId: string;
+    /** 缺省 headless。 */
+    mode?: BrainMode;
+    /** agent 在哪个目录里干活。不给就是 unterm 自己的工作目录。 */
+    cwd?: string;
+  }): Promise<BrainSession>;
+  /**
+   * 接着一个托管会话原来的对话说下一句：新会话、同一个 CLI 和工作目录，
+   * CLI 自己把上下文接回来。原会话的进程没了也行（控制台或 unterm 重启过）。
+   * 没有可接的对话时报错，不会悄悄开一段新的。
+   */
+  resume(input: {
+    sessionId: string;
+    prompt: string;
+    taskId: string;
+    runId: string;
+    stepId: string;
   }): Promise<BrainSession>;
   /** 从 cursor 之后取事件，返回下一个 cursor。断了能从上次的位置续。 */
   events(sessionId: string, cursor: number): Promise<{ cursor: number; events: BrainEvent[] }>;
@@ -194,6 +231,41 @@ export interface BrainPort {
   /** 停掉它和它启动的一切。 */
   interrupt(sessionId: string, graceMs?: number): Promise<void>;
   close(sessionId: string): Promise<{ exitCode: number; reason?: string }>;
+}
+
+/**
+ * 托管会话的常设规则：某个工作区里某个工具（某条命令）以后自动批准或拒绝，
+ * 不再进收件箱。只有人能定 —— 控制台这里，或审批时勾"记住"；agent 没有任何
+ * 途径给自己加规则。
+ */
+export type AgentRule = {
+  id: string;
+  /** 对哪个目录（含子目录）生效；不给就是所有工作区。 */
+  workspace?: string;
+  /** CLI 里的工具名（Bash、shell、run_command…），不区分大小写；* 是任何工具。 */
+  tool: string;
+  /** 命令类工具：命令要以它开头（按整词）。放行规则不会匹配拼接命令。 */
+  commandPrefix?: string;
+  decision: "allow" | "deny";
+  note?: string;
+  createdAt: string;
+  /** console：在设置里加的；remember：审批时勾了记住。 */
+  createdBy: string;
+};
+
+export type AgentRuleDraft = {
+  workspace?: string;
+  tool: string;
+  commandPrefix?: string;
+  decision: "allow" | "deny";
+  note?: string;
+};
+
+export interface AgentRulePort {
+  /** store：规则存在哪个文件（unterm 的状态目录），演示版没有。 */
+  list(): Promise<{ rules: AgentRule[]; store?: string }>;
+  add(draft: AgentRuleDraft): Promise<AgentRule>;
+  remove(id: string): Promise<void>;
 }
 
 export interface TeamPort {
@@ -226,6 +298,7 @@ export interface WorkspaceProvider {
   policy: PolicyPort;
   team: TeamPort;
   brain: BrainPort;
+  agentRules: AgentRulePort;
   /** 当前状态的同步快照，用于初始化组件 state。 */
   snapshot(): WorkspaceSnapshot;
   /**

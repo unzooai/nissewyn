@@ -13,6 +13,7 @@ export type SettingsSectionId =
   | "usage"
   | "team"
   | "preferences"
+  | "agents"
   | "data"
   | "connectors"
   | "security";
@@ -351,6 +352,11 @@ export type TaskRun = {
   summary: string;
   errorCode?: string;
   errorMessage?: string;
+  /**
+   * 这次运行交给的 unterm 托管会话。有它才能"继续对话"：会话关了、甚至
+   * unterm 重启过，也能接着它原来的对话说下一句。
+   */
+  sessionId?: string;
 };
 
 export type TaskRunStageStatus = "成功" | "失败" | "运行中" | "已取消" | "已跳过";

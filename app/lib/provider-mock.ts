@@ -25,11 +25,14 @@ import type {
 } from "../types";
 import type {
   ActivityPort,
+  AgentRule,
+  AgentRulePort,
   ApprovalDecision,
   ApprovalPort,
   ArtifactPort,
   BrainEvent,
   BrainPort,
+  BrainSession,
   CapabilityLease,
   ConnectorPort,
   PolicyPort,
@@ -258,22 +261,50 @@ export function createMockProvider(): WorkspaceProvider {
    */
   const brainSessions = new Map<string, { events: BrainEvent[]; startedAt: number }>();
 
+  /** 演示会话说过的话，续接时用来证明"接上了"。 */
+  const brainTranscripts = new Map<string, { agent: BrainSession["agent"]; prompts: string[] }>();
+
+  function playTurn(
+    agent: BrainSession["agent"],
+    prompt: string,
+    ids: { taskId: string; runId: string; stepId: string },
+    reply: string,
+  ): BrainSession {
+    const sessionId = nextId("ags");
+    const at = new Date().toISOString();
+    brainSessions.set(sessionId, {
+      startedAt: Date.now(),
+      events: [
+        { event: "session.started", at, ...ids },
+        { event: "turn.started", at, model: agent === "claude-code" ? "claude-opus-5" : "gpt-5-codex", ...ids },
+        { event: "output.delta", at, stream: "assistant", message: reply, ...ids },
+        { event: "usage.updated", at, ...ids },
+        { event: "turn.completed", at, state: "finished", ...ids },
+      ],
+    });
+    return { sessionId, agent, adapter: agent === "claude-code" ? "claude" : "codex" };
+  }
+
   const brainPort: BrainPort = {
     async start({ agent, prompt, taskId, runId, stepId }) {
-      const sessionId = nextId("ags");
-      const at = new Date().toISOString();
-      const ids = { taskId, runId, stepId };
-      brainSessions.set(sessionId, {
-        startedAt: Date.now(),
-        events: [
-          { event: "session.started", at, ...ids },
-          { event: "turn.started", at, model: agent === "claude-code" ? "claude-opus-5" : "gpt-5-codex", ...ids },
-          { event: "output.delta", at, message: `收到：${prompt.slice(0, 40)}`, ...ids },
-          { event: "usage", at, ...ids },
-          { event: "turn.ended", at, ...ids },
-        ],
+      const session = playTurn(agent, prompt, { taskId, runId, stepId }, `收到：${prompt.slice(0, 40)}`);
+      brainTranscripts.set(session.sessionId, { agent, prompts: [prompt] });
+      return session;
+    },
+    async resume({ sessionId, prompt, taskId, runId, stepId }) {
+      const earlier = brainTranscripts.get(sessionId);
+      if (!earlier) throw new Error(`会话 ${sessionId} 没有可以接着的对话`);
+      const session = playTurn(
+        earlier.agent,
+        prompt,
+        { taskId, runId, stepId },
+        `接着上次（${earlier.prompts[0].slice(0, 20)}）：${prompt.slice(0, 40)}`,
+      );
+      brainTranscripts.set(session.sessionId, {
+        agent: earlier.agent,
+        prompts: [...earlier.prompts, prompt],
       });
-      return { sessionId, agent, adapter: agent === "claude-code" ? "claude" : "codex" };
+      return session;
     },
     async events(sessionId, cursor) {
       const session = brainSessions.get(sessionId);
@@ -301,6 +332,35 @@ export function createMockProvider(): WorkspaceProvider {
     async close(sessionId) {
       const existed = brainSessions.delete(sessionId);
       return existed ? { exitCode: 0 } : { exitCode: 1, reason: "会话已经结束" };
+    },
+  };
+
+  /** 演示版的常设规则：只活在这一页里，真规则在 unterm 的状态目录。 */
+  let agentRules: AgentRule[] = [];
+  const agentRulePort: AgentRulePort = {
+    async list() {
+      return { rules: clone(agentRules) };
+    },
+    async add(draft) {
+      const tool = draft.tool.trim();
+      if (!tool) throw new Error("规则要写明是哪个工具");
+      const rule: AgentRule = {
+        id: nextId("rule"),
+        tool,
+        decision: draft.decision,
+        workspace: draft.workspace?.trim() || undefined,
+        commandPrefix: draft.commandPrefix?.trim() || undefined,
+        note: draft.note?.trim() || undefined,
+        createdAt: new Date().toISOString(),
+        createdBy: "console",
+      };
+      agentRules = [...agentRules, rule];
+      return clone(rule);
+    },
+    async remove(id) {
+      const before = agentRules.length;
+      agentRules = agentRules.filter((rule) => rule.id !== id);
+      if (agentRules.length === before) throw new Error(`没有这条规则：${id}`);
     },
   };
 
@@ -347,6 +407,7 @@ export function createMockProvider(): WorkspaceProvider {
     policy: policyPort,
     team: teamPort,
     brain: brainPort,
+    agentRules: agentRulePort,
     snapshot,
     defaults,
     reset,

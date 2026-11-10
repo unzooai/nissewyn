@@ -20,7 +20,8 @@ import {
   toApprovalItem,
   type RawAgentApproval,
 } from "./agent-approvals";
-import type { ApprovalDecision, CapabilityLease, WorkspaceProvider } from "./provider";
+import { fromAgentRuleDraft, toAgentRule, toBrainEvent, type RawAgentRule } from "./brain-events";
+import type { ApprovalDecision, BrainSession, CapabilityLease, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -106,6 +107,16 @@ async function decideAgentApproval(id: string, decision: ApprovalDecision): Prom
   }
 }
 
+/** 这份控制台是不是 unterm 托管的：拿得到 token 就是。 */
+async function untermReachable(): Promise<boolean> {
+  try {
+    await authToken();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function callUnterm<T>(path: string, payload: Record<string, unknown>): Promise<T> {
   const token = await authToken();
   const response = await fetch(path, {
@@ -174,25 +185,52 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
     brain: {
       async start(input) {
         if (!inBrowser) return fallback.brain.start(input);
+        const mode = input.mode ?? "headless";
+        let data: { agent: string; adapter: string; hosted?: boolean; session: { session_id: string } };
         try {
-          const data = await callUnterm<{ agent: string; adapter: string; session: { session_id: string } }>(
-            "/api/agent/start",
-            {
-              agent: input.agent,
-              prompt: input.prompt,
-              task_id: input.taskId,
-              run_id: input.runId,
-              step_id: input.stepId,
-            },
-          );
-          return {
-            sessionId: data.session.session_id,
+          data = await callUnterm("/api/agent/start", {
             agent: input.agent,
-            adapter: data.adapter,
-          };
-        } catch {
+            prompt: input.prompt,
+            task_id: input.taskId,
+            run_id: input.runId,
+            step_id: input.stepId,
+            ...(mode === "governed" ? { governed: true } : mode === "hosted" ? { hosted: true } : {}),
+            ...(input.cwd ? { cwd: input.cwd } : {}),
+          });
+        } catch (error) {
+          // 只有"这份控制台不归 unterm 托管"才落回演示。unterm 在、但拒绝了
+          // （工作目录不存在、agent 没装）要原样报出来，换成演示事件等于
+          // 假装跑过了。
+          if (await untermReachable()) throw error;
           return fallback.brain.start(input);
         }
+        return {
+          sessionId: data.session.session_id,
+          agent: input.agent,
+          adapter: data.adapter,
+          hosted: Boolean(data.hosted),
+        };
+      },
+
+      async resume(input): Promise<BrainSession> {
+        if (!input.sessionId.startsWith("ags_")) return fallback.brain.resume(input);
+        const data = await callUnterm<{ session_id: string; adapter?: string }>("/api/agent/resume", {
+          session_id: input.sessionId,
+          prompt: input.prompt,
+          task_id: input.taskId,
+          run_id: input.runId,
+          step_id: input.stepId,
+        });
+        const status = await callUnterm<{ adapter?: string; agent?: string }>("/api/agent/status", {
+          session_id: data.session_id,
+        }).catch(() => ({}) as { adapter?: string });
+        return {
+          sessionId: data.session_id,
+          // 续接只认得 unterm 记下的那个 CLI；控制台这边的 agent id 只用来显示。
+          agent: status.adapter === "codex" ? "codex-cli" : "claude-code",
+          adapter: status.adapter ?? "claude",
+          hosted: true,
+        };
       },
 
       async events(sessionId, cursor) {
@@ -201,18 +239,7 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           "/api/agent/events",
           { session_id: sessionId, cursor },
         );
-        return {
-          cursor: data.cursor,
-          events: (data.events ?? []).map((raw) => ({
-            event: String(raw.event ?? ""),
-            at: String(raw.at ?? ""),
-            taskId: raw.task_id as string | undefined,
-            runId: raw.run_id as string | undefined,
-            stepId: raw.step_id as string | undefined,
-            message: raw.message as string | undefined,
-            model: raw.model as string | undefined,
-          })),
-        };
+        return { cursor: data.cursor, events: (data.events ?? []).map(toBrainEvent) };
       },
 
       async status(sessionId) {
@@ -220,11 +247,13 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
         const data = await callUnterm<{
           state: string;
           turns?: number;
-          usage?: { input_tokens?: number; output_tokens?: number; cached_input_tokens?: number };
+          pending_approvals?: string[];
+          usage?: { input_tokens?: number; output_tokens?: number; cached_input_tokens?: number } | null;
         }>("/api/agent/status", { session_id: sessionId });
         return {
           state: data.state,
           turns: data.turns ?? 0,
+          pendingApprovals: data.pending_approvals?.length ?? 0,
           usage: {
             inputTokens: data.usage?.input_tokens ?? 0,
             outputTokens: data.usage?.output_tokens ?? 0,
@@ -247,6 +276,35 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           session_id: sessionId,
         });
         return { exitCode: data.exit_code ?? 0, reason: data.reason ?? undefined };
+      },
+    },
+
+    /** 常设规则只存在 unterm 那边；控制台不归它托管时用演示实现。 */
+    agentRules: {
+      async list() {
+        if (!inBrowser) return fallback.agentRules.list();
+        let data: { rules?: RawAgentRule[]; store?: string };
+        try {
+          data = await getUnterm("/api/agent/policy");
+        } catch (error) {
+          if (await untermReachable()) throw error;
+          return fallback.agentRules.list();
+        }
+        return {
+          rules: (data.rules ?? []).map(toAgentRule).filter((rule) => rule !== null),
+          store: data.store ?? undefined,
+        };
+      },
+      async add(draft) {
+        if (!inBrowser || !(await untermReachable())) return fallback.agentRules.add(draft);
+        const data = await callUnterm<{ rule: RawAgentRule }>("/api/agent/policy", fromAgentRuleDraft(draft));
+        const rule = toAgentRule(data.rule);
+        if (!rule) throw new Error("unterm 返回的规则不完整");
+        return rule;
+      },
+      async remove(id) {
+        if (!inBrowser || !(await untermReachable())) return fallback.agentRules.remove(id);
+        await callUnterm("/api/agent/policy/remove", { id });
       },
     },
 
