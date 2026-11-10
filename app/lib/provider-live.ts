@@ -29,6 +29,7 @@ import {
   type RawAgentRule,
 } from "./brain-events";
 import { parseAgentRunSettings } from "./agent-run-settings";
+import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeRun, RuntimeTask } from "./runtime-tasks";
 import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, WorkspaceProvider } from "./provider";
 
@@ -61,31 +62,15 @@ function nowLabel(): string {
  * 取不到就说明这份控制台不是 unterm 在托管（云端演示版，或者本机没起
  * unterm），调用方据此落回 mock。
  */
-let untermToken: Promise<string> | null = null;
-
-function authToken(): Promise<string> {
-  if (!untermToken) {
-    untermToken = fetch("/bootstrap.json")
-      .then((response) => {
-        if (!response.ok) throw new Error(`bootstrap.json 返回 ${response.status}`);
-        return response.json() as Promise<{ auth_token?: string }>;
-      })
-      .then((body) => {
-        if (!body.auth_token) throw new Error("bootstrap.json 里没有 auth_token");
-        return body.auth_token;
-      })
-      .catch((error: unknown) => {
-        // 下次调用重新试，别把一次失败缓存成永久失败。
-        untermToken = null;
-        throw error;
-      });
-  }
-  return untermToken;
+async function authToken(): Promise<string> {
+  return (await coreConnection()).token;
 }
 
 async function getUnterm<T>(path: string): Promise<T> {
-  const token = await authToken();
-  const response = await fetch(path, { headers: { authorization: `Bearer ${token}` } });
+  const connection = await coreConnection();
+  const response = await fetch(coreUrl(connection, path), {
+    headers: { authorization: `Bearer ${connection.token}` },
+  });
   const body = (await response.json()) as T & { error?: string };
   if (!response.ok || body?.error) throw new Error(body?.error ?? `unterm 返回 ${response.status}`);
   return body;
@@ -127,10 +112,10 @@ async function untermReachable(): Promise<boolean> {
 }
 
 async function callUnterm<T>(path: string, payload: Record<string, unknown>): Promise<T> {
-  const token = await authToken();
-  const response = await fetch(path, {
+  const connection = await coreConnection();
+  const response = await fetch(coreUrl(connection, path), {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    headers: { "content-type": "application/json", authorization: `Bearer ${connection.token}` },
     body: JSON.stringify(payload),
   });
   const body = (await response.json()) as T & { error?: string };
