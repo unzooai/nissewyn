@@ -92,6 +92,14 @@ export interface ApprovalPort {
   decideMany(ids: string[], decision: ApprovalDecision): Promise<void>;
   /** 稍后处理。截止时间到了重新回到队列，纯本地状态，后端不感知。 */
   defer(id: string, until: string): Promise<void>;
+  /**
+   * 托管会话里正在等答复的审批（unterm GET /api/agent/approvals）。
+   *
+   * 和 list() 分开：页面轮询它，只按 id 增删托管审批，不动本地队列里的其它
+   * 审批。拒绝一条托管审批 = 拒绝并停止 agent 的这一轮，和控制台"拒绝后暂停
+   * 任务"的语义一致。拿不到（不是 unterm 托管的控制台）就是空数组。
+   */
+  live(): Promise<ApprovalItem[]>;
 }
 
 export interface ArtifactPort {

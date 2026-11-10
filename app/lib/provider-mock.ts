@@ -111,6 +111,10 @@ export function createMockProvider(): WorkspaceProvider {
     async list() {
       return approvals.slice();
     },
+    // 内存实现没有托管会话。
+    async live() {
+      return [];
+    },
     async decide(id, decision) {
       return approvalPort.decideMany([id], decision);
     },

@@ -221,6 +221,7 @@ import {
 } from "./data/mock";
 import type { BrainEvent } from "./lib/provider";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
+import { reconcileAgentApprovals } from "./lib/agent-approvals";
 
 // 组件不再直接读 mock：首屏种子和出厂数据都从 provider 拿，换实现时这里不用动。
 const workspaceProvider = getWorkspaceProvider();
@@ -1433,6 +1434,25 @@ export default function HomePage() {
   const [isCheckingNetwork, setIsCheckingNetwork] = useState(false);
   const [selectedStep, setSelectedStep] = useState("analyze");
   const [approvals, setApprovals] = useState(workspaceSeed.approvals);
+  // 托管会话的审批：agent 执行工具前停下来问，问题从 unterm 轮询进收件箱。
+  // 只增删托管审批（id 以 agent: 开头），本地队列里的其它审批不受影响。
+  useEffect(() => {
+    let stopped = false;
+    async function poll() {
+      try {
+        const live = await workspaceProvider.approvals.live();
+        if (!stopped) setApprovals((items) => reconcileAgentApprovals(items, live));
+      } catch {
+        // 取不到就下次再试；本地审批照常可用。
+      }
+    }
+    void poll();
+    const timer = window.setInterval(poll, 2000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, []);
   const [approvalDeferrals, setApprovalDeferrals] =
     useState<ApprovalDeferrals>({});
   const [approvalClock, setApprovalClock] = useState(() => Date.now());
@@ -6362,6 +6382,12 @@ export default function HomePage() {
     const relatedTask = tasks.find((task) => task.id === rejected.taskId);
     const nextApproval = approvals.find((item) => item.id !== rejected.id);
     stageApprovalRejectUndo(1);
+    // 和批量拒绝、单条批准一样把决定交给后端。原来这里只改本地状态：内存
+    // 审批看不出差别，托管会话的审批却永远等不到答复，agent 一直挂着。
+    syncBackend(
+      workspaceProvider.approvals.decide(rejected.id, { kind: "reject", reason }),
+      "拒绝操作",
+    );
     setApprovals((items) => items.filter((item) => item.id !== rejected.id));
     removeApprovalDeferrals(new Set([rejected.id]));
     replaceApprovalSelection(nextApproval);

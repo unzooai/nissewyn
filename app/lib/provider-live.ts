@@ -14,7 +14,13 @@
  */
 
 import type { ConnectorCheckResult, ConnectorId } from "../types";
-import type { CapabilityLease, WorkspaceProvider } from "./provider";
+import {
+  isAgentApprovalId,
+  parseAgentApprovalId,
+  toApprovalItem,
+  type RawAgentApproval,
+} from "./agent-approvals";
+import type { ApprovalDecision, CapabilityLease, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -67,6 +73,38 @@ function authToken(): Promise<string> {
   return untermToken;
 }
 
+async function getUnterm<T>(path: string): Promise<T> {
+  const token = await authToken();
+  const response = await fetch(path, { headers: { authorization: `Bearer ${token}` } });
+  const body = (await response.json()) as T & { error?: string };
+  if (!response.ok || body?.error) throw new Error(body?.error ?? `unterm 返回 ${response.status}`);
+  return body;
+}
+
+/**
+ * 已经在这里答复过的托管审批。答复发出去和 unterm 把它移出队列之间有一个
+ * 来回，这期间的一次轮询还会看到它；不滤掉，刚处理完的审批会闪回收件箱。
+ */
+const answeredAgentApprovals = new Set<string>();
+
+async function decideAgentApproval(id: string, decision: ApprovalDecision): Promise<void> {
+  const parsed = parseAgentApprovalId(id);
+  if (!parsed) throw new Error(`不是托管会话的审批：${id}`);
+  answeredAgentApprovals.add(id);
+  try {
+    await callUnterm("/api/agent/decide", {
+      session_id: parsed.sessionId,
+      request_id: parsed.requestId,
+      allow: decision.kind === "approve",
+      // 控制台的拒绝 = 拒绝并停止这一轮：不停的话 agent 往往换个命令再问一遍。
+      ...(decision.kind === "reject" ? { message: decision.reason, interrupt: true } : {}),
+    });
+  } catch (error) {
+    answeredAgentApprovals.delete(id);
+    throw error;
+  }
+}
+
 async function callUnterm<T>(path: string, payload: Record<string, unknown>): Promise<T> {
   const token = await authToken();
   const response = await fetch(path, {
@@ -88,6 +126,41 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
 
   return {
     ...fallback,
+
+    /**
+     * 审批：本地队列照旧走 fallback，托管会话的审批走 unterm。
+     * live() 取不到（云端演示版、本机没起 unterm）就当没有，不影响其它审批。
+     */
+    approvals: {
+      ...fallback.approvals,
+
+      async live() {
+        if (!inBrowser) return [];
+        try {
+          const data = await getUnterm<{ approvals?: RawAgentApproval[] }>("/api/agent/approvals");
+          const now = Date.now();
+          return (data.approvals ?? [])
+            .map((raw) => toApprovalItem(raw, now))
+            .filter((item) => !answeredAgentApprovals.has(item.id));
+        } catch {
+          return [];
+        }
+      },
+
+      async decide(id, decision) {
+        if (isAgentApprovalId(id)) return decideAgentApproval(id, decision);
+        return fallback.approvals.decide(id, decision);
+      },
+
+      async decideMany(ids, decision) {
+        const agent = ids.filter(isAgentApprovalId);
+        const local = ids.filter((id) => !isAgentApprovalId(id));
+        await Promise.all([
+          ...agent.map((id) => decideAgentApproval(id, decision)),
+          ...(local.length ? [fallback.approvals.decideMany(local, decision)] : []),
+        ]);
+      },
+    },
 
     /**
      * 真的跑一个 brain。这条只在 unterm 托管这份控制台时通 —— 别处拿不到
