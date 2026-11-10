@@ -6,7 +6,9 @@
  * 运行摘要因此一直是空的）。
  */
 
-import type { AgentRule, AgentRuleDraft, BrainEvent } from "./provider";
+import type {
+  BrainAgent,
+  BrainId, AgentRule, AgentRuleDraft, BrainEvent } from "./provider";
 
 function str(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
@@ -95,4 +97,33 @@ export function turnOutcome(events: BrainEvent[]): { done: boolean; state?: stri
     }
   }
   return { done: false };
+}
+
+const brainIds: readonly BrainId[] = ["claude-code", "codex-cli", "opencode"];
+
+export function isBrainId(value: unknown): value is BrainId {
+  return typeof value === "string" && (brainIds as readonly string[]).includes(value);
+}
+
+/**
+ * unterm GET /api/agents/list 的一行 → BrainAgent。控制台不认识的 agent
+ * （还没有托管协议的那些）丢掉：交给它也跑不起来。
+ */
+export function toBrainAgent(raw: Record<string, unknown>): BrainAgent | null {
+  if (!isBrainId(raw.id)) return null;
+  return {
+    id: raw.id,
+    name: typeof raw.name === "string" && raw.name ? raw.name : raw.id,
+    installed: raw.installed === true,
+    version: typeof raw.detected_version === "string" ? raw.detected_version : undefined,
+    hosted: raw.hosted_supported === true,
+    governed: raw.governed_supported === true,
+  };
+}
+
+/** unterm 报的 adapter 名 → 控制台的 agent id（续接时只拿得到 adapter）。 */
+export function agentForAdapter(adapter: string | undefined): BrainId {
+  if (adapter === "codex") return "codex-cli";
+  if (adapter === "opencode") return "opencode";
+  return "claude-code";
 }

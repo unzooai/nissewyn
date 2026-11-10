@@ -286,6 +286,13 @@ export function createMockProvider(): WorkspaceProvider {
   }
 
   const brainPort: BrainPort = {
+    async agents() {
+      return [
+        { id: "claude-code", name: "Claude Code", installed: true, hosted: true, governed: true },
+        { id: "codex-cli", name: "Codex CLI", installed: true, hosted: true, governed: false },
+        { id: "opencode", name: "OpenCode", installed: false, hosted: true, governed: false },
+      ];
+    },
     async start({ agent, prompt, taskId, runId, stepId }) {
       const session = playTurn(agent, prompt, { taskId, runId, stepId }, `收到：${prompt.slice(0, 40)}`);
       brainTranscripts.set(session.sessionId, { agent, prompts: [prompt] });

@@ -143,7 +143,19 @@ export interface PolicyPort {
 }
 
 /** 能驱动的 brain。和 unterm agent manifest 里的 id 对齐。 */
-export type BrainId = "claude-code" | "codex-cli";
+export type BrainId = "claude-code" | "codex-cli" | "opencode";
+
+/** 能交任务的一个 agent：这台机器上装了没有，能用哪些模式。 */
+export type BrainAgent = {
+  id: BrainId;
+  name: string;
+  installed: boolean;
+  version?: string;
+  /** 能托管：每次工具调用先进收件箱。控制台只把任务交给能托管的。 */
+  hosted: boolean;
+  /** 能受管：自带 shell 关掉，命令只能经 Unterm。 */
+  governed: boolean;
+};
 
 /**
  * brain 吐出的一条事件。字段是 unterm 那边 BrainEvent 的形状，原样带过来
@@ -202,6 +214,8 @@ export type BrainStatus = {
  * 任务详情页据此把事件归到对应的运行和步骤。
  */
 export interface BrainPort {
+  /** 能交任务的 agent（unterm 的 agent 清单 + 本机检测结果）。 */
+  agents(): Promise<BrainAgent[]>;
   start(input: {
     agent: BrainId;
     prompt: string;

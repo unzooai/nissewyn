@@ -1,13 +1,14 @@
 "use client";
 
-import { FolderOpen, Plus, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
+import { Bot, FolderOpen, Plus, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
+  defaultAgentRunSettings,
   readAgentRunSettings,
   writeAgentRunSettings,
   type AgentRunSettings,
 } from "./lib/agent-run-settings";
-import type { AgentRule, AgentRulePort } from "./lib/provider";
+import type { AgentRule, AgentRulePort, BrainAgent, BrainPort } from "./lib/provider";
 
 /**
  * 设置 › 智能体：任务交给 agent 时在哪个目录跑、是否受管，以及托管会话的
@@ -17,12 +18,16 @@ import type { AgentRule, AgentRulePort } from "./lib/provider";
  */
 export function AgentRunPanel({
   rules: rulePort,
+  brain,
   notify,
 }: {
   rules: AgentRulePort;
+  brain: Pick<BrainPort, "agents">;
   notify: (message: string) => void;
 }) {
-  const [settings, setSettings] = useState<AgentRunSettings>({ cwd: "", governed: true });
+  const [settings, setSettings] = useState<AgentRunSettings>({ ...defaultAgentRunSettings });
+  const [agents, setAgents] = useState<BrainAgent[] | null>(null);
+  const [agentsError, setAgentsError] = useState<string | null>(null);
   const [cwdDraft, setCwdDraft] = useState("");
   const [rules, setRules] = useState<AgentRule[]>([]);
   const [store, setStore] = useState<string | undefined>();
@@ -58,6 +63,26 @@ export function AgentRunPanel({
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    let live = true;
+    brain
+      .agents()
+      .then((list) => {
+        if (!live) return;
+        // 只列能托管的：交给不能托管的 agent，工具调用就进不了收件箱。
+        setAgents(list.filter((agent) => agent.hosted));
+        setAgentsError(null);
+      })
+      .catch((error: unknown) => {
+        if (live) setAgentsError(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      live = false;
+    };
+  }, [brain]);
+
+  const chosen = agents?.find((agent) => agent.id === settings.agent);
 
   function save(next: AgentRunSettings, message: string) {
     setSettings(next);
@@ -115,6 +140,44 @@ export function AgentRunPanel({
         <h2>工作目录、受管模式与常设规则</h2>
       </div>
 
+      <label className="setting-row agent-run-agent">
+        <span>
+          <strong>交给哪个智能体</strong>
+          <small>
+            {agentsError
+              ? `读不到智能体清单：${agentsError}`
+              : chosen && !chosen.installed
+                ? `${chosen.name} 没装在这台机器上，任务会启动失败。`
+                : chosen && !chosen.governed && settings.governed
+                  ? `${chosen.name} 不支持受管，会以托管模式运行：每次工具调用照样先进收件箱。`
+                  : "新建、继续和重试的任务都交给它。继续对话沿用那次运行原来的智能体。"}
+          </small>
+        </span>
+        <span className="agent-run-input agent-run-select">
+          <Bot size={14} aria-hidden="true" />
+          <select
+            aria-label="交给哪个智能体"
+            value={settings.agent}
+            disabled={!agents}
+            onChange={(event) => {
+              const next = agents?.find((agent) => agent.id === event.target.value);
+              if (next) save({ ...settings, agent: next.id }, `任务改为交给 ${next.name}`);
+            }}
+          >
+            {!agents && <option value={settings.agent}>正在读取…</option>}
+            {agents && !chosen && (
+              <option value={settings.agent}>{settings.agent}（清单里没有）</option>
+            )}
+            {agents?.map((agent) => (
+              <option key={agent.id} value={agent.id}>
+                {agent.name}
+                {agent.installed ? (agent.version ? ` ${agent.version}` : "") : "（未安装）"}
+              </option>
+            ))}
+          </select>
+        </span>
+      </label>
+
       <form
         className="setting-row agent-run-cwd"
         onSubmit={(event) => {
@@ -148,7 +211,7 @@ export function AgentRunPanel({
           <strong>受管模式</strong>
           <small>
             关掉 Claude Code 自带的 Bash、PowerShell 和联网工具，命令只能经 Unterm 执行，每一步都先进收件箱。
-            其它智能体不支持受管，会以托管模式运行：用自己的工具，但同样逐条等你批准。
+            目前只有 Claude Code 支持；其它智能体以托管模式运行：用自己的工具，但同样逐条等你批准。
           </small>
         </span>
         <button

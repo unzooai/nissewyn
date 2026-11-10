@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  agentForAdapter,
   fromAgentRuleDraft,
   toAgentRule,
+  toBrainAgent,
   toBrainEvent,
   turnOutcome,
 } from "../.test-build/brain-events.mjs";
@@ -77,10 +79,42 @@ test("规则草稿：空串当作没给，不会生成只匹配空命令的规�
 });
 
 test("运行设置：坏数据退回默认，受管只给 Claude Code", () => {
-  assert.deepEqual(parseAgentRunSettings(null), { cwd: "", governed: true });
-  assert.deepEqual(parseAgentRunSettings("{oops"), { cwd: "", governed: true });
-  assert.deepEqual(parseAgentRunSettings('{"cwd":" C:\\\\w ","governed":false}'), { cwd: "C:\\w", governed: false });
+  const fallback = { agent: "claude-code", cwd: "", governed: true };
+  assert.deepEqual(parseAgentRunSettings(null), fallback);
+  assert.deepEqual(parseAgentRunSettings("{oops"), fallback);
+  assert.deepEqual(parseAgentRunSettings('{"cwd":" C:\\\\w ","governed":false}'), {
+    agent: "claude-code",
+    cwd: "C:\\w",
+    governed: false,
+  });
+  assert.equal(parseAgentRunSettings('{"agent":"codex-cli"}').agent, "codex-cli");
+  assert.equal(parseAgentRunSettings('{"agent":"rm -rf"}').agent, "claude-code", "不认识的 agent 退回默认");
   assert.equal(brainModeFor("claude-code", { cwd: "", governed: true }), "governed");
   assert.equal(brainModeFor("codex-cli", { cwd: "", governed: true }), "hosted");
   assert.equal(brainModeFor("claude-code", { cwd: "", governed: false }), "hosted");
+});
+
+test("agent 清单：只认得能驱动的，模式照 unterm 说的", () => {
+  const codex = toBrainAgent({
+    id: "codex-cli",
+    name: "Codex CLI",
+    installed: true,
+    detected_version: "0.167.0",
+    hosted_supported: true,
+    governed_supported: false,
+  });
+  assert.deepEqual(codex, {
+    id: "codex-cli",
+    name: "Codex CLI",
+    installed: true,
+    version: "0.167.0",
+    hosted: true,
+    governed: false,
+  });
+  assert.equal(toBrainAgent({ id: "aider", installed: true }), null);
+  // 旧版 unterm 不报 hosted_supported：当作不能托管，不会被列出来。
+  assert.equal(toBrainAgent({ id: "claude-code", installed: true }).hosted, false);
+  assert.equal(agentForAdapter("codex"), "codex-cli");
+  assert.equal(agentForAdapter("opencode"), "opencode");
+  assert.equal(agentForAdapter("claude"), "claude-code");
 });

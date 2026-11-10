@@ -20,8 +20,15 @@ import {
   toApprovalItem,
   type RawAgentApproval,
 } from "./agent-approvals";
-import { fromAgentRuleDraft, toAgentRule, toBrainEvent, type RawAgentRule } from "./brain-events";
-import type { ApprovalDecision, BrainSession, CapabilityLease, WorkspaceProvider } from "./provider";
+import {
+  agentForAdapter,
+  fromAgentRuleDraft,
+  toAgentRule,
+  toBrainAgent,
+  toBrainEvent,
+  type RawAgentRule,
+} from "./brain-events";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -183,6 +190,19 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
      * 让界面显示一段根本没发生过的事。
      */
     brain: {
+      async agents() {
+        if (!inBrowser) return fallback.brain.agents();
+        try {
+          const data = await getUnterm<{ agents?: Record<string, unknown>[] }>("/api/agents/list");
+          return (data.agents ?? [])
+            .map(toBrainAgent)
+            .filter((agent): agent is BrainAgent => agent !== null);
+        } catch (error) {
+          // unterm 在跑但清单读不到（离线、签名过期）要报出来；连 unterm 都没有才退回演示。
+          if (await untermReachable()) throw error;
+          return fallback.brain.agents();
+        }
+      },
       async start(input) {
         if (!inBrowser) return fallback.brain.start(input);
         const mode = input.mode ?? "headless";
@@ -227,7 +247,7 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
         return {
           sessionId: data.session_id,
           // 续接只认得 unterm 记下的那个 CLI；控制台这边的 agent id 只用来显示。
-          agent: status.adapter === "codex" ? "codex-cli" : "claude-code",
+          agent: agentForAdapter(status.adapter),
           adapter: status.adapter ?? "claude",
           hosted: true,
         };

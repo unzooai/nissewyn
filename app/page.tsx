@@ -2781,6 +2781,9 @@ export default function HomePage() {
     }
 
     const timer = window.setTimeout(() => {
+      // 正在提交：createTask 会清掉草稿。这个定时器可能在清掉之后、关闭
+      // 对话框的状态提交之前触发，再写一次就成了"已创建的任务还留着草稿"。
+      if (taskSavingRef.current) return;
       const savedAt = new Date().toISOString();
       const recovery: TaskDraftRecovery = {
         version: 1,
@@ -9059,7 +9062,7 @@ export default function HomePage() {
     };
 
     const runSettings = readAgentRunSettings();
-    const agent = "claude-code" as const;
+    const agent = runSettings.agent;
     let session: Awaited<ReturnType<typeof workspaceProvider.brain.start>>;
     try {
       session = continueFrom
@@ -12979,7 +12982,11 @@ export default function HomePage() {
               </label>
             </div>
 
-            <AgentRunPanel rules={workspaceProvider.agentRules} notify={setNotice} />
+            <AgentRunPanel
+              rules={workspaceProvider.agentRules}
+              brain={workspaceProvider.brain}
+              notify={setNotice}
+            />
 
             <section className="settings-data-center" id="settings-data">
               <header className="settings-data-heading">

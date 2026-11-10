@@ -8,6 +8,8 @@
 import type { BrainId, BrainMode } from "./provider";
 
 export type AgentRunSettings = {
+  /** 任务交给哪个 agent。 */
+  agent: BrainId;
   /** agent 的工作目录。空串：不指定，用 unterm 自己的工作目录。 */
   cwd: string;
   /**
@@ -19,13 +21,23 @@ export type AgentRunSettings = {
 
 export const AGENT_RUN_SETTINGS_KEY = "unzoo-one.agent-run";
 
-export const defaultAgentRunSettings: AgentRunSettings = { cwd: "", governed: true };
+export const defaultAgentRunSettings: AgentRunSettings = {
+  agent: "claude-code",
+  cwd: "",
+  governed: true,
+};
+
+const knownAgents: readonly string[] = ["claude-code", "codex-cli", "opencode"];
 
 export function parseAgentRunSettings(text: string | null): AgentRunSettings {
   if (!text) return { ...defaultAgentRunSettings };
   try {
     const raw = JSON.parse(text) as Partial<AgentRunSettings>;
     return {
+      agent:
+        typeof raw.agent === "string" && knownAgents.includes(raw.agent)
+          ? (raw.agent as BrainId)
+          : defaultAgentRunSettings.agent,
       cwd: typeof raw.cwd === "string" ? raw.cwd.trim() : defaultAgentRunSettings.cwd,
       governed: typeof raw.governed === "boolean" ? raw.governed : defaultAgentRunSettings.governed,
     };
