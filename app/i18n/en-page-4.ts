@@ -8,7 +8,7 @@ export const enPage4: Record<string, string> = {
   "当前工作区": "Current workspace",
   "设备离线 · 本机数据可用": "Offline · local data available",
   "当前为临时会话": "Temporary session",
-  "成员": "Members",
+  "成员": "Member",
   "可用连接": "Available connections",
   "网络状态": "Network",
   "离线": "Offline",

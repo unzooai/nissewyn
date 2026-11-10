@@ -30,6 +30,8 @@ export type RuntimeRun = {
   session_id?: string | null;
   summary?: string | null;
   error?: string | null;
+  /** 运行时自己结束这一轮的原因（start_failed、idle_timeout、session_lost、service_restarted）。 */
+  error_code?: string | null;
   /** 正等人在收件箱批准一次工具调用。 */
   waiting?: boolean;
   usage?: { input_tokens?: number; output_tokens?: number } | null;
@@ -118,6 +120,26 @@ const runStatus: Record<string, TaskRunStatus> = {
   interrupted: "失败",
 };
 
+/**
+ * 一次失败运行的原因，用读者的语言：运行时自己结束的，按原因码翻译；
+ * agent 自己报的错，原样给出。
+ */
+export function runError(run: Pick<RuntimeRun, "error" | "error_code">): string | undefined {
+  const raw = run.error?.trim() || undefined;
+  switch (run.error_code) {
+    case "start_failed":
+      return t("智能体没能启动：{error}", { error: raw ?? "" });
+    case "idle_timeout":
+      return t("十分钟没有任何进展，已停止");
+    case "session_lost":
+      return t("智能体的会话意外中断了");
+    case "service_restarted":
+      return t("这次运行还没结束，后台服务就停止了");
+    default:
+      return raw;
+  }
+}
+
 export function toTaskRun(run: RuntimeRun): TaskRun {
   const status = runStatus[run.state] ?? "失败";
   const started = Date.parse(run.started_at);
@@ -132,7 +154,7 @@ export function toTaskRun(run: RuntimeRun): TaskRun {
   } else if (status === "已取消") {
     text = t("已停止");
   } else {
-    text = run.error?.trim() || (summary ? summary.slice(-160) : t("运行失败"));
+    text = runError(run) || (summary ? summary.slice(-160) : t("运行失败"));
   }
   return {
     id: run.id,
@@ -141,7 +163,7 @@ export function toTaskRun(run: RuntimeRun): TaskRun {
     durationSeconds:
       Number.isNaN(started) || Number.isNaN(ended) ? undefined : Math.max(0, Math.round((ended - started) / 1000)),
     summary: `${scheduled}${text}`,
-    errorMessage: status === "失败" ? run.error ?? undefined : undefined,
+    errorMessage: status === "失败" ? runError(run) : undefined,
     sessionId: run.session_id ?? undefined,
     waiting: status === "运行中" && run.waiting === true,
   };
@@ -201,7 +223,7 @@ export function mergeRuntimeTasks(
       updated: updatedFrom(latest, status, base.updated),
       progress: status === "已完成" ? 100 : status === "运行中" ? Math.max(base.progress, 8) : base.progress,
       runs: allRuns,
-      lastError: status === "失败" ? latest?.error ?? base.lastError : undefined,
+      lastError: status === "失败" ? (latest ? runError(latest) : undefined) ?? base.lastError : undefined,
     };
   };
 

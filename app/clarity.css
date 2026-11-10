@@ -25100,3 +25100,28 @@ body {
   background: #255f9f;
   color: #ffffff;
 }
+
+/* Desktop app: open the terminal */
+.clarity-sidebar-terminal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: auto 0 10px;
+  padding: 10px 12px;
+  border: 1px solid #dce3eb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2f3b4f;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clarity-sidebar-terminal:hover {
+  border-color: #255f9f;
+  color: #255f9f;
+}
+
+.clarity-sidebar-terminal + .clarity-sidebar-status {
+  margin-top: 0;
+}

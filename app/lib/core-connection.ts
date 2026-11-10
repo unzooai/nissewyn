@@ -62,3 +62,10 @@ async function resolve(): Promise<CoreConnection> {
 export function coreUrl(connection: CoreConnection, path: string): string {
   return `${connection.base}${path}`;
 }
+
+/** Open the terminal next to Unzoo One (desktop app only). */
+export async function openTerminal(): Promise<void> {
+  const invoke = tauri()?.core?.invoke;
+  if (!invoke) throw new Error(t("终端只能在 Unzoo One 桌面版里打开"));
+  await invoke("open_terminal");
+}

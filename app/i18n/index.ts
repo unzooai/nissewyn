@@ -95,5 +95,9 @@ export function dateLocale(): string {
 
 /** Keep `<html lang>` in step with the language actually shown. */
 export function applyDocumentLanguage(): void {
-  if (typeof document !== "undefined") document.documentElement.lang = current;
+  if (typeof document === "undefined") return;
+  document.documentElement.lang = current;
+  // The page metadata is English (server rendering); the title follows the
+  // language actually shown.
+  document.title = t("Unzoo One | AI 任务工作台");
 }

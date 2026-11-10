@@ -56,6 +56,7 @@ import {
   UserPlus,
   Users,
   X,
+  SquareTerminal,
 } from "lucide-react";
 
 import type {
@@ -190,8 +191,8 @@ const workspaceSyncSectionLabels: Record<WorkspaceSyncSection, string> = {
   team: t("团队成员"),
 };
 const defaultWorkspaceProfile: WorkspaceProfile = {
-  name: t("MVP 工作区"),
-  description: t("长期 AI 任务、审批与成果协作"),
+  name: t("我的工作区"),
+  description: t("交给 AI 的任务、审批与成果"),
 };
 const defaultSettings: SettingsState = {
   approval: true,
@@ -232,6 +233,7 @@ import {
 } from "./lib/runtime-tasks";
 import { AgentRunPanel } from "./agent-run-panel";
 import { RuntimeFocusCard } from "./runtime-focus";
+import { inDesktopApp, openTerminal } from "./lib/core-connection";
 import { applyDocumentLanguage, chooseLocale, dateLocale, locale, locales, t, type Locale } from "./i18n";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
 import { isAgentApprovalId, reconcileAgentApprovals } from "./lib/agent-approvals";
@@ -1549,6 +1551,9 @@ export default function HomePage() {
    */
   const [runtimeMode, setRuntimeMode] = useState<boolean | null>(null);
   const runtimeSent = useRef(new Map<string, string>());
+  // Only known in the browser: false for the server render, then the truth.
+  const [desktopApp, setDesktopApp] = useState(false);
+  useEffect(() => setDesktopApp(inDesktopApp()), []);
   // <html lang> follows the language actually shown, not the server default.
   useEffect(() => applyDocumentLanguage(), []);
   const runtimeRemoved = useRef(new Set<string>());
@@ -1749,6 +1754,7 @@ export default function HomePage() {
       }).format(new Date(workspaceLastSavedAt))
     : "";
   const runningTaskTotal = tasks.filter((task) => task.status === "运行中").length;
+  const planLabel = runtimeMode ? t("个人版") : t("Team 方案");
   const systemStatusTone =
     workspacePersistenceStatus === "failed"
       ? "storage-failed"
@@ -2079,7 +2085,7 @@ export default function HomePage() {
     {
       id: "task",
       label: t("创建真实任务"),
-      description: t("示例任务不会替代你的真实配置"),
+      description: runtimeMode ? t("交给智能体的第一项工作") : t("示例任务不会替代你的真实配置"),
       actionLabel: t("新建任务"),
       complete: tasks.some((task) => !demoTaskIds.has(task.id)),
       icon: Sparkles,
@@ -4809,7 +4815,8 @@ export default function HomePage() {
         : lastWorkspaceBackupAt
           ? t("最近可用备份：{workspaceBackupFreshnessLabel}。导入时会再次校验文件结构。", { workspaceBackupFreshnessLabel })
           : t("本机保存用于日常恢复，手动备份用于迁移设备或应对浏览器数据被清理。");
-  const latestActivity = activityLog[0] ?? workspaceDefaults.activity[0];
+  // The demo shows its sample activity; a real workspace starts with none.
+  const latestActivity = activityLog[0] ?? (runtimeMode ? null : workspaceDefaults.activity[0]);
   const latestArtifact = artifacts[0] ?? null;
   const notificationItems = useMemo<NotificationItem[]>(() => {
     const items: NotificationItem[] = [];
@@ -4837,16 +4844,18 @@ export default function HomePage() {
         tone: "amber",
       });
     }
-    items.push({
-      id: `activity-${latestActivity.id}`,
-      title: latestActivity.title,
-      detail: latestActivity.detail,
-      meta: latestActivity.time,
-      target: "activity",
-      targetId: latestActivity.id,
-      icon: activityIconMap[latestActivity.icon] ?? Activity,
-      tone: "blue",
-    });
+    if (latestActivity) {
+      items.push({
+        id: `activity-${latestActivity.id}`,
+        title: latestActivity.title,
+        detail: latestActivity.detail,
+        meta: latestActivity.time,
+        target: "activity",
+        targetId: latestActivity.id,
+        icon: activityIconMap[latestActivity.icon] ?? Activity,
+        tone: "blue",
+      });
+    }
     if (latestArtifact) {
       items.push({
         id: `artifact-${latestArtifact.id}`,
@@ -9731,6 +9740,21 @@ export default function HomePage() {
           ))}
         </nav>
 
+        {desktopApp && (
+          <button
+            className="clarity-sidebar-terminal"
+            type="button"
+            onClick={() => {
+              openTerminal().catch((error: unknown) =>
+                setNotice(t("没能打开终端：{error}", { error: error instanceof Error ? error.message : String(error) })),
+              );
+            }}
+          >
+            <SquareTerminal size={17} aria-hidden="true" />
+            <span>{t("打开终端")}</span>
+          </button>
+        )}
+
         <div className="clarity-sidebar-status">
           <i className={systemStatusTone} />
           <div>
@@ -10128,7 +10152,7 @@ export default function HomePage() {
                 </span>
                 <span className="workspace-menu-trigger-copy">
                   <strong>{workspaceProfile.name}</strong>
-                  <small>{t("Team 方案")}</small>
+                  <small>{planLabel}</small>
                 </span>
                 <ChevronDown
                   className={workspaceMenuOpen ? "is-open" : ""}
@@ -10179,7 +10203,7 @@ export default function HomePage() {
 
                   <div className="workspace-menu-summary" aria-label={t("工作区状态")}>
                     <span>
-                      <small>{t("成员")}</small>
+                      <small>{t("团队成员")}</small>
                       <strong>{teamMembers.length}</strong>
                     </span>
                     <span className={!isOnline ? "is-alert" : ""}>
@@ -10567,7 +10591,7 @@ export default function HomePage() {
               >
                 <div className="workspace-onboarding-intro">
                   <header>
-                    <span>{t("首次设置 · 示例工作区")}</span>
+                    <span>{runtimeMode ? t("首次设置") : t("首次设置 · 示例工作区")}</span>
                     <strong>{t("{onboardingCompletedCount}/{length} 已完成", { onboardingCompletedCount, length: onboardingSteps.length })}</strong>
                   </header>
                   <button
@@ -10584,7 +10608,9 @@ export default function HomePage() {
                   </h2>
                   <p>
                     
-                    {t("当前任务用于展示产品能力。完成下面的设置，再运行属于你的真实任务。")}
+                    {runtimeMode
+                      ? t("完成下面几步，就可以把真实的工作交给智能体。")
+                      : t("当前任务用于展示产品能力。完成下面的设置，再运行属于你的真实任务。")}
                   </p>
                   <div
                     className="workspace-onboarding-progress"
@@ -12720,7 +12746,7 @@ export default function HomePage() {
                   >
                     <Sparkles size={15} />
                     
-                    {t("Team 方案")}
+                    {planLabel}
                   </button>
                   <button type="button" onClick={exportUsageReport}>
                     <Download size={15} />
@@ -16496,7 +16522,7 @@ export default function HomePage() {
             <div className="workspace-profile-preview" aria-label={t("工作区资料预览")}>
               <span>{getWorkspaceInitial(workspaceNameDraft)}</span>
               <span>
-                <small>{t("Team 方案")}</small>
+                <small>{planLabel}</small>
                 <strong>{workspaceNameDraft.trim() || t("未命名工作区")}</strong>
                 <em>
                   {workspaceDescriptionDraft.trim() || t("尚未填写工作区说明")}
@@ -16693,7 +16719,7 @@ export default function HomePage() {
               </span>
               <span>
                 <span className="plan-center-eyebrow">{t("当前方案")}</span>
-                <h2 id="plan-center-title">{t("Team 方案")}</h2>
+                <h2 id="plan-center-title">{planLabel}</h2>
                 <p id="plan-center-description">
                   
                   {t("当前工作区的额度、席位和安全能力都在这里汇总，可直接调整预算或管理成员。")}

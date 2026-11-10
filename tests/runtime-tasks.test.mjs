@@ -72,6 +72,19 @@ test("一次运行在控制台里的样子", () => {
   assert.equal(lost.status, "失败");
   assert.equal(lost.errorMessage, "Unterm stopped");
   assert.equal(toTaskRun({ id: "r", attempt: 3, state: "cancelled", started_at: "x" }).status, "已取消");
+
+  // The runtime's own reasons are said in the reader's language; an agent's
+  // own error is shown as it came.
+  const restarted = toTaskRun({
+    id: "r", attempt: 4, state: "interrupted", started_at: "x",
+    error: "the background service stopped before this run finished", error_code: "service_restarted",
+  });
+  assert.equal(restarted.errorMessage, "The background service stopped before this run finished");
+  const notInstalled = toTaskRun({
+    id: "r", attempt: 5, state: "failed", started_at: "x",
+    error: "Codex CLI is not installed on this machine", error_code: "start_failed",
+  });
+  assert.equal(notInstalled.errorMessage, "The agent couldn't start: Codex CLI is not installed on this machine");
 });
 
 test("任务状态由最近一次运行决定", () => {
