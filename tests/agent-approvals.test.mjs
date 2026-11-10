@@ -37,27 +37,28 @@ test("托管审批：一条 approval.requested 变成收件箱里说清楚要做
   const item = toApprovalItem(claudeAsks, now);
   assert.equal(item.id, `agent:${claudeAsks.session_id}:${claudeAsks.approval.request_id}`);
   assert.equal(item.taskId, claudeAsks.task_id, "挂回调用方给的任务");
-  assert.equal(item.title, "Claude Code 请求执行命令");
+  // Interface text is English by default; data values (risk) stay as data.
+  assert.equal(item.title, "Claude Code wants to run a command");
   assert.equal(item.target, "echo hi > out.txt", "命令原文，而不是整段 JSON");
   assert.equal(item.reason, "Write hi to out.txt");
-  assert.equal(item.scope, "仅本次调用");
+  assert.equal(item.scope, "This call only");
   assert.equal(item.risk, "中风险");
-  assert.equal(item.requestedAt, "5 分钟前");
+  assert.equal(item.requestedAt, "5 min ago");
 
   // agy 的命令在 CommandLine 里；Codex 的补丁、权限请求各有各的样子。
   const agy = toApprovalItem({
     session_id: "ags_2", adapter: "agy",
     approval: { request_id: "1", tool_call: { tool: "run_command", arguments: { CommandLine: "echo hi > out.txt" } } },
   });
-  assert.equal(agy.title, "Antigravity 请求执行命令");
+  assert.equal(agy.title, "Antigravity wants to run a command");
   assert.equal(agy.target, "echo hi > out.txt");
-  assert.equal(agy.requestedAt, "刚刚", "没有时间就当刚刚");
+  assert.equal(agy.requestedAt, "Just now", "没有时间就当刚刚");
 
   const patch = toApprovalItem({
     session_id: "ags_3", adapter: "codex",
     approval: { request_id: "5", tool_call: { tool: "apply_patch", arguments: [{ path: "a.txt", kind: "add" }] } },
   });
-  assert.equal(patch.action, "修改文件");
+  assert.equal(patch.action, "change a file");
   assert.match(patch.target, /a\.txt/);
 
   const perms = toApprovalItem({

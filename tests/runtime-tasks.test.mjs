@@ -26,7 +26,7 @@ const task = {
 
 test("推给运行时的：提示词、计划、暂停；运行记录不推", () => {
   const put = toRuntimePut(task);
-  assert.equal(put.prompt, "周报\n汇总本周提交\n目标：演示仓库");
+  assert.equal(put.prompt, "周报\n汇总本周提交\nTarget: 演示仓库", "the label is in the interface language (English here)");
   assert.deepEqual(put.schedule, { kind: "weekly", time: "17:30", weekday: 5 });
   assert.equal(put.paused, false);
   assert.equal("runs" in put.console, false);
@@ -51,7 +51,8 @@ test("一次运行在控制台里的样子", () => {
     session_id: "ags_1",
   });
   assert.equal(waiting.status, "运行中");
-  assert.equal(waiting.summary, "等你在收件箱确认一次工具调用");
+  assert.equal(waiting.summary, "Waiting for you to approve a tool call in your inbox");
+  assert.equal(waiting.waiting, true);
   assert.equal(waiting.sessionId, "ags_1");
 
   const done = toTaskRun({
@@ -65,7 +66,7 @@ test("一次运行在控制台里的样子", () => {
   });
   assert.equal(done.status, "成功");
   assert.equal(done.durationSeconds, 13);
-  assert.equal(done.summary, "按计划运行 · 已新建 hello.txt");
+  assert.equal(done.summary, "Scheduled run · 已新建 hello.txt");
 
   const lost = toTaskRun({ id: "r", attempt: 2, state: "interrupted", started_at: "x", error: "Unterm stopped" });
   assert.equal(lost.status, "失败");

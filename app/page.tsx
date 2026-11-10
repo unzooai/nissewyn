@@ -130,28 +130,28 @@ const settingsDraftDiscardCopy: Record<
   { eyebrow: string; title: string; description: string; discardLabel: string }
 > = {
   profile: {
-    eyebrow: "工作区资料尚未保存",
-    title: "放弃这次工作区资料修改？",
-    description: "名称和说明会恢复为当前已保存的内容。",
-    discardLabel: "放弃修改",
+    eyebrow: t("工作区资料尚未保存"),
+    title: t("放弃这次工作区资料修改？"),
+    description: t("名称和说明会恢复为当前已保存的内容。"),
+    discardLabel: t("放弃修改"),
   },
   budget: {
-    eyebrow: "预算尚未保存",
-    title: "放弃这次预算调整？",
-    description: "月度额度、提醒阈值和到限保护会恢复为当前已保存的设置。",
-    discardLabel: "放弃调整",
+    eyebrow: t("预算尚未保存"),
+    title: t("放弃这次预算调整？"),
+    description: t("月度额度、提醒阈值和到限保护会恢复为当前已保存的设置。"),
+    discardLabel: t("放弃调整"),
   },
   invite: {
-    eyebrow: "邀请尚未发送",
-    title: "放弃这份成员邀请？",
-    description: "已经填写的姓名、工作邮箱和成员角色不会被保留。",
-    discardLabel: "放弃邀请",
+    eyebrow: t("邀请尚未发送"),
+    title: t("放弃这份成员邀请？"),
+    description: t("已经填写的姓名、工作邮箱和成员角色不会被保留。"),
+    discardLabel: t("放弃邀请"),
   },
   member: {
-    eyebrow: "角色尚未保存",
-    title: "放弃这次角色修改？",
-    description: "成员会继续使用当前角色，新选择的权限不会生效。",
-    discardLabel: "放弃修改",
+    eyebrow: t("角色尚未保存"),
+    title: t("放弃这次角色修改？"),
+    description: t("成员会继续使用当前角色，新选择的权限不会生效。"),
+    discardLabel: t("放弃修改"),
   },
 };
 const weekdays: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
@@ -179,19 +179,19 @@ const workspacePreferenceStorageKeys = [
 ] as const;
 const taskDraftRecoveryMaxAge = 7 * 24 * 60 * 60 * 1000;
 const workspaceSyncSectionLabels: Record<WorkspaceSyncSection, string> = {
-  profile: "工作区资料",
+  profile: t("工作区资料"),
   tasks: "任务",
-  approvals: "待确认操作",
-  artifacts: "成果",
-  activity: "运行记录",
-  settings: "工作设置",
-  usage: "预算",
-  connectors: "连接器",
-  team: "团队成员",
+  approvals: t("待确认操作"),
+  artifacts: t("成果"),
+  activity: t("运行记录"),
+  settings: t("工作设置"),
+  usage: t("预算"),
+  connectors: t("连接器"),
+  team: t("团队成员"),
 };
 const defaultWorkspaceProfile: WorkspaceProfile = {
-  name: "MVP 工作区",
-  description: "长期 AI 任务、审批与成果协作",
+  name: t("MVP 工作区"),
+  description: t("长期 AI 任务、审批与成果协作"),
 };
 const defaultSettings: SettingsState = {
   approval: true,
@@ -204,8 +204,8 @@ const defaultUsageSettings: UsageSettings = {
   pauseAtLimit: true,
 };
 const defaultConnectorChecks: ConnectorCheckState = {
-  browser: { checkedAt: "2 分钟前", latency: 184 },
-  workspace: { checkedAt: "8 分钟前", latency: 42 },
+  browser: { checkedAt: t("2 分钟前"), latency: 184 },
+  workspace: { checkedAt: t("8 分钟前"), latency: 42 },
   mail: null,
   calendar: null,
 };
@@ -232,6 +232,7 @@ import {
 } from "./lib/runtime-tasks";
 import { AgentRunPanel } from "./agent-run-panel";
 import { RuntimeFocusCard } from "./runtime-focus";
+import { applyDocumentLanguage, chooseLocale, dateLocale, locale, locales, t, type Locale } from "./i18n";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
 import { isAgentApprovalId, reconcileAgentApprovals } from "./lib/agent-approvals";
 
@@ -339,7 +340,7 @@ function parseArtifactDraftRecovery(
 }
 
 function formatDraftSavedAt(savedAt: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(dateLocale(), {
     month: "numeric",
     day: "numeric",
     hour: "2-digit",
@@ -348,24 +349,23 @@ function formatDraftSavedAt(savedAt: string) {
 }
 
 function formatBackupFreshness(savedAt: string | null) {
-  if (!savedAt) return "尚未创建";
+  if (!savedAt) return t("尚未创建");
   const savedTime = Date.parse(savedAt);
-  if (Number.isNaN(savedTime)) return "时间未知";
+  if (Number.isNaN(savedTime)) return t("时间未知");
   const elapsed = Math.max(0, Date.now() - savedTime);
-  if (elapsed < 60 * 1000) return "刚刚";
+  if (elapsed < 60 * 1000) return t("刚刚");
   if (elapsed < 60 * 60 * 1000) {
-    return `${Math.floor(elapsed / (60 * 1000))} 分钟前`;
+    return t("{floor} 分钟前", { floor: Math.floor(elapsed / (60 * 1000)) });
   }
   if (elapsed < 24 * 60 * 60 * 1000) {
-    return `${Math.floor(elapsed / (60 * 60 * 1000))} 小时前`;
+    return t("{floor} 小时前", { floor: Math.floor(elapsed / (60 * 60 * 1000)) });
   }
   return formatDraftSavedAt(savedAt);
 }
 
 function getWorkspaceToday() {
   const now = new Date();
-  const dateParts = new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Asia/Shanghai",
+  const dateParts = new Intl.DateTimeFormat(dateLocale(), {
     month: "numeric",
     day: "numeric",
   }).formatToParts(now);
@@ -373,15 +373,14 @@ function getWorkspaceToday() {
   const day = dateParts.find((part) => part.type === "day")?.value ?? "";
   const hour = Number(
     new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Asia/Shanghai",
       hour: "2-digit",
       hourCycle: "h23",
     }).format(now),
   );
   const greeting =
-    hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
+    hour < 6 ? t("夜深了") : hour < 12 ? t("早上好") : hour < 18 ? t("下午好") : t("晚上好");
   return {
-    eyebrow: `今天 · ${month} 月 ${day} 日`,
+    eyebrow: t("今天 · {month} 月 {day} 日", { month, day }),
     greeting,
   };
 }
@@ -416,12 +415,12 @@ function getWorkspacePersistenceError(error: unknown, clearing = false) {
     errorName === "NS_ERROR_DOM_QUOTA_REACHED";
 
   if (clearing) {
-    return "浏览器阻止了本机数据清理。请重试，或先导出备份后检查浏览器的站点存储权限。";
+    return t("浏览器阻止了本机数据清理。请重试，或先导出备份后检查浏览器的站点存储权限。");
   }
   if (quotaExceeded) {
-    return "本机存储空间不足，新的修改还没有安全落盘。请导出备份并清理浏览器站点数据后重试。";
+    return t("本机存储空间不足，新的修改还没有安全落盘。请导出备份并清理浏览器站点数据后重试。");
   }
-  return "浏览器暂时阻止了本机保存，当前页面中的修改仍然保留。请重试保存或立即导出备份。";
+  return t("浏览器暂时阻止了本机保存，当前页面中的修改仍然保留。请重试保存或立即导出备份。");
 }
 
 function DraftRecoveryNotice({
@@ -460,7 +459,8 @@ function DraftRecoveryNotice({
           {continueLabel}
         </button>
         <button type="button" onClick={onDiscard}>
-          放弃草稿
+          
+          {t("放弃草稿")}
         </button>
       </span>
     </section>
@@ -845,15 +845,15 @@ function formatApprovalDeferredUntil(value: string, nowMs = Date.now()) {
   const deferredUntil = new Date(value);
   const remainingMs = deferredUntil.getTime() - nowMs;
   if (Number.isNaN(deferredUntil.getTime()) || remainingMs <= 0) {
-    return "现在重新提醒";
+    return t("现在重新提醒");
   }
-  const timeLabel = deferredUntil.toLocaleTimeString("zh-CN", {
+  const timeLabel = deferredUntil.toLocaleTimeString(dateLocale(), {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
   if (remainingMs < 60 * 60 * 1000) {
-    return `${Math.max(1, Math.ceil(remainingMs / 60000))} 分钟后 · ${timeLabel}`;
+    return t("{max} 分钟后 · {timeLabel}", { max: Math.max(1, Math.ceil(remainingMs / 60000)), timeLabel });
   }
   const now = new Date(nowMs);
   const tomorrow = new Date(now);
@@ -862,9 +862,9 @@ function formatApprovalDeferredUntil(value: string, nowMs = Date.now()) {
     deferredUntil.getFullYear() === tomorrow.getFullYear() &&
     deferredUntil.getMonth() === tomorrow.getMonth() &&
     deferredUntil.getDate() === tomorrow.getDate();
-  if (isTomorrow) return `明天 ${timeLabel}`;
-  if (remainingMs < 24 * 60 * 60 * 1000) return `今天 ${timeLabel}`;
-  return deferredUntil.toLocaleString("zh-CN", {
+  if (isTomorrow) return t("明天 {timeLabel}", { timeLabel });
+  if (remainingMs < 24 * 60 * 60 * 1000) return t("今天 {timeLabel}", { timeLabel });
+  return deferredUntil.toLocaleString(dateLocale(), {
     month: "numeric",
     day: "numeric",
     hour: "2-digit",
@@ -878,16 +878,16 @@ function formatSchedule(
   time = "09:00",
   day: Weekday = "周一",
 ) {
-  if (schedule === "每天") return `每天 ${time}`;
-  if (schedule === "每周") return `每${day} ${time}`;
-  return "立即运行一次";
+  if (schedule === "每天") return t("每天 {time}", { time });
+  if (schedule === "每周") return t("每{day} {time}", { day: t(day), time });
+  return t("立即运行一次");
 }
 
 function formatApprovalDecisionLabel(action: string) {
-  if (action.startsWith("允许")) {
-    return `批准${action.slice(2)}`;
+  if (action.startsWith(t("允许"))) {
+    return t("批准{slice}", { slice: action.slice(2) });
   }
-  return `批准并${action}`;
+  return t("批准并{action}", { action });
 }
 
 function formatTaskSchedule(task: TaskItem) {
@@ -900,8 +900,8 @@ function formatTaskSchedule(task: TaskItem) {
 
 function formatTaskRunTime(value: string) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "时间未知";
-  return date.toLocaleString("zh-CN", {
+  if (Number.isNaN(date.getTime())) return t("时间未知");
+  return date.toLocaleString(dateLocale(), {
     month: "numeric",
     day: "numeric",
     hour: "2-digit",
@@ -911,16 +911,16 @@ function formatTaskRunTime(value: string) {
 }
 
 function formatTaskRunDuration(seconds?: number) {
-  if (seconds === undefined) return "进行中";
-  if (seconds < 60) return `${seconds} 秒`;
+  if (seconds === undefined) return t("进行中");
+  if (seconds < 60) return t("{seconds} 秒", { seconds });
   if (seconds >= 3600) {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    return minutes ? `${hours} 小时 ${minutes} 分` : `${hours} 小时`;
+    return minutes ? t("{hours} 小时 {minutes} 分", { hours, minutes }) : t("{hours} 小时", { hours });
   }
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
-  return remainder ? `${minutes} 分 ${remainder} 秒` : `${minutes} 分钟`;
+  return remainder ? t("{minutes} 分 {remainder} 秒", { minutes, remainder }) : t("{minutes} 分钟", { minutes });
 }
 
 function stopActiveTaskRuns(
@@ -965,41 +965,41 @@ function getTaskRunStages(run: TaskRun): TaskRunStage[] {
   return [
     {
       id: "configuration",
-      title: "载入任务配置",
-      detail: "已读取任务目标、运行计划和执行边界。",
+      title: t("载入任务配置"),
+      detail: t("已读取任务目标、运行计划和执行边界。"),
       status: "成功",
     },
     {
       id: "authorization",
-      title: "验证连接器与权限",
+      title: t("验证连接器与权限"),
       detail: failedDuringAuthorization
-        ? run.errorMessage ?? "连接器授权验证未通过。"
-        : "连接器和审批边界已通过运行前检查。",
+        ? run.errorMessage ?? t("连接器授权验证未通过。")
+        : t("连接器和审批边界已通过运行前检查。"),
       status: failedDuringAuthorization ? "失败" : "成功",
     },
     {
       id: "execution",
-      title: "执行任务步骤",
+      title: t("执行任务步骤"),
       detail:
         executionStatus === "已跳过"
-          ? "为避免越过授权边界，系统没有进入外部执行。"
+          ? t("为避免越过授权边界，系统没有进入外部执行。")
           : run.summary,
       status: executionStatus,
     },
     {
       id: "audit",
-      title: "保存结果与审计",
+      title: t("保存结果与审计"),
       detail:
         run.status === "运行中"
-          ? "运行结束后会保存结果、耗时和完整审计。"
-          : "运行结果和安全边界已写入本机审计记录。",
+          ? t("运行结束后会保存结果、耗时和完整审计。")
+          : t("运行结果和安全边界已写入本机审计记录。"),
       status: run.status === "运行中" ? "已跳过" : "成功",
     },
   ];
 }
 
 function formatAuditTimestamp(createdAt: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(dateLocale(), {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -1013,12 +1013,12 @@ function formatAuditTimestamp(createdAt: string) {
 }
 
 function getNextRunLabel(task: TaskItem) {
-  if (task.status === "已暂停") return "恢复任务后重新计算";
-  if (task.schedule === "每天") return `明天 ${task.scheduleTime ?? "09:00"}`;
+  if (task.status === "已暂停") return t("恢复任务后重新计算");
+  if (task.schedule === "每天") return t("明天 {value}", { value: task.scheduleTime ?? "09:00" });
   if (task.schedule === "每周") {
-    return `下一个${task.scheduleDay ?? "周一"} ${task.scheduleTime ?? "09:00"}`;
+    return t("下一个{value} {value2}", { value: t(task.scheduleDay ?? "周一"), value2: task.scheduleTime ?? "09:00" });
   }
-  return task.status === "已完成" ? "已完成" : "创建后立即运行";
+  return task.status === "已完成" ? "已完成" : t("创建后立即运行");
 }
 
 const navItems: Array<{
@@ -1027,12 +1027,12 @@ const navItems: Array<{
   mobileLabel: string;
   icon: typeof Home;
 }> = [
-  { id: "home", label: "首页", mobileLabel: "首页", icon: Home },
-  { id: "tasks", label: "任务", mobileLabel: "任务", icon: ListChecks },
-  { id: "approvals", label: "待确认", mobileLabel: "确认", icon: ShieldCheck },
-  { id: "artifacts", label: "成果", mobileLabel: "成果", icon: Files },
-  { id: "activity", label: "运行记录", mobileLabel: "记录", icon: History },
-  { id: "settings", label: "设置", mobileLabel: "设置", icon: Settings2 },
+  { id: "home", label: t("首页"), mobileLabel: t("首页"), icon: Home },
+  { id: "tasks", label: t("任务"), mobileLabel: t("任务"), icon: ListChecks },
+  { id: "approvals", label: t("待确认的操作"), mobileLabel: t("确认"), icon: ShieldCheck },
+  { id: "artifacts", label: t("成果"), mobileLabel: t("成果"), icon: Files },
+  { id: "activity", label: t("运行记录"), mobileLabel: t("记录"), icon: History },
+  { id: "settings", label: t("设置"), mobileLabel: t("设置"), icon: Settings2 },
 ];
 
 const settingsSections: Array<{
@@ -1043,50 +1043,50 @@ const settingsSections: Array<{
 }> = [
   {
     id: "overview",
-    label: "概览",
-    description: "工作区状态",
+    label: t("概览"),
+    description: t("工作区状态"),
     icon: Building2,
   },
   {
     id: "usage",
-    label: "用量",
-    description: "预算与保护",
+    label: t("用量"),
+    description: t("预算与保护"),
     icon: Sparkles,
   },
   {
     id: "team",
-    label: "团队",
-    description: "成员与权限",
+    label: t("团队"),
+    description: t("成员与权限"),
     icon: Users,
   },
   {
     id: "preferences",
-    label: "偏好",
-    description: "运行与通知",
+    label: t("偏好"),
+    description: t("运行与通知"),
     icon: Settings2,
   },
   {
     id: "agents",
-    label: "智能体",
-    description: "工作目录与规则",
+    label: t("智能体"),
+    description: t("工作目录与规则"),
     icon: Bot,
   },
   {
     id: "data",
-    label: "数据",
-    description: "备份与恢复",
+    label: t("数据"),
+    description: t("备份与恢复"),
     icon: HardDrive,
   },
   {
     id: "connectors",
-    label: "连接",
-    description: "工具与授权",
+    label: t("连接"),
+    description: t("工具与授权"),
     icon: Link2,
   },
   {
     id: "security",
-    label: "安全",
-    description: "边界与审计",
+    label: t("安全"),
+    description: t("边界与审计"),
     icon: ShieldCheck,
   },
 ];
@@ -1292,29 +1292,29 @@ const taskFilterPageCopy: Record<
   { eyebrow: string; title: string; description: string }
 > = {
   运行中: {
-    eyebrow: "任务 · 正在执行",
-    title: "正在运行的任务",
-    description: "查看实时进度，必要时暂停运行或打开完整记录。",
+    eyebrow: t("任务 · 正在执行"),
+    title: t("正在运行的任务"),
+    description: t("查看实时进度，必要时暂停运行或打开完整记录。"),
   },
   待确认: {
-    eyebrow: "任务 · 等待决定",
-    title: "等待确认的任务",
-    description: "这些任务已停在安全边界，确认后才会继续执行。",
+    eyebrow: t("任务 · 等待决定"),
+    title: t("等待确认的任务"),
+    description: t("这些任务已停在安全边界，确认后才会继续执行。"),
   },
   失败: {
-    eyebrow: "任务 · 需要处理",
-    title: "需要恢复的任务",
-    description: "检查失败原因，从安全检查点重试或修复连接。",
+    eyebrow: t("任务 · 需要处理"),
+    title: t("需要恢复的任务"),
+    description: t("检查失败原因，从安全检查点重试或修复连接。"),
   },
   已暂停: {
-    eyebrow: "任务 · 已暂停",
-    title: "暂时停止的任务",
-    description: "进度和证据都已保存，可以随时继续运行。",
+    eyebrow: t("任务 · 已暂停"),
+    title: t("暂时停止的任务"),
+    description: t("进度和证据都已保存，可以随时继续运行。"),
   },
   已完成: {
-    eyebrow: "任务 · 已交付",
-    title: "已经完成的任务",
-    description: "查看最终进度、运行记录和对应成果。",
+    eyebrow: t("任务 · 已交付"),
+    title: t("已经完成的任务"),
+    description: t("查看最终进度、运行记录和对应成果。"),
   },
 };
 const approvalRiskFilters: ApprovalRiskFilter[] = [
@@ -1329,24 +1329,24 @@ const approvalFilterPageCopy: Record<
   { eyebrow: string; title: string; description: string }
 > = {
   高风险: {
-    eyebrow: "待确认 · 高风险",
-    title: "需要逐项确认的高风险操作",
-    description: "逐项核对执行对象、影响范围和证据后再做决定。",
+    eyebrow: t("待确认 · 高风险"),
+    title: t("需要逐项确认的高风险操作"),
+    description: t("逐项核对执行对象、影响范围和证据后再做决定。"),
   },
   中风险: {
-    eyebrow: "待确认 · 中风险",
-    title: "需要确认的中风险操作",
-    description: "确认执行范围与授权边界，批准后任务才会继续。",
+    eyebrow: t("待确认 · 中风险"),
+    title: t("需要确认的中风险操作"),
+    description: t("确认执行范围与授权边界，批准后任务才会继续。"),
   },
   低风险: {
-    eyebrow: "待确认 · 低风险",
-    title: "可以快速处理的低风险操作",
-    description: "检查目标和内容后，可以逐项或批量处理。",
+    eyebrow: t("待确认 · 低风险"),
+    title: t("可以快速处理的低风险操作"),
+    description: t("检查目标和内容后，可以逐项或批量处理。"),
   },
   稍后: {
-    eyebrow: "待确认 · 稍后提醒",
-    title: "已经安排稍后处理的操作",
-    description: "这些操作仍未执行，会在约定时间重新进入待确认列表。",
+    eyebrow: t("待确认 · 稍后提醒"),
+    title: t("已经安排稍后处理的操作"),
+    description: t("这些操作仍未执行，会在约定时间重新进入待确认列表。"),
   },
 };
 const artifactFilters: ArtifactFilter[] = [
@@ -1361,34 +1361,34 @@ const activityFilters: ActivityFilter[] = ["全部", "任务", "审批", "系统
 
 const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: string }> = {
   home: {
-    eyebrow: "今天",
-    title: "你好，今天有需要你处理的事项",
-    description: "任务正在后台运行，只有需要你决定时才会停下来。",
+    eyebrow: t("今天"),
+    title: t("你好，今天有需要你处理的事项"),
+    description: t("任务正在后台运行，只有需要你决定时才会停下来。"),
   },
   tasks: {
     eyebrow: "任务",
-    title: "所有任务",
-    description: "查看运行、确认、失败恢复与已完成任务。",
+    title: t("所有任务"),
+    description: t("查看运行、确认、失败恢复与已完成任务。"),
   },
   approvals: {
     eyebrow: "待确认",
-    title: "需要你决定的操作",
-    description: "Unzoo One 不会在你确认前执行外部发送或敏感访问。",
+    title: t("需要你决定的操作"),
+    description: t("Unzoo One 不会在你确认前执行外部发送或敏感访问。"),
   },
   artifacts: {
-    eyebrow: "成果",
-    title: "任务交付与证据",
-    description: "查看 AI 生成的报告、数据和证据包，并追溯到对应任务。",
+    eyebrow: t("成果"),
+    title: t("任务交付与证据"),
+    description: t("查看 AI 生成的报告、数据和证据包，并追溯到对应任务。"),
   },
   activity: {
-    eyebrow: "运行记录",
-    title: "系统刚刚做了什么",
-    description: "每一步都有时间、结果和证据，可以随时回看。",
+    eyebrow: t("运行记录"),
+    title: t("系统刚刚做了什么"),
+    description: t("每一步都有时间、结果和证据，可以随时回看。"),
   },
   settings: {
-    eyebrow: "设置",
-    title: "工作方式",
-    description: "决定任务如何运行，以及哪些操作必须经过你确认。",
+    eyebrow: t("设置"),
+    title: t("工作方式"),
+    description: t("决定任务如何运行，以及哪些操作必须经过你确认。"),
   },
 };
 
@@ -1549,6 +1549,8 @@ export default function HomePage() {
    */
   const [runtimeMode, setRuntimeMode] = useState<boolean | null>(null);
   const runtimeSent = useRef(new Map<string, string>());
+  // <html lang> follows the language actually shown, not the server default.
+  useEffect(() => applyDocumentLanguage(), []);
   const runtimeRemoved = useRef(new Set<string>());
   const [artifacts, setArtifacts] = useState<ArtifactItem[]>(workspaceSeed.artifacts);
   const [artifactFilter, setArtifactFilter] = useState<ArtifactFilter>("全部");
@@ -1607,10 +1609,10 @@ export default function HomePage() {
     string | null
   >(null);
   const [workspaceSaveRetryToken, setWorkspaceSaveRetryToken] = useState(0);
-  const [taskName, setTaskName] = useState("跟踪产品页面变化");
+  const [taskName, setTaskName] = useState(t("跟踪产品页面变化"));
   const [taskTarget, setTaskTarget] = useState("https://example.com/product");
   const [taskDescription, setTaskDescription] = useState(
-    "检查页面内容变化，只保留有意义的更新并生成摘要。",
+    t("检查页面内容变化，只保留有意义的更新并生成摘要。"),
   );
   const [taskSchedule, setTaskSchedule] = useState<TaskSchedule>("每天");
   const [taskScheduleTime, setTaskScheduleTime] = useState("09:00");
@@ -1741,8 +1743,7 @@ export default function HomePage() {
   const attentionCount = activeApprovalCount + failedTaskCount;
   const workspaceToday = getWorkspaceToday();
   const workspaceLastSavedLabel = workspaceLastSavedAt
-    ? new Intl.DateTimeFormat("zh-CN", {
-        timeZone: "Asia/Shanghai",
+    ? new Intl.DateTimeFormat(dateLocale(), {
         hour: "2-digit",
         minute: "2-digit",
       }).format(new Date(workspaceLastSavedAt))
@@ -1760,39 +1761,39 @@ export default function HomePage() {
             : "paused";
   const systemStatusLabel =
     workspacePersistenceStatus === "failed"
-      ? "本机保存失败"
+      ? t("本机保存失败")
       : workspacePersistenceStatus === "retrying"
-        ? "正在重试保存"
+        ? t("正在重试保存")
         : !isOnline
-          ? "设备当前离线"
+          ? t("设备当前离线")
           : runtimeMode
             ? runningTaskTotal > 0
-              ? `${runningTaskTotal} 个任务在运行`
-              : "本机运行时已连接"
+              ? t("{runningTaskTotal} 个任务在运行", { runningTaskTotal })
+              : t("本机运行时已连接")
             : isRunning
-              ? "系统运行正常"
-              : "自动运行已暂停";
+              ? t("系统运行正常")
+              : t("自动运行已暂停");
   const systemStatusDetail =
     workspacePersistenceStatus === "failed"
-      ? "请重试或导出紧急备份"
+      ? t("请重试或导出紧急备份")
       : workspacePersistenceStatus === "retrying"
-        ? "正在验证本机存储"
+        ? t("正在验证本机存储")
         : !isOnline
-          ? "本机数据可用 · 在线能力暂停"
+          ? t("本机数据可用 · 在线能力暂停")
           : settings.local
             ? workspaceLastSavedLabel
-              ? `本机已保存 · ${workspaceLastSavedLabel}`
-              : "数据保存在本机"
-            : "临时会话 · 关闭后清空";
+              ? t("本机已保存 · {workspaceLastSavedLabel}", { workspaceLastSavedLabel })
+              : t("数据保存在本机")
+            : t("临时会话 · 关闭后清空");
   const pageTitle =
     activeView === "home"
       ? {
           ...viewTitles.home,
           eyebrow: workspaceToday.eyebrow,
-          title: `${workspaceToday.greeting}，今天有 ${attentionCount} 件事需要你处理`,
+          title: t("{greeting}，今天有 {attentionCount} 件事需要你处理", { greeting: workspaceToday.greeting, attentionCount }),
           description:
             failedTaskCount > 0
-              ? `${failedTaskCount} 个任务需要恢复，${activeApprovalCount} 项操作等待确认。`
+              ? t("{failedTaskCount} 个任务需要恢复，{activeApprovalCount} 项操作等待确认。", { failedTaskCount, activeApprovalCount })
               : viewTitles.home.description,
         }
       : activeView === "tasks" && taskFilter !== "全部"
@@ -1940,13 +1941,13 @@ export default function HomePage() {
         `${inspectedRun.errorCode ?? ""} ${inspectedRun.errorMessage ?? ""}`,
       ),
   );
-  const inspectedRunLaunchType = inspectedRun?.summary.includes("重试")
-    ? "人工重试"
-    : inspectedRun?.summary.includes("继续")
-      ? "断点继续"
+  const inspectedRunLaunchType = inspectedRun?.summary.includes(t("重试"))
+    ? t("人工重试")
+    : inspectedRun?.summary.includes(t("继续"))
+      ? t("断点继续")
       : inspectedRunTask?.schedule === "仅运行一次"
-        ? "手动启动"
-        : "计划触发";
+        ? t("手动启动")
+        : t("计划触发");
   const connectorIssueTasks: Record<ConnectorId, TaskItem[]> = {
     browser: tasks.filter((task) =>
       connectorErrorCodes.browser.includes(task.errorCode ?? ""),
@@ -2049,9 +2050,9 @@ export default function HomePage() {
   }> = [
     {
       id: "profile",
-      label: "命名工作区",
-      description: "让团队知道这里负责什么工作",
-      actionLabel: "设置资料",
+      label: t("命名工作区"),
+      description: t("让团队知道这里负责什么工作"),
+      actionLabel: t("设置资料"),
       complete:
         workspaceProfile.name !== defaultWorkspaceProfile.name ||
         workspaceProfile.description !== defaultWorkspaceProfile.description,
@@ -2059,27 +2060,27 @@ export default function HomePage() {
     },
     {
       id: "connectors",
-      label: "检查能力连接",
-      description: `${healthyConnectorCount} 项连接可以安全使用`,
-      actionLabel: "检查连接",
+      label: t("检查能力连接"),
+      description: t("{healthyConnectorCount} 项连接可以安全使用", { healthyConnectorCount }),
+      actionLabel: t("检查连接"),
       complete: healthyConnectorCount >= 2,
       icon: Link2,
     },
     {
       id: "security",
-      label: "保留审批边界",
+      label: t("保留审批边界"),
       description: settings.approval
-        ? "敏感操作会先等待确认"
-        : "当前允许已授权操作自动执行",
-      actionLabel: "检查安全",
+        ? t("敏感操作会先等待确认")
+        : t("当前允许已授权操作自动执行"),
+      actionLabel: t("检查安全"),
       complete: settings.approval,
       icon: ShieldCheck,
     },
     {
       id: "task",
-      label: "创建真实任务",
-      description: "示例任务不会替代你的真实配置",
-      actionLabel: "新建任务",
+      label: t("创建真实任务"),
+      description: t("示例任务不会替代你的真实配置"),
+      actionLabel: t("新建任务"),
       complete: tasks.some((task) => !demoTaskIds.has(task.id)),
       icon: Sparkles,
     },
@@ -2093,7 +2094,8 @@ export default function HomePage() {
     browser: tasks.filter((task) => /^https?:\/\//i.test(task.target)).length,
     workspace: tasks.filter((task) => !/^https?:\/\//i.test(task.target)).length,
     mail: approvals.filter((item) =>
-      `${item.title} ${item.reason} ${item.action}`.includes("发送"),
+      // Approval text can be in either language; match both, ignoring case.
+      /发送|send/i.test(`${item.title} ${item.reason} ${item.action}`),
     ).length,
     calendar: tasks.filter((task) => task.schedule !== "仅运行一次").length,
   };
@@ -2125,32 +2127,32 @@ export default function HomePage() {
   const usageBreakdown = [
     {
       id: "reasoning",
-      label: "AI 分析与推理",
-      detail: "页面理解、摘要与报告生成",
+      label: t("AI 分析与推理"),
+      detail: t("页面理解、摘要与报告生成"),
       credits: reasoningCredits,
       icon: Brain,
       tone: "blue",
     },
     {
       id: "browser",
-      label: "浏览器执行",
-      detail: "页面读取、截图与结构提取",
+      label: t("浏览器执行"),
+      detail: t("页面读取、截图与结构提取"),
       credits: browserCredits,
       icon: Globe2,
       tone: "green",
     },
     {
       id: "connectors",
-      label: "连接器调用",
-      detail: "邮件、工作区与审批动作",
+      label: t("连接器调用"),
+      detail: t("邮件、工作区与审批动作"),
       credits: connectorCredits,
       icon: Link2,
       tone: "amber",
     },
     {
       id: "storage",
-      label: "成果与证据保存",
-      detail: "报告、数据与审计证据",
+      label: t("成果与证据保存"),
+      detail: t("报告、数据与审计证据"),
       credits: storageCredits,
       icon: HardDrive,
       tone: "violet",
@@ -2241,10 +2243,10 @@ export default function HomePage() {
             ? {
                 ...task,
                 status: "已暂停",
-                updated: "因用量到限保护暂停",
+                updated: t("因用量到限保护暂停"),
                 runs: stopActiveTaskRuns(
                   task.runs,
-                  "达到预算上限，系统已停止本次运行。",
+                  t("达到预算上限，系统已停止本次运行。"),
                 ),
               }
             : task,
@@ -2252,14 +2254,14 @@ export default function HomePage() {
       );
       if (runningIds.has("competitor")) setIsRunning(false);
       recordActivity({
-        title: "预算保护已自动生效",
-        detail: `本月已使用 ${usedCredits} 点，达到 ${usageSettings.monthlyBudget} 点额度；已暂停 ${runningTaskIds.length} 个运行中任务。`,
+        title: t("预算保护已自动生效"),
+        detail: t("本月已使用 {usedCredits} 点，达到 {monthlyBudget} 点额度；已暂停 {length} 个运行中任务。", { usedCredits, monthlyBudget: usageSettings.monthlyBudget, length: runningTaskIds.length }),
         icon: "shield",
         tone: "amber",
         kind: "系统",
       });
       setNotice(
-        `已达到月度额度，预算保护暂停了 ${runningTaskIds.length} 个任务`,
+        t("已达到月度额度，预算保护暂停了 {length} 个任务", { length: runningTaskIds.length }),
       );
     }, 0);
 
@@ -2578,17 +2580,17 @@ export default function HomePage() {
   const workspaceSyncLabel = workspaceSyncNotice
     ? workspaceSyncNotice.sections
         .map((section) => workspaceSyncSectionLabels[section])
-        .join("、")
+        .join(t("、"))
     : "";
   const artifactUndoAvailable = Boolean(
     artifactDeleteSnapshot &&
-      notice === `已删除成果“${artifactDeleteSnapshot.artifact.title}”`,
+      notice === t("已删除成果“{title}”", { title: artifactDeleteSnapshot.artifact.title }),
   );
   const taskDeleteUndoAvailable = Boolean(
-    taskDeleteSnapshot && notice.startsWith("已删除 "),
+    taskDeleteSnapshot && notice.startsWith(t("已删除 ")),
   );
   const approvalRejectUndoAvailable = Boolean(
-    approvalRejectSnapshot && notice.startsWith("已拒绝"),
+    approvalRejectSnapshot && notice.startsWith(t("已拒绝")),
   );
 
   function applyWorkspaceSyncSnapshot(
@@ -2715,11 +2717,11 @@ export default function HomePage() {
 
   useEffect(() => {
     function handleOffline() {
-      setNotice("设备已离线，本机任务、成果和审计记录仍可查看");
+      setNotice(t("设备已离线，本机任务、成果和审计记录仍可查看"));
     }
 
     function handleOnline() {
-      setNotice("网络连接已恢复，在线能力可以继续使用");
+      setNotice(t("网络连接已恢复，在线能力可以继续使用"));
     }
 
     window.addEventListener("offline", handleOffline);
@@ -3126,14 +3128,14 @@ export default function HomePage() {
             workspaceSyncKey,
           ]);
           setWorkspaceLoadWarning(
-            "检测到损坏的本机数据，已使用安全的默认工作区启动。你可以继续使用，或从备份恢复原有内容。",
+            t("检测到损坏的本机数据，已使用安全的默认工作区启动。你可以继续使用，或从备份恢复原有内容。"),
           );
         } else {
           const detail = getWorkspacePersistenceError(error);
           setWorkspacePersistenceStatus("failed");
           setWorkspacePersistenceDetail(detail);
           setWorkspaceLoadWarning(
-            "浏览器未能完成本机数据校验，当前页面已使用安全的默认工作区。请先重试保存，或从备份恢复。",
+            t("浏览器未能完成本机数据校验，当前页面已使用安全的默认工作区。请先重试保存，或从备份恢复。"),
           );
         }
       } finally {
@@ -3372,8 +3374,8 @@ export default function HomePage() {
       ) {
         setNotice(
           fallbackArtifact
-            ? "该成果已不存在，已打开最新可用成果"
-            : "该成果已不存在，当前工作区还没有其他成果",
+            ? t("该成果已不存在，已打开最新可用成果")
+            : t("该成果已不存在，当前工作区还没有其他成果"),
         );
       }
       if (
@@ -3383,8 +3385,8 @@ export default function HomePage() {
       ) {
         setNotice(
           fallbackApproval
-            ? "该审批已处理或不存在，已打开当前队列中的下一项"
-            : "该审批已处理或不存在，当前筛选下没有其他待办",
+            ? t("该审批已处理或不存在，已打开当前队列中的下一项")
+            : t("该审批已处理或不存在，当前筛选下没有其他待办"),
         );
       }
       if (
@@ -3394,15 +3396,15 @@ export default function HomePage() {
       ) {
         setNotice(
           fallbackActivity
-            ? "该审计事件已不存在，已打开范围内最新记录"
-            : "该审计事件已不存在，当前范围还没有其他记录",
+            ? t("该审计事件已不存在，已打开范围内最新记录")
+            : t("该审计事件已不存在，当前范围还没有其他记录"),
         );
       } else if (
         requestedRoute.view === "activity" &&
         requestedRoute.activityTaskId &&
         !requestedActivityTask
       ) {
-        setNotice("关联任务已不存在，已打开全部审计记录");
+        setNotice(t("关联任务已不存在，已打开全部审计记录"));
       }
       writeWorkspaceRoute(
         resolvedRoute,
@@ -3655,7 +3657,7 @@ export default function HomePage() {
           setWorkspaceLastSavedAt(savedAt);
           if (workspaceSaveRetryingRef.current) {
             workspaceSaveRetryingRef.current = false;
-            setNotice("本机保存已恢复，当前工作区已经安全落盘");
+            setNotice(t("本机保存已恢复，当前工作区已经安全落盘"));
           }
         });
       } catch (error) {
@@ -3666,7 +3668,7 @@ export default function HomePage() {
           setWorkspacePersistenceDetail(detail);
           if (workspaceSaveRetryingRef.current) {
             workspaceSaveRetryingRef.current = false;
-            setNotice("重试保存失败，请先导出紧急备份");
+            setNotice(t("重试保存失败，请先导出紧急备份"));
           }
         });
       }
@@ -3685,7 +3687,7 @@ export default function HomePage() {
           setLastWorkspaceBackupAt(null);
           if (workspaceSaveRetryingRef.current) {
             workspaceSaveRetryingRef.current = false;
-            setNotice("本机数据已清理，当前为临时会话");
+            setNotice(t("本机数据已清理，当前为临时会话"));
           }
         });
       } else {
@@ -3695,7 +3697,7 @@ export default function HomePage() {
           setWorkspacePersistenceDetail(detail);
           if (workspaceSaveRetryingRef.current) {
             workspaceSaveRetryingRef.current = false;
-            setNotice("重试清理失败，请检查浏览器的站点存储权限");
+            setNotice(t("重试清理失败，请检查浏览器的站点存储权限"));
           }
         });
       }
@@ -3852,7 +3854,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!notice) return;
     const timeout =
-      notice.startsWith("已删除") || notice.startsWith("已拒绝") ? 10000 : 4200;
+      notice.startsWith(t("已删除")) || notice.startsWith(t("已拒绝")) ? 10000 : 4200;
     const timer = window.setTimeout(() => {
       setNotice("");
       setTaskDeleteSnapshot(null);
@@ -4405,7 +4407,7 @@ export default function HomePage() {
       }
       if (artifactSort === "文件名") {
         return (
-          first.filename.localeCompare(second.filename, "zh-CN", {
+          first.filename.localeCompare(second.filename, dateLocale(), {
             numeric: true,
             sensitivity: "base",
           }) || recent
@@ -4475,7 +4477,7 @@ export default function HomePage() {
       id: item.id,
       title: item.label,
       description: viewTitles[item.id].description,
-      meta: "页面",
+      meta: t("页面"),
       icon: item.icon,
     }));
     const actionResults: SearchResult[] = [
@@ -4483,31 +4485,31 @@ export default function HomePage() {
         key: "action-new-task",
         kind: "action",
         id: "new-task",
-        title: "新建任务",
-        description: "配置目标、运行频率和发送前确认规则。",
-        meta: "快捷操作",
+        title: t("新建任务"),
+        description: t("配置目标、运行频率和发送前确认规则。"),
+        meta: t("快捷操作"),
         icon: Plus,
       },
       {
         key: "action-approvals",
         kind: "action",
         id: "approvals",
-        title: "处理待确认操作",
+        title: t("处理待确认操作"),
         description: activeApprovalCount
-          ? `${activeApprovalCount} 项敏感操作正在等待你的决定。`
+          ? t("{activeApprovalCount} 项敏感操作正在等待你的决定。", { activeApprovalCount })
           : deferredApprovalCount
-            ? `${deferredApprovalCount} 项操作已安排稍后提醒。`
-            : "当前没有等待确认的敏感操作。",
-        meta: activeApprovalCount ? `${activeApprovalCount} 项` : "已清空",
+            ? t("{deferredApprovalCount} 项操作已安排稍后提醒。", { deferredApprovalCount })
+            : t("当前没有等待确认的敏感操作。"),
+        meta: activeApprovalCount ? t("{activeApprovalCount} 项", { activeApprovalCount }) : t("已清空"),
         icon: ShieldCheck,
       },
       {
         key: "action-artifacts",
         kind: "action",
         id: "artifacts",
-        title: "查看最新成果",
-        description: `${artifacts.length} 个报告、数据或证据包可以查看。`,
-        meta: `${artifacts.length} 项`,
+        title: t("查看最新成果"),
+        description: t("{length} 个报告、数据或证据包可以查看。", { length: artifacts.length }),
+        meta: t("{length} 项", { length: artifacts.length }),
         icon: Files,
       },
     ];
@@ -4565,18 +4567,18 @@ export default function HomePage() {
       return [
         {
           id: "recent",
-          label: "最近访问",
+          label: t("最近访问"),
           results: recentResults,
           canClear: true,
         },
         {
           id: "actions",
-          label: "快捷操作",
+          label: t("快捷操作"),
           results: otherResults.filter((result) => result.kind === "action"),
         },
         {
           id: "suggested",
-          label: "继续工作",
+          label: t("继续工作"),
           results: otherResults.filter((result) => result.kind !== "action"),
         },
       ].filter((section) => section.results.length > 0);
@@ -4584,9 +4586,9 @@ export default function HomePage() {
 
     const sectionLabels: Record<SearchResultKind, string> = {
       task: "任务",
-      artifact: "成果",
-      view: "页面",
-      action: "操作",
+      artifact: t("成果"),
+      view: t("页面"),
+      action: t("操作"),
     };
     return (["task", "artifact", "view", "action"] as SearchResultKind[])
       .map((kind) => ({
@@ -4629,7 +4631,7 @@ export default function HomePage() {
     return [...matchingTasks].sort((first, second) => {
       if (taskSort === "进度最高") return second.progress - first.progress;
       if (taskSort === "名称") {
-        return first.title.localeCompare(second.title, "zh-CN");
+        return first.title.localeCompare(second.title, dateLocale());
       }
       return statusPriority[first.status] - statusPriority[second.status];
     });
@@ -4791,22 +4793,22 @@ export default function HomePage() {
         : "is-ready";
   const workspaceRecoveryHeadline =
     workspacePersistenceStatus === "failed"
-      ? "本机保存需要处理，请立即导出紧急备份"
+      ? t("本机保存需要处理，请立即导出紧急备份")
       : !settings.local
-        ? "当前工作区只在本次会话中保留"
+        ? t("当前工作区只在本次会话中保留")
         : !lastWorkspaceBackupAt
-          ? "自动保存正常，建议创建一份可迁移备份"
+          ? t("自动保存正常，建议创建一份可迁移备份")
           : !workspaceBackupIsFresh
-            ? "可恢复，但手动备份已经超过 7 天"
-            : "自动保存与手动备份均已就绪";
+            ? t("可恢复，但手动备份已经超过 7 天")
+            : t("自动保存与手动备份均已就绪");
   const workspaceRecoveryDetail =
     workspacePersistenceStatus === "failed"
       ? workspacePersistenceDetail
       : !settings.local
-        ? "关闭或刷新页面后无法恢复当前改动，离开前请先导出备份。"
+        ? t("关闭或刷新页面后无法恢复当前改动，离开前请先导出备份。")
         : lastWorkspaceBackupAt
-          ? `最近可用备份：${workspaceBackupFreshnessLabel}。导入时会再次校验文件结构。`
-          : "本机保存用于日常恢复，手动备份用于迁移设备或应对浏览器数据被清理。";
+          ? t("最近可用备份：{workspaceBackupFreshnessLabel}。导入时会再次校验文件结构。", { workspaceBackupFreshnessLabel })
+          : t("本机保存用于日常恢复，手动备份用于迁移设备或应对浏览器数据被清理。");
   const latestActivity = activityLog[0] ?? workspaceDefaults.activity[0];
   const latestArtifact = artifacts[0] ?? null;
   const notificationItems = useMemo<NotificationItem[]>(() => {
@@ -4815,8 +4817,8 @@ export default function HomePage() {
     failedTasks.slice(0, 2).forEach((task) => {
       items.push({
         id: `task-failed-${task.id}-${task.retryCount ?? 0}`,
-        title: `任务需要恢复：${task.title}`,
-        detail: task.lastError ?? "任务已安全停止，等待检查后重新运行。",
+        title: t("任务需要恢复：{title}", { title: task.title }),
+        detail: task.lastError ?? t("任务已安全停止，等待检查后重新运行。"),
         meta: task.updated,
         target: "task",
         targetId: task.id,
@@ -4827,9 +4829,9 @@ export default function HomePage() {
     if (activeApprovals.length > 0) {
       items.push({
         id: `approvals-${activeApprovals.map((item) => item.id).join("-")}`,
-        title: `${activeApprovals.length} 项操作等你确认`,
-        detail: "涉及外部访问或发送，任务已在执行前暂停。",
-        meta: "需要处理",
+        title: t("{length} 项操作等你确认", { length: activeApprovals.length }),
+        detail: t("涉及外部访问或发送，任务已在执行前暂停。"),
+        meta: t("需要处理"),
         target: "approvals",
         icon: ShieldCheck,
         tone: "amber",
@@ -4848,7 +4850,7 @@ export default function HomePage() {
     if (latestArtifact) {
       items.push({
         id: `artifact-${latestArtifact.id}`,
-        title: `成果已保存：${latestArtifact.title}`,
+        title: t("成果已保存：{title}", { title: latestArtifact.title }),
         detail: `${latestArtifact.filename} · ${latestArtifact.sizeKb.toFixed(1)} KB`,
         meta: latestArtifact.updated,
         target: "artifact",
@@ -4870,48 +4872,48 @@ export default function HomePage() {
       : notificationItems;
   const desktopNotificationPreferenceDetail =
     desktopNotificationPermission === "checking"
-      ? "正在检查浏览器通知权限。"
+      ? t("正在检查浏览器通知权限。")
       : desktopNotificationPermission === "unsupported"
-        ? "当前浏览器不支持桌面通知，页面内通知仍会保留。"
+        ? t("当前浏览器不支持桌面通知，页面内通知仍会保留。")
         : desktopNotificationPermission === "denied"
-          ? "浏览器已阻止桌面通知，页面内通知仍会保留。"
+          ? t("浏览器已阻止桌面通知，页面内通知仍会保留。")
           : settings.notifications
-            ? "浏览器授权已通过，需要确认时会发送桌面提醒。"
+            ? t("浏览器授权已通过，需要确认时会发送桌面提醒。")
             : desktopNotificationPermission === "granted"
-              ? "浏览器权限可用，当前未开启主动提醒。"
-              : "开启后浏览器会请求一次桌面通知权限。";
+              ? t("浏览器权限可用，当前未开启主动提醒。")
+              : t("开启后浏览器会请求一次桌面通知权限。");
   const desktopNotificationSummary =
     desktopNotificationPermission === "checking"
-      ? "正在检查浏览器通知权限"
+      ? t("正在检查浏览器通知权限")
       : desktopNotificationPermission === "unsupported"
-        ? "当前浏览器不支持桌面提醒"
+        ? t("当前浏览器不支持桌面提醒")
         : desktopNotificationPermission === "denied"
-          ? "浏览器已阻止桌面提醒"
+          ? t("浏览器已阻止桌面提醒")
           : settings.notifications
-            ? "任务暂停时发送桌面提醒"
-            : "当前不会主动发送桌面提醒";
+            ? t("任务暂停时发送桌面提醒")
+            : t("当前不会主动发送桌面提醒");
   const desktopNotificationStateLabel =
     desktopNotificationPermission === "checking"
-      ? "检查中"
+      ? t("检查中")
       : desktopNotificationPermission === "unsupported"
-        ? "不支持"
+        ? t("不支持")
         : desktopNotificationPermission === "denied"
-          ? "需授权"
+          ? t("需授权")
           : settings.notifications
-            ? "已开启"
-            : "已关闭";
+            ? t("已开启")
+            : t("已关闭");
   const desktopNotificationStateClass = settings.notifications
     ? "is-safe"
     : desktopNotificationPermission === "denied"
       ? "is-caution"
       : "is-neutral";
   const desktopNotificationActionLabel = settings.notifications
-    ? "关闭提醒"
+    ? t("关闭提醒")
     : desktopNotificationPermission === "denied"
-      ? "检查权限"
+      ? t("检查权限")
       : desktopNotificationPermission === "unsupported"
-        ? "查看状态"
-        : "开启提醒";
+        ? t("查看状态")
+        : t("开启提醒");
 
   useEffect(() => {
     const actionableItems = notificationItems.filter(
@@ -4975,7 +4977,7 @@ export default function HomePage() {
   function syncBackend(op: Promise<unknown>, action: string) {
     void op.catch((error: unknown) => {
       const detail = error instanceof Error ? error.message : String(error);
-      setNotice(`${action}没有同步到后台：${detail}`);
+      setNotice(t("{action}没有同步到后台：{detail}", { action, detail }));
     });
   }
 
@@ -4983,7 +4985,7 @@ export default function HomePage() {
     item: Omit<ActivityItem, "id" | "time" | "createdAt">,
   ) {
     const now = new Date();
-    const time = now.toLocaleTimeString("zh-CN", {
+    const time = now.toLocaleTimeString(dateLocale(), {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
@@ -5020,13 +5022,13 @@ export default function HomePage() {
     anchor.remove();
     window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
     recordActivity({
-      title: "审计记录已导出",
-      detail: `已导出 ${activityLog.length} 条记录，文件仅保存在本机。`,
+      title: t("审计记录已导出"),
+      detail: t("已导出 {length} 条记录，文件仅保存在本机。", { length: activityLog.length }),
       icon: "activity",
       tone: "blue",
       kind: "系统",
     });
-    setNotice(`已导出 ${activityLog.length} 条审计记录`);
+    setNotice(t("已导出 {length} 条审计记录", { length: activityLog.length }));
   }
 
   function exportActivityItem(item: ActivityItem) {
@@ -5046,7 +5048,7 @@ export default function HomePage() {
     anchor.click();
     anchor.remove();
     window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
-    setNotice(`已导出事件“${item.title}”`);
+    setNotice(t("已导出事件“{title}”", { title: item.title }));
   }
 
   async function copyActivityId(item: ActivityItem) {
@@ -5062,7 +5064,7 @@ export default function HomePage() {
       document.execCommand("copy");
       textarea.remove();
     }
-    setNotice(`已复制事件 ID：${item.id}`);
+    setNotice(t("已复制事件 ID：{id}", { id: item.id }));
   }
 
   async function copyActivityEventLink(item: ActivityItem) {
@@ -5078,7 +5080,7 @@ export default function HomePage() {
       "replace",
       canReturnToWorkspaceParent(),
     );
-    await copyCurrentViewLink("审计事件链接");
+    await copyCurrentViewLink(t("审计事件链接"));
   }
 
   function rememberWorkspaceBackup(exportedAt: string) {
@@ -5123,13 +5125,13 @@ export default function HomePage() {
     window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
     rememberWorkspaceBackup(exportedAt);
     recordActivity({
-      title: "工作区备份已导出",
-      detail: `已备份 ${tasks.length} 个任务、${artifacts.length} 个成果、${teamMembers.length} 位成员和 ${activityLog.length} 条运行记录。`,
+      title: t("工作区备份已导出"),
+      detail: t("已备份 {length} 个任务、{length2} 个成果、{length3} 位成员和 {length4} 条运行记录。", { length: tasks.length, length2: artifacts.length, length3: teamMembers.length, length4: activityLog.length }),
       icon: "activity",
       tone: "blue",
       kind: "系统",
     });
-    setNotice("工作区备份已保存到本机");
+    setNotice(t("工作区备份已保存到本机"));
   }
 
   function downloadArtifact(artifact: ArtifactItem) {
@@ -5151,14 +5153,14 @@ export default function HomePage() {
     anchor.remove();
     window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
     recordActivity({
-      title: `成果已下载：${artifact.title}`,
+      title: t("成果已下载：{title}", { title: artifact.title }),
       detail: `${artifact.filename} · ${artifact.sizeKb.toFixed(1)} KB`,
       icon: "file",
       tone: "blue",
       kind: "系统",
       taskId: artifact.taskId,
     });
-    setNotice(`已下载“${artifact.filename}”`);
+    setNotice(t("已下载“{filename}”", { filename: artifact.filename }));
   }
 
   async function copyArtifactContent(artifact: ArtifactItem) {
@@ -5175,28 +5177,28 @@ export default function HomePage() {
       textarea.remove();
     }
     recordActivity({
-      title: `成果内容已复制：${artifact.title}`,
-      detail: `已复制 ${artifact.filename} 的可读内容。`,
+      title: t("成果内容已复制：{title}", { title: artifact.title }),
+      detail: t("已复制 {filename} 的可读内容。", { filename: artifact.filename }),
       icon: "copy",
       tone: "violet",
       kind: "系统",
       taskId: artifact.taskId,
     });
-    setNotice(`已复制“${artifact.title}”的内容`);
+    setNotice(t("已复制“{title}”的内容", { title: artifact.title }));
   }
 
   function toggleArtifactStar(artifact: ArtifactItem) {
     const nextStarred = !artifact.starred;
     syncBackend(
       workspaceProvider.artifacts.update(artifact.id, { starred: nextStarred }),
-      nextStarred ? "标记重点" : "取消重点",
+      nextStarred ? t("标记重点") : t("取消重点"),
     );
     setArtifacts((items) =>
       items.map((item) =>
         item.id === artifact.id ? { ...item, starred: nextStarred } : item,
       ),
     );
-    setNotice(nextStarred ? "已加入重点成果" : "已取消重点标记");
+    setNotice(nextStarred ? t("已加入重点成果") : t("已取消重点标记"));
   }
 
   function requestDeleteArtifact(artifact: ArtifactItem) {
@@ -5219,7 +5221,7 @@ export default function HomePage() {
       artifact,
       index: Math.max(0, artifactIndex),
     });
-    syncBackend(workspaceProvider.artifacts.remove(artifact.id), "删除成果");
+    syncBackend(workspaceProvider.artifacts.remove(artifact.id), t("删除成果"));
     setArtifacts((items) => items.filter((item) => item.id !== artifact.id));
     const nextArtifactId =
       nextVisibleArtifact?.id ?? nextWorkspaceArtifact?.id ?? "";
@@ -5236,16 +5238,14 @@ export default function HomePage() {
     );
     setArtifactDeleteId(null);
     recordActivity({
-      title: `成果已删除：${artifact.title}`,
-      detail: `${artifact.filename} 及其 ${
-        (artifact.revisions?.length ?? 0) + 1
-      } 个版本已从工作区移除；关联任务和原审计记录保持不变。`,
+      title: t("成果已删除：{title}", { title: artifact.title }),
+      detail: t("{filename} 及其 {value} 个版本已从工作区移除；关联任务和原审计记录保持不变。", { filename: artifact.filename, value: (artifact.revisions?.length ?? 0) + 1 }),
       icon: "trash",
       tone: "red",
       kind: "系统",
       taskId: artifact.taskId,
     });
-    setNotice(`已删除成果“${artifact.title}”`);
+    setNotice(t("已删除成果“{title}”", { title: artifact.title }));
   }
 
   function undoArtifactDelete() {
@@ -5270,14 +5270,14 @@ export default function HomePage() {
     );
     setArtifactDeleteSnapshot(null);
     recordActivity({
-      title: `已撤销成果删除：${artifact.title}`,
-      detail: `${artifact.filename} 和全部修订版本已恢复到原位置。`,
+      title: t("已撤销成果删除：{title}", { title: artifact.title }),
+      detail: t("{filename} 和全部修订版本已恢复到原位置。", { filename: artifact.filename }),
       icon: "activity",
       tone: "green",
       kind: "系统",
       taskId: artifact.taskId,
     });
-    setNotice(`已恢复成果“${artifact.title}”`);
+    setNotice(t("已恢复成果“{title}”", { title: artifact.title }));
   }
 
   function artifactCanBeEdited(artifact: ArtifactItem) {
@@ -5286,7 +5286,7 @@ export default function HomePage() {
 
   function openArtifactEditor(artifact: ArtifactItem) {
     if (!artifactCanBeEdited(artifact)) {
-      setNotice("数据和证据保持只读，避免破坏原始交付记录");
+      setNotice(t("数据和证据保持只读，避免破坏原始交付记录"));
       return;
     }
     setEditingArtifactId(artifact.id);
@@ -5336,7 +5336,7 @@ export default function HomePage() {
 
   function confirmDiscardArtifactDraft() {
     closeArtifactEditor();
-    setNotice("未保存的成果修订已放弃");
+    setNotice(t("未保存的成果修订已放弃"));
   }
 
   function restoreRecoveredArtifactDraft() {
@@ -5346,7 +5346,7 @@ export default function HomePage() {
       artifacts.find((item) => item.id === recovery.artifactId) ?? null;
     if (!artifact || !artifactCanBeEdited(artifact)) {
       clearArtifactDraftRecovery();
-      setNotice("原成果已不存在或不可编辑，恢复草稿已安全移除");
+      setNotice(t("原成果已不存在或不可编辑，恢复草稿已安全移除"));
       return;
     }
 
@@ -5382,14 +5382,14 @@ export default function HomePage() {
 
     if (recovery.baseVersion !== (artifact.version ?? 1)) {
       setNotice(
-        `草稿基于 v${recovery.baseVersion}，当前为 v${artifact.version ?? 1}；保存时会保留两个版本`,
+        t("草稿基于 v{baseVersion}，当前为 v{value}；保存时会保留两个版本", { baseVersion: recovery.baseVersion, value: artifact.version ?? 1 }),
       );
     }
   }
 
   function discardRecoveredArtifactDraft() {
     clearArtifactDraftRecovery();
-    setNotice("未完成的成果修订草稿已放弃");
+    setNotice(t("未完成的成果修订草稿已放弃"));
   }
 
   function loadArtifactRevision(revision: ArtifactRevision) {
@@ -5397,13 +5397,13 @@ export default function HomePage() {
     setArtifactFilenameDraft(revision.filename);
     setArtifactContentDraft(revision.content);
     setArtifactEditSubmitted(false);
-    setNotice(`已将 v${revision.version} 载入编辑器，保存后会生成新版本`);
+    setNotice(t("已将 v{version} 载入编辑器，保存后会生成新版本", { version: revision.version }));
     window.requestAnimationFrame(() => artifactTitleRef.current?.focus());
   }
 
   async function saveArtifactEdit() {
     if (artifactWorkspaceConflict) {
-      setNotice("成果已在另一窗口更新，请先处理版本冲突");
+      setNotice(t("成果已在另一窗口更新，请先处理版本冲突"));
       return;
     }
     if (
@@ -5425,7 +5425,7 @@ export default function HomePage() {
       return;
     }
     if (!artifactEditorDirty) {
-      setNotice("当前版本没有需要保存的修改");
+      setNotice(t("当前版本没有需要保存的修改"));
       return;
     }
 
@@ -5462,11 +5462,11 @@ export default function HomePage() {
         content: normalizedContent,
         sizeKb: nextSizeKb,
         editedAt: now.toISOString(),
-        editedBy: "刘一帆",
+        editedBy: t("刘一帆"),
         version: nextVersion,
         revisions: nextRevisions,
       }),
-      "保存成果",
+      t("保存成果"),
     );
     setArtifacts((items) =>
       items.map((artifact) =>
@@ -5478,9 +5478,9 @@ export default function HomePage() {
               content: normalizedContent,
               sizeKb: nextSizeKb,
               status: artifact.type === "报告" ? "已修订" : artifact.status,
-              updated: "刚刚",
+              updated: t("刚刚"),
               editedAt: now.toISOString(),
-              editedBy: "刘一帆",
+              editedBy: t("刘一帆"),
               version: nextVersion,
               revisions: nextRevisions,
             }
@@ -5488,8 +5488,8 @@ export default function HomePage() {
       ),
     );
     recordActivity({
-      title: `成果已保存为 v${nextVersion}：${normalizedTitle}`,
-      detail: `${normalizedFilename} 已由刘一帆修订；v${editingArtifactVersion} 仍保留在版本记录中。`,
+      title: t("成果已保存为 v{nextVersion}：{normalizedTitle}", { nextVersion, normalizedTitle }),
+      detail: t("{normalizedFilename} 已由刘一帆修订；v{editingArtifactVersion} 仍保留在版本记录中。", { normalizedFilename, editingArtifactVersion }),
       icon: "file",
       tone: "green",
       kind: "系统",
@@ -5497,7 +5497,7 @@ export default function HomePage() {
     });
     artifactSavingRef.current = false;
     setIsSavingArtifact(false);
-    setNotice(`已保存 v${nextVersion}，上一版本可随时恢复`);
+    setNotice(t("已保存 v{nextVersion}，上一版本可随时恢复", { nextVersion }));
     closeArtifactEditor({ clearRecovery: true });
   }
 
@@ -5574,7 +5574,7 @@ export default function HomePage() {
         fileSize: file.size,
       });
     } catch {
-      setNotice("导入失败，请选择由 Unzoo One 导出的工作区备份");
+      setNotice(t("导入失败，请选择由 Unzoo One 导出的工作区备份"));
     } finally {
       input.value = "";
     }
@@ -5583,7 +5583,7 @@ export default function HomePage() {
   function confirmWorkspaceImport() {
     if (!pendingWorkspaceImport) return;
     if (!workspaceImportAcknowledged) {
-      setNotice("请先确认当前工作区会被这份备份替换");
+      setNotice(t("请先确认当前工作区会被这份备份替换"));
       return;
     }
     const { backup, fileName } = pendingWorkspaceImport;
@@ -5673,19 +5673,19 @@ export default function HomePage() {
       "push",
     );
     recordActivity({
-      title: "工作区备份已恢复",
-      detail: `已从“${fileName}”恢复 ${backup.tasks.length} 个任务、${restoredArtifacts.length} 个成果、${(backup.members ?? workspaceDefaults.members).length} 位成员和 ${backup.activity.length} 条运行记录。`,
+      title: t("工作区备份已恢复"),
+      detail: t("已从“{fileName}”恢复 {length} 个任务、{length2} 个成果、{length3} 位成员和 {length4} 条运行记录。", { fileName, length: backup.tasks.length, length2: restoredArtifacts.length, length3: (backup.members ?? workspaceDefaults.members).length, length4: backup.activity.length }),
       icon: "activity",
       tone: "green",
       kind: "系统",
     });
-    setNotice(`已恢复 ${backup.tasks.length} 个任务，工作区可以继续使用`);
+    setNotice(t("已恢复 {length} 个任务，工作区可以继续使用", { length: backup.tasks.length }));
     scrollWorkspaceTop();
   }
 
   function resetWorkspace() {
     if (!workspaceResetAcknowledged) {
-      setNotice("请先确认当前工作区会恢复为初始状态");
+      setNotice(t("请先确认当前工作区会恢复为初始状态"));
       return;
     }
     const factory = workspaceProvider.reset();
@@ -5769,13 +5769,13 @@ export default function HomePage() {
     setOnboardingDismissed(false);
     setWorkspaceLoadWarning("");
     recordActivity({
-      title: "工作区已恢复初始状态",
-      detail: "任务、成果、团队成员、待确认事项、运行记录和设置已重新初始化。",
+      title: t("工作区已恢复初始状态"),
+      detail: t("任务、成果、团队成员、待确认事项、运行记录和设置已重新初始化。"),
       icon: "settings",
       tone: "amber",
       kind: "系统",
     });
-    setNotice("工作区已恢复初始状态");
+    setNotice(t("工作区已恢复初始状态"));
   }
 
   function openActivityItem(item: ActivityItem) {
@@ -5801,7 +5801,7 @@ export default function HomePage() {
     const activity = activityLog.find((item) => item.id === activityId);
     if (!activity) {
       openView("activity");
-      setNotice("该审计事件已不存在，已打开运行记录");
+      setNotice(t("该审计事件已不存在，已打开运行记录"));
       return;
     }
     const nextActivityTaskId =
@@ -6029,7 +6029,7 @@ export default function HomePage() {
   function requestBulkApprovalDecision(decision: BulkApprovalDecision) {
     if (selectedApprovals.length === 0) return;
     if (decision === "approve" && bulkApprovableApprovals.length === 0) {
-      setNotice("高风险操作必须逐项审核，不能批量批准");
+      setNotice(t("高风险操作必须逐项审核，不能批量批准"));
       return;
     }
     setApprovalRejectReason("");
@@ -6048,7 +6048,7 @@ export default function HomePage() {
     if (bulkApprovableApprovals.length === 0) return;
     if (
       !requireOnline(
-        "设备离线，未执行批量批准；所选操作仍保留在待确认列表中",
+        t("设备离线，未执行批量批准；所选操作仍保留在待确认列表中"),
       )
     ) {
       setBulkApprovalDecision(null);
@@ -6060,7 +6060,7 @@ export default function HomePage() {
     );
     if (
       approvalWouldResumeTasks &&
-      !requireBudgetCapacity("批量批准并继续关联任务")
+      !requireBudgetCapacity(t("批量批准并继续关联任务"))
     ) {
       setBulkApprovalDecision(null);
       return;
@@ -6081,7 +6081,7 @@ export default function HomePage() {
 
     syncBackend(
       workspaceProvider.approvals.decideMany([...approvedIds], { kind: "approve" }),
-      "批量批准",
+      t("批量批准"),
     );
     setApprovals((items) =>
       items.filter((approval) => !approvedIds.has(approval.id)),
@@ -6099,7 +6099,7 @@ export default function HomePage() {
           progress: shouldResume
             ? Math.min(99, task.progress + 4)
             : task.progress,
-          updated: shouldResume ? "刚刚批量批准" : "刚刚批准操作",
+          updated: shouldResume ? t("刚刚批量批准") : t("刚刚批准操作"),
         };
       }),
     );
@@ -6108,8 +6108,8 @@ export default function HomePage() {
     }
     bulkApprovableApprovals.forEach((approval) => {
       recordActivity({
-        title: `已批准：${approval.title}`,
-        detail: `${approval.impact} 授权范围：${approval.scope}。批量决策已记录。`,
+        title: t("已批准：{title}", { title: approval.title }),
+        detail: t("{impact} 授权范围：{scope}。批量决策已记录。", { impact: approval.impact, scope: approval.scope }),
         icon: "shield",
         tone: "green",
         kind: "审批",
@@ -6119,8 +6119,8 @@ export default function HomePage() {
     setBulkApprovalDecision(null);
     setNotice(
       selectedHighRiskApprovalCount
-        ? `已批准 ${bulkApprovableApprovals.length} 项，${selectedHighRiskApprovalCount} 项高风险操作保留待审`
-        : `已批准 ${bulkApprovableApprovals.length} 项操作`,
+        ? t("已批准 {length} 项，{selectedHighRiskApprovalCount} 项高风险操作保留待审", { length: bulkApprovableApprovals.length, selectedHighRiskApprovalCount })
+        : t("已批准 {length} 项操作", { length: bulkApprovableApprovals.length }),
     );
     if (nextApproval) {
       scrollApprovalIntoView();
@@ -6170,13 +6170,13 @@ export default function HomePage() {
       "push",
     );
     recordActivity({
-      title: `已撤销拒绝 ${snapshot.rejectedCount} 项操作`,
-      detail: "待确认操作、关联任务状态和原运行记录已恢复；之前的拒绝与本次恢复仍保留在审计中。",
+      title: t("已撤销拒绝 {rejectedCount} 项操作", { rejectedCount: snapshot.rejectedCount }),
+      detail: t("待确认操作、关联任务状态和原运行记录已恢复；之前的拒绝与本次恢复仍保留在审计中。"),
       icon: "activity",
       tone: "green",
       kind: "审批",
     });
-    setNotice(`已恢复 ${snapshot.rejectedCount} 项待确认操作`);
+    setNotice(t("已恢复 {rejectedCount} 项待确认操作", { rejectedCount: snapshot.rejectedCount }));
     scrollApprovalIntoView();
   }
 
@@ -6193,7 +6193,7 @@ export default function HomePage() {
     stageApprovalRejectUndo(rejected.length);
     syncBackend(
       workspaceProvider.approvals.decideMany([...rejectedIds], { kind: "reject", reason }),
-      "拒绝操作",
+      t("拒绝操作"),
     );
     setApprovals((items) =>
       items.filter((approval) => !rejectedIds.has(approval.id)),
@@ -6207,10 +6207,10 @@ export default function HomePage() {
           ? {
               ...task,
               status: "已暂停",
-              updated: "因批量审批拒绝暂停",
+              updated: t("因批量审批拒绝暂停"),
               runs: stopActiveTaskRuns(
                 task.runs,
-                "批量审批被拒绝，本次运行未执行外部操作。",
+                t("批量审批被拒绝，本次运行未执行外部操作。"),
               ),
             }
           : task,
@@ -6222,8 +6222,8 @@ export default function HomePage() {
     rejected.forEach((approval) => {
       const relatedTask = tasks.find((task) => task.id === approval.taskId);
       recordActivity({
-        title: `已拒绝：${approval.title}`,
-        detail: `未执行外部操作，关联任务“${relatedTask?.title ?? approval.taskId}”已暂停。原因：${reason}`,
+        title: t("已拒绝：{title}", { title: approval.title }),
+        detail: t("未执行外部操作，关联任务“{value}”已暂停。原因：{reason}", { value: relatedTask?.title ?? approval.taskId, reason }),
         icon: "shield",
         tone: "red",
         kind: "审批",
@@ -6233,7 +6233,7 @@ export default function HomePage() {
     setBulkApprovalDecision(null);
     setApprovalRejectReason("");
     setNotice(
-      `已拒绝 ${rejected.length} 项操作，暂停 ${affectedTaskIds.size} 个关联任务`,
+      t("已拒绝 {length} 项操作，暂停 {size} 个关联任务", { length: rejected.length, size: affectedTaskIds.size }),
     );
     if (nextApproval) {
       scrollApprovalIntoView();
@@ -6267,7 +6267,7 @@ export default function HomePage() {
   function approveCurrent(approval: ApprovalItem) {
     if (
       !requireOnline(
-        "设备离线，未执行批准操作；这项操作仍保留在待确认列表中",
+        t("设备离线，未执行批准操作；这项操作仍保留在待确认列表中"),
       )
     ) {
       return;
@@ -6277,7 +6277,7 @@ export default function HomePage() {
     const shouldResume = relatedTask?.status === "待确认";
     if (
       shouldResume &&
-      !requireBudgetCapacity(`批准并继续任务“${relatedTask?.title}”`)
+      !requireBudgetCapacity(t("批准并继续任务“{title}”", { title: relatedTask?.title }))
     ) {
       return;
     }
@@ -6289,7 +6289,7 @@ export default function HomePage() {
         kind: "approve",
         remember: rememberApprovalId === approved.id && isAgentApprovalId(approved.id),
       }),
-      "批准操作",
+      t("批准操作"),
     );
     setRememberApprovalId(null);
     setApprovals((items) => items.filter((item) => item.id !== approved.id));
@@ -6305,7 +6305,7 @@ export default function HomePage() {
               ...task,
               status: shouldResume ? "运行中" : task.status,
               progress: shouldResume ? Math.min(99, task.progress + 4) : task.progress,
-              updated: shouldResume ? "刚刚获得确认" : "刚刚批准操作",
+              updated: shouldResume ? t("刚刚获得确认") : t("刚刚批准操作"),
             }
           : task,
       ),
@@ -6314,8 +6314,8 @@ export default function HomePage() {
       setIsRunning(true);
     }
     recordActivity({
-      title: `已批准：${approved.title}`,
-      detail: `${approved.impact} 授权范围：${approved.scope}。`,
+      title: t("已批准：{title}", { title: approved.title }),
+      detail: t("{impact} 授权范围：{scope}。", { impact: approved.impact, scope: approved.scope }),
       icon: "shield",
       tone: "green",
       kind: "审批",
@@ -6323,8 +6323,8 @@ export default function HomePage() {
     });
     setNotice(
       shouldResume
-        ? `已允许操作，任务“${relatedTask?.title}”继续运行`
-        : `已允许：${approved.title}`,
+        ? t("已允许操作，任务“{title}”继续运行", { title: relatedTask?.title })
+        : t("已允许：{title}", { title: approved.title }),
     );
     if (nextApproval) {
       scrollApprovalIntoView();
@@ -6357,20 +6357,20 @@ export default function HomePage() {
     setSelectedApprovalIds((ids) => ids.filter((id) => id !== held.id));
     setApprovalSnoozeId(null);
     recordActivity({
-      title: `稍后处理：${held.title}`,
-      detail: `操作会在 ${formatApprovalDeferredUntil(
+      title: t("稍后处理：{title}", { title: held.title }),
+      detail: t("操作会在 {formatApprovalDeferredUntil} 重新进入待确认列表，期间没有执行任何外部动作。", { formatApprovalDeferredUntil: formatApprovalDeferredUntil(
         deferredUntil.toISOString(),
         approvalClock,
-      )} 重新进入待确认列表，期间没有执行任何外部动作。`,
+      ) }),
       icon: "clock",
       tone: "amber",
       kind: "审批",
       taskId: held.taskId,
     });
-    setNotice(`已安排 ${formatApprovalDeferredUntil(
+    setNotice(t("已安排 {formatApprovalDeferredUntil} 重新提醒", { formatApprovalDeferredUntil: formatApprovalDeferredUntil(
       deferredUntil.toISOString(),
       approvalClock,
-    )} 重新提醒`);
+    ) }));
     if (nextApproval) {
       scrollApprovalIntoView();
     }
@@ -6399,14 +6399,14 @@ export default function HomePage() {
       canReturnToWorkspaceParent(),
     );
     recordActivity({
-      title: `已恢复待确认：${approval.title}`,
-      detail: "操作已提前回到待确认列表，仍未执行任何外部动作。",
+      title: t("已恢复待确认：{title}", { title: approval.title }),
+      detail: t("操作已提前回到待确认列表，仍未执行任何外部动作。"),
       icon: "clock",
       tone: "blue",
       kind: "审批",
       taskId: approval.taskId,
     });
-    setNotice(`“${approval.title}”已回到待确认列表`);
+    setNotice(t("“{title}”已回到待确认列表", { title: approval.title }));
     scrollApprovalIntoView();
   }
 
@@ -6427,7 +6427,7 @@ export default function HomePage() {
     // 审批看不出差别，托管会话的审批却永远等不到答复，agent 一直挂着。
     syncBackend(
       workspaceProvider.approvals.decide(rejected.id, { kind: "reject", reason }),
-      "拒绝操作",
+      t("拒绝操作"),
     );
     setApprovals((items) => items.filter((item) => item.id !== rejected.id));
     removeApprovalDeferrals(new Set([rejected.id]));
@@ -6441,10 +6441,10 @@ export default function HomePage() {
           ? {
               ...task,
               status: "已暂停",
-              updated: "因审批拒绝暂停",
+              updated: t("因审批拒绝暂停"),
               runs: stopActiveTaskRuns(
                 task.runs,
-                "审批被拒绝，本次运行未执行外部操作。",
+                t("审批被拒绝，本次运行未执行外部操作。"),
               ),
             }
           : task,
@@ -6456,14 +6456,14 @@ export default function HomePage() {
     setRejectApprovalId(null);
     setApprovalRejectReason("");
     recordActivity({
-      title: `已拒绝：${rejected.title}`,
-      detail: `未执行任何外部操作，关联任务“${relatedTask?.title ?? rejected.taskId}”已暂停。原因：${reason}`,
+      title: t("已拒绝：{title}", { title: rejected.title }),
+      detail: t("未执行任何外部操作，关联任务“{value}”已暂停。原因：{reason}", { value: relatedTask?.title ?? rejected.taskId, reason }),
       icon: "shield",
       tone: "red",
       kind: "审批",
       taskId: rejected.taskId,
     });
-    setNotice(`已拒绝操作，任务“${relatedTask?.title ?? rejected.taskId}”已暂停`);
+    setNotice(t("已拒绝操作，任务“{value}”已暂停", { value: relatedTask?.title ?? rejected.taskId }));
     if (nextApproval) {
       scrollApprovalIntoView();
     } else {
@@ -6474,7 +6474,7 @@ export default function HomePage() {
   async function createTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (editingTaskId && taskWorkspaceConflict) {
-      setNotice("任务已在另一窗口更新，请先处理版本冲突");
+      setNotice(t("任务已在另一窗口更新，请先处理版本冲突"));
       return;
     }
     setTaskFormSubmitted(true);
@@ -6506,7 +6506,7 @@ export default function HomePage() {
             scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
             requiresApproval: taskApproval,
           }),
-          "修改任务",
+          t("修改任务"),
         );
         setTasks((items) =>
           items.map((item) =>
@@ -6521,7 +6521,7 @@ export default function HomePage() {
                     taskSchedule === "仅运行一次" ? undefined : taskScheduleTime,
                   scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
                   requiresApproval: taskApproval,
-                  updated: "刚刚修改",
+                  updated: t("刚刚修改"),
                 }
               : item,
           ),
@@ -6529,20 +6529,20 @@ export default function HomePage() {
         closeComposer({ clearRecovery: true });
         setSelectedTaskId(task.id);
         recordActivity({
-          title: `任务配置已更新：${taskName.trim()}`,
+          title: t("任务配置已更新：{trim}", { trim: taskName.trim() }),
           detail: `${formatSchedule(
             taskSchedule,
             taskScheduleTime,
             taskScheduleDay,
           )} · ${
-            taskApproval ? "敏感操作需要确认" : "按任务范围自动执行"
+            taskApproval ? t("敏感操作需要确认") : t("按任务范围自动执行")
           }`,
           icon: "settings",
           tone: "blue",
           kind: "任务",
           taskId: task.id,
         });
-        setNotice(`任务“${taskName.trim()}”已更新`);
+        setNotice(t("任务“{trim}”已更新", { trim: taskName.trim() }));
         return;
       }
 
@@ -6556,10 +6556,10 @@ export default function HomePage() {
         status: startImmediately ? "运行中" : "已暂停",
         progress: startImmediately ? 3 : 0,
         updated: startImmediately
-          ? "刚刚创建"
+          ? t("刚刚创建")
           : budgetBlocksRun
-            ? "已保存，等待调整预算"
-            : "已保存，等待网络",
+            ? t("已保存，等待调整预算")
+            : t("已保存，等待网络"),
         schedule: taskSchedule,
         scheduleTime: taskSchedule === "仅运行一次" ? undefined : taskScheduleTime,
         scheduleDay: taskSchedule === "每周" ? taskScheduleDay : undefined,
@@ -6571,12 +6571,12 @@ export default function HomePage() {
                 id: `run-${Date.now()}`,
                 status: "运行中",
                 startedAt: new Date().toISOString(),
-                summary: "任务已创建，正在检查数据来源和执行范围。",
+                summary: t("任务已创建，正在检查数据来源和执行范围。"),
               },
             ]
           : [],
       };
-      syncBackend(workspaceProvider.tasks.create(newTask), "新建任务");
+      syncBackend(workspaceProvider.tasks.create(newTask), t("新建任务"));
       setTasks((items) => [newTask, ...items]);
       const firstRun = newTask.runs?.[0];
       if (firstRun) void driveBrainRun(newTask, firstRun.id);
@@ -6597,18 +6597,16 @@ export default function HomePage() {
       setTaskScheduleDay("周一");
       setTaskApproval(true);
       recordActivity({
-        title: `${
-          startImmediately
-            ? "任务已创建"
+        title: t("{value}：{title}", { value: t(startImmediately
+            ? t("任务已创建")
             : budgetBlocksRun
-              ? "任务已保存，预算保护阻止运行"
-              : "离线任务已保存"
-        }：${newTask.title}`,
+              ? t("任务已保存，预算保护阻止运行")
+              : t("离线任务已保存")), title: newTask.title }),
         detail: startImmediately
-          ? `${formatTaskSchedule(newTask)} · 目标：${newTask.target}`
+          ? t("{formatTaskSchedule} · 目标：{target}", { formatTaskSchedule: formatTaskSchedule(newTask), target: newTask.target })
           : budgetBlocksRun
-            ? `${formatTaskSchedule(newTask)} · 当前已使用 ${usedCredits} / ${usageSettings.monthlyBudget} 点，调整额度后可手动开始。`
-          : `${formatTaskSchedule(newTask)} · 已保存配置，恢复网络后可手动开始运行。`,
+            ? t("{formatTaskSchedule} · 当前已使用 {usedCredits} / {monthlyBudget} 点，调整额度后可手动开始。", { formatTaskSchedule: formatTaskSchedule(newTask), usedCredits, monthlyBudget: usageSettings.monthlyBudget })
+          : t("{formatTaskSchedule} · 已保存配置，恢复网络后可手动开始运行。", { formatTaskSchedule: formatTaskSchedule(newTask) }),
         icon: "sparkles",
         tone: startImmediately ? "blue" : "amber",
         kind: "任务",
@@ -6616,10 +6614,10 @@ export default function HomePage() {
       });
       setNotice(
         startImmediately
-          ? `任务“${newTask.title}”已开始运行`
+          ? t("任务“{title}”已开始运行", { title: newTask.title })
           : budgetBlocksRun
-            ? `任务“${newTask.title}”已保存；月度额度已用完，暂未运行`
-          : `任务“${newTask.title}”已保存，联网后可以开始运行`,
+            ? t("任务“{title}”已保存；月度额度已用完，暂未运行", { title: newTask.title })
+          : t("任务“{title}”已保存，联网后可以开始运行", { title: newTask.title }),
       );
     } finally {
       taskSavingRef.current = false;
@@ -6729,8 +6727,8 @@ export default function HomePage() {
     closeComposer();
     setNotice(
       wasEditing
-        ? "未保存的任务修改已放弃"
-        : "未保存的新任务草稿已放弃",
+        ? t("未保存的任务修改已放弃")
+        : t("未保存的新任务草稿已放弃"),
     );
   }
 
@@ -6776,13 +6774,13 @@ export default function HomePage() {
     setComposerOpen(true);
 
     if (recovery.editingTaskId && !originalTask) {
-      setNotice("原任务已不存在，草稿将作为新任务继续编辑");
+      setNotice(t("原任务已不存在，草稿将作为新任务继续编辑"));
     }
   }
 
   function discardRecoveredTaskDraft() {
     clearTaskDraftRecovery();
-    setNotice("未完成的任务草稿已放弃");
+    setNotice(t("未完成的任务草稿已放弃"));
   }
 
   function applyTaskTemplate(template: (typeof taskTemplates)[number]) {
@@ -6818,13 +6816,13 @@ export default function HomePage() {
     workspaceSaveRetryingRef.current = true;
     lastWorkspaceSyncSignatureRef.current = "";
     setWorkspacePersistenceStatus("retrying");
-    setWorkspacePersistenceDetail("正在重新验证本机存储并保存完整工作区。");
+    setWorkspacePersistenceDetail(t("正在重新验证本机存储并保存完整工作区。"));
     setWorkspaceSaveRetryToken((value) => value + 1);
   }
 
   function exportEmergencyWorkspaceBackup() {
     exportWorkspace();
-    setNotice("紧急备份已导出；本机保存恢复前请保留这份文件");
+    setNotice(t("紧急备份已导出；本机保存恢复前请保留这份文件"));
   }
 
   function reviewWorkspaceSync() {
@@ -6877,7 +6875,7 @@ export default function HomePage() {
       preserveProfileDraft: profileWorkspaceConflict,
     });
     setWorkspaceSyncNotice(null);
-    setNotice("当前草稿已保留，保存后将以这份内容为准");
+    setNotice(t("当前草稿已保留，保存后将以这份内容为准"));
   }
 
   function useLatestWorkspaceVersion() {
@@ -6940,24 +6938,24 @@ export default function HomePage() {
       }
     }
     setWorkspaceSyncNotice(null);
-    setNotice("已载入另一窗口的最新内容");
+    setNotice(t("已载入另一窗口的最新内容"));
   }
 
   function duplicateTask(task: TaskItem) {
     const duplicate: TaskItem = {
       ...task,
       id: `task-${Date.now()}`,
-      title: `${task.title}（副本）`,
+      title: t("{title}（副本）", { title: task.title }),
       status: "已暂停",
       progress: 0,
-      updated: "刚刚复制",
+      updated: t("刚刚复制"),
       pinned: false,
       runs: [],
       lastError: undefined,
       errorCode: undefined,
       retryCount: 0,
     };
-    syncBackend(workspaceProvider.tasks.create(duplicate), "复制任务");
+    syncBackend(workspaceProvider.tasks.create(duplicate), t("复制任务"));
     setTasks((items) => [duplicate, ...items]);
     setSelectedTaskId(duplicate.id);
     writeWorkspaceRoute(
@@ -6965,19 +6963,19 @@ export default function HomePage() {
       "push",
     );
     recordActivity({
-      title: `任务已复制：${duplicate.title}`,
-      detail: "为避免误执行，复制后的任务保持暂停。",
+      title: t("任务已复制：{title}", { title: duplicate.title }),
+      detail: t("为避免误执行，复制后的任务保持暂停。"),
       icon: "copy",
       tone: "violet",
       kind: "任务",
       taskId: duplicate.id,
     });
-    setNotice(`已复制“${task.title}”，副本保持暂停`);
+    setNotice(t("已复制“{title}”，副本保持暂停", { title: task.title }));
   }
 
   function requestDeleteTask(task: TaskItem) {
     if (task.pinned) {
-      setNotice("首页主任务不能删除，你可以暂停或修改它");
+      setNotice(t("首页主任务不能删除，你可以暂停或修改它"));
       return;
     }
     setDeleteTaskId(task.id);
@@ -7019,7 +7017,7 @@ export default function HomePage() {
     );
     stageTaskDeleteUndo(1, deletingTaskId);
     // provider 的 remove 会连带清掉这个任务的成果和待审批，和下面的本地更新一致。
-    syncBackend(workspaceProvider.tasks.remove(deletingTaskId), "删除任务");
+    syncBackend(workspaceProvider.tasks.remove(deletingTaskId), t("删除任务"));
     setTasks((items) => items.filter((item) => item.id !== deletingTask.id));
     setArtifacts((items) =>
       items.filter((artifact) => artifact.taskId !== deletingTask.id),
@@ -7053,14 +7051,14 @@ export default function HomePage() {
       "replace",
     );
     recordActivity({
-      title: `任务已删除：${deletingTask.title}`,
-      detail: `已移除任务配置、关联成果和本机记录，原数据来源：${deletingTask.target}`,
+      title: t("任务已删除：{title}", { title: deletingTask.title }),
+      detail: t("已移除任务配置、关联成果和本机记录，原数据来源：{target}", { target: deletingTask.target }),
       icon: "trash",
       tone: "red",
       kind: "任务",
       taskId: deletingTaskId,
     });
-    setNotice(`已删除 1 个任务“${deletingTask.title}”`);
+    setNotice(t("已删除 1 个任务“{title}”", { title: deletingTask.title }));
   }
 
   function toggleTaskSelection(taskId: string) {
@@ -7088,7 +7086,7 @@ export default function HomePage() {
         .map((task) => task.id),
     );
     if (targetIds.size === 0) {
-      setNotice("所选任务中没有可以暂停的任务");
+      setNotice(t("所选任务中没有可以暂停的任务"));
       return;
     }
     setTasks((items) =>
@@ -7097,10 +7095,10 @@ export default function HomePage() {
           ? {
               ...task,
               status: "已暂停",
-              updated: "刚刚批量暂停",
+              updated: t("刚刚批量暂停"),
               runs: stopActiveTaskRuns(
                 task.runs,
-                "任务已由批量操作暂停，当前检查点已保存。",
+                t("任务已由批量操作暂停，当前检查点已保存。"),
               ),
             }
           : task,
@@ -7108,18 +7106,18 @@ export default function HomePage() {
     );
     syncBackend(
       Promise.all([...targetIds].map((id) => workspaceProvider.tasks.pause(id))),
-      "批量暂停",
+      t("批量暂停"),
     );
     if (targetIds.has("competitor")) setIsRunning(false);
     setSelectedTaskIds([]);
     recordActivity({
-      title: `已批量暂停 ${targetIds.size} 个任务`,
-      detail: "任务保留当前进度和已保存证据，可随时继续运行。",
+      title: t("已批量暂停 {size} 个任务", { size: targetIds.size }),
+      detail: t("任务保留当前进度和已保存证据，可随时继续运行。"),
       icon: "clock",
       tone: "amber",
       kind: "任务",
     });
-    setNotice(`已暂停 ${targetIds.size} 个任务`);
+    setNotice(t("已暂停 {size} 个任务", { size: targetIds.size }));
   }
 
   function bulkResumeTasks() {
@@ -7134,17 +7132,17 @@ export default function HomePage() {
         .map((task) => task.id),
     );
     if (targetIds.size === 0) {
-      setNotice("所选任务中没有可以继续的任务");
+      setNotice(t("所选任务中没有可以继续的任务"));
       return;
     }
     if (
       !requireOnline(
-        `设备离线，未继续所选的 ${targetIds.size} 个任务；任务仍保持原状态`,
+        t("设备离线，未继续所选的 {size} 个任务；任务仍保持原状态", { size: targetIds.size }),
       )
     ) {
       return;
     }
-    if (!requireBudgetCapacity(`继续所选的 ${targetIds.size} 个任务`)) return;
+    if (!requireBudgetCapacity(t("继续所选的 {size} 个任务", { size: targetIds.size }))) return;
     setTasks((items) =>
       items.map((task) =>
         targetIds.has(task.id)
@@ -7155,7 +7153,7 @@ export default function HomePage() {
                 task.status === "已完成" || task.status === "失败"
                   ? Math.max(3, Math.min(task.progress, 12))
                   : task.progress,
-              updated: "刚刚批量继续",
+              updated: t("刚刚批量继续"),
               lastError: undefined,
               errorCode: undefined,
               retryCount:
@@ -7169,10 +7167,10 @@ export default function HomePage() {
                   startedAt: new Date().toISOString(),
                   summary:
                     task.status === "失败"
-                      ? "批量重试已启动，正在重新验证任务依赖。"
+                      ? t("批量重试已启动，正在重新验证任务依赖。")
                       : task.status === "已完成"
-                        ? "批量再次运行已启动，正在重新读取任务目标。"
-                        : "任务已由批量操作从保存的检查点继续运行。",
+                        ? t("批量再次运行已启动，正在重新读取任务目标。")
+                        : t("任务已由批量操作从保存的检查点继续运行。"),
                 },
                 ...(task.runs ?? []),
               ].slice(0, 12),
@@ -7182,18 +7180,18 @@ export default function HomePage() {
     );
     syncBackend(
       Promise.all([...targetIds].map((id) => workspaceProvider.tasks.resume(id))),
-      "批量继续",
+      t("批量继续"),
     );
     if (targetIds.has("competitor")) setIsRunning(true);
     setSelectedTaskIds([]);
     recordActivity({
-      title: `已批量继续 ${targetIds.size} 个任务`,
-      detail: "任务已从各自保存的进度重新开始运行。",
+      title: t("已批量继续 {size} 个任务", { size: targetIds.size }),
+      detail: t("任务已从各自保存的进度重新开始运行。"),
       icon: "activity",
       tone: "green",
       kind: "任务",
     });
-    setNotice(`已继续 ${targetIds.size} 个任务`);
+    setNotice(t("已继续 {size} 个任务", { size: targetIds.size }));
   }
 
   function bulkEnableApproval() {
@@ -7203,7 +7201,7 @@ export default function HomePage() {
         .map((task) => task.id),
     );
     if (targetIds.size === 0) {
-      setNotice("所选任务已经启用审批保护");
+      setNotice(t("所选任务已经启用审批保护"));
       return;
     }
     setTasks((items) =>
@@ -7213,18 +7211,18 @@ export default function HomePage() {
     );
     setSelectedTaskIds([]);
     recordActivity({
-      title: `已为 ${targetIds.size} 个任务启用审批保护`,
-      detail: "这些任务执行外部操作前会暂停并等待人工确认。",
+      title: t("已为 {size} 个任务启用审批保护", { size: targetIds.size }),
+      detail: t("这些任务执行外部操作前会暂停并等待人工确认。"),
       icon: "shield",
       tone: "blue",
       kind: "系统",
     });
-    setNotice(`已保护 ${targetIds.size} 个任务`);
+    setNotice(t("已保护 {size} 个任务", { size: targetIds.size }));
   }
 
   function requestBulkDelete() {
     if (deletableSelectedTasks.length === 0) {
-      setNotice("首页主任务不能删除，请选择其他任务");
+      setNotice(t("首页主任务不能删除，请选择其他任务"));
       return;
     }
     setBulkDeleteOpen(true);
@@ -7263,16 +7261,14 @@ export default function HomePage() {
     setSelectedTaskIds([]);
     setBulkDeleteOpen(false);
     recordActivity({
-      title: `已批量删除 ${deletedCount} 个任务`,
-      detail: "关联成果、审批事项和任务运行记录已一并移除，可在当前提示中撤销。",
+      title: t("已批量删除 {deletedCount} 个任务", { deletedCount }),
+      detail: t("关联成果、审批事项和任务运行记录已一并移除，可在当前提示中撤销。"),
       icon: "trash",
       tone: "red",
       kind: "系统",
     });
     setNotice(
-      `已删除 ${deletedCount} 个任务${
-        protectedSelectedTaskCount ? "，首页任务已保留" : ""
-      }`,
+      t("已删除 {deletedCount} 个任务{value}", { deletedCount, value: protectedSelectedTaskCount ? t("，首页任务已保留") : "" }),
     );
   }
 
@@ -7314,9 +7310,9 @@ export default function HomePage() {
     setTaskDeleteSnapshot(null);
     recordActivity({
       title: restoredTask
-        ? `已撤销删除：${restoredTask.title}`
-        : `已撤销删除 ${snapshot.deletedCount} 个任务`,
-      detail: "任务、关联成果、审批事项和运行记录已恢复。",
+        ? t("已撤销删除：{title}", { title: restoredTask.title })
+        : t("已撤销删除 {deletedCount} 个任务", { deletedCount: snapshot.deletedCount }),
+      detail: t("任务、关联成果、审批事项和运行记录已恢复。"),
       icon: "activity",
       tone: "green",
       kind: restoredTask ? "任务" : "系统",
@@ -7324,8 +7320,8 @@ export default function HomePage() {
     });
     setNotice(
       restoredTask
-        ? `已恢复任务“${restoredTask.title}”`
-        : `已恢复 ${snapshot.deletedCount} 个任务`,
+        ? t("已恢复任务“{title}”", { title: restoredTask.title })
+        : t("已恢复 {deletedCount} 个任务", { deletedCount: snapshot.deletedCount }),
     );
   }
 
@@ -7392,7 +7388,7 @@ export default function HomePage() {
     event.preventDefault();
     setWorkspaceProfileSubmitted(true);
     if (profileWorkspaceConflict) {
-      setNotice("工作区资料已在另一窗口更新，请先处理版本冲突");
+      setNotice(t("工作区资料已在另一窗口更新，请先处理版本冲突"));
       return;
     }
     if (workspaceProfileFormHasErrors) {
@@ -7418,16 +7414,16 @@ export default function HomePage() {
     setWorkspaceProfileSubmitted(false);
     setWorkspaceProfileOpen(false);
     recordActivity({
-      title: `工作区资料已更新：${nextProfile.name}`,
+      title: t("工作区资料已更新：{name}", { name: nextProfile.name }),
       detail:
         previousName === nextProfile.name
-          ? `工作区说明已更新为“${nextProfile.description}”。`
-          : `工作区已从“${previousName}”更名为“${nextProfile.name}”。`,
+          ? t("工作区说明已更新为“{description}”。", { description: nextProfile.description })
+          : t("工作区已从“{previousName}”更名为“{name}”。", { previousName, name: nextProfile.name }),
       icon: "settings",
       tone: "green",
       kind: "系统",
     });
-    setNotice(`工作区已更新为“${nextProfile.name}”`);
+    setNotice(t("工作区已更新为“{name}”", { name: nextProfile.name }));
   }
 
   function requestCloseUsageBudget() {
@@ -7469,12 +7465,12 @@ export default function HomePage() {
 
   function saveUsageBudget() {
     if (budgetWorkspaceConflict) {
-      setNotice("预算已在另一窗口更新，请先处理版本冲突");
+      setNotice(t("预算已在另一窗口更新，请先处理版本冲突"));
       return;
     }
     if (!usageBudgetCanSave) {
       if (usageBudgetRequiresConfirmation && !usagePauseConfirmed) {
-        setNotice("请先确认会立即暂停运行中任务");
+        setNotice(t("请先确认会立即暂停运行中任务"));
       }
       return;
     }
@@ -7500,10 +7496,10 @@ export default function HomePage() {
             ? {
                 ...task,
                 status: "已暂停",
-                updated: "因用量到限保护暂停",
+                updated: t("因用量到限保护暂停"),
                 runs: stopActiveTaskRuns(
                   task.runs,
-                  "达到预算上限，系统已停止本次运行。",
+                  t("达到预算上限，系统已停止本次运行。"),
                 ),
               }
             : task,
@@ -7513,39 +7509,39 @@ export default function HomePage() {
         setIsRunning(false);
       }
       recordActivity({
-        title: `月度额度已更新：${monthlyBudget} 点`,
-        detail: `当前已使用 ${usedCredits} 点，达到预算上限；已暂停 ${runningTaskIds.length} 个运行中任务。提醒阈值：${usageAlertDraft}%。`,
+        title: t("月度额度已更新：{monthlyBudget} 点", { monthlyBudget }),
+        detail: t("当前已使用 {usedCredits} 点，达到预算上限；已暂停 {length} 个运行中任务。提醒阈值：{usageAlertDraft}%。", { usedCredits, length: runningTaskIds.length, usageAlertDraft }),
         icon: "settings",
         tone: "amber",
         kind: "系统",
       });
       setNotice(
-        `预算已保存，${runningTaskIds.length} 个任务因用量到限保护暂停`,
+        t("预算已保存，{length} 个任务因用量到限保护暂停", { length: runningTaskIds.length }),
       );
       return;
     }
 
     recordActivity({
-      title: `月度额度已更新：${monthlyBudget} 点`,
-      detail: `提醒阈值：${usageAlertDraft}% · 到限自动暂停：${usagePauseDraft ? "开启" : "关闭"}。`,
+      title: t("月度额度已更新：{monthlyBudget} 点", { monthlyBudget }),
+      detail: t("提醒阈值：{usageAlertDraft}% · 到限自动暂停：{value}。", { usageAlertDraft, value: usagePauseDraft ? t("已开启") : t("已关闭") }),
       icon: "settings",
       tone: "blue",
       kind: "系统",
     });
-    setNotice(`月度额度已更新为 ${monthlyBudget} 点`);
+    setNotice(t("月度额度已更新为 {monthlyBudget} 点", { monthlyBudget }));
   }
 
   function exportUsageReport() {
     const rows = [
-      ["项目", "本月额度", "占已用比例"],
+      [t("项目"), t("本月额度"), t("占已用比例")],
       ...usageBreakdown.map((item) => [
         item.label,
         String(item.credits),
         `${Math.round((item.credits / Math.max(1, usedCredits)) * 100)}%`,
       ]),
-      ["合计", String(usedCredits), "100%"],
-      ["月度预算", String(usageSettings.monthlyBudget), ""],
-      ["月底预计", String(forecastCredits), ""],
+      [t("合计"), String(usedCredits), "100%"],
+      [t("月度预算"), String(usageSettings.monthlyBudget), ""],
+      [t("月底预计"), String(forecastCredits), ""],
     ];
     const csv = rows
       .map((row) =>
@@ -7568,26 +7564,26 @@ export default function HomePage() {
     anchor.remove();
     window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
     recordActivity({
-      title: "用量报告已导出",
-      detail: `已导出本月 ${usedCredits} 点 AI 用量及分类明细。`,
+      title: t("用量报告已导出"),
+      detail: t("已导出本月 {usedCredits} 点 AI 用量及分类明细。", { usedCredits }),
       icon: "activity",
       tone: "blue",
       kind: "系统",
     });
-    setNotice("本月用量报告已导出");
+    setNotice(t("本月用量报告已导出"));
   }
 
   function toggleSetting(key: keyof SettingsState, label: string) {
     const nextValue = !settings[key];
     setSettings((current) => ({ ...current, [key]: nextValue }));
     recordActivity({
-      title: `${label}已${nextValue ? "开启" : "关闭"}`,
-      detail: "设置变更已应用到后续任务执行。",
+      title: t("{label}：{value}", { label, value: nextValue ? t("已开启") : t("已关闭") }),
+      detail: t("设置变更已应用到后续任务执行。"),
       icon: "settings",
       tone: "neutral",
       kind: "系统",
     });
-    setNotice(`${label}已${nextValue ? "开启" : "关闭"}`);
+    setNotice(t("{label}：{value}", { label, value: nextValue ? t("已开启") : t("已关闭") }));
   }
 
   async function toggleDesktopNotifications() {
@@ -7601,19 +7597,19 @@ export default function HomePage() {
     if (settings.notifications) {
       setSettings((current) => ({ ...current, notifications: false }));
       recordActivity({
-        title: "桌面确认提醒已关闭",
-        detail: "页面内通知中心仍会保留任务、审批和成果动态。",
+        title: t("桌面确认提醒已关闭"),
+        detail: t("页面内通知中心仍会保留任务、审批和成果动态。"),
         icon: "settings",
         tone: "neutral",
         kind: "系统",
       });
-      setNotice("桌面提醒已关闭，页面内通知仍会保留");
+      setNotice(t("桌面提醒已关闭，页面内通知仍会保留"));
       return;
     }
 
     if (!("Notification" in window)) {
       setDesktopNotificationPermission("unsupported");
-      setNotice("当前浏览器不支持桌面通知，页面内通知仍可正常使用");
+      setNotice(t("当前浏览器不支持桌面通知，页面内通知仍可正常使用"));
       return;
     }
 
@@ -7628,36 +7624,36 @@ export default function HomePage() {
       if (permission !== "granted") {
         setSettings((current) => ({ ...current, notifications: false }));
         recordActivity({
-          title: "桌面通知授权未通过",
+          title: t("桌面通知授权未通过"),
           detail:
             permission === "denied"
-              ? "浏览器已阻止当前站点发送桌面通知。"
-              : "本次未授予桌面通知权限，页面内通知不受影响。",
+              ? t("浏览器已阻止当前站点发送桌面通知。")
+              : t("本次未授予桌面通知权限，页面内通知不受影响。"),
           icon: "settings",
           tone: "amber",
           kind: "系统",
         });
         setNotice(
           permission === "denied"
-            ? "浏览器已阻止桌面通知，请在网站权限中允许后重试"
-            : "未开启桌面通知，页面内通知仍会保留",
+            ? t("浏览器已阻止桌面通知，请在网站权限中允许后重试")
+            : t("未开启桌面通知，页面内通知仍会保留"),
         );
         return;
       }
 
       setSettings((current) => ({ ...current, notifications: true }));
       recordActivity({
-        title: "桌面确认提醒已开启",
-        detail: "后续任务需要确认或安全停止时，浏览器会主动发送桌面提醒。",
+        title: t("桌面确认提醒已开启"),
+        detail: t("后续任务需要确认或安全停止时，浏览器会主动发送桌面提醒。"),
         icon: "settings",
         tone: "green",
         kind: "系统",
       });
-      setNotice("桌面提醒已开启");
+      setNotice(t("桌面提醒已开启"));
 
       try {
-        const confirmation = new window.Notification("Unzoo One 提醒已开启", {
-          body: "后续需要你决定的任务会在这里提醒。",
+        const confirmation = new window.Notification(t("Unzoo One 提醒已开启"), {
+          body: t("后续需要你决定的任务会在这里提醒。"),
           icon: "/unzoo-one-mark-v6.png",
           tag: "unzoo-one-notifications-enabled",
         });
@@ -7668,7 +7664,7 @@ export default function HomePage() {
     } catch {
       setSettings((current) => ({ ...current, notifications: false }));
       setDesktopNotificationPermission(window.Notification.permission);
-      setNotice("无法开启桌面通知，页面内通知仍可正常使用");
+      setNotice(t("无法开启桌面通知，页面内通知仍可正常使用"));
     } finally {
       setIsRequestingNotificationPermission(false);
     }
@@ -7681,26 +7677,26 @@ export default function HomePage() {
     }
     setSettings((current) => ({ ...current, local: true }));
     recordActivity({
-      title: "本机持久保存已开启",
-      detail: "当前任务、成果、审批和运行记录会继续保存在这台设备。",
+      title: t("本机持久保存已开启"),
+      detail: t("当前任务、成果、审批和运行记录会继续保存在这台设备。"),
       icon: "settings",
       tone: "green",
       kind: "系统",
     });
-    setNotice("已开启本机持久保存，当前工作区会在下次打开时恢复");
+    setNotice(t("已开启本机持久保存，当前工作区会在下次打开时恢复"));
   }
 
   function confirmTemporaryMode() {
     setSettings((current) => ({ ...current, local: false }));
     setTemporaryModeOpen(false);
     recordActivity({
-      title: "已切换到临时会话",
-      detail: "当前页面关闭后，本次工作区不会从本机恢复；本次会话中的数据仍可继续使用或导出。",
+      title: t("已切换到临时会话"),
+      detail: t("当前页面关闭后，本次工作区不会从本机恢复；本次会话中的数据仍可继续使用或导出。"),
       icon: "settings",
       tone: "amber",
       kind: "系统",
     });
-    setNotice("已进入临时会话，关闭页面前可以随时重新开启保存");
+    setNotice(t("已进入临时会话，关闭页面前可以随时重新开启保存"));
   }
 
   function preserveConnectorSettingsRoute() {
@@ -7749,35 +7745,35 @@ export default function HomePage() {
     const connector = connectorCatalog.find((item) => item.id === connectorId);
     if (!connector) return;
     if (!connectorAuthorizeAcknowledged) {
-      setNotice("请先确认这项连接将获得的权限范围");
+      setNotice(t("请先确认这项连接将获得的权限范围"));
       return;
     }
     if (
       !requireOnline(
-        `设备离线，${connector.name}尚未连接；恢复网络后可以继续授权`,
+        t("设备离线，{name}尚未连接；恢复网络后可以继续授权", { name: connector.name }),
       )
     ) {
       return;
     }
-    syncBackend(workspaceProvider.connectors.connect(connectorId), "连接器授权");
+    syncBackend(workspaceProvider.connectors.connect(connectorId), t("连接器授权"));
     setConnectorStates((current) => ({ ...current, [connectorId]: true }));
     setConnectorCheckResults((current) => ({
       ...current,
       [connectorId]: {
-        checkedAt: "刚刚",
+        checkedAt: t("刚刚"),
         latency: connectorTestLatencies[connectorId],
       },
     }));
     setConnectorDisconnectConfirm(false);
     setConnectorAuthorizeAcknowledged(false);
     recordActivity({
-      title: `连接器已授权：${connector.name}`,
-      detail: `已启用 ${connector.permissions.join("、")}；授权范围为${connector.scope}。`,
+      title: t("连接器已授权：{name}", { name: connector.name }),
+      detail: t("已启用 {join}；授权范围为{scope}。", { join: connector.permissions.join(t("、")), scope: connector.scope }),
       icon: "settings",
       tone: "green",
       kind: "系统",
     });
-    setNotice(`${connector.name}已连接，可以用于后续任务`);
+    setNotice(t("{name}已连接，可以用于后续任务", { name: connector.name }));
   }
 
   function testConnector(connectorId: ConnectorId) {
@@ -7792,7 +7788,7 @@ export default function HomePage() {
     }
     if (
       !requireOnline(
-        `设备离线，无法测试${connector.name}；当前授权状态没有改变`,
+        t("设备离线，无法测试{name}；当前授权状态没有改变", { name: connector.name }),
       )
     ) {
       return;
@@ -7806,25 +7802,25 @@ export default function HomePage() {
         setConnectorTestingId(null);
         setConnectorCheckResults((current) => ({ ...current, [connectorId]: result }));
         recordActivity({
-          title: `连接测试通过：${connector.name}`,
-          detail: `连接正常，往返 ${result.latency} ms，当前授权范围为${connector.scope}。`,
+          title: t("连接测试通过：{name}", { name: connector.name }),
+          detail: t("连接正常，往返 {latency} ms，当前授权范围为{scope}。", { latency: result.latency, scope: connector.scope }),
           icon: "settings",
           tone: "green",
           kind: "系统",
         });
-        setNotice(`${connector.name}连接正常，往返 ${result.latency} ms`);
+        setNotice(t("{name}连接正常，往返 {latency} ms", { name: connector.name, latency: result.latency }));
       })
       .catch((error: unknown) => {
         setConnectorTestingId(null);
         const detail = error instanceof Error ? error.message : String(error);
         recordActivity({
-          title: `连接测试失败：${connector.name}`,
+          title: t("连接测试失败：{name}", { name: connector.name }),
           detail,
           icon: "settings",
           tone: "red",
           kind: "系统",
         });
-        setNotice(`${connector.name}连接测试失败：${detail}`);
+        setNotice(t("{name}连接测试失败：{detail}", { name: connector.name, detail }));
       });
   }
 
@@ -7837,11 +7833,11 @@ export default function HomePage() {
         connectorIssueTasks[connector.id].length === 0,
     );
     if (testableConnectors.length === 0) {
-      setNotice("当前没有可以检测的已授权连接");
+      setNotice(t("当前没有可以检测的已授权连接"));
       return;
     }
     if (
-      !requireOnline("设备离线，无法执行连接检测；当前授权状态没有改变")
+      !requireOnline(t("设备离线，无法执行连接检测；当前授权状态没有改变"))
     ) {
       return;
     }
@@ -7865,25 +7861,25 @@ export default function HomePage() {
         setConnectorTestingAll(false);
         const slowest = Math.max(...entries.map(([, result]) => result.latency));
         recordActivity({
-          title: "连接器健康检测已完成",
-          detail: `${testableConnectors.length} 项已授权连接通过身份凭证、权限范围和响应检测，最慢一项往返 ${slowest} ms；异常授权仍保持安全停止。`,
+          title: t("连接器健康检测已完成"),
+          detail: t("{length} 项已授权连接通过身份凭证、权限范围和响应检测，最慢一项往返 {slowest} ms；异常授权仍保持安全停止。", { length: testableConnectors.length, slowest }),
           icon: "shield",
           tone: "green",
           kind: "系统",
         });
-        setNotice(`${testableConnectors.length} 项连接检测通过`);
+        setNotice(t("{length} 项连接检测通过", { length: testableConnectors.length }));
       })
       .catch((error: unknown) => {
         setConnectorTestingAll(false);
         const detail = error instanceof Error ? error.message : String(error);
         recordActivity({
-          title: "连接器健康检测失败",
+          title: t("连接器健康检测失败"),
           detail,
           icon: "shield",
           tone: "red",
           kind: "系统",
         });
-        setNotice(`连接检测失败：${detail}`);
+        setNotice(t("连接检测失败：{detail}", { detail }));
       });
   }
 
@@ -7899,12 +7895,12 @@ export default function HomePage() {
       return;
     }
     if (!connectorAuthorizeAcknowledged) {
-      setNotice("请先确认恢复这项连接的权限范围");
+      setNotice(t("请先确认恢复这项连接的权限范围"));
       return;
     }
     if (
       !requireOnline(
-        `设备离线，${connector.name}尚未重新授权；受影响任务仍保持安全停止`,
+        t("设备离线，{name}尚未重新授权；受影响任务仍保持安全停止", { name: connector.name }),
       )
     ) {
       return;
@@ -7913,12 +7909,12 @@ export default function HomePage() {
     const impactedTaskIds = new Set(impactedTasks.map((task) => task.id));
     setConnectorTestingId(connectorId);
     window.setTimeout(() => {
-      syncBackend(workspaceProvider.connectors.connect(connectorId), "连接器授权");
+      syncBackend(workspaceProvider.connectors.connect(connectorId), t("连接器授权"));
     setConnectorStates((current) => ({ ...current, [connectorId]: true }));
       setConnectorCheckResults((current) => ({
         ...current,
         [connectorId]: {
-          checkedAt: "刚刚",
+          checkedAt: t("刚刚"),
           latency: connectorTestLatencies[connectorId],
         },
       }));
@@ -7928,8 +7924,8 @@ export default function HomePage() {
             ? {
                 ...task,
                 errorCode: "RECOVERY_READY",
-                lastError: `${connector.name}已重新授权，任务可以从安全检查点继续。`,
-                updated: "刚刚恢复授权",
+                lastError: t("{name}已重新授权，任务可以从安全检查点继续。", { name: connector.name }),
+                updated: t("刚刚恢复授权"),
               }
             : task,
         ),
@@ -7937,14 +7933,14 @@ export default function HomePage() {
       setConnectorTestingId(null);
       setConnectorAuthorizeAcknowledged(false);
       recordActivity({
-        title: `连接器已重新授权：${connector.name}`,
-        detail: `授权验证通过，${impactedTasks.length} 个受影响任务已准备好重新运行；系统仍会保留原始失败记录。`,
+        title: t("连接器已重新授权：{name}", { name: connector.name }),
+        detail: t("授权验证通过，{length} 个受影响任务已准备好重新运行；系统仍会保留原始失败记录。", { length: impactedTasks.length }),
         icon: "shield",
         tone: "green",
         kind: "系统",
         taskId: impactedTasks.length === 1 ? impactedTasks[0].id : undefined,
       });
-      setNotice(`${connector.name}已恢复，受影响任务可以重新运行`);
+      setNotice(t("{name}已恢复，受影响任务可以重新运行", { name: connector.name }));
     }, 950);
   }
 
@@ -7959,12 +7955,12 @@ export default function HomePage() {
   function confirmDisconnectConnector() {
     if (!selectedConnector) return;
     if (!connectorDisconnectAcknowledged) {
-      setNotice("请先确认后续任务将无法继续使用这项能力");
+      setNotice(t("请先确认后续任务将无法继续使用这项能力"));
       return;
     }
     syncBackend(
       workspaceProvider.connectors.disconnect(selectedConnector.id),
-      "断开连接器",
+      t("断开连接器"),
     );
     setConnectorStates((current) => ({
       ...current,
@@ -7978,13 +7974,13 @@ export default function HomePage() {
     setConnectorDisconnectAcknowledged(false);
     setConnectorAuthorizeAcknowledged(false);
     recordActivity({
-      title: `连接器已断开：${selectedConnector.name}`,
-      detail: "后续任务不会再使用这项能力，历史运行记录仍会保留。",
+      title: t("连接器已断开：{name}", { name: selectedConnector.name }),
+      detail: t("后续任务不会再使用这项能力，历史运行记录仍会保留。"),
       icon: "settings",
       tone: "amber",
       kind: "系统",
     });
-    setNotice(`${selectedConnector.name}已断开`);
+    setNotice(t("{name}已断开", { name: selectedConnector.name }));
   }
 
   function preserveTeamSettingsRoute() {
@@ -8030,16 +8026,16 @@ export default function HomePage() {
     setInviteFormSubmitted(true);
     if (teamInviteFormHasErrors) return;
     if (teamSeatLimitReached) {
-      setNotice("当前工作区席位已用完，请先移除成员或升级方案");
+      setNotice(t("当前工作区席位已用完，请先移除成员或升级方案"));
       return;
     }
     if (inviteNeedsAdminAcknowledgement) {
-      setNotice("请先确认管理员将获得的高权限");
+      setNotice(t("请先确认管理员将获得的高权限"));
       return;
     }
     if (
       !requireOnline(
-        "设备离线，邀请尚未发送；已填写的姓名、邮箱和角色仍保留在表单中",
+        t("设备离线，邀请尚未发送；已填写的姓名、邮箱和角色仍保留在表单中"),
       )
     ) {
       return;
@@ -8060,21 +8056,21 @@ export default function HomePage() {
         status: "已邀请",
         avatar: normalizedName.slice(0, 1).toUpperCase(),
         tone: tones[teamMembers.length % tones.length],
-        lastActive: "邀请刚刚发送",
+        lastActive: t("邀请刚刚发送"),
       };
-      syncBackend(workspaceProvider.team.invite(member), "邀请成员");
+      syncBackend(workspaceProvider.team.invite(member), t("邀请成员"));
       setTeamMembers((members) => [...members, member]);
       setTeamInviteOpen(false);
       setInviteAdminAcknowledged(false);
       setInviteFormSubmitted(false);
       recordActivity({
-        title: `已邀请团队成员：${member.name}`,
-        detail: `${member.email} · ${member.role} · 邀请邮件已发送。`,
+        title: t("已邀请团队成员：{name}", { name: member.name }),
+        detail: t("{email} · {role} · 邀请邮件已发送。", { email: member.email, role: t(member.role) }),
         icon: "settings",
         tone: "blue",
         kind: "系统",
       });
-      setNotice(`邀请已发送给 ${member.name}`);
+      setNotice(t("邀请已发送给 {name}", { name: member.name }));
     } finally {
       inviteSavingRef.current = false;
       setIsSendingInvite(false);
@@ -8102,17 +8098,17 @@ export default function HomePage() {
 
   function saveTeamMemberRole() {
     if (memberWorkspaceConflict) {
-      setNotice("成员角色已在另一窗口更新，请先处理版本冲突");
+      setNotice(t("成员角色已在另一窗口更新，请先处理版本冲突"));
       return;
     }
     if (!selectedTeamMember || selectedTeamMember.role === "所有者") return;
     if (memberRoleDraft === selectedTeamMember.role) {
-      setNotice("成员角色没有变化");
+      setNotice(t("成员角色没有变化"));
       return;
     }
     if (
       !requireOnline(
-        `设备离线，${selectedTeamMember.name}的角色仍保持不变；恢复网络后可以保存`,
+        t("设备离线，{name}的角色仍保持不变；恢复网络后可以保存", { name: selectedTeamMember.name }),
       )
     ) {
       return;
@@ -8120,7 +8116,7 @@ export default function HomePage() {
     const previousRole = selectedTeamMember.role;
     syncBackend(
       workspaceProvider.team.updateRole(selectedTeamMember.id, memberRoleDraft),
-      "修改成员角色",
+      t("修改成员角色"),
     );
     setTeamMembers((members) =>
       members.map((member) =>
@@ -8130,20 +8126,20 @@ export default function HomePage() {
       ),
     );
     recordActivity({
-      title: `成员角色已更新：${selectedTeamMember.name}`,
-      detail: `${previousRole} → ${memberRoleDraft}；新权限已立即生效。`,
+      title: t("成员角色已更新：{name}", { name: selectedTeamMember.name }),
+      detail: t("{previousRole} → {memberRoleDraft}；新权限已立即生效。", { previousRole: t(previousRole), memberRoleDraft: t(memberRoleDraft) }),
       icon: "shield",
       tone: "violet",
       kind: "系统",
     });
-    setNotice(`${selectedTeamMember.name} 已设为${memberRoleDraft}`);
+    setNotice(t("{name} 已设为{memberRoleDraft}", { name: selectedTeamMember.name, memberRoleDraft: t(memberRoleDraft) }));
   }
 
   function resendTeamInvite() {
     if (!selectedTeamMember || selectedTeamMember.status !== "已邀请") return;
     if (
       !requireOnline(
-        `设备离线，尚未向${selectedTeamMember.name}重新发送邀请`,
+        t("设备离线，尚未向{name}重新发送邀请", { name: selectedTeamMember.name }),
       )
     ) {
       return;
@@ -8151,35 +8147,35 @@ export default function HomePage() {
     setTeamMembers((members) =>
       members.map((member) =>
         member.id === selectedTeamMember.id
-          ? { ...member, lastActive: "邀请刚刚重新发送" }
+          ? { ...member, lastActive: t("邀请刚刚重新发送") }
           : member,
       ),
     );
     recordActivity({
-      title: `团队邀请已重发：${selectedTeamMember.name}`,
-      detail: `新的邀请邮件已发送至 ${selectedTeamMember.email}。`,
+      title: t("团队邀请已重发：{name}", { name: selectedTeamMember.name }),
+      detail: t("新的邀请邮件已发送至 {email}。", { email: selectedTeamMember.email }),
       icon: "settings",
       tone: "blue",
       kind: "系统",
     });
-    setNotice(`已重新发送邀请给 ${selectedTeamMember.name}`);
+    setNotice(t("已重新发送邀请给 {name}", { name: selectedTeamMember.name }));
   }
 
   function confirmRemoveTeamMember() {
     if (!selectedTeamMember || selectedTeamMember.role === "所有者") return;
     if (!memberRemoveAcknowledged) {
-      setNotice("请先确认该成员会立即失去工作区访问权限");
+      setNotice(t("请先确认该成员会立即失去工作区访问权限"));
       return;
     }
     if (
       !requireOnline(
-        `设备离线，${selectedTeamMember.name}仍保留工作区访问权限；恢复网络后可以移除`,
+        t("设备离线，{name}仍保留工作区访问权限；恢复网络后可以移除", { name: selectedTeamMember.name }),
       )
     ) {
       return;
     }
     const removedMember = selectedTeamMember;
-    syncBackend(workspaceProvider.team.remove(removedMember.id), "移除成员");
+    syncBackend(workspaceProvider.team.remove(removedMember.id), t("移除成员"));
     setTeamMembers((members) =>
       members.filter((member) => member.id !== removedMember.id),
     );
@@ -8187,13 +8183,13 @@ export default function HomePage() {
     setMemberRemoveConfirm(false);
     setMemberRemoveAcknowledged(false);
     recordActivity({
-      title: `团队成员已移除：${removedMember.name}`,
-      detail: `${removedMember.email} 已失去当前工作区访问权限。`,
+      title: t("团队成员已移除：{name}", { name: removedMember.name }),
+      detail: t("{email} 已失去当前工作区访问权限。", { email: removedMember.email }),
       icon: "settings",
       tone: "red",
       kind: "系统",
     });
-    setNotice(`${removedMember.name} 已从工作区移除`);
+    setNotice(t("{name} 已从工作区移除", { name: removedMember.name }));
   }
 
   function scrollWorkspaceTop() {
@@ -8375,8 +8371,8 @@ export default function HomePage() {
     openView("tasks", { taskFilter: filter });
     setNotice(
       taskFilterCounts[filter] > 0
-        ? `正在查看 ${taskFilterCounts[filter]} 个${filter}任务`
-        : `当前没有${filter}任务`,
+        ? t("正在查看 {value} 个{filter}任务", { value: taskFilterCounts[filter], filter: t(filter) })
+        : t("当前没有{filter}任务", { filter: t(filter) }),
     );
   }
 
@@ -8385,8 +8381,8 @@ export default function HomePage() {
     openView("approvals");
     setNotice(
       activeApprovalCount > 0
-        ? `正在查看 ${activeApprovalCount} 项待确认操作`
-        : "当前没有待确认操作",
+        ? t("正在查看 {activeApprovalCount} 项待确认操作", { activeApprovalCount })
+        : t("当前没有待确认操作"),
     );
   }
 
@@ -8437,7 +8433,7 @@ export default function HomePage() {
         textarea.remove();
       }
     }
-    setNotice(copied ? `${label}已复制` : "复制失败，请稍后重试");
+    setNotice(copied ? t("{label}已复制", { label }) : t("复制失败，请稍后重试"));
   }
 
   async function copyApprovalLink(approval: ApprovalItem) {
@@ -8456,7 +8452,7 @@ export default function HomePage() {
       "replace",
       canReturnToWorkspaceParent(),
     );
-    await copyCurrentViewLink("审批链接");
+    await copyCurrentViewLink(t("审批链接"));
   }
 
   function openSettingsSection(section: SettingsSectionId) {
@@ -8479,8 +8475,8 @@ export default function HomePage() {
     );
     const sectionLabel =
       settingsSections.find((section) => section.id === settingsSection)
-        ?.label ?? "当前";
-    await copyCurrentViewLink(`${sectionLabel}设置链接`);
+        ?.label ?? t("当前");
+    await copyCurrentViewLink(t("{sectionLabel}设置链接", { sectionLabel }));
   }
 
   function openWorkspaceSection(section: SettingsSectionId) {
@@ -8505,8 +8501,8 @@ export default function HomePage() {
     setOnboardingPreference(true);
     setNotice(
       completed
-        ? "首次设置已完成，工作区可以开始正式使用"
-        : "首次设置已收起，可从工作区菜单重新打开",
+        ? t("首次设置已完成，工作区可以开始正式使用")
+        : t("首次设置已收起，可从工作区菜单重新打开"),
     );
   }
 
@@ -8670,7 +8666,7 @@ export default function HomePage() {
       document.execCommand("copy");
       textarea.remove();
     }
-    setNotice(`已复制运行 ID：${run.id}`);
+    setNotice(t("已复制运行 ID：{id}", { id: run.id }));
   }
 
   function downloadTaskRun(task: TaskItem, run: TaskRun) {
@@ -8717,14 +8713,14 @@ export default function HomePage() {
     anchor.remove();
     window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
     recordActivity({
-      title: `运行记录已导出：${task.title}`,
+      title: t("运行记录已导出：{title}", { title: task.title }),
       detail: `${run.id} · ${run.status} · ${formatTaskRunDuration(run.durationSeconds)}`,
       icon: "activity",
       tone: "blue",
       kind: "系统",
       taskId: task.id,
     });
-    setNotice("运行记录已导出为 JSON");
+    setNotice(t("运行记录已导出为 JSON"));
   }
 
   function pauseInspectedRun(task: TaskItem) {
@@ -8802,7 +8798,7 @@ export default function HomePage() {
     const artifact = artifacts.find((item) => item.id === artifactId);
     if (!artifact) {
       openView("artifacts");
-      setNotice("该成果已不存在，已打开成果列表");
+      setNotice(t("该成果已不存在，已打开成果列表"));
       return;
     }
     setArtifactTaskId(options.taskId ?? null);
@@ -8912,7 +8908,7 @@ export default function HomePage() {
         new Set([...notificationItems.map((item) => item.id), ...ids]),
       ).slice(0, 30),
     );
-    setNotice("全部通知已标记为已读");
+    setNotice(t("全部通知已标记为已读"));
   }
 
   function closeNotifications() {
@@ -8938,13 +8934,13 @@ export default function HomePage() {
   function requireBudgetCapacity(actionLabel: string) {
     if (!usageSettings.pauseAtLimit || !budgetExceeded) return true;
     recordActivity({
-      title: "预算保护已阻止任务运行",
-      detail: `${actionLabel}未执行：本月已使用 ${usedCredits} / ${usageSettings.monthlyBudget} 点。调整额度后即可继续。`,
+      title: t("预算保护已阻止任务运行"),
+      detail: t("{actionLabel}未执行：本月已使用 {usedCredits} / {monthlyBudget} 点。调整额度后即可继续。", { actionLabel, usedCredits, monthlyBudget: usageSettings.monthlyBudget }),
       icon: "shield",
       tone: "amber",
       kind: "系统",
     });
-    setNotice(`月度额度已用完，已阻止${actionLabel}；请先调整预算`);
+    setNotice(t("月度额度已用完，已阻止{actionLabel}；请先调整预算", { actionLabel }));
     return false;
   }
 
@@ -8953,7 +8949,7 @@ export default function HomePage() {
     setIsCheckingNetwork(true);
     try {
       if (!window.navigator.onLine) {
-        setNotice("设备仍处于离线状态，本机数据不会受到影响");
+        setNotice(t("设备仍处于离线状态，本机数据不会受到影响"));
         return;
       }
 
@@ -8964,9 +8960,9 @@ export default function HomePage() {
       if (!response.ok) {
         throw new Error("Network check failed");
       }
-      setNotice("网络连接正常，在线能力可以继续使用");
+      setNotice(t("网络连接正常，在线能力可以继续使用"));
     } catch {
-      setNotice("暂时无法连接在线服务，本机数据仍可正常查看");
+      setNotice(t("暂时无法连接在线服务，本机数据仍可正常查看"));
     } finally {
       setIsCheckingNetwork(false);
     }
@@ -9104,12 +9100,12 @@ export default function HomePage() {
           });
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
-      const what = continueFrom ? "没能接上原来的对话" : "没能启动 brain";
-      patchRun({ status: "失败", summary: `${what}：${detail}`, errorMessage: detail });
+      const what = continueFrom ? t("没能接上原来的对话") : t("没能启动 brain");
+      patchRun({ status: "失败", summary: t("{what}：{detail}", { what: t(what), detail }), errorMessage: detail });
       setTasks((items) =>
         items.map((item) =>
           item.id === task.id
-            ? { ...item, status: "失败", lastError: detail, updated: "刚刚失败" }
+            ? { ...item, status: "失败", lastError: detail, updated: t("刚刚失败") }
             : item,
         ),
       );
@@ -9119,13 +9115,11 @@ export default function HomePage() {
 
     recordActivity({
       title: continueFrom
-        ? `已接着原来的对话：${task.title}`
-        : `已交给 ${session.adapter}：${task.title}`,
+        ? t("已接着原来的对话：{title}", { title: task.title })
+        : t("已交给 {adapter}：{title}", { adapter: session.adapter, title: task.title }),
       detail: continueFrom
-        ? `会话 ${session.sessionId} 接着 ${continueFrom.sessionId} 的对话继续。`
-        : `会话 ${session.sessionId} 开始运行${
-            session.hosted ? "，每次使用工具前都会先进收件箱等你确认" : ""
-          }。`,
+        ? t("会话 {sessionId} 接着 {sessionId2} 的对话继续。", { sessionId: session.sessionId, sessionId2: continueFrom.sessionId })
+        : t("会话 {sessionId} 开始运行{value}。", { sessionId: session.sessionId, value: t(session.hosted ? t("，每次使用工具前都会先进收件箱等你确认") : "") }),
       icon: "brain",
       tone: "blue",
       kind: "任务",
@@ -9195,7 +9189,7 @@ export default function HomePage() {
 
       for (const item of events) {
         if (item.event === "turn.started" && item.model) {
-          patchRun({ summary: `${session.adapter} · ${item.model} 正在处理` });
+          patchRun({ summary: t("{adapter} · {model} 正在处理", { adapter: session.adapter, model: item.model }) });
         } else if (
           item.event === "output.delta" &&
           item.message &&
@@ -9205,7 +9199,7 @@ export default function HomePage() {
           assistantText += item.message;
           patchRun({ summary: assistantText.slice(-120) });
         } else if (item.event === "approval.requested") {
-          patchRun({ summary: "等你在收件箱确认一次工具调用" });
+          patchRun({ summary: t("等你在收件箱确认一次工具调用") });
         } else if (item.event === "error" && item.message) {
           failure = item.message;
         }
@@ -9244,10 +9238,10 @@ export default function HomePage() {
       const spent = usage.inputTokens + usage.outputTokens;
       const outcome = ok
         ? assistantText.trim().slice(-120) ||
-          (endedState ? "运行已结束（结果在页面关闭期间产生）" : "运行完成")
+          (endedState ? t("运行已结束（结果在页面关闭期间产生）") : t("运行完成"))
         : stopped
-          ? "这一轮已停止（你拒绝了一次工具调用，或者暂停了任务）"
-          : (failure ?? "运行失败");
+          ? t("这一轮已停止（你拒绝了一次工具调用，或者暂停了任务）")
+          : (failure ?? t("运行失败"));
       patchRun({
         status: ok ? "成功" : stopped ? "已取消" : "失败",
         durationSeconds: Math.max(1, Math.round((Date.now() - startedAtMs) / 1000)),
@@ -9261,7 +9255,7 @@ export default function HomePage() {
                 ...item,
                 status: ok ? "已完成" : stopped ? "已暂停" : "失败",
                 progress: ok ? 100 : item.progress,
-                updated: ok ? "刚刚完成" : stopped ? "刚刚停止" : "刚刚失败",
+                updated: ok ? t("刚刚完成") : stopped ? t("刚刚停止") : t("刚刚失败"),
                 lastError: ok || stopped ? undefined : (failure ?? undefined),
               }
             : item,
@@ -9269,11 +9263,11 @@ export default function HomePage() {
       );
       recordActivity({
         title: ok
-          ? `任务已完成：${task.title}`
+          ? t("任务已完成：{title}", { title: task.title })
           : stopped
-            ? `任务已停止：${task.title}`
-            : `任务失败：${task.title}`,
-        detail: ok ? `${session.adapter} 用了 ${spent} 个 token。` : outcome,
+            ? t("任务已停止：{title}", { title: task.title })
+            : t("任务失败：{title}", { title: task.title }),
+        detail: ok ? t("{adapter} 用了 {spent} 个 token。", { adapter: session.adapter, spent }) : outcome,
         icon: ok ? "sparkles" : "shield",
         tone: ok ? "green" : stopped ? "blue" : "red",
         kind: "任务",
@@ -9320,7 +9314,7 @@ export default function HomePage() {
     try {
       remote = await workspaceProvider.runtime.list();
     } catch (error) {
-      setNotice(`读不到本机运行时里的任务：${error instanceof Error ? error.message : String(error)}`);
+      setNotice(t("读不到本机运行时里的任务：{value}", { value: error instanceof Error ? error.message : String(error) }));
       setRuntimeMode(false);
       reattachLocalRuns();
       return;
@@ -9386,7 +9380,7 @@ export default function HomePage() {
             : item,
         ),
       );
-      setNotice(`任务没能开始：${message}`);
+      setNotice(t("任务没能开始：{message}", { message }));
     }
     void refreshFromRuntime();
   }
@@ -9412,7 +9406,7 @@ export default function HomePage() {
       runtimeSent.current.set(task.id, signature);
       workspaceProvider.runtime.put(toRuntimePut(task)).catch((error: unknown) => {
         runtimeSent.current.delete(task.id);
-        setNotice(`任务没有保存到本机运行时：${error instanceof Error ? error.message : String(error)}`);
+        setNotice(t("任务没有保存到本机运行时：{value}", { value: error instanceof Error ? error.message : String(error) }));
       });
     }
     for (const id of [...runtimeSent.current.keys()]) {
@@ -9447,7 +9441,7 @@ export default function HomePage() {
         void followBrainSession(
           task,
           run.id,
-          { sessionId: run.sessionId, adapter: "智能体" },
+          { sessionId: run.sessionId, adapter: t("智能体") },
           startedAtMs,
         );
       }
@@ -9459,13 +9453,13 @@ export default function HomePage() {
     const text = prompt.trim();
     const sessionId = run.sessionId;
     if (!sessionId || !text) return false;
-    if (!requireOnline(`设备离线，暂时不能继续“${task.title}”的对话`)) return false;
-    if (!requireBudgetCapacity(`继续任务“${task.title}”的对话`)) return false;
+    if (!requireOnline(t("设备离线，暂时不能继续“{title}”的对话", { title: task.title }))) return false;
+    if (!requireBudgetCapacity(t("继续任务“{title}”的对话", { title: task.title }))) return false;
     const nextRun: TaskRun = {
       id: `run-${task.id}-${Date.now()}`,
       status: "运行中",
       startedAt: new Date().toISOString(),
-      summary: `接着上次的对话：${text.slice(0, 80)}`,
+      summary: t("接着上次的对话：{slice}", { slice: text.slice(0, 80) }),
     };
     setTasks((items) =>
       items.map((item) =>
@@ -9473,7 +9467,7 @@ export default function HomePage() {
           ? {
               ...item,
               status: "运行中",
-              updated: "刚刚继续",
+              updated: t("刚刚继续"),
               lastError: undefined,
               errorCode: undefined,
               runs: [nextRun, ...(item.runs ?? [])].slice(0, 12),
@@ -9488,18 +9482,18 @@ export default function HomePage() {
   function retryTask(task: TaskItem) {
     if (
       !requireOnline(
-        `设备离线，任务“${task.title}”仍保持停止；恢复网络后可以重试`,
+        t("设备离线，任务“{title}”仍保持停止；恢复网络后可以重试", { title: task.title }),
       )
     ) {
       return;
     }
-    if (!requireBudgetCapacity(`重试任务“${task.title}”`)) return;
+    if (!requireBudgetCapacity(t("重试任务“{title}”", { title: task.title }))) return;
     const now = new Date();
     const nextRun: TaskRun = {
       id: `run-${task.id}-${now.getTime()}`,
       status: "运行中",
       startedAt: now.toISOString(),
-      summary: "重试已启动，正在重新验证连接器授权和任务依赖。",
+      summary: t("重试已启动，正在重新验证连接器授权和任务依赖。"),
     };
 
     setTasks((items) =>
@@ -9509,7 +9503,7 @@ export default function HomePage() {
               ...item,
               status: "运行中",
               progress: Math.max(3, Math.min(item.progress, 12)),
-              updated: "刚刚重试",
+              updated: t("刚刚重试"),
               lastError: undefined,
               errorCode: undefined,
               retryCount: (item.retryCount ?? 0) + 1,
@@ -9521,14 +9515,14 @@ export default function HomePage() {
     if (task.id === "competitor") setIsRunning(true);
     void driveBrainRun(task, nextRun.id);
     recordActivity({
-      title: `任务已重新运行：${task.title}`,
-      detail: `重试 #${(task.retryCount ?? 0) + 1} 已启动；系统会先验证连接器授权，再从安全检查点继续。`,
+      title: t("任务已重新运行：{title}", { title: task.title }),
+      detail: t("重试 #{value} 已启动；系统会先验证连接器授权，再从安全检查点继续。", { value: (task.retryCount ?? 0) + 1 }),
       icon: "activity",
       tone: "blue",
       kind: "任务",
       taskId: task.id,
     });
-    setNotice(`任务“${task.title}”已重新运行`);
+    setNotice(t("任务“{title}”已重新运行", { title: task.title }));
   }
 
   function openTaskRecoverySettings() {
@@ -9552,14 +9546,14 @@ export default function HomePage() {
     if (
       willStart &&
       !requireOnline(
-        `设备离线，任务“${task.title}”仍保持暂停；恢复网络后可以继续`,
+        t("设备离线，任务“{title}”仍保持暂停；恢复网络后可以继续", { title: task.title }),
       )
     ) {
       return;
     }
     if (
       willStart &&
-      !requireBudgetCapacity(`继续任务“${task.title}”`)
+      !requireBudgetCapacity(t("继续任务“{title}”", { title: task.title }))
     ) {
       return;
     }
@@ -9569,7 +9563,7 @@ export default function HomePage() {
     // 暂停一个真在跑的 agent：停掉它这一轮，别让它在"已暂停"的任务里继续干活。
     if (task.status === "运行中" && runtimeMode) {
       workspaceProvider.runtime.stop(task.id).catch((error: unknown) => {
-        setNotice(`没能停下智能体：${error instanceof Error ? error.message : String(error)}`);
+        setNotice(t("没能停下智能体：{value}", { value: error instanceof Error ? error.message : String(error) }));
       });
     } else if (task.status === "运行中") {
       const current = tasks.find((item) => item.id === task.id) ?? task;
@@ -9593,7 +9587,7 @@ export default function HomePage() {
               ...item,
               status: nextStatus,
               progress: nextProgress,
-              updated: nextStatus === "已暂停" ? "刚刚暂停" : "刚刚继续",
+              updated: nextStatus === "已暂停" ? t("刚刚暂停") : t("刚刚继续"),
               runs:
                 nextStatus === "运行中"
                   ? [
@@ -9603,14 +9597,14 @@ export default function HomePage() {
                         startedAt: new Date().toISOString(),
                         summary:
                           task.status === "已完成"
-                            ? "再次运行已启动，正在重新读取任务目标。"
-                            : "任务已从保存的检查点继续运行。",
+                            ? t("再次运行已启动，正在重新读取任务目标。")
+                            : t("任务已从保存的检查点继续运行。"),
                       },
                       ...(item.runs ?? []),
                     ].slice(0, 12)
                   : stopActiveTaskRuns(
                       item.runs,
-                      "用户暂停运行，当前检查点已保存。",
+                      t("用户暂停运行，当前检查点已保存。"),
                     ),
             }
           : item,
@@ -9623,11 +9617,11 @@ export default function HomePage() {
     if (nextStatus === "运行中") void driveBrainRun(task, nextRunId);
 
     recordActivity({
-      title: `${nextStatus === "已暂停" ? "任务已暂停" : "任务已继续"}：${task.title}`,
+      title: t("{value}：{title}", { value: t(nextStatus === "已暂停" ? t("任务已暂停") : t("任务已继续")), title: task.title }),
       detail:
         nextStatus === "已暂停"
-          ? "任务停止执行，但保留当前进度和已保存证据。"
-          : "任务从上次进度继续运行。",
+          ? t("任务停止执行，但保留当前进度和已保存证据。")
+          : t("任务从上次进度继续运行。"),
       icon: nextStatus === "已暂停" ? "clock" : "activity",
       tone: nextStatus === "已暂停" ? "amber" : "green",
       kind: "任务",
@@ -9635,8 +9629,8 @@ export default function HomePage() {
     });
     setNotice(
       nextStatus === "已暂停"
-        ? `任务“${task.title}”已暂停`
-        : `任务“${task.title}”已继续运行`,
+        ? t("任务“{title}”已暂停", { title: task.title })
+        : t("任务“{title}”已继续运行", { title: task.title }),
     );
   }
 
@@ -9645,14 +9639,14 @@ export default function HomePage() {
     if (
       nextRunning &&
       !requireOnline(
-        `设备离线，任务“${primaryTask.title}”仍保持暂停；恢复网络后可以继续`,
+        t("设备离线，任务“{title}”仍保持暂停；恢复网络后可以继续", { title: primaryTask.title }),
       )
     ) {
       return;
     }
     if (
       nextRunning &&
-      !requireBudgetCapacity(`继续任务“${primaryTask.title}”`)
+      !requireBudgetCapacity(t("继续任务“{title}”", { title: primaryTask.title }))
     ) {
       return;
     }
@@ -9663,30 +9657,30 @@ export default function HomePage() {
           ? {
               ...task,
               status: nextRunning ? "运行中" : "已暂停",
-              updated: nextRunning ? "刚刚继续" : "刚刚暂停",
+              updated: nextRunning ? t("刚刚继续") : t("刚刚暂停"),
               runs: nextRunning
                 ? [
                     {
                       id: `run-${task.id}-${Date.now()}`,
                       status: "运行中" as const,
                       startedAt: new Date().toISOString(),
-                      summary: "首页主任务已从保存的检查点继续运行。",
+                      summary: t("首页主任务已从保存的检查点继续运行。"),
                     },
                     ...(task.runs ?? []),
                   ].slice(0, 12)
                 : stopActiveTaskRuns(
                     task.runs,
-                    "用户从首页暂停运行，当前检查点已保存。",
+                    t("用户从首页暂停运行，当前检查点已保存。"),
                   ),
             }
           : task,
       ),
     );
     recordActivity({
-      title: `${nextRunning ? "任务已继续" : "任务已暂停"}：${primaryTask.title}`,
+      title: t("{value}：{title}", { value: (nextRunning ? t("任务已继续") : t("任务已暂停")), title: primaryTask.title }),
       detail: nextRunning
-        ? "首页主任务已恢复后台执行。"
-        : "首页主任务停止执行，已保存当前进度。",
+        ? t("首页主任务已恢复后台执行。")
+        : t("首页主任务停止执行，已保存当前进度。"),
       icon: nextRunning ? "activity" : "clock",
       tone: nextRunning ? "green" : "amber",
       kind: "任务",
@@ -9696,11 +9690,11 @@ export default function HomePage() {
 
   return (
     <main className="clarity-shell">
-      <aside className="clarity-sidebar" aria-label="主导航">
+      <aside className="clarity-sidebar" aria-label={t("主导航")}>
         <button
           className="clarity-brand"
           type="button"
-          aria-label="返回首页"
+          aria-label={t("返回首页")}
           onClick={() => openView("home")}
         >
           <span className="clarity-brand-mark">
@@ -9712,7 +9706,7 @@ export default function HomePage() {
               <span className="clarity-wordmark-name">Unzoo</span>
               <span className="clarity-wordmark-one">One</span>
             </strong>
-            <small>可信 AI 执行</small>
+            <small>{t("可信 AI 执行")}</small>
           </div>
         </button>
 
@@ -9751,7 +9745,7 @@ export default function HomePage() {
           <button
             className="clarity-mobile-brand"
             type="button"
-            aria-label="返回首页"
+            aria-label={t("返回首页")}
             onClick={() => openView("home")}
           >
             <span className="clarity-mobile-brand-mark">
@@ -9772,8 +9766,8 @@ export default function HomePage() {
           <button
             className="clarity-mobile-create"
             type="button"
-            aria-label="新建任务"
-            title="新建任务"
+            aria-label={t("新建任务")}
+            title={t("新建任务")}
             onClick={beginCreateTask}
           >
             <Plus size={19} />
@@ -9794,7 +9788,7 @@ export default function HomePage() {
                 <input
                   ref={searchInputRef}
                   role="combobox"
-                  aria-label="全局搜索"
+                  aria-label={t("全局搜索")}
                   aria-autocomplete="list"
                   aria-controls="global-search-results"
                   aria-expanded={searchOpen}
@@ -9804,7 +9798,7 @@ export default function HomePage() {
                       : undefined
                   }
                   autoComplete="off"
-                  placeholder="搜索任务、成果、页面和操作"
+                  placeholder={t("搜索任务、成果、页面和操作")}
                   value={query}
                   onFocus={() => {
                     setNotificationsOpen(false);
@@ -9822,7 +9816,7 @@ export default function HomePage() {
                   <button
                     className="clarity-search-clear"
                     type="button"
-                    aria-label="清除搜索"
+                    aria-label={t("清除搜索")}
                     onClick={clearSearch}
                   >
                     <X size={14} />
@@ -9835,11 +9829,11 @@ export default function HomePage() {
                   className="clarity-search-panel"
                   id="global-search-results"
                   role="listbox"
-                  aria-label="全局搜索结果"
+                  aria-label={t("全局搜索结果")}
                 >
                   <div className="clarity-search-panel-heading">
-                    <strong>{query ? "搜索结果" : "快速访问"}</strong>
-                    <span>{searchResults.length} 项</span>
+                    <strong>{(query ? t("搜索结果") : t("快速访问"))}</strong>
+                    <span>{t("{length} 项", { length: searchResults.length })}</span>
                   </div>
 
                   {searchResults.length > 0 ? (
@@ -9859,7 +9853,8 @@ export default function HomePage() {
                                 type="button"
                                 onClick={clearRecentSearches}
                               >
-                                清除
+                                
+                                {t("清除")}
                               </button>
                             )}
                           </div>
@@ -9905,8 +9900,8 @@ export default function HomePage() {
                   ) : (
                     <div className="clarity-search-empty">
                       <Search size={18} />
-                      <strong>没有找到匹配内容</strong>
-                      <span>换一个任务名称、页面或操作试试。</span>
+                      <strong>{t("没有找到匹配内容")}</strong>
+                      <span>{t("换一个任务名称、页面或操作试试。")}</span>
                     </div>
                   )}
                 </div>
@@ -9920,8 +9915,8 @@ export default function HomePage() {
                 type="button"
                 aria-label={
                   unreadNotificationCount
-                    ? `通知，${unreadNotificationCount} 条未读`
-                    : "通知，无未读消息"
+                    ? t("通知，{unreadNotificationCount} 条未读", { unreadNotificationCount })
+                    : t("通知，无未读消息")
                 }
                 aria-controls="global-notifications"
                 aria-expanded={notificationsOpen}
@@ -9965,7 +9960,7 @@ export default function HomePage() {
                     className="notification-backdrop"
                     type="button"
                     tabIndex={-1}
-                    aria-label="关闭通知中心"
+                    aria-label={t("关闭通知中心")}
                     onClick={closeNotifications}
                   />
                   <div
@@ -9973,16 +9968,16 @@ export default function HomePage() {
                     id="global-notifications"
                     role="dialog"
                     aria-modal="true"
-                    aria-label="通知"
+                    aria-label={t("通知")}
                     ref={notificationPanelRef}
                   >
                   <header className="notification-heading">
                     <div>
-                      <strong>通知中心</strong>
+                      <strong>{t("通知中心")}</strong>
                       <span>
                         {unreadNotificationCount
-                          ? `${unreadNotificationCount} 条未读`
-                          : "全部已读"}
+                          ? t("{unreadNotificationCount} 条未读", { unreadNotificationCount })
+                          : t("全部已读")}
                       </span>
                     </div>
                     <div>
@@ -9993,12 +9988,13 @@ export default function HomePage() {
                         onClick={markAllNotificationsRead}
                       >
                         <CheckCircle2 size={14} />
-                        全部已读
+                        
+                        {t("全部已读")}
                       </button>
                       <button
                         className="notification-close"
                         type="button"
-                        aria-label="关闭通知"
+                        aria-label={t("关闭通知")}
                         onClick={closeNotifications}
                       >
                         <X size={16} />
@@ -10009,7 +10005,7 @@ export default function HomePage() {
                   <div
                     className="notification-filters"
                     role="tablist"
-                    aria-label="通知筛选"
+                    aria-label={t("通知筛选")}
                   >
                     {(["全部", "未读"] as NotificationFilter[]).map(
                       (filter) => (
@@ -10023,7 +10019,7 @@ export default function HomePage() {
                           aria-selected={notificationFilter === filter}
                           onClick={() => setNotificationFilter(filter)}
                         >
-                          {filter}
+                          {t(filter)}
                           <span>
                             {filter === "全部"
                               ? notificationItems.length
@@ -10067,13 +10063,14 @@ export default function HomePage() {
                   ) : (
                     <div className="notification-empty">
                       <CheckCircle2 size={22} />
-                      <strong>没有未读通知</strong>
-                      <small>需要处理的新消息会出现在这里。</small>
+                      <strong>{t("没有未读通知")}</strong>
+                      <small>{t("需要处理的新消息会出现在这里。")}</small>
                       <button
                         type="button"
                         onClick={() => setNotificationFilter("全部")}
                       >
-                        查看全部
+                        
+                        {t("查看全部")}
                       </button>
                     </div>
                   )}
@@ -10086,7 +10083,8 @@ export default function HomePage() {
                       openView("activity");
                     }}
                   >
-                    查看全部运行记录
+                    
+                    {t("查看全部运行记录")}
                     <ChevronRight size={14} />
                   </button>
                   </div>
@@ -10101,7 +10099,7 @@ export default function HomePage() {
                   workspaceMenuOpen ? "open" : ""
                 }`}
                 type="button"
-                aria-label="打开工作区控制中心"
+                aria-label={t("打开工作区控制中心")}
                 aria-controls="workspace-control-center"
                 aria-expanded={workspaceMenuOpen}
                 aria-haspopup="dialog"
@@ -10130,7 +10128,7 @@ export default function HomePage() {
                 </span>
                 <span className="workspace-menu-trigger-copy">
                   <strong>{workspaceProfile.name}</strong>
-                  <small>Team 方案</small>
+                  <small>{t("Team 方案")}</small>
                 </span>
                 <ChevronDown
                   className={workspaceMenuOpen ? "is-open" : ""}
@@ -10144,7 +10142,7 @@ export default function HomePage() {
                     className="workspace-menu-backdrop"
                     type="button"
                     tabIndex={-1}
-                    aria-label="关闭工作区控制中心"
+                    aria-label={t("关闭工作区控制中心")}
                     onClick={closeWorkspaceMenu}
                   />
                   <div
@@ -10152,7 +10150,7 @@ export default function HomePage() {
                     id="workspace-control-center"
                     role="dialog"
                     aria-modal="true"
-                    aria-label="工作区控制中心"
+                    aria-label={t("工作区控制中心")}
                     ref={workspaceMenuPanelRef}
                   >
                   <header className="workspace-menu-heading">
@@ -10160,51 +10158,51 @@ export default function HomePage() {
                       {workspaceInitial}
                     </span>
                     <div>
-                      <span>当前工作区</span>
+                      <span>{t("当前工作区")}</span>
                       <strong>{workspaceProfile.name}</strong>
                       <small>
-                        {!isOnline
-                          ? "设备离线 · 本机数据可用"
+                        {t(!isOnline
+                          ? t("设备离线 · 本机数据可用")
                           : settings.local
-                            ? "数据保存在本机"
-                            : "当前为临时会话"}
+                            ? t("数据保存在本机")
+                            : t("当前为临时会话"))}
                       </small>
                     </div>
                     <button
                       type="button"
-                      aria-label="关闭工作区控制中心"
+                      aria-label={t("关闭工作区控制中心")}
                       onClick={closeWorkspaceMenu}
                     >
                       <X size={16} />
                     </button>
                   </header>
 
-                  <div className="workspace-menu-summary" aria-label="工作区状态">
+                  <div className="workspace-menu-summary" aria-label={t("工作区状态")}>
                     <span>
-                      <small>成员</small>
+                      <small>{t("成员")}</small>
                       <strong>{teamMembers.length}</strong>
                     </span>
                     <span className={!isOnline ? "is-alert" : ""}>
-                      <small>{isOnline ? "可用连接" : "网络状态"}</small>
+                      <small>{(isOnline ? t("可用连接") : t("网络状态"))}</small>
                       <strong>
                         {isOnline
                           ? `${healthyConnectorCount}/${connectorCatalog.length}`
-                          : "离线"}
+                          : t("离线")}
                       </strong>
                     </span>
                     <span className={budgetAlertReached ? "is-alert" : ""}>
-                      <small>本月用量</small>
+                      <small>{t("本月用量")}</small>
                       <strong>{usagePercent}%</strong>
                     </span>
                   </div>
 
-                  <nav className="workspace-menu-nav" aria-label="工作区快捷操作">
+                  <nav className="workspace-menu-nav" aria-label={t("工作区快捷操作")}>
                     <button type="button" onClick={openWorkspaceProfile}>
                       <span className="tone-green">
                         <Pencil size={17} />
                       </span>
                       <span>
-                        <strong>工作区资料</strong>
+                        <strong>{t("工作区资料")}</strong>
                         <small>{workspaceProfile.description}</small>
                       </span>
                       <ChevronRight size={15} />
@@ -10217,10 +10215,8 @@ export default function HomePage() {
                         <Users size={17} />
                       </span>
                       <span>
-                        <strong>团队与权限</strong>
-                        <small>
-                          {onlineMemberCount} 位在线 · {approverMemberCount} 位可审批
-                        </small>
+                        <strong>{t("团队与权限")}</strong>
+                        <small>{t("{onlineMemberCount} 位在线 · {approverMemberCount} 位可审批", { onlineMemberCount, approverMemberCount })}</small>
                       </span>
                       <ChevronRight size={15} />
                     </button>
@@ -10229,10 +10225,8 @@ export default function HomePage() {
                         <Sparkles size={17} />
                       </span>
                       <span>
-                        <strong>用量与预算</strong>
-                        <small>
-                          已使用 {usedCredits} / {usageSettings.monthlyBudget} 点
-                        </small>
+                        <strong>{t("用量与预算")}</strong>
+                        <small>{t("已使用 {usedCredits} / {monthlyBudget} 点", { usedCredits, monthlyBudget: usageSettings.monthlyBudget })}</small>
                       </span>
                       <ChevronRight size={15} />
                     </button>
@@ -10248,11 +10242,11 @@ export default function HomePage() {
                         <Link2 size={17} />
                       </span>
                       <span>
-                        <strong>能力连接</strong>
+                        <strong>{t("能力连接")}</strong>
                         <small>
                           {connectorIssueCount > 0
-                            ? `${connectorIssueCount} 项需要处理`
-                            : `${connectedConnectorCount} 项已连接`}
+                            ? t("{connectorIssueCount} 项需要处理", { connectorIssueCount })
+                            : t("{connectedConnectorCount} 项已连接", { connectedConnectorCount })}
                         </small>
                       </span>
                       <ChevronRight size={15} />
@@ -10262,8 +10256,8 @@ export default function HomePage() {
                         <ListChecks size={17} />
                       </span>
                       <span>
-                        <strong>首次设置</strong>
-                        <small>{onboardingCompletedCount}/4 项已完成</small>
+                        <strong>{t("首次设置")}</strong>
+                        <small>{t("{onboardingCompletedCount}/4 项已完成", { onboardingCompletedCount })}</small>
                       </span>
                       <ChevronRight size={15} />
                     </button>
@@ -10272,8 +10266,8 @@ export default function HomePage() {
                         <Download size={17} />
                       </span>
                       <span>
-                        <strong>导出工作区备份</strong>
-                        <small>下载任务、成果、设置和审计记录</small>
+                        <strong>{t("导出工作区备份")}</strong>
+                        <small>{t("下载任务、成果、设置和审计记录")}</small>
                       </span>
                       <ChevronRight size={15} />
                     </button>
@@ -10282,7 +10276,7 @@ export default function HomePage() {
                   <footer className="workspace-menu-footer">
                     <div
                       className="workspace-menu-people"
-                      aria-label={`${teamMembers.length} 位工作区成员`}
+                      aria-label={t("{length} 位工作区成员", { length: teamMembers.length })}
                     >
                       {teamMembers.slice(0, 3).map((member) => (
                         <span
@@ -10293,11 +10287,12 @@ export default function HomePage() {
                           {member.avatar}
                         </span>
                       ))}
-                      <small>{teamMembers.length} 位成员</small>
+                      <small>{t("{length} 位成员", { length: teamMembers.length })}</small>
                     </div>
                     <button type="button" onClick={openWorkspaceInvite}>
                       <UserPlus size={15} />
-                      邀请成员
+                      
+                      {t("邀请成员")}
                     </button>
                   </footer>
                   </div>
@@ -10311,7 +10306,8 @@ export default function HomePage() {
               onClick={beginCreateTask}
             >
               <Plus size={17} />
-              新建任务
+              
+              {t("新建任务")}
             </button>
           </div>
         </header>
@@ -10335,9 +10331,9 @@ export default function HomePage() {
               </span>
               <span className="workspace-storage-copy">
                 <strong>
-                  {workspacePersistenceStatus === "retrying"
-                    ? "正在恢复本机保存"
-                    : "本机保存未完成"}
+                  {t(workspacePersistenceStatus === "retrying"
+                    ? t("正在恢复本机保存")
+                    : t("本机保存未完成"))}
                 </strong>
                 <small>{workspacePersistenceDetail}</small>
               </span>
@@ -10353,16 +10349,17 @@ export default function HomePage() {
                   ) : (
                     <RotateCcw size={15} />
                   )}
-                  {workspacePersistenceStatus === "retrying"
-                    ? "正在重试"
-                    : "重试保存"}
+                  {t(workspacePersistenceStatus === "retrying"
+                    ? t("正在重试")
+                    : t("重试保存"))}
                 </button>
                 <button
                   type="button"
                   onClick={exportEmergencyWorkspaceBackup}
                 >
                   <Download size={15} />
-                  导出紧急备份
+                  
+                  {t("导出紧急备份")}
                 </button>
               </span>
             </section>
@@ -10378,9 +10375,10 @@ export default function HomePage() {
               <Globe2 size={18} />
             </span>
             <div>
-              <strong>当前设备已离线</strong>
+              <strong>{t("当前设备已离线")}</strong>
               <p>
-                本机任务、成果和审计记录仍可查看；网页、邮件和日历能力会在网络恢复后继续。
+                
+                {t("本机任务、成果和审计记录仍可查看；网页、邮件和日历能力会在网络恢复后继续。")}
               </p>
             </div>
             <button
@@ -10393,7 +10391,7 @@ export default function HomePage() {
               ) : (
                 <RotateCcw size={15} />
               )}
-              {isCheckingNetwork ? "正在检查" : "检查连接"}
+              {(isCheckingNetwork ? t("正在检查") : t("检查连接"))}
             </button>
           </section>
         )}
@@ -10416,13 +10414,13 @@ export default function HomePage() {
             <span className="workspace-sync-copy">
               <strong>
                 {workspaceSyncHasConflict
-                  ? "另一窗口更新了你正在编辑的内容"
-                  : `另一窗口更新了${workspaceSyncLabel}`}
+                  ? t("另一窗口更新了你正在编辑的内容")
+                  : t("另一窗口更新了{workspaceSyncLabel}", { workspaceSyncLabel })}
               </strong>
               <small>
                 {workspaceSyncHasConflict
-                  ? `已暂停同步${workspaceSyncLabel}，当前草稿没有被覆盖。`
-                  : "当前工作区已自动同步，无需重新加载页面。"}
+                  ? t("已暂停同步{workspaceSyncLabel}，当前草稿没有被覆盖。", { workspaceSyncLabel })
+                  : t("当前工作区已自动同步，无需重新加载页面。")}
               </small>
             </span>
             <span className="workspace-sync-actions">
@@ -10434,7 +10432,8 @@ export default function HomePage() {
                     onClick={useLatestWorkspaceVersion}
                   >
                     <RotateCcw size={14} />
-                    载入最新版本
+                    
+                    {t("载入最新版本")}
                   </button>
                   <button
                     className="keep"
@@ -10442,12 +10441,14 @@ export default function HomePage() {
                     onClick={keepCurrentWorkspaceDrafts}
                   >
                     <Save size={14} />
-                    保留当前草稿
+                    
+                    {t("保留当前草稿")}
                   </button>
                 </>
               ) : (
                 <button type="button" onClick={reviewWorkspaceSync}>
-                  查看更新
+                  
+                  {t("查看更新")}
                   <ChevronRight size={14} />
                 </button>
               )}
@@ -10456,7 +10457,7 @@ export default function HomePage() {
               <button
                 className="workspace-sync-dismiss"
                 type="button"
-                aria-label="关闭同步提示"
+                aria-label={t("关闭同步提示")}
                 onClick={() => setWorkspaceSyncNotice(null)}
               >
                 <X size={15} />
@@ -10477,15 +10478,15 @@ export default function HomePage() {
           <section
             className="workspace-loading"
             role="status"
-            aria-label="正在恢复工作区"
+            aria-label={t("正在恢复工作区")}
           >
             <div className="workspace-loading-heading">
               <span className="workspace-loading-icon">
                 <LoaderCircle size={19} />
               </span>
               <span>
-                <strong>正在恢复你的工作区</strong>
-                <small>读取本机任务、成果和运行记录</small>
+                <strong>{t("正在恢复你的工作区")}</strong>
+                <small>{t("读取本机任务、成果和运行记录")}</small>
               </span>
             </div>
             <div className="workspace-loading-metrics" aria-hidden="true">
@@ -10507,17 +10508,18 @@ export default function HomePage() {
               <AlertTriangle size={19} />
             </span>
             <span className="workspace-warning-copy">
-              <strong>工作区已安全恢复</strong>
+              <strong>{t("工作区已安全恢复")}</strong>
               <small>{workspaceLoadWarning}</small>
             </span>
             <button type="button" onClick={restoreWorkspaceFromWarning}>
               <Upload size={15} />
-              从备份恢复
+              
+              {t("从备份恢复")}
             </button>
             <button
               className="workspace-warning-dismiss"
               type="button"
-              aria-label="关闭工作区提示"
+              aria-label={t("关闭工作区提示")}
               onClick={() => setWorkspaceLoadWarning("")}
             >
               <X size={15} />
@@ -10529,13 +10531,9 @@ export default function HomePage() {
           <DraftRecoveryNotice
             id="task-draft-recovery"
             icon={Save}
-            title="发现未完成的任务草稿"
-            description={`${
-              pendingTaskDraftRecovery.editingTaskId ? "任务修改" : "新任务"
-            }：${
-              pendingTaskDraftRecovery.draft.name.trim() || "未命名任务"
-            } · 保存于 ${formatDraftSavedAt(pendingTaskDraftRecovery.savedAt)}`}
-            continueLabel="继续编辑"
+            title={t("发现未完成的任务草稿")}
+            description={t("{value}：{value2} · 保存于 {formatDraftSavedAt}", { value: (pendingTaskDraftRecovery.editingTaskId ? t("任务修改") : t("新任务")), value2: pendingTaskDraftRecovery.draft.name.trim() || t("未命名任务"), formatDraftSavedAt: formatDraftSavedAt(pendingTaskDraftRecovery.savedAt) })}
+            continueLabel={t("继续编辑")}
             onContinue={restoreRecoveredTaskDraft}
             onDiscard={discardRecoveredTaskDraft}
           />
@@ -10545,13 +10543,11 @@ export default function HomePage() {
           <DraftRecoveryNotice
             id="artifact-draft-recovery"
             icon={FileText}
-            title="发现未完成的成果修订"
-            description={`成果修订：${
-              pendingArtifactDraftRecovery.draft.title.trim() || "未命名成果"
-            } · 保存于 ${formatDraftSavedAt(
+            title={t("发现未完成的成果修订")}
+            description={t("成果修订：{value} · 保存于 {formatDraftSavedAt}", { value: pendingArtifactDraftRecovery.draft.title.trim() || t("未命名成果"), formatDraftSavedAt: formatDraftSavedAt(
               pendingArtifactDraftRecovery.savedAt,
-            )}`}
-            continueLabel="继续修订"
+            ) })}
+            continueLabel={t("继续修订")}
             onContinue={restoreRecoveredArtifactDraft}
             onDiscard={discardRecoveredArtifactDraft}
           />
@@ -10571,29 +10567,29 @@ export default function HomePage() {
               >
                 <div className="workspace-onboarding-intro">
                   <header>
-                    <span>首次设置 · 示例工作区</span>
-                    <strong>
-                      {onboardingCompletedCount}/{onboardingSteps.length} 已完成
-                    </strong>
+                    <span>{t("首次设置 · 示例工作区")}</span>
+                    <strong>{t("{onboardingCompletedCount}/{length} 已完成", { onboardingCompletedCount, length: onboardingSteps.length })}</strong>
                   </header>
                   <button
                     className="workspace-onboarding-dismiss"
                     type="button"
-                    aria-label="关闭首次设置"
+                    aria-label={t("关闭首次设置")}
                     onClick={() => dismissOnboarding()}
                   >
                     <X size={16} />
                   </button>
                   <h2 id="workspace-onboarding-title">
-                    把这里变成你的 AI 工作区
+                    
+                    {t("把这里变成你的 AI 工作区")}
                   </h2>
                   <p>
-                    当前任务用于展示产品能力。完成下面的设置，再运行属于你的真实任务。
+                    
+                    {t("当前任务用于展示产品能力。完成下面的设置，再运行属于你的真实任务。")}
                   </p>
                   <div
                     className="workspace-onboarding-progress"
                     role="progressbar"
-                    aria-label="首次设置进度"
+                    aria-label={t("首次设置进度")}
                     aria-valuemin={0}
                     aria-valuemax={onboardingSteps.length}
                     aria-valuenow={onboardingCompletedCount}
@@ -10621,19 +10617,21 @@ export default function HomePage() {
                       ) : (
                         <>
                           <Check size={15} />
-                          完成设置
+                          
+                          {t("完成设置")}
                         </>
                       )}
                     </button>
                     <button type="button" onClick={() => dismissOnboarding()}>
-                      稍后处理
+                      
+                      {t("稍后处理")}
                     </button>
                   </div>
                 </div>
 
                 <div
                   className="workspace-onboarding-steps"
-                  aria-label="首次设置步骤"
+                  aria-label={t("首次设置步骤")}
                 >
                   {onboardingSteps.map((step) => {
                     const StepIcon = step.icon;
@@ -10645,9 +10643,7 @@ export default function HomePage() {
                         }`}
                         key={step.id}
                         type="button"
-                        aria-label={`${step.label}，${
-                          step.complete ? "已完成" : step.actionLabel
-                        }`}
+                        aria-label={t("{label}，{value}", { label: step.label, value: step.complete ? "已完成" : step.actionLabel })}
                         onClick={() => runOnboardingStep(step.id)}
                       >
                         <span>
@@ -10671,16 +10667,16 @@ export default function HomePage() {
               </section>
             )}
 
-            <div className="home-summary" aria-label="今日概览">
+            <div className="home-summary" aria-label={t("今日概览")}>
               <button
                 className="summary-running"
                 type="button"
-                aria-label={`查看 ${runningTaskCount} 个正在运行的任务`}
+                aria-label={t("查看 {runningTaskCount} 个正在运行的任务", { runningTaskCount })}
                 onClick={() => openTaskStatus("运行中")}
               >
                 <i><Play size={14} /></i>
                 <span>
-                  <small>正在运行</small>
+                  <small>{t("正在运行")}</small>
                   <strong>{runningTaskCount}</strong>
                 </span>
                 <ChevronRight className="summary-open-icon" size={14} />
@@ -10688,12 +10684,12 @@ export default function HomePage() {
               <button
                 className="summary-waiting"
                 type="button"
-                aria-label={`查看 ${activeApprovalCount} 项待确认操作`}
+                aria-label={t("查看 {activeApprovalCount} 项待确认操作", { activeApprovalCount })}
                 onClick={openApprovalQueue}
               >
                 <i><ShieldCheck size={14} /></i>
                 <span>
-                  <small>等待确认</small>
+                  <small>{t("等待确认")}</small>
                   <strong>{activeApprovalCount}</strong>
                 </span>
                 <ChevronRight className="summary-open-icon" size={14} />
@@ -10701,12 +10697,12 @@ export default function HomePage() {
               <button
                 className="summary-failed"
                 type="button"
-                aria-label={`查看 ${failedTaskCount} 个需要恢复的任务`}
+                aria-label={t("查看 {failedTaskCount} 个需要恢复的任务", { failedTaskCount })}
                 onClick={() => openTaskStatus("失败")}
               >
                 <i><AlertTriangle size={14} /></i>
                 <span>
-                  <small>需要恢复</small>
+                  <small>{t("需要恢复")}</small>
                   <strong>{failedTaskCount}</strong>
                 </span>
                 <ChevronRight className="summary-open-icon" size={14} />
@@ -10714,12 +10710,12 @@ export default function HomePage() {
               <button
                 className="summary-done"
                 type="button"
-                aria-label={`查看 ${completedTaskCount} 个已完成任务`}
+                aria-label={t("查看 {completedTaskCount} 个已完成任务", { completedTaskCount })}
                 onClick={() => openTaskStatus("已完成")}
               >
                 <i><CheckCircle2 size={14} /></i>
                 <span>
-                  <small>已完成</small>
+                  <small>{t("已完成")}</small>
                   <strong>{completedTaskCount}</strong>
                 </span>
                 <ChevronRight className="summary-open-icon" size={14} />
@@ -10736,20 +10732,20 @@ export default function HomePage() {
                   onCreate={beginCreateTask}
                 />
               ) : (
-                <section className="active-task-panel" aria-label="正在运行的任务">
+                <section className="active-task-panel" aria-label={t("正在运行的任务")}>
                   <div className="task-ai-hero">
                     <div className="task-ai-copy">
                       <div className="focus-panel-heading">
                         <div>
                           <span>
                             {formatTaskSchedule(primaryTask)} ·{" "}
-                            {isRunning ? "正在运行" : "已暂停"}
+                            {isRunning ? t("正在运行") : t("已暂停")}
                           </span>
                           <strong>{primaryTask.title}</strong>
                         </div>
                         <span className={`live-state ${isRunning ? "" : "paused"}`}>
                           <i />
-                          {isRunning ? "运行中" : "已暂停"}
+                          {t(isRunning ? "运行中" : "已暂停")}
                         </span>
                       </div>
 
@@ -10757,32 +10753,32 @@ export default function HomePage() {
                         {primaryTask.description}
                       </p>
 
-                      <div className="task-ai-context" aria-label="AI 当前状态">
-                        <span><Brain size={15} /> Codex 推理</span>
+                      <div className="task-ai-context" aria-label={t("AI 当前状态")}>
+                        <span><Brain size={15} />  {t("Codex 推理")}</span>
                         <i />
-                        <span><ShieldCheck size={15} /> 可审计执行</span>
+                        <span><ShieldCheck size={15} />  {t("可审计执行")}</span>
                       </div>
                     </div>
 
-                    <div className="task-ai-visual" aria-label="AI 正在整合网页证据">
+                    <div className="task-ai-visual" aria-label={t("AI 正在整合网页证据")}>
                       {/* The source WebP is already optimized; vinext has no Next image proxy. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src="/ai-core-premium.webp" alt="" aria-hidden="true" />
                       <span className="task-ai-visual-status">
                         <Sparkles size={15} />
                         <span>
-                          <small>AI 引擎实况</small>
-                          <strong>正在整合 12 份页面证据</strong>
+                          <small>{t("AI 引擎实况")}</small>
+                          <strong>{t("正在整合 12 份页面证据")}</strong>
                         </span>
                       </span>
                     </div>
                   </div>
 
-                  <div className="task-signal-band" aria-label="今日任务信号">
+                  <div className="task-signal-band" aria-label={t("今日任务信号")}>
                     <div className="signal-metric">
-                      <span>今天发现</span>
+                      <span>{t("今天发现")}</span>
                       <strong>4</strong>
-                      <small>处页面变化</small>
+                      <small>{t("处页面变化")}</small>
                     </div>
                     <div className="signal-chart" aria-hidden="true">
                       <svg viewBox="0 0 100 50" preserveAspectRatio="none">
@@ -10792,20 +10788,20 @@ export default function HomePage() {
                       </svg>
                       <span>
                         <small>09:00</small>
-                        <small>现在</small>
+                        <small>{t("现在")}</small>
                       </span>
                     </div>
                     <div className="signal-metric">
-                      <span>保存证据</span>
+                      <span>{t("保存证据")}</span>
                       <strong>12</strong>
-                      <small>张页面截图</small>
+                      <small>{t("张页面截图")}</small>
                     </div>
                   </div>
 
                   <div className="simple-progress">
                     <div>
-                      <span>已完成 2 / 3 步</span>
-                      <strong>{isRunning ? `${primaryTask.progress}%` : "暂停"}</strong>
+                      <span>{t("已完成 2 / 3 步")}</span>
+                      <strong>{isRunning ? `${primaryTask.progress}%` : t("暂停")}</strong>
                     </div>
                     <span>
                       <i
@@ -10843,14 +10839,14 @@ export default function HomePage() {
                       {selectedStep === "send" && <Mail size={19} />}
                     </div>
                     <div>
-                      <span>当前查看</span>
+                      <span>{t("当前查看")}</span>
                       <strong>
                         {runSteps.find((step) => step.id === selectedStep)?.title}
                       </strong>
                       <small>
-                        {selectedStep === "collect" && "网页已经检查完成，截图和页面内容均已保存。"}
-                        {selectedStep === "analyze" && "正在提取真正有意义的变化，预计还需要 2 分钟。"}
-                        {selectedStep === "send" && "摘要已经准备好，确认收件人后才能发送。"}
+                        {selectedStep === "collect" && t("网页已经检查完成，截图和页面内容均已保存。")}
+                        {selectedStep === "analyze" && t("正在提取真正有意义的变化，预计还需要 2 分钟。")}
+                        {selectedStep === "send" && t("摘要已经准备好，确认收件人后才能发送。")}
                       </small>
                     </div>
                     <button
@@ -10858,25 +10854,27 @@ export default function HomePage() {
                       onClick={togglePrimaryTask}
                     >
                       {isRunning ? <Pause size={15} /> : <Play size={15} />}
-                      {isRunning ? "暂停" : "继续"}
+                      {(isRunning ? t("暂停") : t("继续"))}
                     </button>
                   </div>
 
                   <footer className="task-tools">
-                    <span>本次使用</span>
-                    <span><Globe2 size={14} /> 浏览器</span>
+                    <span>{t("本次使用")}</span>
+                    <span><Globe2 size={14} />  {t("浏览器")}</span>
                     <span><Brain size={14} /> Codex</span>
-                    <span><Mail size={14} /> 邮件</span>
+                    <span><Mail size={14} />  {t("邮件")}</span>
                     <div className="task-tools-actions">
                       <button
                         type="button"
                         onClick={() => openTaskArtifacts(primaryTask.id)}
                       >
                         <Files size={14} />
-                        查看成果
+                        
+                        {t("查看成果")}
                       </button>
                       <button type="button" onClick={() => openView("activity")}>
-                        完整记录
+                        
+                        {t("完整记录")}
                         <ChevronRight size={14} />
                       </button>
                     </div>
@@ -10884,9 +10882,9 @@ export default function HomePage() {
                 </section>
               )}
 
-              <aside className="needs-action-panel" aria-label="需要你确认">
+              <aside className="needs-action-panel" aria-label={t("需要你确认")}>
                 <div className="attention-heading">
-                  <span>需要你处理</span>
+                  <span>{t("需要你处理")}</span>
                   <strong>{activeApprovalCount}</strong>
                 </div>
 
@@ -10901,13 +10899,13 @@ export default function HomePage() {
                     {selectedApproval.id === "send-summary" && (
                       <div className="recipient-preview">
                         <div>
-                          <span>刘</span>
-                          <span>王</span>
-                          <span>陈</span>
+                          <span>{t("刘")}</span>
+                          <span>{t("王")}</span>
+                          <span>{t("陈")}</span>
                         </div>
                         <p>
-                          <strong>领导沟通群</strong>
-                          <small>3 位成员将看到这份摘要</small>
+                          <strong>{t("领导沟通群")}</strong>
+                          <small>{t("3 位成员将看到这份摘要")}</small>
                         </p>
                       </div>
                     )}
@@ -10915,24 +10913,24 @@ export default function HomePage() {
                     <div className="plain-impact">
                       <ShieldCheck size={17} />
                       <span>
-                        <strong>确认后会发生什么</strong>
+                        <strong>{t("确认后会发生什么")}</strong>
                         <small>{selectedApproval.impact}</small>
                       </span>
                     </div>
 
-                    <div className="decision-boundary" aria-label="本次操作边界">
+                    <div className="decision-boundary" aria-label={t("本次操作边界")}>
                       <span>
-                        <small>执行对象</small>
+                        <small>{t("执行对象")}</small>
                         <strong>{selectedApproval.target}</strong>
                       </span>
                       <span>
-                        <small>影响范围</small>
+                        <small>{t("影响范围")}</small>
                         <strong>{selectedApproval.scope}</strong>
                       </span>
                       <span>
-                        <small>风险等级</small>
+                        <small>{t("风险等级")}</small>
                         <strong className={`approval-risk risk-${selectedApproval.risk}`}>
-                          {selectedApproval.risk}
+                          {t(selectedApproval.risk)}
                         </strong>
                       </span>
                     </div>
@@ -10948,9 +10946,10 @@ export default function HomePage() {
                         }
                       >
                         <ShieldCheck size={16} />
-                        查看并确认
+                        
+                        {t("查看并确认")}
                       </button>
-                      <button type="button" onClick={holdCurrent}>稍后处理</button>
+                      <button type="button" onClick={holdCurrent}>{t("稍后处理")}</button>
                     </div>
 
                     <button
@@ -10958,7 +10957,8 @@ export default function HomePage() {
                       type="button"
                       onClick={() => openView("approvals")}
                     >
-                      查看全部待确认操作
+                      
+                      {t("查看全部待确认操作")}
                       <ChevronRight size={15} />
                     </button>
                   </>
@@ -10970,14 +10970,14 @@ export default function HomePage() {
                       <CheckCircle2 size={28} />
                     )}
                     <strong>
-                      {deferredApprovalCount > 0
-                        ? "当前待办已经清空"
-                        : "暂时没有需要处理的事"}
+                      {t(deferredApprovalCount > 0
+                        ? t("当前待办已经清空")
+                        : t("暂时没有需要处理的事"))}
                     </strong>
                     <p>
                       {deferredApprovalCount > 0
-                        ? `${deferredApprovalCount} 项操作会在安排的时间重新提醒。`
-                        : "任务会继续在后台运行。"}
+                        ? t("{deferredApprovalCount} 项操作会在安排的时间重新提醒。", { deferredApprovalCount })
+                        : t("任务会继续在后台运行。")}
                     </p>
                     {deferredApprovalCount > 0 && (
                       <button
@@ -10988,7 +10988,8 @@ export default function HomePage() {
                           })
                         }
                       >
-                        查看稍后提醒
+                        
+                        {t("查看稍后提醒")}
                         <ChevronRight size={14} />
                       </button>
                     )}
@@ -11000,11 +11001,12 @@ export default function HomePage() {
             <section className="recent-section">
               <div className="section-title-row">
                 <div>
-                  <span>最近任务</span>
-                  <h2>你交给 Unzoo One 的工作</h2>
+                  <span>{t("最近任务")}</span>
+                  <h2>{t("你交给 Unzoo One 的工作")}</h2>
                 </div>
                 <button type="button" onClick={() => openView("tasks")}>
-                  查看全部
+                  
+                  {t("查看全部")}
                   <ChevronRight size={15} />
                 </button>
               </div>
@@ -11025,7 +11027,7 @@ export default function HomePage() {
                     </span>
                     <span className="recent-task-copy">
                       <span className="recent-task-topline">
-                        <em className={`status-label status-${task.status}`}>{task.status}</em>
+                        <em className={`status-label status-${task.status}`}>{t(task.status)}</em>
                         <small>{task.updated}</small>
                       </span>
                       <strong>{task.title}</strong>
@@ -11048,7 +11050,7 @@ export default function HomePage() {
         {activeView === "tasks" && (
           <section className="tasks-view">
             <div className="view-toolbar">
-              <div className="view-filter-tabs" role="tablist" aria-label="任务筛选">
+              <div className="view-filter-tabs" role="tablist" aria-label={t("任务筛选")}>
                 {taskFilters.map((filter) => (
                   <button
                     className={taskFilter === filter ? "active" : ""}
@@ -11058,7 +11060,7 @@ export default function HomePage() {
                     aria-selected={taskFilter === filter}
                     onClick={() => chooseTaskFilter(filter)}
                   >
-                    <span>{filter}</span>
+                    <span>{t(filter)}</span>
                     <em>{taskFilterCounts[filter]}</em>
                   </button>
                 ))}
@@ -11069,7 +11071,8 @@ export default function HomePage() {
                 onClick={beginCreateTask}
               >
                 <Plus size={16} />
-                新建任务
+                
+                {t("新建任务")}
               </button>
             </div>
 
@@ -11078,16 +11081,16 @@ export default function HomePage() {
                 <Search size={16} />
                 <input
                   type="search"
-                  aria-label="搜索任务列表"
+                  aria-label={t("搜索任务列表")}
                   autoComplete="off"
-                  placeholder="搜索名称、来源或运行计划"
+                  placeholder={t("搜索名称、来源或运行计划")}
                   value={taskListQuery}
                   onChange={(event) => setTaskListQuery(event.target.value)}
                 />
                 {taskListQuery && (
                   <button
                     type="button"
-                    aria-label="清除任务搜索"
+                    aria-label={t("清除任务搜索")}
                     onClick={() => setTaskListQuery("")}
                   >
                     <X size={14} />
@@ -11097,15 +11100,15 @@ export default function HomePage() {
 
               <label className="task-sort-control">
                 <ArrowUpDown size={15} />
-                <span>排序</span>
+                <span>{t("排序")}</span>
                 <select
-                  aria-label="任务排序"
+                  aria-label={t("任务排序")}
                   value={taskSort}
                   onChange={(event) => setTaskSort(event.target.value as TaskSort)}
                 >
-                  <option value="状态优先">状态优先</option>
-                  <option value="进度最高">进度最高</option>
-                  <option value="名称">名称</option>
+                  <option value={t("状态优先")}>{t("状态优先")}</option>
+                  <option value={t("进度最高")}>{t("进度最高")}</option>
+                  <option value={t("名称")}>{t("名称")}</option>
                 </select>
               </label>
 
@@ -11114,23 +11117,24 @@ export default function HomePage() {
                   <button
                     className="task-filter-context"
                     type="button"
-                    aria-label={`清除${taskFilter}筛选`}
+                    aria-label={t("清除{taskFilter}筛选", { taskFilter: t(taskFilter) })}
                     onClick={() => chooseTaskFilter("全部")}
                   >
                     <ListChecks size={13} />
-                    <span>{taskFilter}</span>
+                    <span>{t(taskFilter)}</span>
                     <X size={12} />
                   </button>
                 )}
                 <span className="task-result-count" aria-live="polite">
-                  显示 <strong>{filteredTasks.length}</strong> / {tasks.length} 个任务
+                  
+                  {t("显示")} <strong>{filteredTasks.length}</strong> / {tasks.length}  {t("个任务")}
                 </span>
                 <button
                   className="view-link-copy"
                   type="button"
-                  aria-label="复制当前任务视图链接"
-                  title="复制当前任务视图链接"
-                  onClick={() => copyCurrentViewLink("任务视图链接")}
+                  aria-label={t("复制当前任务视图链接")}
+                  title={t("复制当前任务视图链接")}
+                  onClick={() => copyCurrentViewLink(t("任务视图链接"))}
                 >
                   <Link2 size={14} />
                 </button>
@@ -11141,18 +11145,18 @@ export default function HomePage() {
               <section
                 className="task-bulk-bar"
                 role="toolbar"
-                aria-label="批量任务操作"
+                aria-label={t("批量任务操作")}
               >
                 <div className="task-bulk-summary">
                   <span>
                     <CheckCircle2 size={17} />
                   </span>
                   <span>
-                    <strong>已选择 {selectedTasks.length} 个任务</strong>
+                    <strong>{t("已选择 {length} 个任务", { length: selectedTasks.length })}</strong>
                     <small>
                       {selectedVisibleTaskCount === selectedTasks.length
-                        ? "操作只会影响当前选择"
-                        : `其中 ${selectedVisibleTaskCount} 个在当前筛选中`}
+                        ? t("操作只会影响当前选择")
+                        : t("其中 {selectedVisibleTaskCount} 个在当前筛选中", { selectedVisibleTaskCount })}
                     </small>
                   </span>
                 </div>
@@ -11163,7 +11167,7 @@ export default function HomePage() {
                     onClick={toggleAllVisibleTasks}
                   >
                     <ListChecks size={15} />
-                    {allVisibleTasksSelected ? "取消全选" : "全选当前"}
+                    {(allVisibleTasksSelected ? t("取消全选") : t("全选当前"))}
                   </button>
                   <button
                     type="button"
@@ -11171,7 +11175,8 @@ export default function HomePage() {
                     onClick={bulkPauseTasks}
                   >
                     <Pause size={15} />
-                    暂停
+                    
+                    {t("暂停")}
                   </button>
                   <button
                     className={!isOnline ? "is-network-paused" : undefined}
@@ -11179,11 +11184,11 @@ export default function HomePage() {
                     disabled={resumableSelectedTaskCount === 0}
                     onClick={bulkResumeTasks}
                     title={
-                      isOnline ? undefined : "恢复网络后可以继续所选任务"
+                      isOnline ? undefined : t("恢复网络后可以继续所选任务")
                     }
                   >
                     {isOnline ? <Play size={15} /> : <Globe2 size={15} />}
-                    {isOnline ? "继续" : "联网后继续"}
+                    {(isOnline ? t("继续") : t("联网后继续"))}
                   </button>
                   <button
                     type="button"
@@ -11191,7 +11196,8 @@ export default function HomePage() {
                     onClick={bulkEnableApproval}
                   >
                     <ShieldCheck size={15} />
-                    开启审批
+                    
+                    {t("开启审批")}
                   </button>
                   <button
                     className="danger"
@@ -11200,13 +11206,14 @@ export default function HomePage() {
                     onClick={requestBulkDelete}
                   >
                     <Trash2 size={15} />
-                    删除
+                    
+                    {t("删除")}
                   </button>
                   <button
                     className="task-bulk-clear"
                     type="button"
-                    aria-label="清除任务选择"
-                    title="清除选择"
+                    aria-label={t("清除任务选择")}
+                    title={t("清除选择")}
                     onClick={() => setSelectedTaskIds([])}
                   >
                     <X size={16} />
@@ -11220,7 +11227,7 @@ export default function HomePage() {
                 <label className="task-selection-control task-select-all">
                   <input
                     type="checkbox"
-                    aria-label="选择当前筛选中的全部任务"
+                    aria-label={t("选择当前筛选中的全部任务")}
                     checked={allVisibleTasksSelected}
                     ref={(input) => {
                       if (input) {
@@ -11235,10 +11242,10 @@ export default function HomePage() {
                     <Check size={13} />
                   </span>
                 </label>
-                <span>任务</span>
-                <span>状态</span>
-                <span>进度</span>
-                <span>最后更新</span>
+                <span>{t("任务")}</span>
+                <span>{t("状态")}</span>
+                <span>{t("进度")}</span>
+                <span>{t("最后更新")}</span>
                 <span />
               </div>
               {filteredTasks.map((task) => (
@@ -11251,7 +11258,7 @@ export default function HomePage() {
                   <label className="task-selection-control">
                     <input
                       type="checkbox"
-                      aria-label={`选择任务：${task.title}`}
+                      aria-label={t("选择任务：{title}", { title: task.title })}
                       checked={selectedTaskIds.includes(task.id)}
                       onChange={() => toggleTaskSelection(task.id)}
                     />
@@ -11262,16 +11269,17 @@ export default function HomePage() {
                   <button
                     className="task-table-row"
                     type="button"
-                    aria-label={`打开任务：${task.title}`}
+                    aria-label={t("打开任务：{title}", { title: task.title })}
                     onClick={() => openTask(task.id)}
                   >
                   <span className="task-table-title">
                     <span className="task-table-title-line">
                       <strong>{task.title}</strong>
                       {task.pinned && (
-                        <em title="首页主任务">
+                        <em title={t("首页主任务")}>
                           <Pin size={11} />
-                          首页任务
+                          
+                          {t("首页任务")}
                         </em>
                       )}
                     </span>
@@ -11295,7 +11303,7 @@ export default function HomePage() {
                       {formatTaskSchedule(task)}
                     </small>
                   </span>
-                  <em className={`status-label status-${task.status}`}>{task.status}</em>
+                  <em className={`status-label status-${task.status}`}>{t(task.status)}</em>
                   <span className="table-progress">
                     <i><b style={{ width: `${task.progress}%` }} /></i>
                     <small>{task.progress}%</small>
@@ -11310,13 +11318,13 @@ export default function HomePage() {
                   <Search size={22} />
                   <strong>
                     {taskListQuery.trim()
-                      ? `没有找到“${taskListQuery.trim()}”`
-                      : "这个状态下还没有任务"}
+                      ? t("没有找到“{trim}”", { trim: taskListQuery.trim() })
+                      : t("这个状态下还没有任务")}
                   </strong>
                   <p>
-                    {taskListQuery.trim()
-                      ? "可以搜索任务名称、来源地址或运行计划。"
-                      : "切换状态筛选，查看其他任务。"}
+                    {t(taskListQuery.trim()
+                      ? t("可以搜索任务名称、来源地址或运行计划。")
+                      : t("切换状态筛选，查看其他任务。"))}
                   </p>
                   <button
                     type="button"
@@ -11328,7 +11336,7 @@ export default function HomePage() {
                       }
                     }}
                   >
-                    {taskListQuery.trim() ? "清除搜索" : "查看全部任务"}
+                    {t(taskListQuery.trim() ? t("清除搜索") : t("查看全部任务"))}
                   </button>
                 </div>
               )}
@@ -11346,26 +11354,30 @@ export default function HomePage() {
                       <ShieldCheck size={20} />
                     </span>
                     <div>
-                      <small>审批收件箱</small>
-                      <strong>{activeApprovalCount} 项操作等待决定</strong>
+                      <small>{t("审批收件箱")}</small>
+                      <strong>{t("{activeApprovalCount} 项操作等待决定", { activeApprovalCount })}</strong>
                     </div>
-                    <div className="approval-risk-summary" aria-label="待确认风险分布">
+                    <div className="approval-risk-summary" aria-label={t("待确认风险分布")}>
                       <span>
                         <i className="risk-dot high" />
-                        高风险 {approvalRiskCounts["高风险"]}
+                        
+                        {t("高风险")} {approvalRiskCounts["高风险"]}
                       </span>
                       <span>
                         <i className="risk-dot medium" />
-                        中风险 {approvalRiskCounts["中风险"]}
+                        
+                        {t("中风险")} {approvalRiskCounts["中风险"]}
                       </span>
                       <span>
                         <i className="risk-dot low" />
-                        低风险 {approvalRiskCounts["低风险"]}
+                        
+                        {t("低风险")} {approvalRiskCounts["低风险"]}
                       </span>
                       {deferredApprovalCount > 0 && (
                         <span className="is-deferred">
                           <Clock3 size={12} />
-                          稍后 {deferredApprovalCount}
+                          
+                          {t("稍后")} {deferredApprovalCount}
                         </span>
                       )}
                     </div>
@@ -11375,9 +11387,9 @@ export default function HomePage() {
                       <Search size={16} />
                       <input
                         type="search"
-                        aria-label="搜索待确认操作"
+                        aria-label={t("搜索待确认操作")}
                         autoComplete="off"
-                        placeholder="搜索操作、对象或关联任务"
+                        placeholder={t("搜索操作、对象或关联任务")}
                         value={approvalListQuery}
                         onChange={(event) =>
                           setApprovalListQuery(event.target.value)
@@ -11386,7 +11398,7 @@ export default function HomePage() {
                       {approvalListQuery && (
                         <button
                           type="button"
-                          aria-label="清除审批搜索"
+                          aria-label={t("清除审批搜索")}
                           onClick={() => setApprovalListQuery("")}
                         >
                           <X size={14} />
@@ -11396,7 +11408,7 @@ export default function HomePage() {
                     <div
                       className="approval-risk-filters"
                       role="tablist"
-                      aria-label="审批风险筛选"
+                      aria-label={t("审批风险筛选")}
                     >
                       {approvalRiskFilters.map((filter) => (
                         <button
@@ -11408,24 +11420,20 @@ export default function HomePage() {
                           onClick={() => chooseApprovalRiskFilter(filter)}
                         >
                           {filter === "稍后" && <Clock3 size={13} />}
-                          {filter}
+                          {t(filter)}
                           <span>{approvalRiskCounts[filter]}</span>
                         </button>
                       ))}
                     </div>
                     <div className="approval-result-meta">
-                      <span className="approval-result-count" aria-live="polite">
-                        显示 {filteredApprovals.length} /{" "}
-                        {approvalRiskFilter === "稍后"
+                      <span className="approval-result-count" aria-live="polite">{t("显示 {length} /{value}{value2}{value3}项", { length: filteredApprovals.length, value: " ", value2: approvalRiskFilter === "稍后"
                           ? deferredApprovalCount
-                          : activeApprovalCount}{" "}
-                        项
-                      </span>
+                          : activeApprovalCount, value3: " " })}</span>
                       <button
                         className="view-link-copy"
                         type="button"
-                        aria-label="复制当前审批链接"
-                        title="复制当前审批链接"
+                        aria-label={t("复制当前审批链接")}
+                        title={t("复制当前审批链接")}
                         onClick={() =>
                           selectedApproval && copyApprovalLink(selectedApproval)
                         }
@@ -11440,18 +11448,18 @@ export default function HomePage() {
                   <section
                     className="approval-bulk-bar"
                     role="toolbar"
-                    aria-label="批量审批操作"
+                    aria-label={t("批量审批操作")}
                   >
                     <div className="approval-bulk-summary">
                       <span>
                         <ListChecks size={17} />
                       </span>
                       <span>
-                        <strong>已选择 {selectedApprovals.length} 项操作</strong>
+                        <strong>{t("已选择 {length} 项操作", { length: selectedApprovals.length })}</strong>
                         <small>
                           {selectedHighRiskApprovalCount
-                            ? `${selectedHighRiskApprovalCount} 项高风险操作只能逐项批准`
-                            : `涉及 ${selectedApprovalTaskCount} 个任务`}
+                            ? t("{selectedHighRiskApprovalCount} 项高风险操作只能逐项批准", { selectedHighRiskApprovalCount })
+                            : t("涉及 {selectedApprovalTaskCount} 个任务", { selectedApprovalTaskCount })}
                         </small>
                       </span>
                     </div>
@@ -11462,7 +11470,7 @@ export default function HomePage() {
                         onClick={toggleAllVisibleApprovals}
                       >
                         <ListChecks size={15} />
-                        {allVisibleApprovalsSelected ? "取消全选" : "全选当前"}
+                        {(allVisibleApprovalsSelected ? t("取消全选") : t("全选当前"))}
                       </button>
                       <button
                         className="approve"
@@ -11471,7 +11479,8 @@ export default function HomePage() {
                         onClick={() => requestBulkApprovalDecision("approve")}
                       >
                         <Check size={15} />
-                        批量批准
+                        
+                        {t("批量批准")}
                         {bulkApprovableApprovals.length > 0 &&
                           ` ${bulkApprovableApprovals.length}`}
                       </button>
@@ -11481,13 +11490,14 @@ export default function HomePage() {
                         onClick={() => requestBulkApprovalDecision("reject")}
                       >
                         <Ban size={15} />
-                        批量拒绝 {selectedApprovals.length}
+                        
+                        {t("批量拒绝")} {selectedApprovals.length}
                       </button>
                       <button
                         className="approval-bulk-clear"
                         type="button"
-                        aria-label="清除审批选择"
-                        title="清除选择"
+                        aria-label={t("清除审批选择")}
+                        title={t("清除选择")}
                         onClick={() => setSelectedApprovalIds([])}
                       >
                         <X size={16} />
@@ -11509,7 +11519,7 @@ export default function HomePage() {
                       <label className="approval-selection-control approval-select-all">
                         <input
                           type="checkbox"
-                          aria-label="选择当前筛选中的全部审批"
+                          aria-label={t("选择当前筛选中的全部审批")}
                           checked={allVisibleApprovalsSelected}
                           ref={(input) => {
                             if (input) {
@@ -11526,9 +11536,9 @@ export default function HomePage() {
                       </label>
                     )}
                     <span>
-                      {approvalRiskFilter === "稍后" ? "稍后提醒" : "审批队列"}
+                      {t(approvalRiskFilter === "稍后" ? t("稍后提醒") : t("审批队列"))}
                     </span>
-                    <strong>{filteredApprovals.length} 项</strong>
+                    <strong>{t("{length} 项", { length: filteredApprovals.length })}</strong>
                   </div>
                   {filteredApprovals.map((item) => (
                     <div
@@ -11550,7 +11560,7 @@ export default function HomePage() {
                         <label className="approval-selection-control">
                           <input
                             type="checkbox"
-                            aria-label={`选择审批：${item.title}`}
+                            aria-label={t("选择审批：{title}", { title: item.title })}
                             checked={selectedApprovalIds.includes(item.id)}
                             onChange={() => toggleApprovalSelection(item.id)}
                           />
@@ -11563,7 +11573,7 @@ export default function HomePage() {
                         className="approval-queue-main"
                         type="button"
                         aria-pressed={selectedApproval?.id === item.id}
-                        aria-label={`查看审批：${item.title}`}
+                        aria-label={t("查看审批：{title}", { title: item.title })}
                         onClick={() => chooseApproval(item.id)}
                       >
                         <item.icon size={17} />
@@ -11571,15 +11581,15 @@ export default function HomePage() {
                           <span className="approval-queue-topline">
                             <strong>{item.title}</strong>
                             <em className={`approval-risk risk-${item.risk}`}>
-                              {item.risk}
+                              {t(item.risk)}
                             </em>
                           </span>
                           <small>
                             {deferredApprovalIds.has(item.id)
-                              ? `${formatApprovalDeferredUntil(
+                              ? t("{formatApprovalDeferredUntil} 重新提醒", { formatApprovalDeferredUntil: formatApprovalDeferredUntil(
                                   approvalDeferrals[item.id],
                                   approvalClock,
-                                )} 重新提醒`
+                                ) })
                               : `${item.target} · ${item.requestedAt}`}
                           </small>
                         </span>
@@ -11597,18 +11607,18 @@ export default function HomePage() {
                         <Search size={22} />
                       )}
                       <strong>
-                        {approvalRiskFilter === "稍后"
-                          ? "没有安排稍后提醒的操作"
+                        {t(approvalRiskFilter === "稍后"
+                          ? t("没有安排稍后提醒的操作")
                           : activeApprovalCount === 0
-                            ? "当前没有需要立即处理的操作"
-                            : "没有匹配的待确认操作"}
+                            ? t("当前没有需要立即处理的操作")
+                            : t("没有匹配的待确认操作"))}
                       </strong>
                       <small>
                         {approvalRiskFilter === "稍后"
-                          ? "使用“稍后处理”后，操作会在这里显示并按时重新提醒。"
+                          ? t("使用“稍后处理”后，操作会在这里显示并按时重新提醒。")
                           : activeApprovalCount === 0 && deferredApprovalCount > 0
-                            ? `${deferredApprovalCount} 项操作已安排稍后提醒，期间不会执行外部动作。`
-                            : "换一个关键词或风险等级，待确认操作不会被移除。"}
+                            ? t("{deferredApprovalCount} 项操作已安排稍后提醒，期间不会执行外部动作。", { deferredApprovalCount })
+                            : t("换一个关键词或风险等级，待确认操作不会被移除。")}
                       </small>
                       <button
                         type="button"
@@ -11622,9 +11632,9 @@ export default function HomePage() {
                           );
                         }}
                       >
-                        {activeApprovalCount === 0 && deferredApprovalCount > 0
-                          ? "查看稍后提醒"
-                          : "清除筛选"}
+                        {t(activeApprovalCount === 0 && deferredApprovalCount > 0
+                          ? t("查看稍后提醒")
+                          : t("清除筛选"))}
                       </button>
                     </div>
                   )}
@@ -11640,14 +11650,14 @@ export default function HomePage() {
                           ) : (
                             <ShieldCheck size={15} />
                           )}
-                          {selectedApprovalIsDeferred
-                            ? "已安排稍后处理"
-                            : "等待你的确认"}
+                          {t(selectedApprovalIsDeferred
+                            ? t("已安排稍后处理")
+                            : t("等待你的确认"))}
                         </span>
                         <em
                           className={`approval-risk risk-${selectedApproval.risk}`}
                         >
-                          {selectedApproval.risk}
+                          {t(selectedApproval.risk)}
                         </em>
                       </div>
                       <h2>{selectedApproval.title}</h2>
@@ -11662,15 +11672,13 @@ export default function HomePage() {
                         >
                           <Clock3 size={18} />
                           <span>
-                            <strong>
-                              {formatApprovalDeferredUntil(
+                            <strong>{t("{formatApprovalDeferredUntil}{value}重新提醒", { formatApprovalDeferredUntil: formatApprovalDeferredUntil(
                                 selectedApprovalDeferredUntil,
                                 approvalClock,
-                              )}{" "}
-                              重新提醒
-                            </strong>
+                              ), value: " " })}</strong>
                             <small>
-                              到期前不会执行这项操作，也不会计入当前待办。
+                              
+                              {t("到期前不会执行这项操作，也不会计入当前待办。")}
                             </small>
                           </span>
                         </div>
@@ -11680,7 +11688,7 @@ export default function HomePage() {
                       <div>
                         <Link2 size={16} />
                         <span>
-                          <small>关联任务</small>
+                          <small>{t("关联任务")}</small>
                           <button
                             type="button"
                             onClick={() => openTask(selectedApproval.taskId)}
@@ -11694,21 +11702,21 @@ export default function HomePage() {
                       <div>
                         <selectedApproval.icon size={16} />
                         <span>
-                          <small>执行对象</small>
+                          <small>{t("执行对象")}</small>
                           <strong>{selectedApproval.target}</strong>
                         </span>
                       </div>
                       <div>
                         <ShieldCheck size={16} />
                         <span>
-                          <small>授权范围</small>
+                          <small>{t("授权范围")}</small>
                           <strong>{selectedApproval.scope}</strong>
                         </span>
                       </div>
                       <div>
                         <Timer size={16} />
                         <span>
-                          <small>请求时间 · 失效时间</small>
+                          <small>{t("请求时间 · 失效时间")}</small>
                           <strong>
                             {selectedApproval.requestedAt} · {selectedApproval.expiresAt}
                           </strong>
@@ -11726,13 +11734,13 @@ export default function HomePage() {
                       </span>
                       <div>
                         <strong>
-                          {selectedApprovalIsDeferred
-                            ? "当前保持什么状态"
-                            : "批准后会发生什么"}
+                          {t(selectedApprovalIsDeferred
+                            ? t("当前保持什么状态")
+                            : t("批准后会发生什么"))}
                         </strong>
                         <p>
                           {selectedApprovalIsDeferred
-                            ? "操作保持未执行，关联任务继续停在安全检查点。"
+                            ? t("操作保持未执行，关联任务继续停在安全检查点。")
                             : selectedApproval.impact}
                         </p>
                       </div>
@@ -11744,14 +11752,14 @@ export default function HomePage() {
                           <ShieldCheck size={17} />
                         </span>
                         <div>
-                          <strong>策略检查已通过</strong>
+                          <strong>{t("策略检查已通过")}</strong>
                           <small>{selectedApproval.policy}</small>
                         </div>
                       </div>
                       <div className="approval-scope">
-                        <span><Check size={14} /> 只允许这一次</span>
-                        <span><Check size={14} /> 决策写入审计记录</span>
-                        <span><Check size={14} /> 拒绝后自动暂停任务</span>
+                        <span><Check size={14} />  {t("只允许这一次")}</span>
+                        <span><Check size={14} />  {t("决策写入审计记录")}</span>
+                        <span><Check size={14} />  {t("拒绝后自动暂停任务")}</span>
                       </div>
                     </div>
 
@@ -11768,8 +11776,9 @@ export default function HomePage() {
                           }
                         />
                         <span>
-                          以后在这个项目里自动批准这条命令
-                          <small>只限同一工具、同一条命令；拼接命令不会被记住</small>
+                          
+                          {t("以后在这个项目里自动批准这条命令")}
+                          <small>{t("只限同一工具、同一条命令；拼接命令不会被记住")}</small>
                         </span>
                       </label>
                     ) : null}
@@ -11788,14 +11797,16 @@ export default function HomePage() {
                             }
                           >
                             <RotateCcw size={16} />
-                            提前恢复到待确认
+                            
+                            {t("提前恢复到待确认")}
                           </button>
                           <button
                             type="button"
                             onClick={() => openTask(selectedApproval.taskId)}
                           >
                             <Link2 size={16} />
-                            查看关联任务
+                            
+                            {t("查看关联任务")}
                           </button>
                         </>
                       ) : (
@@ -11811,12 +11822,13 @@ export default function HomePage() {
                               <Check size={16} />
                             )}
                             {selectedApproval.risk === "高风险"
-                              ? "核对后批准"
+                              ? t("核对后批准")
                               : formatApprovalDecisionLabel(selectedApproval.action)}
                           </button>
                           <button type="button" onClick={holdCurrent}>
                             <Timer size={16} />
-                            稍后处理
+                            
+                            {t("稍后处理")}
                           </button>
                           <button
                             className="danger"
@@ -11824,7 +11836,8 @@ export default function HomePage() {
                             onClick={requestRejectApproval}
                           >
                             <Ban size={16} />
-                            拒绝操作
+                            
+                            {t("拒绝操作")}
                           </button>
                         </>
                       )}
@@ -11835,9 +11848,9 @@ export default function HomePage() {
             ) : (
               <div className="empty-view">
                 <CheckCircle2 size={34} />
-                <h2>所有操作都处理完了</h2>
-                <p>任务会继续在后台运行，有新的决定需要你处理时会再次提醒。</p>
-                <button type="button" onClick={() => openView("home")}>返回首页</button>
+                <h2>{t("所有操作都处理完了")}</h2>
+                <p>{t("任务会继续在后台运行，有新的决定需要你处理时会再次提醒。")}</p>
+                <button type="button" onClick={() => openView("home")}>{t("返回首页")}</button>
               </div>
             )}
           </section>
@@ -11851,34 +11864,34 @@ export default function HomePage() {
                   <Files size={21} />
                 </span>
                 <div>
-                  <small>{artifactScopeTask ? "任务成果" : "成果库"}</small>
+                  <small>{(artifactScopeTask ? t("任务成果") : t("成果库"))}</small>
                   <h2>
                     {artifactScopeTask
                       ? artifactScopeTask.title
-                      : "AI 已交付的工作成果"}
+                      : t("AI 已交付的工作成果")}
                   </h2>
                   <p>
-                    {artifactScopeTask
-                      ? "这里只显示当前任务生成的文件和证据。"
-                      : "所有成果都保存在本机，并与原始任务和审计记录关联。"}
+                    {t(artifactScopeTask
+                      ? t("这里只显示当前任务生成的文件和证据。")
+                      : t("所有成果都保存在本机，并与原始任务和审计记录关联。"))}
                   </p>
                 </div>
               </div>
               <div className="artifact-overview-metrics">
                 <span>
-                  <small>全部成果</small>
+                  <small>{t("全部成果")}</small>
                   <strong>{artifactStats.total}</strong>
                 </span>
                 <span>
-                  <small>完成报告</small>
+                  <small>{t("完成报告")}</small>
                   <strong>{artifactStats.reports}</strong>
                 </span>
                 <span>
-                  <small>截图证据</small>
+                  <small>{t("截图证据")}</small>
                   <strong>{artifactStats.evidence}</strong>
                 </span>
                 <span>
-                  <small>本机占用</small>
+                  <small>{t("本机占用")}</small>
                   <strong>{artifactStats.size.toFixed(1)} KB</strong>
                 </span>
               </div>
@@ -11889,7 +11902,7 @@ export default function HomePage() {
                 <div
                   className="artifact-filter-tabs"
                   role="tablist"
-                  aria-label="成果筛选"
+                  aria-label={t("成果筛选")}
                 >
                   {artifactFilters.map((filter) => {
                     const count =
@@ -11911,7 +11924,7 @@ export default function HomePage() {
                         onClick={() => chooseArtifactFilter(filter)}
                       >
                         {filter === "重点" && <Star size={13} />}
-                        {filter}
+                        {t(filter)}
                         <span>{count}</span>
                       </button>
                     );
@@ -11940,7 +11953,8 @@ export default function HomePage() {
                     }}
                   >
                     <X size={14} />
-                    查看全部任务
+                    
+                    {t("查看全部任务")}
                   </button>
                 )}
               </div>
@@ -11950,16 +11964,16 @@ export default function HomePage() {
                   <Search size={16} />
                   <input
                     type="search"
-                    aria-label="搜索成果列表"
+                    aria-label={t("搜索成果列表")}
                     autoComplete="off"
-                    placeholder="搜索成果名称、文件名或格式"
+                    placeholder={t("搜索成果名称、文件名或格式")}
                     value={artifactListQuery}
                     onChange={(event) => setArtifactListQuery(event.target.value)}
                   />
                   {artifactListQuery && (
                     <button
                       type="button"
-                      aria-label="清除成果搜索"
+                      aria-label={t("清除成果搜索")}
                       onClick={() => setArtifactListQuery("")}
                     >
                       <X size={14} />
@@ -11969,34 +11983,32 @@ export default function HomePage() {
 
                 <label className="artifact-sort-control">
                   <ArrowUpDown size={15} />
-                  <span>排序</span>
+                  <span>{t("排序")}</span>
                   <select
-                    aria-label="成果排序"
+                    aria-label={t("成果排序")}
                     value={artifactSort}
                     onChange={(event) =>
                       setArtifactSort(event.target.value as ArtifactSort)
                     }
                   >
-                    <option value="最近更新">最近更新</option>
-                    <option value="重点优先">重点优先</option>
-                    <option value="文件名">文件名</option>
+                    <option value={t("最近更新")}>{t("最近更新")}</option>
+                    <option value={t("重点优先")}>{t("重点优先")}</option>
+                    <option value={t("文件名")}>{t("文件名")}</option>
                   </select>
                 </label>
 
-                <span className="artifact-result-count" aria-live="polite">
-                  显示 {filteredArtifacts.length} / {scopedArtifacts.length} 项
-                </span>
+                <span className="artifact-result-count" aria-live="polite">{t("显示 {length} / {length2} 项", { length: filteredArtifacts.length, length2: scopedArtifacts.length })}</span>
               </div>
             </div>
 
             <div className="artifact-workspace">
-              <aside className="artifact-list" aria-label="成果列表">
+              <aside className="artifact-list" aria-label={t("成果列表")}>
                 <div className="artifact-list-heading">
                   <span>
-                    <strong>成果列表</strong>
-                    <small>{artifactSort}</small>
+                    <strong>{t("成果列表")}</strong>
+                    <small>{t(artifactSort)}</small>
                   </span>
-                  <em>{filteredArtifacts.length} 项</em>
+                  <em>{t("{length} 项", { length: filteredArtifacts.length })}</em>
                 </div>
                 <div className="artifact-list-items">
                   {filteredArtifacts.map((artifact) => {
@@ -12018,7 +12030,7 @@ export default function HomePage() {
                           </span>
                           <span className="artifact-list-copy">
                             <span>
-                              <em>{artifact.type}</em>
+                              <em>{t(artifact.type)}</em>
                               <small>{artifact.updated}</small>
                             </span>
                             <strong>{artifact.title}</strong>
@@ -12035,10 +12047,10 @@ export default function HomePage() {
                           type="button"
                           aria-label={
                             artifact.starred
-                              ? `取消重点标记：${artifact.title}`
-                              : `标记为重点：${artifact.title}`
+                              ? t("取消重点标记：{title}", { title: artifact.title })
+                              : t("标记为重点：{title}", { title: artifact.title })
                           }
-                          title={artifact.starred ? "取消重点" : "标记为重点"}
+                          title={artifact.starred ? t("取消重点") : t("标记为重点")}
                           onClick={() => toggleArtifactStar(artifact)}
                         >
                           <Star size={15} fill={artifact.starred ? "currentColor" : "none"} />
@@ -12051,13 +12063,13 @@ export default function HomePage() {
                       {artifactListQuery.trim() ? <Search size={22} /> : <Files size={22} />}
                       <strong>
                         {artifactListQuery.trim()
-                          ? `没有找到“${artifactListQuery.trim()}”`
-                          : "这个分类还没有成果"}
+                          ? t("没有找到“{trim}”", { trim: artifactListQuery.trim() })
+                          : t("这个分类还没有成果")}
                       </strong>
                       <small>
-                        {artifactListQuery.trim()
-                          ? "可以尝试成果名称、文件名、格式或关联任务。"
-                          : "切换到其他分类查看已有交付文件。"}
+                        {t(artifactListQuery.trim()
+                          ? t("可以尝试成果名称、文件名、格式或关联任务。")
+                          : t("切换到其他分类查看已有交付文件。"))}
                       </small>
                       <button
                         type="button"
@@ -12067,7 +12079,7 @@ export default function HomePage() {
                             : chooseArtifactFilter("全部")
                         }
                       >
-                        {artifactListQuery.trim() ? "清除搜索" : "查看全部成果"}
+                        {t(artifactListQuery.trim() ? t("清除搜索") : t("查看全部成果"))}
                       </button>
                     </div>
                   )}
@@ -12083,13 +12095,13 @@ export default function HomePage() {
                       </span>
                       <span>
                         <small>
-                          {selectedArtifact.type} · {selectedArtifact.status}
+                          {t(selectedArtifact.type)} · {t(selectedArtifact.status)}
                         </small>
                         <h2>{selectedArtifact.title}</h2>
                         <p>{selectedArtifact.description}</p>
                       </span>
                     </div>
-                    <div className="artifact-preview-actions" aria-label="成果操作">
+                    <div className="artifact-preview-actions" aria-label={t("成果操作")}>
                       {artifactCanBeEdited(selectedArtifact) && (
                         <button
                           className="edit"
@@ -12097,29 +12109,29 @@ export default function HomePage() {
                           onClick={() => openArtifactEditor(selectedArtifact)}
                         >
                           <Pencil size={16} />
-                          <span>编辑</span>
+                          <span>{t("编辑")}</span>
                         </button>
                       )}
                       <button
                         className="view-link-copy artifact-link-copy"
                         type="button"
-                        aria-label="复制当前成果链接"
-                        title="复制当前成果链接"
-                        onClick={() => copyCurrentViewLink("成果链接")}
+                        aria-label={t("复制当前成果链接")}
+                        title={t("复制当前成果链接")}
+                        onClick={() => copyCurrentViewLink(t("成果链接"))}
                       >
                         <Link2 size={16} />
-                        <span>复制链接</span>
+                        <span>{t("复制链接")}</span>
                       </button>
                       <button
                         className={selectedArtifact.starred ? "active" : ""}
                         type="button"
                         aria-label={
                           selectedArtifact.starred
-                            ? "取消重点标记"
-                            : "标记为重点"
+                            ? t("取消重点标记")
+                            : t("标记为重点")
                         }
                         title={
-                          selectedArtifact.starred ? "取消重点" : "标记为重点"
+                          selectedArtifact.starred ? t("取消重点") : t("标记为重点")
                         }
                         onClick={() => toggleArtifactStar(selectedArtifact)}
                       >
@@ -12127,26 +12139,26 @@ export default function HomePage() {
                           size={16}
                           fill={selectedArtifact.starred ? "currentColor" : "none"}
                         />
-                        <span>{selectedArtifact.starred ? "取消重点" : "重点"}</span>
+                        <span>{t(selectedArtifact.starred ? t("取消重点") : "重点")}</span>
                       </button>
                       <button
                         type="button"
-                        aria-label="复制成果内容"
-                        title="复制内容"
+                        aria-label={t("复制成果内容")}
+                        title={t("复制内容")}
                         onClick={() => copyArtifactContent(selectedArtifact)}
                       >
                         <Copy size={16} />
-                        <span>复制</span>
+                        <span>{t("复制")}</span>
                       </button>
                       <button
                         className="delete"
                         type="button"
-                        aria-label="删除成果"
-                        title="删除成果"
+                        aria-label={t("删除成果")}
+                        title={t("删除成果")}
                         onClick={() => requestDeleteArtifact(selectedArtifact)}
                       >
                         <Trash2 size={16} />
-                        <span>删除</span>
+                        <span>{t("删除")}</span>
                       </button>
                       <button
                         className="download"
@@ -12154,34 +12166,35 @@ export default function HomePage() {
                         onClick={() => downloadArtifact(selectedArtifact)}
                       >
                         <Download size={16} />
-                        下载
+                        
+                        {t("下载")}
                       </button>
                     </div>
                   </header>
 
                   <div className="artifact-preview-meta">
                     <span>
-                      <small>文件名</small>
+                      <small>{t("文件名")}</small>
                       <strong>{selectedArtifact.filename}</strong>
                     </span>
                     <span>
-                      <small>格式</small>
+                      <small>{t("格式")}</small>
                       <strong>
                         {selectedArtifact.format} ·{" "}
                         {selectedArtifact.sizeKb.toFixed(1)} KB
                       </strong>
                     </span>
                     <span>
-                      <small>当前版本</small>
+                      <small>{t("当前版本")}</small>
                       <strong>v{selectedArtifact.version ?? 1}</strong>
                     </span>
                     <span>
-                      <small>最近更新</small>
+                      <small>{t("最近更新")}</small>
                       <strong>{selectedArtifact.updated}</strong>
                     </span>
                   </div>
 
-                  <div className="artifact-highlights" aria-label="成果摘要">
+                  <div className="artifact-highlights" aria-label={t("成果摘要")}>
                     {selectedArtifact.highlights.map((highlight) => (
                       <span key={highlight}>
                         <CheckCircle2 size={14} />
@@ -12192,12 +12205,12 @@ export default function HomePage() {
 
                   <section className="artifact-content-preview">
                     <div>
-                      <span>内容预览</span>
+                      <span>{t("内容预览")}</span>
                       <em>
                         v{selectedArtifact.version ?? 1} ·{" "}
-                        {artifactCanBeEdited(selectedArtifact)
-                          ? "可修订"
-                          : "原始记录只读"}
+                        {t(artifactCanBeEdited(selectedArtifact)
+                          ? t("可修订")
+                          : t("原始记录只读"))}
                       </em>
                     </div>
                     {selectedArtifact.table ? (
@@ -12230,7 +12243,7 @@ export default function HomePage() {
                     <span>
                       <ShieldCheck size={16} />
                       <span>
-                        <small>来源已验证</small>
+                        <small>{t("来源已验证")}</small>
                         <strong>
                           {tasks.find(
                             (task) => task.id === selectedArtifact.taskId,
@@ -12242,7 +12255,8 @@ export default function HomePage() {
                       type="button"
                       onClick={() => openTask(selectedArtifact.taskId)}
                     >
-                      查看关联任务
+                      
+                      {t("查看关联任务")}
                       <ChevronRight size={14} />
                     </button>
                   </footer>
@@ -12250,8 +12264,8 @@ export default function HomePage() {
               ) : (
                 <div className="artifact-preview-empty">
                   <Files size={28} />
-                  <strong>选择一个成果查看内容</strong>
-                  <p>切换筛选条件，或从任务详情进入对应成果。</p>
+                  <strong>{t("选择一个成果查看内容")}</strong>
+                  <p>{t("切换筛选条件，或从任务详情进入对应成果。")}</p>
                 </div>
               )}
             </div>
@@ -12263,13 +12277,13 @@ export default function HomePage() {
             <div className="activity-toolbar">
               <div className="activity-toolbar-primary">
                 <div className="activity-toolbar-title">
-                  <span>{activityTask ? "任务审计" : "可信审计"}</span>
-                  <strong>{scopedActivityLog.length} 条记录</strong>
+                  <span>{(activityTask ? t("任务审计") : t("可信审计"))}</span>
+                  <strong>{t("{length} 条记录", { length: scopedActivityLog.length })}</strong>
                 </div>
                 <div
                   className="activity-filter-tabs"
                   role="tablist"
-                  aria-label="运行记录筛选"
+                  aria-label={t("运行记录筛选")}
                 >
                   {activityFilters.map((filter) => (
                     <button
@@ -12280,7 +12294,7 @@ export default function HomePage() {
                       aria-selected={activityFilter === filter}
                       onClick={() => chooseActivityFilter(filter)}
                     >
-                      {filter}
+                      {t(filter)}
                       <span>{activityCounts[filter]}</span>
                     </button>
                   ))}
@@ -12291,7 +12305,8 @@ export default function HomePage() {
                   onClick={exportActivity}
                 >
                   <Download size={15} />
-                  导出全部
+                  
+                  {t("导出全部")}
                 </button>
               </div>
 
@@ -12300,16 +12315,16 @@ export default function HomePage() {
                   <Search size={16} />
                   <input
                     type="search"
-                    aria-label="搜索运行记录"
+                    aria-label={t("搜索运行记录")}
                     autoComplete="off"
-                    placeholder="搜索事件、任务或事件 ID"
+                    placeholder={t("搜索事件、任务或事件 ID")}
                     value={activityListQuery}
                     onChange={(event) => setActivityListQuery(event.target.value)}
                   />
                   {activityListQuery && (
                     <button
                       type="button"
-                      aria-label="清除运行记录搜索"
+                      aria-label={t("清除运行记录搜索")}
                       onClick={() => setActivityListQuery("")}
                     >
                       <X size={14} />
@@ -12319,22 +12334,20 @@ export default function HomePage() {
 
                 <label className="activity-sort-control">
                   <ArrowUpDown size={15} />
-                  <span>时间</span>
+                  <span>{t("时间")}</span>
                   <select
-                    aria-label="运行记录排序"
+                    aria-label={t("运行记录排序")}
                     value={activitySort}
                     onChange={(event) =>
                       setActivitySort(event.target.value as ActivitySort)
                     }
                   >
-                    <option value="最新优先">最新优先</option>
-                    <option value="最早优先">最早优先</option>
+                    <option value={t("最新优先")}>{t("最新优先")}</option>
+                    <option value={t("最早优先")}>{t("最早优先")}</option>
                   </select>
                 </label>
 
-                <span className="activity-result-count" aria-live="polite">
-                  显示 {filteredActivityLog.length} / {scopedActivityLog.length} 条
-                </span>
+                <span className="activity-result-count" aria-live="polite">{t("显示 {length} / {length2} 条", { length: filteredActivityLog.length, length2: scopedActivityLog.length })}</span>
               </div>
             </div>
 
@@ -12342,12 +12355,12 @@ export default function HomePage() {
               <Activity size={18} />
               <div>
                 <strong>
-                  {activityTask?.title ?? "所有任务与系统事件"}
+                  {activityTask?.title ?? t("所有任务与系统事件")}
                 </strong>
                 <small>
                   {activityTask
-                    ? `${formatTaskSchedule(activityTask)} · 仅显示此任务的记录`
-                    : "任务执行、审批决定和系统变更都保存在这条时间线上"}
+                    ? t("{formatTaskSchedule} · 仅显示此任务的记录", { formatTaskSchedule: formatTaskSchedule(activityTask) })
+                    : t("任务执行、审批决定和系统变更都保存在这条时间线上")}
                 </small>
               </div>
               <div className="activity-summary-actions">
@@ -12355,11 +12368,12 @@ export default function HomePage() {
                   <button
                     className="activity-scope-clear"
                     type="button"
-                    aria-label={`取消“${activityTask.title}”任务筛选`}
+                    aria-label={t("取消“{title}”任务筛选", { title: activityTask.title })}
                     onClick={clearActivityTaskScope}
                   >
                     <X size={14} />
-                    查看全部
+                    
+                    {t("查看全部")}
                   </button>
                 )}
                 <span
@@ -12368,7 +12382,7 @@ export default function HomePage() {
                   }`}
                 >
                   <i />
-                  {activityTask?.status ?? "持续记录"}
+                  {t(activityTask?.status ?? t("持续记录"))}
                 </span>
               </div>
             </div>
@@ -12399,13 +12413,13 @@ export default function HomePage() {
                         </span>
                         <span className="timeline-content">
                           <span className={`timeline-kind kind-${item.kind}`}>
-                            {item.kind}
+                            {t(item.kind)}
                           </span>
                           <strong>{item.title}</strong>
                           <p>{item.detail}</p>
                           <small>
                             {itemTask?.title ??
-                              (item.kind === "系统" ? "工作区系统" : "无关联任务")}
+                              (item.kind === "系统" ? t("工作区系统") : t("无关联任务"))}
                           </small>
                         </span>
                       </button>
@@ -12414,7 +12428,8 @@ export default function HomePage() {
                         type="button"
                         onClick={() => selectActivityItem(item)}
                       >
-                        查看详情
+                        
+                        {t("查看详情")}
                         <ChevronRight size={14} />
                       </button>
                     </div>
@@ -12425,17 +12440,17 @@ export default function HomePage() {
                     <Search size={22} />
                     <strong>
                       {activityListQuery.trim()
-                        ? `没有找到“${activityListQuery.trim()}”`
+                        ? t("没有找到“{trim}”", { trim: activityListQuery.trim() })
                         : activityTask
                           ? activityFilter === "全部"
-                            ? "这个任务还没有运行记录"
-                            : "这个任务还没有此类记录"
-                          : "这个分类还没有记录"}
+                            ? t("这个任务还没有运行记录")
+                            : t("这个任务还没有此类记录")
+                          : t("这个分类还没有记录")}
                     </strong>
                     <small>
-                      {activityListQuery.trim()
-                        ? "可以尝试事件标题、任务名称或事件 ID。"
-                        : "切换分类或查看全部任务的审计记录。"}
+                      {t(activityListQuery.trim()
+                        ? t("可以尝试事件标题、任务名称或事件 ID。")
+                        : t("切换分类或查看全部任务的审计记录。"))}
                     </small>
                     <button
                       type="button"
@@ -12449,11 +12464,11 @@ export default function HomePage() {
                         }
                       }}
                     >
-                      {activityListQuery.trim()
-                        ? "清除搜索"
+                      {t(activityListQuery.trim()
+                        ? t("清除搜索")
                         : activityFilter !== "全部"
-                          ? "查看此任务全部记录"
-                          : "查看全部任务"}
+                          ? t("查看此任务全部记录")
+                          : t("查看全部任务"))}
                     </button>
                   </div>
                 )}
@@ -12464,16 +12479,14 @@ export default function HomePage() {
                   className="activity-inspector"
                   ref={activityInspectorRef}
                   tabIndex={-1}
-                  aria-label="审计事件详情"
+                  aria-label={t("审计事件详情")}
                 >
                   <header className="activity-inspector-heading">
                     <span className={`timeline-icon ${selectedActivity.tone}`}>
                       <SelectedActivityIcon size={19} />
                     </span>
                     <div>
-                      <small>
-                        {selectedActivity.kind}事件 · 已记录
-                      </small>
+                      <small>{t("{kind}事件 · 已记录", { kind: t(selectedActivity.kind) })}</small>
                       <h2>{selectedActivity.title}</h2>
                     </div>
                   </header>
@@ -12484,51 +12497,51 @@ export default function HomePage() {
 
                   <div className="activity-inspector-facts">
                     <span>
-                      <small>发生时间</small>
+                      <small>{t("发生时间")}</small>
                       <strong>
                         {formatAuditTimestamp(selectedActivity.createdAt)}
                       </strong>
                     </span>
                     <span>
-                      <small>事件类型</small>
-                      <strong>{selectedActivity.kind}</strong>
+                      <small>{t("事件类型")}</small>
+                      <strong>{t(selectedActivity.kind)}</strong>
                     </span>
                     <span>
-                      <small>关联对象</small>
+                      <small>{t("关联对象")}</small>
                       <strong>
-                        {selectedActivityTask?.title ?? "全局工作区"}
+                        {selectedActivityTask?.title ?? t("全局工作区")}
                       </strong>
                     </span>
                     <span>
-                      <small>触发来源</small>
+                      <small>{t("触发来源")}</small>
                       <strong>
-                        {selectedActivity.kind === "任务"
-                          ? "任务执行引擎"
+                        {t(selectedActivity.kind === "任务"
+                          ? t("任务执行引擎")
                           : selectedActivity.kind === "审批"
-                            ? "审批策略引擎"
-                            : "工作区系统"}
+                            ? t("审批策略引擎")
+                            : t("工作区系统"))}
                       </strong>
                     </span>
                   </div>
 
                   <div className="activity-event-id">
                     <span>
-                      <small>事件 ID</small>
+                      <small>{t("事件 ID")}</small>
                       <code>{selectedActivity.id}</code>
                     </span>
                     <span className="activity-event-id-actions">
                       <button
                         type="button"
-                        aria-label="复制当前审计事件链接"
-                        title="复制当前审计事件链接"
+                        aria-label={t("复制当前审计事件链接")}
+                        title={t("复制当前审计事件链接")}
                         onClick={() => copyActivityEventLink(selectedActivity)}
                       >
                         <Link2 size={15} />
                       </button>
                       <button
                         type="button"
-                        aria-label="复制事件 ID"
-                        title="复制事件 ID"
+                        aria-label={t("复制事件 ID")}
+                        title={t("复制事件 ID")}
                         onClick={() => copyActivityId(selectedActivity)}
                       >
                         <Copy size={15} />
@@ -12539,8 +12552,8 @@ export default function HomePage() {
                   <div className="activity-integrity">
                     <ShieldCheck size={18} />
                     <span>
-                      <strong>审计记录已写入本机</strong>
-                      <small>事件时间、来源和关联对象可随工作区一起导出。</small>
+                      <strong>{t("审计记录已写入本机")}</strong>
+                      <small>{t("事件时间、来源和关联对象可随工作区一起导出。")}</small>
                     </span>
                   </div>
 
@@ -12550,18 +12563,19 @@ export default function HomePage() {
                       onClick={() => exportActivityItem(selectedActivity)}
                     >
                       <Download size={15} />
-                      导出此事件
+                      
+                      {t("导出此事件")}
                     </button>
                     <button
                       className="primary"
                       type="button"
                       onClick={() => openActivityItem(selectedActivity)}
                     >
-                      {selectedActivityTask
-                        ? "打开关联任务"
+                      {t(selectedActivityTask
+                        ? t("打开关联任务")
                         : selectedActivity.kind === "审批"
-                          ? "查看审批队列"
-                          : "打开系统设置"}
+                          ? t("查看审批队列")
+                          : t("打开系统设置"))}
                       <ChevronRight size={14} />
                     </button>
                   </footer>
@@ -12569,7 +12583,7 @@ export default function HomePage() {
               ) : (
                 <div className="activity-inspector-empty">
                   <History size={24} />
-                  <strong>选择一条记录查看审计详情</strong>
+                  <strong>{t("选择一条记录查看审计详情")}</strong>
                 </div>
               )}
             </div>
@@ -12578,17 +12592,17 @@ export default function HomePage() {
 
         {activeView === "settings" && (
           <section className="settings-view">
-            <nav className="settings-section-nav" aria-label="设置分区">
+            <nav className="settings-section-nav" aria-label={t("设置分区")}>
               <div className="settings-section-nav-title">
                 <span>
                   <Settings2 size={17} />
                 </span>
                 <span>
-                  <small>设置中心</small>
+                  <small>{t("设置中心")}</small>
                   <strong>
                     {settingsSections.find(
                       (section) => section.id === settingsSection,
-                    )?.label ?? "概览"}
+                    )?.label ?? t("概览")}
                   </strong>
                 </span>
               </div>
@@ -12617,8 +12631,8 @@ export default function HomePage() {
               <button
                 className="settings-section-copy"
                 type="button"
-                aria-label="复制当前设置分区链接"
-                title="复制当前设置分区链接"
+                aria-label={t("复制当前设置分区链接")}
+                title={t("复制当前设置分区链接")}
                 onClick={copySettingsSectionLink}
               >
                 <Link2 size={16} />
@@ -12635,40 +12649,40 @@ export default function HomePage() {
                   <i />
                 </span>
                 <div>
-                  <span>当前工作区</span>
+                  <span>{t("当前工作区")}</span>
                   <h2>{workspaceProfile.name}</h2>
                   <p>{workspaceProfile.description}</p>
                   <small className="workspace-profile-storage">
                     <HardDrive size={13} />
-                    {settings.local ? "本机数据正常" : "当前为临时会话"}
+                    {(settings.local ? t("本机数据正常") : t("当前为临时会话"))}
                   </small>
                 </div>
                 <button
                   className="workspace-profile-edit"
                   type="button"
-                  aria-label="编辑工作区资料"
-                  title="编辑工作区资料"
+                  aria-label={t("编辑工作区资料")}
+                  title={t("编辑工作区资料")}
                   onClick={openWorkspaceProfile}
                 >
                   <Pencil size={15} />
-                  <span>编辑资料</span>
+                  <span>{t("编辑资料")}</span>
                 </button>
               </div>
               <div className="workspace-overview-metrics">
                 <span>
-                  <small>任务</small>
+                  <small>{t("任务")}</small>
                   <strong>{tasks.length}</strong>
                 </span>
                 <span>
-                  <small>运行记录</small>
+                  <small>{t("运行记录")}</small>
                   <strong>{activityLog.length}</strong>
                 </span>
                 <span>
-                  <small>待确认</small>
+                  <small>{t("待确认")}</small>
                   <strong>{activeApprovalCount}</strong>
                 </span>
                 <span>
-                  <small>数据量</small>
+                  <small>{t("数据量")}</small>
                   <strong>{workspaceDataSize} KB</strong>
                 </span>
               </div>
@@ -12686,15 +12700,15 @@ export default function HomePage() {
             >
               <header className="settings-usage-heading">
                 <div>
-                  <span>用量与预算</span>
+                  <span>{t("用量与预算")}</span>
                   <h2>
                     {budgetExceeded
-                      ? "月度额度已用完，保护策略已经生效"
+                      ? t("月度额度已用完，保护策略已经生效")
                       : forecastVariance < 0
-                        ? `按当前趋势，月底预计超出 ${Math.abs(forecastVariance)} 点`
-                        : `本月额度充足，月底预计剩余 ${forecastVariance} 点`}
+                        ? t("按当前趋势，月底预计超出 {abs} 点", { abs: Math.abs(forecastVariance) })
+                        : t("本月额度充足，月底预计剩余 {forecastVariance} 点", { forecastVariance })}
                   </h2>
-                  <p>本月额度根据任务执行、连接器调用和本机成果记录实时估算。</p>
+                  <p>{t("本月额度根据任务执行、连接器调用和本机成果记录实时估算。")}</p>
                 </div>
                 <div className="settings-usage-heading-actions">
                   <button
@@ -12705,15 +12719,18 @@ export default function HomePage() {
                     onClick={openPlanCenter}
                   >
                     <Sparkles size={15} />
-                    Team 方案
+                    
+                    {t("Team 方案")}
                   </button>
                   <button type="button" onClick={exportUsageReport}>
                     <Download size={15} />
-                    导出用量
+                    
+                    {t("导出用量")}
                   </button>
                   <button className="primary" type="button" onClick={openUsageBudget}>
                     <Pencil size={15} />
-                    调整预算
+                    
+                    {t("调整预算")}
                   </button>
                 </div>
               </header>
@@ -12735,36 +12752,36 @@ export default function HomePage() {
                       ) : (
                         <ShieldCheck size={15} />
                       )}
-                      {budgetExceeded
-                        ? "额度已用完"
+                      {t(budgetExceeded
+                        ? t("额度已用完")
                         : budgetAlertReached
-                          ? "接近额度上限"
-                          : "额度状态健康"}
+                          ? t("接近额度上限")
+                          : t("额度状态健康"))}
                     </span>
                     <small>
-                      {usageSettings.pauseAtLimit ? "到限自动保护" : "到限仅提醒"}
+                      {(usageSettings.pauseAtLimit ? t("到限自动保护") : t("到限仅提醒"))}
                     </small>
                   </div>
                   <div className="usage-meter-heading">
                     <span>
-                      <small>本月额度</small>
+                      <small>{t("本月额度")}</small>
                       <strong>
                         {usedCredits}
-                        <em> / {usageSettings.monthlyBudget} 点</em>
+                        <em>{" "}{t("/ {monthlyBudget} 点", { monthlyBudget: usageSettings.monthlyBudget })}</em>
                       </strong>
                     </span>
                     <span>
-                      <small>还可使用</small>
+                      <small>{t("还可使用")}</small>
                       <strong>
                         {remainingCredits}
-                        <em> 点</em>
+                        <em>  {t("点")}</em>
                       </strong>
                     </span>
                   </div>
                   <div
                     className="usage-budget-track"
                     role="progressbar"
-                    aria-label="本月 AI 额度使用"
+                    aria-label={t("本月 AI 额度使用")}
                     aria-valuemin={0}
                     aria-valuemax={usageSettings.monthlyBudget}
                     aria-valuenow={Math.min(
@@ -12777,41 +12794,41 @@ export default function HomePage() {
                       style={{
                         left: `${Math.min(100, usageSettings.alertThreshold)}%`,
                       }}
-                      title={`${usageSettings.alertThreshold}% 提醒线`}
+                      title={t("{alertThreshold}% 提醒线", { alertThreshold: usageSettings.alertThreshold })}
                     />
                   </div>
                   <div className="usage-meter-legend">
-                    <span>{usagePercent}% 已使用</span>
-                    <span>{alertCreditLevel} 点提醒</span>
+                    <span>{t("{usagePercent}% 已使用", { usagePercent })}</span>
+                    <span>{t("{alertCreditLevel} 点提醒", { alertCreditLevel })}</span>
                   </div>
                   <div className="usage-budget-insights">
                     <span>
                       <Activity size={16} />
                       <span>
-                        <small>月底预计</small>
+                        <small>{t("月底预计")}</small>
                         <strong>
                           {forecastVariance >= 0
-                            ? `剩余 ${forecastVariance} 点`
-                            : `超出 ${Math.abs(forecastVariance)} 点`}
+                            ? t("剩余 {forecastVariance} 点", { forecastVariance })
+                            : t("超出 {abs} 点", { abs: Math.abs(forecastVariance) })}
                         </strong>
                       </span>
                     </span>
                     <span>
                       <Bell size={16} />
                       <span>
-                        <small>提醒点位</small>
+                        <small>{t("提醒点位")}</small>
                         <strong>
                           {creditsUntilAlert > 0
-                            ? `再用 ${creditsUntilAlert} 点`
-                            : "已经触发"}
+                            ? t("再用 {creditsUntilAlert} 点", { creditsUntilAlert })
+                            : t("已经触发")}
                         </strong>
                       </span>
                     </span>
                     <span>
                       <Clock3 size={16} />
                       <span>
-                        <small>额度刷新</small>
-                        <strong>8 月 1 日</strong>
+                        <small>{t("额度刷新")}</small>
+                        <strong>{t("8 月 1 日")}</strong>
                       </span>
                     </span>
                   </div>
@@ -12820,18 +12837,18 @@ export default function HomePage() {
                       <AlertTriangle size={16} />
                       <span>
                         <strong>
-                          {budgetExceeded
-                            ? "已达到月度预算"
+                          {t(budgetExceeded
+                            ? t("已达到月度预算")
                             : budgetAlertReached
-                              ? "用量已超过提醒线"
-                              : "按当前趋势可能超出预算"}
+                              ? t("用量已超过提醒线")
+                              : t("按当前趋势可能超出预算"))}
                         </strong>
                         <small>
                           {budgetExceeded && usageSettings.pauseAtLimit
-                            ? "运行中任务会自动暂停，新建、继续和重试也会被阻止。"
+                            ? t("运行中任务会自动暂停，新建、继续和重试也会被阻止。")
                             : usageSettings.pauseAtLimit
-                              ? `到达 ${usageSettings.monthlyBudget} 点后会自动暂停运行中的任务。`
-                              : "当前未开启到限自动暂停，达到额度后任务仍会继续运行。"}
+                              ? t("到达 {monthlyBudget} 点后会自动暂停运行中的任务。", { monthlyBudget: usageSettings.monthlyBudget })
+                              : t("当前未开启到限自动暂停，达到额度后任务仍会继续运行。")}
                         </small>
                       </span>
                     </div>
@@ -12840,8 +12857,8 @@ export default function HomePage() {
 
                 <div className="usage-breakdown-panel">
                   <div className="usage-section-heading">
-                    <span>消耗分布</span>
-                    <strong>{usageBreakdown.length} 类</strong>
+                    <span>{t("消耗分布")}</span>
+                    <strong>{t("{length} 类", { length: usageBreakdown.length })}</strong>
                   </div>
                   <div className="usage-breakdown-list">
                     {usageBreakdown.map((item) => {
@@ -12856,10 +12873,10 @@ export default function HomePage() {
                           </span>
                           <span className="usage-breakdown-copy">
                             <span>
-                              <strong>{item.label}</strong>
-                              <em>{share}% · {item.credits} 点</em>
+                              <strong>{t(item.label)}</strong>
+                              <em>{t("{share}% · {credits} 点", { share, credits: item.credits })}</em>
                             </span>
-                            <small>{item.detail}</small>
+                            <small>{t(item.detail)}</small>
                             <i>
                               <span style={{ width: `${Math.max(5, share)}%` }} />
                             </i>
@@ -12872,47 +12889,46 @@ export default function HomePage() {
 
                 <aside className="usage-guard-panel">
                   <div className="usage-section-heading">
-                    <span>预算保护</span>
+                    <span>{t("预算保护")}</span>
                     <strong>
-                      {budgetExceeded
-                        ? "已触发"
+                      {t(budgetExceeded
+                        ? t("已触发")
                         : usageSettings.pauseAtLimit
-                          ? "保护中"
-                          : "仅提醒"}
+                          ? t("保护中")
+                          : t("仅提醒"))}
                     </strong>
                   </div>
                   <div className="usage-guard-list">
                     <div>
                       <Bell size={17} />
                       <span>
-                        <small>用量提醒</small>
-                        <strong>
-                          {alertCreditLevel} 点（{usageSettings.alertThreshold}%）时提醒
-                        </strong>
+                        <small>{t("用量提醒")}</small>
+                        <strong>{t("{alertCreditLevel} 点（{alertThreshold}%）时提醒", { alertCreditLevel, alertThreshold: usageSettings.alertThreshold })}</strong>
                       </span>
                     </div>
                     <div>
                       <Pause size={17} />
                       <span>
-                        <small>到限处理</small>
+                        <small>{t("到限处理")}</small>
                         <strong>
                           {usageSettings.pauseAtLimit
-                            ? `达到 ${usageSettings.monthlyBudget} 点自动暂停`
-                            : "达到额度后继续运行"}
+                            ? t("达到 {monthlyBudget} 点自动暂停", { monthlyBudget: usageSettings.monthlyBudget })
+                            : t("达到额度后继续运行")}
                         </strong>
                       </span>
                     </div>
                     <div>
                       <ShieldCheck size={17} />
                       <span>
-                        <small>影响范围</small>
-                        <strong>只影响当前工作区</strong>
+                        <small>{t("影响范围")}</small>
+                        <strong>{t("只影响当前工作区")}</strong>
                       </span>
                     </div>
                   </div>
                   <button type="button" onClick={openUsageBudget}>
                     <Settings2 size={15} />
-                    管理预算保护
+                    
+                    {t("管理预算保护")}
                     <ChevronRight size={15} />
                   </button>
                 </aside>
@@ -12921,7 +12937,8 @@ export default function HomePage() {
               <footer className="settings-usage-footnote">
                 <ShieldCheck size={15} />
                 <span>
-                  用量为本机运行记录估算，不包含未连接服务的外部账单；预算变更会写入审计记录。
+                  
+                  {t("用量为本机运行记录估算，不包含未连接服务的外部账单；预算变更会写入审计记录。")}
                 </span>
               </footer>
             </section>
@@ -12929,49 +12946,50 @@ export default function HomePage() {
             <section className="settings-team-center" id="settings-team">
               <header className="settings-team-heading">
                 <div>
-                  <span>团队与权限</span>
-                  <h2>知道谁可以查看、修改和审批</h2>
-                  <p>成员角色会直接决定任务、成果和外部操作的访问边界。</p>
+                  <span>{t("团队与权限")}</span>
+                  <h2>{t("知道谁可以查看、修改和审批")}</h2>
+                  <p>{t("成员角色会直接决定任务、成果和外部操作的访问边界。")}</p>
                 </div>
                 <button type="button" onClick={openTeamInvite}>
                   <UserPlus size={16} />
-                  邀请成员
+                  
+                  {t("邀请成员")}
                 </button>
               </header>
 
-              <div className="settings-team-summary" aria-label="团队概览">
+              <div className="settings-team-summary" aria-label={t("团队概览")}>
                 <span>
                   <Users size={18} />
                   <span>
-                    <small>席位使用</small>
+                    <small>{t("席位使用")}</small>
                     <strong>
                       {teamMembers.length} / {teamSeatLimit}
                     </strong>
-                    <em>{availableSeatCount} 个可用</em>
+                    <em>{t("{availableSeatCount} 个可用", { availableSeatCount })}</em>
                   </span>
                 </span>
                 <span>
                   <Mail size={18} />
                   <span>
-                    <small>待接受邀请</small>
-                    <strong>{pendingInviteCount} 位</strong>
-                    <em>{pendingInviteCount ? "已占用席位" : "暂无待处理"}</em>
+                    <small>{t("待接受邀请")}</small>
+                    <strong>{t("{pendingInviteCount} 位", { pendingInviteCount })}</strong>
+                    <em>{(pendingInviteCount ? t("已占用席位") : t("暂无待处理"))}</em>
                   </span>
                 </span>
                 <span>
                   <ShieldCheck size={18} />
                   <span>
-                    <small>可以审批</small>
-                    <strong>{approverMemberCount} 位</strong>
-                    <em>含所有者与管理员</em>
+                    <small>{t("可以审批")}</small>
+                    <strong>{t("{approverMemberCount} 位", { approverMemberCount })}</strong>
+                    <em>{t("含所有者与管理员")}</em>
                   </span>
                 </span>
                 <span>
                   <Activity size={18} />
                   <span>
-                    <small>当前在线</small>
-                    <strong>{onlineMemberCount} 位</strong>
-                    <em>状态实时同步</em>
+                    <small>{t("当前在线")}</small>
+                    <strong>{t("{onlineMemberCount} 位", { onlineMemberCount })}</strong>
+                    <em>{t("状态实时同步")}</em>
                   </span>
                 </span>
               </div>
@@ -12982,14 +13000,14 @@ export default function HomePage() {
                   <input
                     type="search"
                     value={teamMemberQuery}
-                    aria-label="搜索团队成员"
-                    placeholder="搜索姓名或邮箱"
+                    aria-label={t("搜索团队成员")}
+                    placeholder={t("搜索姓名或邮箱")}
                     onChange={(event) => setTeamMemberQuery(event.target.value)}
                   />
                   {teamMemberQuery && (
                     <button
                       type="button"
-                      aria-label="清空成员搜索"
+                      aria-label={t("清空成员搜索")}
                       onClick={() => setTeamMemberQuery("")}
                     >
                       <X size={14} />
@@ -12999,7 +13017,7 @@ export default function HomePage() {
                 <div
                   className="settings-team-filters"
                   role="group"
-                  aria-label="按角色筛选成员"
+                  aria-label={t("按角色筛选成员")}
                 >
                   {teamRoleFilters.map((filter) => (
                     <button
@@ -13009,23 +13027,21 @@ export default function HomePage() {
                       key={filter}
                       onClick={() => setTeamRoleFilter(filter)}
                     >
-                      {filter}
+                      {t(filter)}
                       <span>{teamRoleFilterCounts[filter]}</span>
                     </button>
                   ))}
                 </div>
-                <span className="settings-team-result-count" aria-live="polite">
-                  显示 {filteredTeamMembers.length} 位
-                </span>
+                <span className="settings-team-result-count" aria-live="polite">{t("显示 {length} 位", { length: filteredTeamMembers.length })}</span>
               </div>
 
               <div className="settings-team-table">
                 <div className="settings-team-table-head" aria-hidden="true">
-                  <span>成员</span>
-                  <span>角色与权限</span>
-                  <span>状态</span>
-                  <span>最近活动</span>
-                  <span>操作</span>
+                  <span>{t("成员")}</span>
+                  <span>{t("角色与权限")}</span>
+                  <span>{t("状态")}</span>
+                  <span>{t("最近活动")}</span>
+                  <span>{t("操作")}</span>
                 </div>
                 <div className="settings-team-list">
                   {filteredTeamMembers.map((member) => (
@@ -13038,20 +13054,20 @@ export default function HomePage() {
                         <span>
                           <strong>
                             {member.name}
-                            {member.role === "所有者" && <em>你</em>}
+                            {member.role === "所有者" && <em>{t("你")}</em>}
                           </strong>
                           <small>{member.email}</small>
                         </span>
                       </div>
                       <div className="settings-team-role">
-                        <strong>{member.role}</strong>
+                        <strong>{t(member.role)}</strong>
                         <small>{teamRoleDetails[member.role].summary}</small>
                       </div>
                       <span
                         className={`settings-team-member-status status-${member.status}`}
                       >
                         <i />
-                        {member.status}
+                        {t(member.status)}
                       </span>
                       <span className="settings-team-last-active">
                         <Clock3 size={14} />
@@ -13059,10 +13075,11 @@ export default function HomePage() {
                       </span>
                       <button
                         type="button"
-                        aria-label={`管理成员：${member.name}`}
+                        aria-label={t("管理成员：{name}", { name: member.name })}
                         onClick={() => openTeamMember(member)}
                       >
-                        管理
+                        
+                        {t("管理")}
                         <ChevronRight size={15} />
                       </button>
                     </article>
@@ -13070,8 +13087,8 @@ export default function HomePage() {
                   {filteredTeamMembers.length === 0 && (
                     <div className="settings-team-empty">
                       <Search size={20} />
-                      <strong>没有符合条件的成员</strong>
-                      <small>换一个姓名、邮箱或角色筛选条件试试。</small>
+                      <strong>{t("没有符合条件的成员")}</strong>
+                      <small>{t("换一个姓名、邮箱或角色筛选条件试试。")}</small>
                       <button
                         type="button"
                         onClick={() => {
@@ -13079,7 +13096,8 @@ export default function HomePage() {
                           setTeamRoleFilter("全部");
                         }}
                       >
-                        清除筛选
+                        
+                        {t("清除筛选")}
                       </button>
                     </div>
                   )}
@@ -13088,7 +13106,7 @@ export default function HomePage() {
 
               <footer className="settings-team-footnote">
                 <ShieldCheck size={16} />
-                <span>只有所有者和管理员可以邀请成员或修改角色。</span>
+                <span>{t("只有所有者和管理员可以邀请成员或修改角色。")}</span>
               </footer>
             </section>
 
@@ -13097,29 +13115,50 @@ export default function HomePage() {
               id="settings-preferences"
             >
               <div>
-                <span>运行偏好</span>
-                <h2>安全、保存与通知</h2>
+                <span>{t("运行偏好")}</span>
+                <h2>{t("安全、保存与通知")}</h2>
               </div>
               <label className="setting-row">
                 <span>
-                  <strong>外部操作前必须确认</strong>
-                  <small>发送邮件、发布内容或访问敏感信息前暂停任务。</small>
+                  <strong>{t("界面语言")}</strong>
+                  <small>{t("切换后页面会重新载入。")}</small>
+                </span>
+                <span className="agent-run-input agent-run-select">
+                  <Globe2 size={14} aria-hidden="true" />
+                  <select
+                    aria-label={t("界面语言")}
+                    value={locale()}
+                    onChange={(event) => chooseLocale(event.target.value as Locale)}
+                  >
+                    {locales.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </span>
+              </label>
+              <label className="setting-row">
+                <span>
+                  <strong>{t("外部操作前必须确认")}</strong>
+                  <small>{t("发送邮件、发布内容或访问敏感信息前暂停任务。")}</small>
                 </span>
                 <button
                   className={`switch-control ${settings.approval ? "on" : ""}`}
                   type="button"
                   role="switch"
                   aria-checked={settings.approval}
-                  onClick={() => toggleSetting("approval", "默认审批保护")}
+                  onClick={() => toggleSetting("approval", t("默认审批保护"))}
                 >
                   <i />
                 </button>
               </label>
               <label className="setting-row">
                 <span>
-                  <strong>关闭页面后保留工作区</strong>
+                  <strong>{t("关闭页面后保留工作区")}</strong>
                   <small>
-                    开启后，任务、成果和运行记录会在下次打开时自动恢复。
+                    
+                    {t("开启后，任务、成果和运行记录会在下次打开时自动恢复。")}
                   </small>
                 </span>
                 <button
@@ -13127,7 +13166,7 @@ export default function HomePage() {
                   type="button"
                   role="switch"
                   aria-checked={settings.local}
-                  aria-label="关闭页面后保留工作区"
+                  aria-label={t("关闭页面后保留工作区")}
                   onClick={requestToggleLocalPersistence}
                 >
                   <i />
@@ -13135,15 +13174,15 @@ export default function HomePage() {
               </label>
               <label className="setting-row">
                 <span>
-                  <strong>需要确认时通知</strong>
-                  <small>{desktopNotificationPreferenceDetail}</small>
+                  <strong>{t("需要确认时通知")}</strong>
+                  <small>{t(desktopNotificationPreferenceDetail)}</small>
                 </span>
                 <button
                   className={`switch-control ${settings.notifications ? "on" : ""}`}
                   type="button"
                   role="switch"
                   aria-checked={settings.notifications}
-                  aria-label="需要确认时发送桌面通知"
+                  aria-label={t("需要确认时发送桌面通知")}
                   aria-busy={isRequestingNotificationPermission}
                   disabled={
                     isRequestingNotificationPermission ||
@@ -13166,17 +13205,18 @@ export default function HomePage() {
             <section className="settings-data-center" id="settings-data">
               <header className="settings-data-heading">
                 <div>
-                  <span>数据安全与恢复</span>
-                  <h2>知道数据保存在哪里，也知道出问题后怎么回来</h2>
-                  <p>本机自动保存用于继续工作，手动备份用于迁移设备和灾难恢复。</p>
+                  <span>{t("数据安全与恢复")}</span>
+                  <h2>{t("知道数据保存在哪里，也知道出问题后怎么回来")}</h2>
+                  <p>{t("本机自动保存用于继续工作，手动备份用于迁移设备和灾难恢复。")}</p>
                 </div>
                 <button type="button" onClick={exportWorkspaceFromDataCenter}>
                   <Download size={16} />
-                  创建备份
+                  
+                  {t("创建备份")}
                 </button>
               </header>
 
-              <div className="settings-data-status" aria-label="数据保护状态">
+              <div className="settings-data-status" aria-label={t("数据保护状态")}>
                 <span
                   className={
                     workspaceAutoSaveReady ? "is-ready" : "is-attention"
@@ -13190,20 +13230,20 @@ export default function HomePage() {
                     )}
                   </i>
                   <span>
-                    <small>本机自动保存</small>
+                    <small>{t("本机自动保存")}</small>
                     <strong>
-                      {workspacePersistenceStatus === "failed"
-                        ? "保存失败"
+                      {t(workspacePersistenceStatus === "failed"
+                        ? t("保存失败")
                         : settings.local
-                          ? "已开启"
-                          : "临时会话"}
+                          ? t("已开启")
+                          : t("临时会话"))}
                     </strong>
                     <em>
                       {workspaceLastSavedLabel
-                        ? `最近保存 ${workspaceLastSavedLabel}`
+                        ? t("最近保存 {workspaceLastSavedLabel}", { workspaceLastSavedLabel })
                         : settings.local
-                          ? "等待首次保存"
-                          : "关闭后不保留"}
+                          ? t("等待首次保存")
+                          : t("关闭后不保留")}
                     </em>
                   </span>
                 </span>
@@ -13216,12 +13256,12 @@ export default function HomePage() {
                     <Download size={17} />
                   </i>
                   <span>
-                    <small>最近可用备份</small>
+                    <small>{t("最近可用备份")}</small>
                     <strong>{workspaceBackupFreshnessLabel}</strong>
                     <em>
-                      {lastWorkspaceBackupAt
-                        ? "可迁移至其他设备"
-                        : "建议现在创建"}
+                      {t(lastWorkspaceBackupAt
+                        ? t("可迁移至其他设备")
+                        : t("建议现在创建"))}
                     </em>
                   </span>
                 </span>
@@ -13230,11 +13270,9 @@ export default function HomePage() {
                     <FileJson size={17} />
                   </i>
                   <span>
-                    <small>当前数据量</small>
-                    <strong>约 {workspaceDataSize} KB</strong>
-                    <em>
-                      {tasks.length} 个任务 · {artifacts.length} 项成果
-                    </em>
+                    <small>{t("当前数据量")}</small>
+                    <strong>{t("约 {workspaceDataSize} KB", { workspaceDataSize })}</strong>
+                    <em>{t("{length} 个任务 · {length2} 项成果", { length: tasks.length, length2: artifacts.length })}</em>
                   </span>
                 </span>
                 <span className="is-ready">
@@ -13242,9 +13280,9 @@ export default function HomePage() {
                     <ShieldCheck size={17} />
                   </i>
                   <span>
-                    <small>恢复文件校验</small>
-                    <strong>已启用</strong>
-                    <em>仅接受 Unzoo One JSON v1</em>
+                    <small>{t("恢复文件校验")}</small>
+                    <strong>{t("已启用")}</strong>
+                    <em>{t("仅接受 Unzoo One JSON v1")}</em>
                   </span>
                 </span>
               </div>
@@ -13262,16 +13300,14 @@ export default function HomePage() {
                       )}
                     </span>
                     <div>
-                      <small>
-                        恢复准备度 · {workspaceRecoveryLayerCount} / 3
-                      </small>
-                      <h3>{workspaceRecoveryHeadline}</h3>
+                      <small>{t("恢复准备度 · {workspaceRecoveryLayerCount} / 3", { workspaceRecoveryLayerCount })}</small>
+                      <h3>{t(workspaceRecoveryHeadline)}</h3>
                       <p>{workspaceRecoveryDetail}</p>
                     </div>
                   </div>
                   <div
                     className="settings-data-layers"
-                    aria-label="数据保护层"
+                    aria-label={t("数据保护层")}
                   >
                     <span className={workspaceAutoSaveReady ? "active" : ""}>
                       {workspaceAutoSaveReady ? (
@@ -13280,8 +13316,8 @@ export default function HomePage() {
                         <X size={14} />
                       )}
                       <span>
-                        <small>第一层</small>
-                        <strong>本机自动保存</strong>
+                        <small>{t("第一层")}</small>
+                        <strong>{t("本机自动保存")}</strong>
                       </span>
                     </span>
                     <span className={lastWorkspaceBackupAt ? "active" : ""}>
@@ -13291,15 +13327,15 @@ export default function HomePage() {
                         <X size={14} />
                       )}
                       <span>
-                        <small>第二层</small>
-                        <strong>手动迁移备份</strong>
+                        <small>{t("第二层")}</small>
+                        <strong>{t("手动迁移备份")}</strong>
                       </span>
                     </span>
                     <span className="active">
                       <Check size={14} />
                       <span>
-                        <small>第三层</small>
-                        <strong>导入结构校验</strong>
+                        <small>{t("第三层")}</small>
+                        <strong>{t("导入结构校验")}</strong>
                       </span>
                     </span>
                   </div>
@@ -13314,12 +13350,12 @@ export default function HomePage() {
                       <Download size={18} />
                     </span>
                     <span>
-                      <small>安全副本</small>
-                      <strong>导出工作区备份</strong>
+                      <small>{t("安全副本")}</small>
+                      <strong>{t("导出工作区备份")}</strong>
                       <em>
                         {lastWorkspaceBackupAt
-                          ? `上次 ${workspaceBackupFreshnessLabel}`
-                          : "下载完整 JSON 文件"}
+                          ? t("上次 {workspaceBackupFreshnessLabel}", { workspaceBackupFreshnessLabel })
+                          : t("下载完整 JSON 文件")}
                       </em>
                     </span>
                     <ChevronRight size={17} />
@@ -13329,9 +13365,9 @@ export default function HomePage() {
                       <Upload size={18} />
                     </span>
                     <span>
-                      <small>迁移与恢复</small>
-                      <strong>从备份恢复</strong>
-                      <em>先校验，再预览覆盖范围</em>
+                      <small>{t("迁移与恢复")}</small>
+                      <strong>{t("从备份恢复")}</strong>
+                      <em>{t("先校验，再预览覆盖范围")}</em>
                     </span>
                     <ChevronRight size={17} />
                   </button>
@@ -13344,9 +13380,9 @@ export default function HomePage() {
                       <RotateCcw size={18} />
                     </span>
                     <span>
-                      <small>危险操作</small>
-                      <strong>恢复初始状态</strong>
-                      <em>清除改动并载入示例工作区</em>
+                      <small>{t("危险操作")}</small>
+                      <strong>{t("恢复初始状态")}</strong>
+                      <em>{t("清除改动并载入示例工作区")}</em>
                     </span>
                     <ChevronRight size={17} />
                   </button>
@@ -13356,13 +13392,14 @@ export default function HomePage() {
               <footer className="settings-data-inventory">
                 <span>
                   <ShieldCheck size={15} />
-                  备份范围
+                  
+                  {t("备份范围")}
                 </span>
-                <strong>{tasks.length} 个任务</strong>
-                <strong>{artifacts.length} 项成果</strong>
-                <strong>{teamMembers.length} 位成员</strong>
-                <strong>{activityLog.length} 条记录</strong>
-                <small>文件只在当前设备生成，不会上传到外部服务。</small>
+                <strong>{t("{length} 个任务", { length: tasks.length })}</strong>
+                <strong>{t("{length} 项成果", { length: artifacts.length })}</strong>
+                <strong>{t("{length} 位成员", { length: teamMembers.length })}</strong>
+                <strong>{t("{length} 条记录", { length: activityLog.length })}</strong>
+                <small>{t("文件只在当前设备生成，不会上传到外部服务。")}</small>
               </footer>
             </section>
 
@@ -13372,9 +13409,9 @@ export default function HomePage() {
             >
               <header className="settings-connectors-heading">
                 <div>
-                  <span>能力连接</span>
-                  <h2>AI 当前可以使用这些工具</h2>
-                  <p>查看每项能力的授权范围、使用状态，并随时测试或断开连接。</p>
+                  <span>{t("能力连接")}</span>
+                  <h2>{t("AI 当前可以使用这些工具")}</h2>
+                  <p>{t("查看每项能力的授权范围、使用状态，并随时测试或断开连接。")}</p>
                 </div>
                 <div className="settings-connectors-heading-actions">
                   <span
@@ -13388,8 +13425,8 @@ export default function HomePage() {
                       <Link2 size={16} />
                     )}
                     {connectorIssueCount > 0
-                      ? `${connectorIssueCount} 项需要处理`
-                      : "全部连接正常"}
+                      ? t("{connectorIssueCount} 项需要处理", { connectorIssueCount })
+                      : t("全部连接正常")}
                   </span>
                   <button
                     type="button"
@@ -13406,21 +13443,21 @@ export default function HomePage() {
                     ) : (
                       <RefreshCw size={15} />
                     )}
-                    {connectorTestingAll ? "正在检测" : "检测全部"}
+                    {(connectorTestingAll ? t("正在检测") : t("检测全部"))}
                   </button>
                 </div>
               </header>
 
               <div
                 className="settings-connectors-summary"
-                aria-label="连接器运行状态"
+                aria-label={t("连接器运行状态")}
               >
                 <span className="is-ready">
                   <i>
                     <CheckCircle2 size={17} />
                   </i>
                   <span>
-                    <small>当前可用</small>
+                    <small>{t("当前可用")}</small>
                     <strong>
                       {healthyConnectorCount} / {connectorCatalog.length}
                     </strong>
@@ -13431,8 +13468,8 @@ export default function HomePage() {
                     <AlertTriangle size={17} />
                   </i>
                   <span>
-                    <small>授权异常</small>
-                    <strong>{connectorIssueCount} 项</strong>
+                    <small>{t("授权异常")}</small>
+                    <strong>{t("{connectorIssueCount} 项", { connectorIssueCount })}</strong>
                   </span>
                 </span>
                 <span>
@@ -13440,8 +13477,8 @@ export default function HomePage() {
                     <Link2 size={17} />
                   </i>
                   <span>
-                    <small>等待授权</small>
-                    <strong>{disconnectedConnectorCount} 项</strong>
+                    <small>{t("等待授权")}</small>
+                    <strong>{t("{disconnectedConnectorCount} 项", { disconnectedConnectorCount })}</strong>
                   </span>
                 </span>
                 <span className={connectorIssueTaskCount > 0 ? "is-risk" : ""}>
@@ -13449,8 +13486,8 @@ export default function HomePage() {
                     <Pause size={17} />
                   </i>
                   <span>
-                    <small>安全停止任务</small>
-                    <strong>{connectorIssueTaskCount} 个</strong>
+                    <small>{t("安全停止任务")}</small>
+                    <strong>{t("{connectorIssueTaskCount} 个", { connectorIssueTaskCount })}</strong>
                   </span>
                 </span>
                 <span>
@@ -13458,7 +13495,7 @@ export default function HomePage() {
                     <Activity size={17} />
                   </i>
                   <span>
-                    <small>已有检测结果</small>
+                    <small>{t("已有检测结果")}</small>
                     <strong>
                       {checkedHealthyConnectorCount} / {healthyConnectorCount}
                     </strong>
@@ -13498,11 +13535,11 @@ export default function HomePage() {
                           }`}
                         >
                           <i />
-                          {hasIssue
-                            ? "需要重新授权"
+                          {t(hasIssue
+                            ? t("需要重新授权")
                             : connected
-                              ? "已连接"
-                              : "未连接"}
+                              ? t("已连接")
+                              : t("未连接"))}
                         </span>
                       </div>
                       <div className="settings-connector-copy">
@@ -13511,49 +13548,49 @@ export default function HomePage() {
                       </div>
                       <div className="settings-connector-facts">
                         <span>
-                          <small>授权范围</small>
+                          <small>{t("授权范围")}</small>
                           <strong>
                             {hasIssue
-                              ? "授权已失效"
+                              ? t("授权已失效")
                               : connected
                                 ? connector.scope
-                                : "尚未授权"}
+                                : t("尚未授权")}
                           </strong>
                         </span>
                         <span>
-                          <small>数据流向</small>
+                          <small>{t("数据流向")}</small>
                           <strong>
-                            {connected ? connector.dataFlow : "尚未建立数据流"}
+                            {connected ? connector.dataFlow : t("尚未建立数据流")}
                           </strong>
                         </span>
                         <span>
-                          <small>最近检测</small>
+                          <small>{t("最近检测")}</small>
                           <strong>
                             {hasIssue
-                              ? "检测失败"
+                              ? t("检测失败")
                               : !connected
-                                ? "等待连接"
+                                ? t("等待连接")
                                 : isChecking
-                                  ? "正在检测"
+                                  ? t("正在检测")
                                   : checkResult
                                     ? `${checkResult.checkedAt} · ${checkResult.latency} ms`
-                                    : "尚未检测"}
+                                    : t("尚未检测")}
                           </strong>
                         </span>
                       </div>
                       <div className="settings-connector-footer">
                         <small>
                           {hasIssue
-                            ? `${usageCount} 个任务关联 · ${issueTasks[0].title} 已停止`
+                            ? t("{usageCount} 个任务关联 · {title} 已停止", { usageCount, title: issueTasks[0].title })
                             : connected
-                              ? `${usageCount} 个任务关联 · ${connector.lastUsed}`
-                              : `${usageCount} 个任务可使用 · 连接后才会调用`}
+                              ? t("{usageCount} 个任务关联 · {lastUsed}", { usageCount, lastUsed: connector.lastUsed })
+                              : t("{usageCount} 个任务可使用 · 连接后才会调用", { usageCount })}
                         </small>
                         <button
                           type="button"
                           onClick={() => openConnector(connector.id)}
                         >
-                          {hasIssue ? "修复" : connected ? "管理" : "连接"}
+                          {hasIssue ? t("修复") : connected ? t("管理") : t("连接")}
                           <ChevronRight size={15} />
                         </button>
                       </div>
@@ -13566,33 +13603,32 @@ export default function HomePage() {
             <section className="settings-trust-center" id="settings-security">
               <header className="settings-trust-heading">
                 <div>
-                  <span>执行边界与审计</span>
-                  <h2>确认 AI 能做什么，以及刚刚做了什么</h2>
-                  <p>这里汇总当前工作区真正生效的规则，不展示未连接的能力。</p>
+                  <span>{t("执行边界与审计")}</span>
+                  <h2>{t("确认 AI 能做什么，以及刚刚做了什么")}</h2>
+                  <p>{t("这里汇总当前工作区真正生效的规则，不展示未连接的能力。")}</p>
                 </div>
                 <span className="settings-trust-state">
                   <CheckCircle2 size={16} />
-                  规则已生效
+                  
+                  {t("规则已生效")}
                 </span>
               </header>
 
               <div className="settings-trust-layout">
-                <div className="settings-policy-list" aria-label="当前执行规则">
+                <div className="settings-policy-list" aria-label={t("当前执行规则")}>
                   <div className="settings-policy-row">
                     <span className="settings-policy-icon approval">
                       <ShieldCheck size={19} />
                     </span>
                     <div>
-                      <span>审批保护</span>
+                      <span>{t("审批保护")}</span>
                       <strong>
-                        {settings.approval ? "新任务默认需要确认" : "新任务默认自动执行"}
+                        {(settings.approval ? t("新任务默认需要确认") : t("新任务默认自动执行"))}
                       </strong>
-                      <small>
-                        {protectedTaskCount} / {tasks.length} 个现有任务保留审批边界
-                      </small>
+                      <small>{t("{protectedTaskCount} / {length} 个现有任务保留审批边界", { protectedTaskCount, length: tasks.length })}</small>
                     </div>
                     <em className={settings.approval ? "is-safe" : "is-caution"}>
-                      {settings.approval ? "默认开启" : "默认关闭"}
+                      {(settings.approval ? t("默认开启") : t("默认关闭"))}
                     </em>
                     <button
                       type="button"
@@ -13602,9 +13638,9 @@ export default function HomePage() {
                     >
                       {approvals.length > 0
                         ? activeApprovalCount > 0
-                          ? `查看 ${activeApprovalCount} 项待确认`
-                          : `查看 ${deferredApprovalCount} 项稍后提醒`
-                        : "查看任务规则"}
+                          ? t("查看 {activeApprovalCount} 项待确认", { activeApprovalCount })
+                          : t("查看 {deferredApprovalCount} 项稍后提醒", { deferredApprovalCount })
+                        : t("查看任务规则")}
                       <ChevronRight size={15} />
                     </button>
                   </div>
@@ -13614,18 +13650,18 @@ export default function HomePage() {
                       <HardDrive size={19} />
                     </span>
                     <div>
-                      <span>工作区保存</span>
+                      <span>{t("工作区保存")}</span>
                       <strong>
-                        {settings.local ? "数据保存在这台设备" : "当前是临时会话"}
+                        {(settings.local ? t("数据保存在这台设备") : t("当前是临时会话"))}
                       </strong>
                       <small>
                         {settings.local
-                          ? `约 ${workspaceDataSize} KB，可随时导出迁移`
-                          : "关闭页面前请先导出需要保留的数据"}
+                          ? t("约 {workspaceDataSize} KB，可随时导出迁移", { workspaceDataSize })
+                          : t("关闭页面前请先导出需要保留的数据")}
                       </small>
                     </div>
                     <em className={settings.local ? "is-safe" : "is-caution"}>
-                      {settings.local ? "本机保存" : "临时模式"}
+                      {(settings.local ? t("本机保存") : t("临时模式"))}
                     </em>
                     <button
                       type="button"
@@ -13633,7 +13669,7 @@ export default function HomePage() {
                         settings.local ? exportWorkspace : requestToggleLocalPersistence
                       }
                     >
-                      {settings.local ? "立即备份" : "开启保存"}
+                      {(settings.local ? t("立即备份") : t("开启保存"))}
                       <ChevronRight size={15} />
                     </button>
                   </div>
@@ -13643,12 +13679,12 @@ export default function HomePage() {
                       <Bell size={19} />
                     </span>
                     <div>
-                      <span>确认提醒</span>
-                      <strong>{desktopNotificationSummary}</strong>
-                      <small>只影响后续需要你决定的任务，不改变执行规则</small>
+                      <span>{t("确认提醒")}</span>
+                      <strong>{t(desktopNotificationSummary)}</strong>
+                      <small>{t("只影响后续需要你决定的任务，不改变执行规则")}</small>
                     </div>
                     <em className={desktopNotificationStateClass}>
-                      {desktopNotificationStateLabel}
+                      {t(desktopNotificationStateLabel)}
                     </em>
                     <button
                       type="button"
@@ -13659,9 +13695,9 @@ export default function HomePage() {
                       }
                       onClick={toggleDesktopNotifications}
                     >
-                      {isRequestingNotificationPermission
-                        ? "等待授权"
-                        : desktopNotificationActionLabel}
+                      {t(isRequestingNotificationPermission
+                        ? t("等待授权")
+                        : desktopNotificationActionLabel)}
                       <ChevronRight size={15} />
                     </button>
                   </div>
@@ -13670,8 +13706,8 @@ export default function HomePage() {
                 <div className="settings-audit-preview">
                   <div className="settings-audit-heading">
                     <div>
-                      <span>最近安全事件</span>
-                      <strong>{settingsAuditItems.length} 条可追溯记录</strong>
+                      <span>{t("最近安全事件")}</span>
+                      <strong>{t("{length} 条可追溯记录", { length: settingsAuditItems.length })}</strong>
                     </div>
                     <History size={18} />
                   </div>
@@ -13689,7 +13725,7 @@ export default function HomePage() {
                           </span>
                           <span>
                             <small>
-                              {item.kind} · {item.time}
+                              {t(item.kind)} · {item.time}
                             </small>
                             <strong>{item.title}</strong>
                           </span>
@@ -13700,8 +13736,8 @@ export default function HomePage() {
                     {settingsAuditItems.length === 0 && (
                       <div className="settings-audit-empty">
                         <CheckCircle2 size={19} />
-                        <strong>还没有安全事件</strong>
-                        <small>审批、设置和系统变更会自动记录在这里。</small>
+                        <strong>{t("还没有安全事件")}</strong>
+                        <small>{t("审批、设置和系统变更会自动记录在这里。")}</small>
                       </div>
                     )}
                   </div>
@@ -13711,7 +13747,8 @@ export default function HomePage() {
                     onClick={() => openView("activity")}
                   >
                     <History size={16} />
-                    打开完整运行记录
+                    
+                    {t("打开完整运行记录")}
                   </button>
                 </div>
               </div>
@@ -13738,7 +13775,7 @@ export default function HomePage() {
             <button
               className="team-dialog-close"
               type="button"
-              aria-label="关闭邀请成员"
+              aria-label={t("关闭邀请成员")}
               onClick={closeTeamInvite}
             >
               <X size={17} />
@@ -13748,10 +13785,11 @@ export default function HomePage() {
                 <UserPlus size={22} />
               </span>
               <div>
-                <span>团队协作</span>
-                <h2 id="team-invite-title">邀请成员加入工作区</h2>
+                <span>{t("团队协作")}</span>
+                <h2 id="team-invite-title">{t("邀请成员加入工作区")}</h2>
                 <p id="team-invite-description">
-                  发送邀请前先选择角色，成员接受后会获得对应权限。
+                  
+                  {t("发送邀请前先选择角色，成员接受后会获得对应权限。")}
                 </p>
               </div>
             </header>
@@ -13764,15 +13802,13 @@ export default function HomePage() {
             >
               <Users size={17} />
               <span>
-                <small>Team 方案席位</small>
-                <strong>
-                  已使用 {teamMembers.length} / {teamSeatLimit}
-                </strong>
+                <small>{t("Team 方案席位")}</small>
+                <strong>{t("已使用 {length} / {teamSeatLimit}", { length: teamMembers.length, teamSeatLimit })}</strong>
               </span>
               <span>
-                <small>邀请后剩余</small>
+                <small>{t("邀请后剩余")}</small>
                 <strong>
-                  {teamSeatLimitReached ? "没有可用席位" : `${availableSeatCount - 1} 个`}
+                  {teamSeatLimitReached ? t("没有可用席位") : t("{value} 个", { value: availableSeatCount - 1 })}
                 </strong>
               </span>
             </div>
@@ -13781,8 +13817,8 @@ export default function HomePage() {
               <div className="team-network-note" role="status">
                 <Globe2 size={17} />
                 <span>
-                  <strong>当前设备离线</strong>
-                  <small>邀请内容会保留，恢复网络后再发送。</small>
+                  <strong>{t("当前设备离线")}</strong>
+                  <small>{t("邀请内容会保留，恢复网络后再发送。")}</small>
                 </span>
               </div>
             )}
@@ -13795,7 +13831,7 @@ export default function HomePage() {
                     : ""
                 }
               >
-                <span>成员姓名</span>
+                <span>{t("成员姓名")}</span>
                 <input
                   type="text"
                   value={inviteName}
@@ -13809,7 +13845,7 @@ export default function HomePage() {
                       ? "team-invite-name-error"
                       : undefined
                   }
-                  placeholder="例如：张宁"
+                  placeholder={t("例如：张宁")}
                   onChange={(event) => {
                     setInviteName(event.target.value);
                     if (inviteFormSubmitted) setInviteFormSubmitted(false);
@@ -13828,7 +13864,7 @@ export default function HomePage() {
                     : ""
                 }
               >
-                <span>工作邮箱</span>
+                <span>{t("工作邮箱")}</span>
                 <input
                   type="email"
                   value={inviteEmail}
@@ -13854,7 +13890,7 @@ export default function HomePage() {
                 )}
               </label>
               <label>
-                <span>成员角色</span>
+                <span>{t("成员角色")}</span>
                 <select
                   value={inviteRole}
                   disabled={isSendingInvite}
@@ -13866,7 +13902,7 @@ export default function HomePage() {
                 >
                   {(["管理员", "审批者", "成员"] as TeamRole[]).map((role) => (
                     <option key={role} value={role}>
-                      {role}
+                      {t(role)}
                     </option>
                   ))}
                 </select>
@@ -13877,7 +13913,7 @@ export default function HomePage() {
               <div>
                 <ShieldCheck size={17} />
                 <span>
-                  <small>{inviteRole}权限</small>
+                  <small>{t("{inviteRole}权限", { inviteRole: t(inviteRole) })}</small>
                   <strong>{teamRoleDetails[inviteRole].summary}</strong>
                 </span>
               </div>
@@ -13907,9 +13943,10 @@ export default function HomePage() {
                 />
                 <ShieldCheck size={18} />
                 <span>
-                  <strong>确认授予管理员权限</strong>
+                  <strong>{t("确认授予管理员权限")}</strong>
                   <small>
-                    管理员可以邀请成员、编辑任务并审批外部操作。
+                    
+                    {t("管理员可以邀请成员、编辑任务并审批外部操作。")}
                   </small>
                 </span>
               </label>
@@ -13921,11 +13958,11 @@ export default function HomePage() {
                 teamSeatLimitReached) && (
               <div className="team-form-error-summary" role="alert">
                 <AlertTriangle size={16} />
-                {teamSeatLimitReached
-                  ? "当前方案没有可用席位，请先移除成员或升级方案。"
+                {t(teamSeatLimitReached
+                  ? t("当前方案没有可用席位，请先移除成员或升级方案。")
                   : inviteNeedsAdminAcknowledgement
-                    ? "请先确认管理员将获得的高权限。"
-                    : "请先修正上方信息，再发送邀请。"}
+                    ? t("请先确认管理员将获得的高权限。")
+                    : t("请先修正上方信息，再发送邀请。"))}
               </div>
             )}
 
@@ -13935,7 +13972,8 @@ export default function HomePage() {
                 disabled={isSendingInvite}
                 onClick={closeTeamInvite}
               >
-                取消
+                
+                {t("取消")}
               </button>
               <button
                 className={`primary${!isOnline ? " is-offline" : ""}`}
@@ -13949,13 +13987,13 @@ export default function HomePage() {
                 ) : (
                   <Send size={16} />
                 )}
-                {isSendingInvite
-                  ? "正在发送"
+                {t(isSendingInvite
+                  ? t("正在发送")
                   : teamSeatLimitReached
-                    ? "席位已用完"
+                    ? t("席位已用完")
                   : isOnline
-                    ? "发送邀请"
-                    : "联网后发送"}
+                    ? t("发送邀请")
+                    : t("联网后发送"))}
               </button>
             </footer>
           </form>
@@ -13978,7 +14016,7 @@ export default function HomePage() {
             <button
               className="team-dialog-close"
               type="button"
-              aria-label="关闭成员管理"
+              aria-label={t("关闭成员管理")}
               onClick={closeTeamMember}
             >
               <X size={17} />
@@ -13990,7 +14028,7 @@ export default function HomePage() {
                 {selectedTeamMember.avatar}
               </span>
               <div>
-                <span>成员权限</span>
+                <span>{t("成员权限")}</span>
                 <h2 id="team-member-title">{selectedTeamMember.name}</h2>
                 <p id="team-member-description">{selectedTeamMember.email}</p>
               </div>
@@ -13998,7 +14036,7 @@ export default function HomePage() {
                 className={`team-member-dialog-status status-${selectedTeamMember.status}`}
               >
                 <i />
-                {selectedTeamMember.status}
+                {t(selectedTeamMember.status)}
               </span>
             </header>
 
@@ -14006,8 +14044,8 @@ export default function HomePage() {
               <div className="team-network-note member" role="status">
                 <Globe2 size={17} />
                 <span>
-                  <strong>成员权限保持不变</strong>
-                  <small>角色、邀请与访问权限会在恢复网络后才能更新。</small>
+                  <strong>{t("成员权限保持不变")}</strong>
+                  <small>{t("角色、邀请与访问权限会在恢复网络后才能更新。")}</small>
                 </span>
               </div>
             )}
@@ -14020,36 +14058,36 @@ export default function HomePage() {
                 >
                   <AlertTriangle size={17} />
                   <span>
-                    <strong>另一窗口更新了成员角色</strong>
-                    <small>请先处理版本冲突，再保存这里的权限变更。</small>
+                    <strong>{t("另一窗口更新了成员角色")}</strong>
+                    <small>{t("请先处理版本冲突，再保存这里的权限变更。")}</small>
                   </span>
                 </div>
               )}
 
             <div className="team-member-facts">
               <span>
-                <small>当前角色</small>
-                <strong>{selectedTeamMember.role}</strong>
+                <small>{t("当前角色")}</small>
+                <strong>{t(selectedTeamMember.role)}</strong>
               </span>
               <span>
-                <small>最近活动</small>
+                <small>{t("最近活动")}</small>
                 <strong>{selectedTeamMember.lastActive}</strong>
               </span>
               <span>
-                <small>审批权限</small>
+                <small>{t("审批权限")}</small>
                 <strong>
-                  {["所有者", "管理员", "审批者"].includes(
+                  {t(["所有者", "管理员", "审批者"].includes(
                     selectedTeamMember.role,
                   )
-                    ? "可以审批"
-                    : "不可审批"}
+                    ? t("可以审批")
+                    : t("不可审批"))}
                 </strong>
               </span>
             </div>
 
             <div className="team-member-role-editor">
               <label>
-                <span>工作区角色</span>
+                <span>{t("工作区角色")}</span>
                 <select
                   value={memberRoleDraft}
                   disabled={selectedTeamMember.role === "所有者"}
@@ -14059,11 +14097,11 @@ export default function HomePage() {
                 >
                   {(["管理员", "审批者", "成员"] as TeamRole[]).map((role) => (
                     <option key={role} value={role}>
-                      {role}
+                      {t(role)}
                     </option>
                   ))}
                   {selectedTeamMember.role === "所有者" && (
-                    <option value="所有者">所有者</option>
+                    <option value={t("所有者")}>{t("所有者")}</option>
                   )}
                 </select>
               </label>
@@ -14072,17 +14110,17 @@ export default function HomePage() {
                   teamMemberRoleDirty ? " has-changes" : ""
                 }`}
               >
-                <small>权限变更</small>
+                <small>{t("权限变更")}</small>
                 <div className="team-role-change-route">
-                  <span>{selectedTeamMember.role}</span>
+                  <span>{t(selectedTeamMember.role)}</span>
                   <ChevronRight size={15} />
-                  <strong>{memberRoleDraft}</strong>
+                  <strong>{t(memberRoleDraft)}</strong>
                 </div>
                 <p>{teamRoleDetails[memberRoleDraft].summary}</p>
                 {teamMemberRoleDirty ? (
                   <div className="team-role-diff">
                     <section className="is-gained">
-                      <span>新增权限</span>
+                      <span>{t("新增权限")}</span>
                       {gainedMemberPermissions.length ? (
                         gainedMemberPermissions.map((permission) => (
                           <small key={permission}>
@@ -14093,12 +14131,13 @@ export default function HomePage() {
                       ) : (
                         <small>
                           <Check size={13} />
-                          没有新增权限
+                          
+                          {t("没有新增权限")}
                         </small>
                       )}
                     </section>
                     <section className="is-lost">
-                      <span>收回权限</span>
+                      <span>{t("收回权限")}</span>
                       {lostMemberPermissions.length ? (
                         lostMemberPermissions.map((permission) => (
                           <small key={permission}>
@@ -14109,7 +14148,8 @@ export default function HomePage() {
                       ) : (
                         <small>
                           <Check size={13} />
-                          没有收回权限
+                          
+                          {t("没有收回权限")}
                         </small>
                       )}
                     </section>
@@ -14117,7 +14157,8 @@ export default function HomePage() {
                 ) : (
                   <div className="team-role-unchanged">
                     <CheckCircle2 size={15} />
-                    当前权限保持不变
+                    
+                    {t("当前权限保持不变")}
                   </div>
                 )}
               </div>
@@ -14127,8 +14168,8 @@ export default function HomePage() {
               <div className="team-owner-note">
                 <ShieldCheck size={17} />
                 <span>
-                  <strong>工作区所有者</strong>
-                  <small>为避免失去管理权限，所有者角色不能在这里修改或移除。</small>
+                  <strong>{t("工作区所有者")}</strong>
+                  <small>{t("为避免失去管理权限，所有者角色不能在这里修改或移除。")}</small>
                 </span>
               </div>
             )}
@@ -14138,26 +14179,29 @@ export default function HomePage() {
                 <header>
                   <AlertTriangle size={18} />
                   <span>
-                    <strong>移除 {selectedTeamMember.name}？</strong>
+                    <strong>{t("移除 {name}？", { name: selectedTeamMember.name })}</strong>
                     <small>
-                      {selectedTeamMember.status === "已邀请"
-                        ? "邀请链接会立即失效，并释放 1 个团队席位。"
-                        : "该成员会立即失去当前工作区的全部访问权限。"}
+                      {t(selectedTeamMember.status === "已邀请"
+                        ? t("邀请链接会立即失效，并释放 1 个团队席位。")
+                        : t("该成员会立即失去当前工作区的全部访问权限。"))}
                     </small>
                   </span>
                 </header>
                 <div className="team-member-remove-impact">
                   <span>
                     <X size={13} />
-                    任务访问
+                    
+                    {t("任务访问")}
                   </span>
                   <span>
                     <X size={13} />
-                    成果下载
+                    
+                    {t("成果下载")}
                   </span>
                   <span>
                     <X size={13} />
-                    审批与设置
+                    
+                    {t("审批与设置")}
                   </span>
                 </div>
                 <label
@@ -14173,7 +14217,8 @@ export default function HomePage() {
                     }
                   />
                   <span>
-                    我确认移除 <strong>{selectedTeamMember.email}</strong>
+                    
+                    {t("我确认移除")} <strong>{selectedTeamMember.email}</strong>
                   </span>
                 </label>
                 <div className="team-member-remove-actions">
@@ -14185,7 +14230,8 @@ export default function HomePage() {
                       setMemberRemoveAcknowledged(false);
                     }}
                   >
-                    取消
+                    
+                    {t("取消")}
                   </button>
                   <button
                     className={`danger${!isOnline ? " is-offline" : ""}`}
@@ -14193,11 +14239,11 @@ export default function HomePage() {
                     disabled={!memberRemoveAcknowledged || !isOnline}
                     onClick={confirmRemoveTeamMember}
                   >
-                    {!isOnline
-                      ? "联网后移除"
+                    {t(!isOnline
+                      ? t("联网后移除")
                       : memberRemoveAcknowledged
-                        ? "确认移除"
-                        : "请先确认"}
+                        ? t("确认移除")
+                        : t("请先确认"))}
                   </button>
                 </div>
               </div>
@@ -14210,7 +14256,8 @@ export default function HomePage() {
                     data-overlay-initial-focus
                     onClick={closeTeamMember}
                   >
-                    完成
+                    
+                    {t("完成")}
                   </button>
                 ) : (
                   <>
@@ -14223,7 +14270,8 @@ export default function HomePage() {
                       }}
                     >
                       <Trash2 size={15} />
-                      移除成员
+                      
+                      {t("移除成员")}
                     </button>
                     {selectedTeamMember.status === "已邀请" && (
                       <button
@@ -14232,7 +14280,7 @@ export default function HomePage() {
                         onClick={resendTeamInvite}
                       >
                         {isOnline ? <Mail size={15} /> : <Globe2 size={15} />}
-                        {isOnline ? "重发邀请" : "联网后重发"}
+                        {(isOnline ? t("重发邀请") : t("联网后重发"))}
                       </button>
                     )}
                     <button
@@ -14250,12 +14298,12 @@ export default function HomePage() {
                         <ShieldCheck size={15} />
                       )}
                       {!isOnline
-                        ? "联网后保存"
+                        ? t("联网后保存")
                         : memberWorkspaceConflict
-                          ? "先处理冲突"
+                          ? t("先处理冲突")
                           : teamMemberRoleDirty
-                            ? `保存为${memberRoleDraft}`
-                            : "角色未更改"}
+                            ? t("保存为{memberRoleDraft}", { memberRoleDraft: t(memberRoleDraft) })
+                            : t("角色未更改")}
                     </button>
                   </>
                 )}
@@ -14283,7 +14331,7 @@ export default function HomePage() {
             <button
               className="connector-detail-close"
               type="button"
-              aria-label="关闭连接器管理"
+              aria-label={t("关闭连接器管理")}
               data-overlay-initial-focus
               onClick={closeConnector}
             >
@@ -14295,7 +14343,7 @@ export default function HomePage() {
                 <SelectedConnectorIcon size={23} />
               </span>
               <div>
-                <span>连接器管理</span>
+                <span>{t("连接器管理")}</span>
                 <h2 id="connector-detail-title">{selectedConnector.name}</h2>
                 <p id="connector-detail-description">
                   {selectedConnector.description}
@@ -14311,59 +14359,56 @@ export default function HomePage() {
                 }`}
               >
                 <i />
-                {selectedConnectorHasIssue
-                  ? "需要重新授权"
+                {t(selectedConnectorHasIssue
+                  ? t("需要重新授权")
                   : connectorStates[selectedConnector.id]
-                    ? "连接正常"
-                    : "尚未连接"}
+                    ? t("连接正常")
+                    : t("尚未连接"))}
               </span>
             </header>
 
             <div className="connector-detail-facts">
               <span>
-                <small>授权范围</small>
+                <small>{t("授权范围")}</small>
                 <strong>
                   {selectedConnectorHasIssue
-                    ? "授权已过期，暂不可用"
+                    ? t("授权已过期，暂不可用")
                     : connectorStates[selectedConnector.id]
                     ? selectedConnector.scope
-                    : "未授予任何权限"}
+                    : t("未授予任何权限")}
                 </strong>
               </span>
               <span>
                 <small>
-                  {selectedConnectorHasIssue ? "受影响任务" : "关联任务"}
+                  {(selectedConnectorHasIssue ? t("受影响任务") : t("关联任务"))}
                 </small>
-                <strong>
-                  {selectedConnectorHasIssue
+                <strong>{t("{value}{value2}个", { value: selectedConnectorHasIssue
                     ? selectedConnectorIssueTasks.length
-                    : connectorUsageCounts[selectedConnector.id]}{" "}
-                  个
-                </strong>
+                    : connectorUsageCounts[selectedConnector.id], value2: " " })}</strong>
               </span>
               <span>
-                <small>最近使用</small>
+                <small>{t("最近使用")}</small>
                 <strong>
                   {selectedConnectorHasIssue
                     ? selectedConnectorIssueTasks[0]?.updated
                     : connectorStates[selectedConnector.id]
                     ? selectedConnector.lastUsed
-                  : "尚未使用"}
+                  : t("尚未使用")}
                 </strong>
               </span>
               <span>
-                <small>连接检测</small>
+                <small>{t("连接检测")}</small>
                 <strong>
                   {selectedConnectorHasIssue
-                    ? "未通过 · 需要修复"
+                    ? t("未通过 · 需要修复")
                     : !connectorStates[selectedConnector.id]
-                      ? "授权后自动检测"
+                      ? t("授权后自动检测")
                       : connectorTestingId === selectedConnector.id ||
                           connectorTestingAll
-                        ? "正在检测"
+                        ? t("正在检测")
                         : selectedConnectorCheck
                           ? `${selectedConnectorCheck.checkedAt} · ${selectedConnectorCheck.latency} ms`
-                          : "尚未检测"}
+                          : t("尚未检测")}
                 </strong>
               </span>
             </div>
@@ -14375,8 +14420,8 @@ export default function HomePage() {
                     <AlertTriangle size={17} />
                   </span>
                   <div>
-                    <em>授权异常</em>
-                    <strong>连接仍然存在，但当前凭证已不可用</strong>
+                    <em>{t("授权异常")}</em>
+                    <strong>{t("连接仍然存在，但当前凭证已不可用")}</strong>
                   </div>
                   <code>
                     {selectedConnectorIssueTasks[0]?.errorCode ??
@@ -14384,10 +14429,11 @@ export default function HomePage() {
                   </code>
                 </div>
                 <p>
-                  为避免未经确认的外部操作，系统已停止受影响任务。重新授权不会自动发送内容，也不会删除原始失败记录。
+                  
+                  {t("为避免未经确认的外部操作，系统已停止受影响任务。重新授权不会自动发送内容，也不会删除原始失败记录。")}
                 </p>
                 <div className="connector-issue-tasks">
-                  <span>受影响任务</span>
+                  <span>{t("受影响任务")}</span>
                   {selectedConnectorIssueTasks.map((task) => (
                     <button
                       key={task.id}
@@ -14413,28 +14459,28 @@ export default function HomePage() {
                     ? "is-ready"
                     : "is-idle"
               }`}
-              aria-label="连接健康检查"
+              aria-label={t("连接健康检查")}
             >
               <header>
                 <div>
-                  <span>连接健康检查</span>
+                  <span>{t("连接健康检查")}</span>
                   <strong>
-                    {selectedConnectorHasIssue
-                      ? "凭证失效，外部调用已被阻止"
+                    {t(selectedConnectorHasIssue
+                      ? t("凭证失效，外部调用已被阻止")
                       : connectorStates[selectedConnector.id]
                         ? connectorTestingId === selectedConnector.id ||
                           connectorTestingAll
-                          ? "正在验证身份、权限和响应"
-                          : "身份、权限和服务响应均正常"
-                        : "完成授权后会自动执行三项检测"}
+                          ? t("正在验证身份、权限和响应")
+                          : t("身份、权限和服务响应均正常")
+                        : t("完成授权后会自动执行三项检测"))}
                   </strong>
                 </div>
                 <em>
-                  {selectedConnectorHasIssue
-                    ? "1 项失败"
+                  {t(selectedConnectorHasIssue
+                    ? t("1 项失败")
                     : connectorStates[selectedConnector.id]
-                      ? "3 / 3 通过"
-                      : "等待授权"}
+                      ? t("3 / 3 通过")
+                      : t("等待授权"))}
                 </em>
               </header>
               <div>
@@ -14455,13 +14501,13 @@ export default function HomePage() {
                     <Timer size={14} />
                   )}
                   <span>
-                    <small>身份凭证</small>
+                    <small>{t("身份凭证")}</small>
                     <strong>
                       {selectedConnectorHasIssue
-                        ? "已失效"
+                        ? t("已失效")
                         : connectorStates[selectedConnector.id]
                           ? selectedConnector.credential
-                          : "尚未验证"}
+                          : t("尚未验证")}
                     </strong>
                   </span>
                 </span>
@@ -14480,13 +14526,13 @@ export default function HomePage() {
                     <Timer size={14} />
                   )}
                   <span>
-                    <small>权限范围</small>
+                    <small>{t("权限范围")}</small>
                     <strong>
-                      {selectedConnectorHasIssue
-                        ? "等待重新确认"
+                      {t(selectedConnectorHasIssue
+                        ? t("等待重新确认")
                         : connectorStates[selectedConnector.id]
-                          ? "与任务范围一致"
-                          : "连接时确认"}
+                          ? t("与任务范围一致")
+                          : t("连接时确认"))}
                     </strong>
                   </span>
                 </span>
@@ -14509,15 +14555,15 @@ export default function HomePage() {
                     <Timer size={14} />
                   )}
                   <span>
-                    <small>服务响应</small>
+                    <small>{t("服务响应")}</small>
                     <strong>
                       {selectedConnectorHasIssue
-                        ? "任务已安全停止"
+                        ? t("任务已安全停止")
                         : connectorStates[selectedConnector.id]
                           ? selectedConnectorCheck
                             ? `${selectedConnectorCheck.latency} ms`
-                            : "可正常调用"
-                          : "尚未检测"}
+                            : t("可正常调用")
+                          : t("尚未检测")}
                     </strong>
                   </span>
                 </span>
@@ -14526,11 +14572,11 @@ export default function HomePage() {
 
             <div className="connector-permission-section">
               <div>
-                <span>权限范围</span>
+                <span>{t("权限范围")}</span>
                 <strong>
-                  {connectorStates[selectedConnector.id]
-                    ? "当前已允许以下操作"
-                    : "连接后将请求以下权限"}
+                  {t(connectorStates[selectedConnector.id]
+                    ? t("当前已允许以下操作")
+                    : t("连接后将请求以下权限"))}
                 </strong>
               </div>
               <div className="connector-permission-list">
@@ -14546,9 +14592,9 @@ export default function HomePage() {
             <div className="connector-safety-note">
               <ShieldCheck size={17} />
               <span>
-                {selectedConnector.id === "mail"
-                  ? "邮件只会在你确认后发送，连接器不会绕过审批保护。"
-                  : "连接器只在任务需要时调用，每次使用都会写入运行记录。"}
+                {t(selectedConnector.id === "mail"
+                  ? t("邮件只会在你确认后发送，连接器不会绕过审批保护。")
+                  : t("连接器只在任务需要时调用，每次使用都会写入运行记录。"))}
               </span>
             </div>
 
@@ -14572,12 +14618,13 @@ export default function HomePage() {
                 <ShieldCheck size={18} />
                 <span>
                   <strong>
-                    {selectedConnectorHasIssue
-                      ? "确认恢复上述权限范围"
-                      : "确认授予上述权限范围"}
+                    {t(selectedConnectorHasIssue
+                      ? t("确认恢复上述权限范围")
+                      : t("确认授予上述权限范围"))}
                   </strong>
                   <small>
-                    仅允许当前列出的操作，新的权限会再次请求你的确认。
+                    
+                    {t("仅允许当前列出的操作，新的权限会再次请求你的确认。")}
                   </small>
                 </span>
               </label>
@@ -14587,10 +14634,8 @@ export default function HomePage() {
               <div className="connector-disconnect-confirm" role="alert">
                 <AlertTriangle size={18} />
                 <span>
-                  <strong>确认断开 {selectedConnector.name}？</strong>
-                  <small>
-                    {connectorUsageCounts[selectedConnector.id]} 个关联任务将无法继续使用这项能力，历史记录不会被删除。
-                  </small>
+                  <strong>{t("确认断开 {name}？", { name: selectedConnector.name })}</strong>
+                  <small>{t("{value} 个关联任务将无法继续使用这项能力，历史记录不会被删除。", { value: connectorUsageCounts[selectedConnector.id] })}</small>
                 </span>
                 <label
                   className={`connector-disconnect-ack${
@@ -14606,8 +14651,8 @@ export default function HomePage() {
                     }
                   />
                   <span>
-                    <strong>我确认后续任务会失去这项能力</strong>
-                    <small>断开后可以重新授权，已有审计记录会继续保留。</small>
+                    <strong>{t("我确认后续任务会失去这项能力")}</strong>
+                    <small>{t("断开后可以重新授权，已有审计记录会继续保留。")}</small>
                   </span>
                 </label>
                 <div className="connector-disconnect-actions">
@@ -14618,7 +14663,8 @@ export default function HomePage() {
                       setConnectorDisconnectAcknowledged(false);
                     }}
                   >
-                    取消
+                    
+                    {t("取消")}
                   </button>
                   <button
                     className="danger"
@@ -14626,9 +14672,9 @@ export default function HomePage() {
                     disabled={!connectorDisconnectAcknowledged}
                     onClick={confirmDisconnectConnector}
                   >
-                    {connectorDisconnectAcknowledged
-                      ? "确认断开"
-                      : "请先确认"}
+                    {t(connectorDisconnectAcknowledged
+                      ? t("确认断开")
+                      : t("请先确认"))}
                   </button>
                 </div>
               </div>
@@ -14641,7 +14687,8 @@ export default function HomePage() {
                       type="button"
                       onClick={requestConnectorDisconnect}
                     >
-                      断开连接
+                      
+                      {t("断开连接")}
                     </button>
                     <button
                       className="primary reauthorize"
@@ -14665,12 +14712,12 @@ export default function HomePage() {
                       ) : (
                         <RotateCcw size={16} />
                       )}
-                      {connectorTestingId === selectedConnector.id ||
+                      {t(connectorTestingId === selectedConnector.id ||
                       connectorTestingAll
-                        ? "正在重新授权"
+                        ? t("正在重新授权")
                         : connectorAuthorizeAcknowledged
-                          ? "重新授权"
-                          : "请先确认权限"}
+                          ? t("重新授权")
+                          : t("请先确认权限"))}
                     </button>
                   </>
                 ) : connectorStates[selectedConnector.id] ? (
@@ -14680,7 +14727,8 @@ export default function HomePage() {
                       type="button"
                       onClick={requestConnectorDisconnect}
                     >
-                      断开连接
+                      
+                      {t("断开连接")}
                     </button>
                     <button
                       className="primary"
@@ -14701,10 +14749,10 @@ export default function HomePage() {
                       ) : (
                         <CheckCircle2 size={16} />
                       )}
-                      {connectorTestingId === selectedConnector.id ||
+                      {t(connectorTestingId === selectedConnector.id ||
                       connectorTestingAll
-                        ? "正在测试"
-                        : "测试连接"}
+                        ? t("正在测试")
+                        : t("测试连接"))}
                     </button>
                   </>
                 ) : (
@@ -14713,7 +14761,8 @@ export default function HomePage() {
                       type="button"
                       onClick={() => setSelectedConnectorId(null)}
                     >
-                      暂不连接
+                      
+                      {t("暂不连接")}
                     </button>
                     <button
                       className="primary"
@@ -14726,9 +14775,9 @@ export default function HomePage() {
                       onClick={() => connectConnector(selectedConnector.id)}
                     >
                       <Link2 size={16} />
-                      {connectorAuthorizeAcknowledged
-                        ? "连接并授权"
-                        : "请先确认权限"}
+                      {t(connectorAuthorizeAcknowledged
+                        ? t("连接并授权")
+                        : t("请先确认权限"))}
                     </button>
                   </>
                 )}
@@ -14754,8 +14803,8 @@ export default function HomePage() {
               className="run-detail-close"
               type="button"
               data-overlay-initial-focus
-              aria-label="返回任务详情"
-              title="返回任务详情"
+              aria-label={t("返回任务详情")}
+              title={t("返回任务详情")}
               onClick={closeRunDetail}
             >
               <X size={18} />
@@ -14771,22 +14820,22 @@ export default function HomePage() {
                 {inspectedRun.status === "已取消" && <Pause size={22} />}
               </span>
               <div>
-                <span>运行详情</span>
+                <span>{t("运行详情")}</span>
                 <h2 id="run-detail-title">{inspectedRunTask.title}</h2>
                 <p>{inspectedRun.summary}</p>
               </div>
-              <em>{inspectedRun.status}</em>
+              <em>{t(inspectedRun.status)}</em>
             </header>
 
-            <div className="run-detail-identity" aria-label="运行信息">
+            <div className="run-detail-identity" aria-label={t("运行信息")}>
               <span className="run-detail-id">
-                <small>运行 ID</small>
+                <small>{t("运行 ID")}</small>
                 <span>
                   <code>{inspectedRun.id}</code>
                   <button
                     type="button"
-                    aria-label="复制运行 ID"
-                    title="复制运行 ID"
+                    aria-label={t("复制运行 ID")}
+                    title={t("复制运行 ID")}
                     onClick={() => copyTaskRunId(inspectedRun)}
                   >
                     <Copy size={14} />
@@ -14794,34 +14843,31 @@ export default function HomePage() {
                 </span>
               </span>
               <span>
-                <small>开始时间</small>
+                <small>{t("开始时间")}</small>
                 <strong>{formatTaskRunTime(inspectedRun.startedAt)}</strong>
               </span>
               <span>
-                <small>实际耗时</small>
+                <small>{t("实际耗时")}</small>
                 <strong>
                   {formatTaskRunDuration(inspectedRun.durationSeconds)}
                 </strong>
               </span>
               <span>
-                <small>启动方式</small>
-                <strong>{inspectedRunLaunchType}</strong>
+                <small>{t("启动方式")}</small>
+                <strong>{t(inspectedRunLaunchType)}</strong>
               </span>
             </div>
 
             <section className="run-stage-section">
               <div className="run-section-heading">
                 <span>
-                  <small>执行路径</small>
-                  <h3>从配置到审计的完整阶段</h3>
+                  <small>{t("执行路径")}</small>
+                  <h3>{t("从配置到审计的完整阶段")}</h3>
                 </span>
-                <em>
-                  {inspectedRunStages.filter((stage) => stage.status === "成功")
-                    .length}
-                  /{inspectedRunStages.length} 已完成
-                </em>
+                <em>{t("{length}/{length2} 已完成", { length: inspectedRunStages.filter((stage) => stage.status === "成功")
+                    .length, length2: inspectedRunStages.length })}</em>
               </div>
-              <ol className="run-stage-list" aria-label="运行阶段">
+              <ol className="run-stage-list" aria-label={t("运行阶段")}>
                 {inspectedRunStages.map((stage, index) => (
                   <li className={`stage-${stage.status}`} key={stage.id}>
                     <span className="run-stage-index">
@@ -14841,7 +14887,7 @@ export default function HomePage() {
                       <strong>{stage.title}</strong>
                       <small>{stage.detail}</small>
                     </span>
-                    <em>{stage.status}</em>
+                    <em>{t(stage.status)}</em>
                   </li>
                 ))}
               </ol>
@@ -14849,19 +14895,19 @@ export default function HomePage() {
 
             <section
               className={`run-boundary-panel status-${inspectedRun.status}`}
-              aria-label="结果与安全边界"
+              aria-label={t("结果与安全边界")}
             >
               <div className="run-section-heading">
                 <span>
-                  <small>结果与安全边界</small>
+                  <small>{t("结果与安全边界")}</small>
                   <h3>
-                    {inspectedRun.status === "失败"
-                      ? "失败已被安全拦截"
+                    {t(inspectedRun.status === "失败"
+                      ? t("失败已被安全拦截")
                       : inspectedRun.status === "运行中"
-                        ? "正在受控执行"
+                        ? t("正在受控执行")
                         : inspectedRun.status === "已取消"
-                          ? "运行已在检查点停止"
-                          : "运行结果已完成保存"}
+                          ? t("运行已在检查点停止")
+                          : t("运行结果已完成保存"))}
                   </h3>
                 </span>
                 <ShieldCheck size={19} />
@@ -14871,31 +14917,31 @@ export default function HomePage() {
                   <code>{inspectedRun.errorCode ?? "RUN_FAILED"}</code>
                   <p>
                     {inspectedRun.errorMessage ??
-                      "本次运行没有完成，系统已保留失败现场和审计记录。"}
+                      t("本次运行没有完成，系统已保留失败现场和审计记录。")}
                   </p>
                 </div>
               )}
               <div className="run-evidence-grid">
                 <span>
-                  <small>外部动作</small>
+                  <small>{t("外部动作")}</small>
                   <strong>
-                    {inspectedRunAuthorizationBlocked ? "0 次" : "已记录"}
+                    {(inspectedRunAuthorizationBlocked ? t("0 次") : t("已记录"))}
                   </strong>
                   <em>
-                    {inspectedRunAuthorizationBlocked
-                      ? "授权通过前未执行"
-                      : "全部进入审计"}
+                    {t(inspectedRunAuthorizationBlocked
+                      ? t("授权通过前未执行")
+                      : t("全部进入审计"))}
                   </em>
                 </span>
                 <span>
-                  <small>关联成果</small>
-                  <strong>{inspectedRunArtifacts.length} 项</strong>
-                  <em>版本和来源可追溯</em>
+                  <small>{t("关联成果")}</small>
+                  <strong>{t("{length} 项", { length: inspectedRunArtifacts.length })}</strong>
+                  <em>{t("版本和来源可追溯")}</em>
                 </span>
                 <span>
-                  <small>审计证据</small>
-                  <strong>{inspectedRunActivity.length} 条</strong>
-                  <em>保存在本机工作区</em>
+                  <small>{t("审计证据")}</small>
+                  <strong>{t("{length} 条", { length: inspectedRunActivity.length })}</strong>
+                  <em>{t("保存在本机工作区")}</em>
                 </span>
               </div>
             </section>
@@ -14921,9 +14967,10 @@ export default function HomePage() {
                   }}
                 >
                   <label htmlFor="run-continue-input">
-                    <strong>继续对话</strong>
+                    <strong>{t("继续对话")}</strong>
                     <small>
-                      接着这次运行的对话再说一句。智能体记得之前做过什么，Unterm 重启过也一样。
+                      
+                      {t("接着这次运行的对话再说一句。智能体记得之前做过什么，后台服务重启过也一样。")}
                     </small>
                   </label>
                   <div>
@@ -14931,7 +14978,7 @@ export default function HomePage() {
                       id="run-continue-input"
                       rows={2}
                       value={runContinuePrompt}
-                      placeholder="比如：把刚才的结果整理成表格"
+                      placeholder={t("比如：把刚才的结果整理成表格")}
                       onChange={(event) => setRunContinuePrompt(event.target.value)}
                     />
                     <button
@@ -14940,7 +14987,8 @@ export default function HomePage() {
                       disabled={!runContinuePrompt.trim()}
                     >
                       <Send size={15} />
-                      继续
+                      
+                      {t("继续")}
                     </button>
                   </div>
                 </form>
@@ -14949,18 +14997,20 @@ export default function HomePage() {
             <footer className="run-detail-actions">
               <button
                 type="button"
-                title="复制运行 ID"
+                title={t("复制运行 ID")}
                 onClick={() => copyTaskRunId(inspectedRun)}
               >
                 <Copy size={15} />
-                复制 ID
+                
+                {t("复制 ID")}
               </button>
               <button
                 type="button"
                 onClick={() => downloadTaskRun(inspectedRunTask, inspectedRun)}
               >
                 <Download size={15} />
-                导出 JSON
+                
+                {t("导出 JSON")}
               </button>
               {inspectedRun.status === "运行中" &&
               inspectedRunTask.status === "运行中" ? (
@@ -14970,7 +15020,8 @@ export default function HomePage() {
                   onClick={() => pauseInspectedRun(inspectedRunTask)}
                 >
                   <Pause size={16} />
-                  暂停本次运行
+                  
+                  {t("暂停本次运行")}
                 </button>
               ) : inspectedRun.status === "失败" &&
                 inspectedRunTask.status !== "运行中" ? (
@@ -14980,7 +15031,8 @@ export default function HomePage() {
                   onClick={() => retryInspectedRun(inspectedRunTask)}
                 >
                   <RotateCcw size={16} />
-                  从安全检查点重试
+                  
+                  {t("从安全检查点重试")}
                 </button>
               ) : inspectedRun.status === "成功" &&
                 inspectedRunArtifacts.length > 0 ? (
@@ -14990,7 +15042,8 @@ export default function HomePage() {
                   onClick={() => openTaskArtifacts(inspectedRunTask.id)}
                 >
                   <Files size={16} />
-                  查看运行成果
+                  
+                  {t("查看运行成果")}
                 </button>
               ) : (
                 <button
@@ -14998,7 +15051,8 @@ export default function HomePage() {
                   type="button"
                   onClick={openInspectedRunTask}
                 >
-                  查看当前任务
+                  
+                  {t("查看当前任务")}
                   <ChevronRight size={16} />
                 </button>
               )}
@@ -15016,37 +15070,37 @@ export default function HomePage() {
             className="task-detail-drawer"
             role="dialog"
             aria-modal="true"
-            aria-label={`任务详情：${selectedTask.title}`}
+            aria-label={t("任务详情：{title}", { title: selectedTask.title })}
             onMouseDown={(event) => event.stopPropagation()}
           >
             <header className="task-detail-heading">
               <div className="task-detail-heading-meta">
-                <span>任务详情</span>
+                <span>{t("任务详情")}</span>
                 <em className={`status-label status-${selectedTask.status}`}>
-                  {selectedTask.status}
+                  {t(selectedTask.status)}
                 </em>
               </div>
               <div className="task-detail-heading-actions">
                 <button
                   type="button"
-                  aria-label="编辑任务"
-                  title="编辑任务"
+                  aria-label={t("编辑任务")}
+                  title={t("编辑任务")}
                   onClick={() => beginEditTask(selectedTask)}
                 >
                   <Pencil size={16} />
                 </button>
                 <button
                   type="button"
-                  aria-label="复制任务"
-                  title="复制任务"
+                  aria-label={t("复制任务")}
+                  title={t("复制任务")}
                   onClick={() => duplicateTask(selectedTask)}
                 >
                   <Copy size={16} />
                 </button>
                 <button
                   type="button"
-                  aria-label="关闭任务详情"
-                  title="关闭"
+                  aria-label={t("关闭任务详情")}
+                  title={t("关闭")}
                   data-overlay-initial-focus
                   onClick={closeTaskDetail}
                 >
@@ -15088,30 +15142,32 @@ export default function HomePage() {
                   </span>
                   <div>
                     <em>
-                      {selectedTaskRecoveryReady
-                        ? "已准备恢复"
-                        : "已安全停止"}
+                      {t(selectedTaskRecoveryReady
+                        ? t("已准备恢复")
+                        : t("已安全停止"))}
                     </em>
                     <h3>
-                      {selectedTaskRecoveryReady
-                        ? "连接器已修复，可以从安全检查点继续"
-                        : "任务未完成，但没有执行外部发送"}
+                      {t(selectedTaskRecoveryReady
+                        ? t("连接器已修复，可以从安全检查点继续")
+                        : t("任务未完成，但没有执行外部发送"))}
                     </h3>
                   </div>
                   <code>{selectedTask.errorCode ?? "TASK_FAILED"}</code>
                 </div>
                 <p>
                   {selectedTask.lastError ??
-                    "任务遇到无法自动恢复的问题，已在安全检查点停止。"}
+                    t("任务遇到无法自动恢复的问题，已在安全检查点停止。")}
                 </p>
                 <div className="task-failure-impact">
                   <span>
                     <CheckCircle2 size={15} />
-                    已生成的成果与证据仍然保留
+                    
+                    {t("已生成的成果与证据仍然保留")}
                   </span>
                   <span>
                     <ShieldCheck size={15} />
-                    未向外部人员发送任何内容
+                    
+                    {t("未向外部人员发送任何内容")}
                   </span>
                 </div>
                 <div className="task-failure-actions">
@@ -15121,11 +15177,12 @@ export default function HomePage() {
                     ) : (
                       <RotateCcw size={15} />
                     )}
-                    {selectedTaskRecoveryReady ? "继续运行" : "立即重试"}
+                    {(selectedTaskRecoveryReady ? t("继续运行") : t("立即重试"))}
                   </button>
                   <button type="button" onClick={openTaskRecoverySettings}>
                     <Link2 size={15} />
-                    检查邮件连接器
+                    
+                    {t("检查邮件连接器")}
                   </button>
                 </div>
               </section>
@@ -15139,10 +15196,10 @@ export default function HomePage() {
                     ? "is-failed"
                     : ""
               }`}
-              aria-label="任务进度"
+              aria-label={t("任务进度")}
             >
               <div>
-                <span>整体进度</span>
+                <span>{t("整体进度")}</span>
                 <strong>{selectedTask.progress}%</strong>
               </div>
               <span>
@@ -15155,24 +15212,24 @@ export default function HomePage() {
               <div>
                 <Globe2 size={17} />
                 <span>
-                  <small>任务目标</small>
+                  <small>{t("任务目标")}</small>
                   <strong>{selectedTask.target}</strong>
                 </span>
               </div>
               <div>
                 <CalendarDays size={17} />
                 <span>
-                  <small>运行计划</small>
+                  <small>{t("运行计划")}</small>
                   <strong>{formatTaskSchedule(selectedTask)}</strong>
                 </span>
               </div>
               <div>
                 <Clock3 size={17} />
                 <span>
-                  <small>下次运行</small>
+                  <small>{t("下次运行")}</small>
                   <strong>
                     {selectedTask.status === "失败"
-                      ? "等待你确认重试"
+                      ? t("等待你确认重试")
                       : getNextRunLabel(selectedTask)}
                   </strong>
                 </span>
@@ -15180,21 +15237,21 @@ export default function HomePage() {
               <div>
                 <ShieldCheck size={17} />
                 <span>
-                  <small>执行策略</small>
+                  <small>{t("执行策略")}</small>
                   <strong>
-                    {selectedTask.requiresApproval ?? true
-                      ? "对外操作前必须确认"
-                      : "按任务范围自动执行"}
+                    {t(selectedTask.requiresApproval ?? true
+                      ? t("对外操作前必须确认")
+                      : t("按任务范围自动执行"))}
                   </strong>
                 </span>
               </div>
             </section>
 
-            <section className="task-run-health" aria-label="运行健康">
+            <section className="task-run-health" aria-label={t("运行健康")}>
               <div className="task-run-health-heading">
                 <span>
-                  <small>运行健康</small>
-                  <strong>最近执行是否稳定</strong>
+                  <small>{t("运行健康")}</small>
+                  <strong>{t("最近执行是否稳定")}</strong>
                 </span>
                 <em
                   className={
@@ -15207,33 +15264,33 @@ export default function HomePage() {
                         : "is-healthy"
                   }
                 >
-                  {selectedTaskRecoveryReady
-                    ? "可以恢复"
+                  {t(selectedTaskRecoveryReady
+                    ? t("可以恢复")
                     : selectedTask.status === "失败"
-                      ? "需要处理"
+                      ? t("需要处理")
                     : selectedTask.status === "运行中"
-                      ? "正在运行"
-                      : "运行正常"}
+                      ? t("正在运行")
+                      : t("运行正常"))}
                 </em>
               </div>
               <div className="task-run-metrics">
                 <span>
-                  <small>成功率</small>
+                  <small>{t("成功率")}</small>
                   <strong>
                     {selectedTaskSuccessRate === null
-                      ? "暂无"
+                      ? t("暂无")
                       : `${selectedTaskSuccessRate}%`}
                   </strong>
                 </span>
                 <span>
-                  <small>近期开跑</small>
-                  <strong>{selectedTaskRuns.length} 次</strong>
+                  <small>{t("近期开跑")}</small>
+                  <strong>{t("{length} 次", { length: selectedTaskRuns.length })}</strong>
                 </span>
                 <span>
-                  <small>平均耗时</small>
+                  <small>{t("平均耗时")}</small>
                   <strong>
                     {selectedTaskAverageDuration === undefined
-                      ? "暂无"
+                      ? t("暂无")
                       : formatTaskRunDuration(selectedTaskAverageDuration)}
                   </strong>
                 </span>
@@ -15244,7 +15301,7 @@ export default function HomePage() {
                     <li className={`run-${run.status}`} key={run.id}>
                       <button
                         type="button"
-                        aria-label={`查看运行：${run.id}`}
+                        aria-label={t("查看运行：{id}", { id: run.id })}
                         onClick={() => openTaskRun(selectedTask.id, run.id)}
                       >
                         <span>
@@ -15256,7 +15313,7 @@ export default function HomePage() {
                           {run.status === "已取消" && <Pause size={14} />}
                         </span>
                         <span>
-                          <strong>{run.status}</strong>
+                          <strong>{t(run.status)}</strong>
                           <small>{run.summary}</small>
                         </span>
                         <span>
@@ -15274,21 +15331,23 @@ export default function HomePage() {
                 </ol>
               ) : (
                 <div className="task-run-empty">
-                  第一次运行开始后，这里会显示成功率和耗时。
+                  
+                  {t("第一次运行开始后，这里会显示成功率和耗时。")}
                 </div>
               )}
             </section>
 
             <section className="task-detail-artifacts">
               <div>
-                <span>关联成果</span>
+                <span>{t("关联成果")}</span>
                 <button
                   type="button"
                   onClick={() => openTaskArtifacts(selectedTask.id)}
                 >
                   {artifacts.filter((artifact) => artifact.taskId === selectedTask.id)
                     .length}{" "}
-                  项
+                  
+                  {t("项")}
                   <ChevronRight size={14} />
                 </button>
               </div>
@@ -15322,8 +15381,8 @@ export default function HomePage() {
                 <div className="task-artifact-empty">
                   <Files size={17} />
                   <span>
-                    <strong>还没有生成成果</strong>
-                    <small>任务完成交付后会自动显示在这里。</small>
+                    <strong>{t("还没有生成成果")}</strong>
+                    <small>{t("任务完成交付后会自动显示在这里。")}</small>
                   </span>
                 </div>
               )}
@@ -15331,12 +15390,13 @@ export default function HomePage() {
 
             <section className="task-detail-trace">
               <div>
-                <span>最近动作</span>
+                <span>{t("最近动作")}</span>
                 <button
                   type="button"
                   onClick={() => openTaskActivity(selectedTask.id)}
                 >
-                  完整记录
+                  
+                  {t("完整记录")}
                   <ChevronRight size={14} />
                 </button>
               </div>
@@ -15364,8 +15424,8 @@ export default function HomePage() {
                 <div className="task-trace-empty">
                   <History size={18} />
                   <span>
-                    <strong>还没有可用记录</strong>
-                    <small>新的关键动作会自动显示在这里。</small>
+                    <strong>{t("还没有可用记录")}</strong>
+                    <small>{t("新的关键动作会自动显示在这里。")}</small>
                   </span>
                 </div>
               )}
@@ -15388,16 +15448,17 @@ export default function HomePage() {
                 {(selectedTask.status === "已暂停" || selectedTask.status === "已完成") && (
                   <Play size={16} />
                 )}
-                {selectedTask.status === "运行中" && "暂停任务"}
-                {selectedTask.status === "待确认" && "处理确认"}
+                {selectedTask.status === "运行中" && t("暂停任务")}
+                {selectedTask.status === "待确认" && t("处理确认")}
                 {selectedTask.status === "失败" &&
-                  (selectedTaskRecoveryReady ? "继续运行" : "重试任务")}
-                {selectedTask.status === "已暂停" && "继续任务"}
-                {selectedTask.status === "已完成" && "再次运行"}
+                  (selectedTaskRecoveryReady ? t("继续运行") : t("重试任务"))}
+                {selectedTask.status === "已暂停" && t("继续任务")}
+                {selectedTask.status === "已完成" && t("再次运行")}
               </button>
               {selectedTask.pinned ? (
                 <button type="button" onClick={closeTaskDetail}>
-                  关闭
+                  
+                  {t("关闭")}
                 </button>
               ) : (
                 <button
@@ -15406,7 +15467,8 @@ export default function HomePage() {
                   onClick={() => requestDeleteTask(selectedTask)}
                 >
                   <Trash2 size={15} />
-                  删除
+                  
+                  {t("删除")}
                 </button>
               )}
             </footer>
@@ -15425,7 +15487,7 @@ export default function HomePage() {
             aria-modal="true"
             aria-busy={isSavingTask}
             aria-hidden={taskDiscardOpen || undefined}
-            aria-label={editingTaskId ? "编辑任务" : "新建任务"}
+            aria-label={editingTaskId ? t("编辑任务") : t("新建任务")}
             aria-labelledby="task-composer-title"
             inert={taskDiscardOpen}
             onSubmit={createTask}
@@ -15434,19 +15496,19 @@ export default function HomePage() {
           >
             <div className="clarity-dialog-heading">
               <div>
-                <span>{editingTaskId ? "编辑配置" : "任务配置"}</span>
+                <span>{(editingTaskId ? t("编辑配置") : t("任务配置"))}</span>
                 <h2 id="task-composer-title">
-                  {editingTaskId ? "更新任务设置" : "交给 Unzoo One 一项工作"}
+                  {(editingTaskId ? t("更新任务设置") : t("交给 Unzoo One 一项工作"))}
                 </h2>
                 <p>
-                  {editingTaskId
-                    ? "修改会立即保存，正在运行的任务会使用新配置。"
-                    : "描述结果，选择节奏，然后让 AI 持续执行。"}
+                  {t(editingTaskId
+                    ? t("修改会立即保存，正在运行的任务会使用新配置。")
+                    : t("描述结果，选择节奏，然后让 AI 持续执行。"))}
                 </p>
               </div>
               <button
                 type="button"
-                aria-label="关闭"
+                aria-label={t("关闭")}
                 disabled={isSavingTask}
                 onClick={requestCloseComposer}
               >
@@ -15458,9 +15520,10 @@ export default function HomePage() {
               <div className="task-offline-note" role="status">
                 <Globe2 size={16} />
                 <span>
-                  <strong>当前处于离线状态</strong>
+                  <strong>{t("当前处于离线状态")}</strong>
                   <small>
-                    任务配置会保存在本机，但不会显示为正在运行；恢复网络后可以手动开始。
+                    
+                    {t("任务配置会保存在本机，但不会显示为正在运行；恢复网络后可以手动开始。")}
                   </small>
                 </span>
               </div>
@@ -15470,18 +15533,20 @@ export default function HomePage() {
               <div className="task-budget-note" role="status">
                 <ShieldCheck size={16} />
                 <span>
-                  <strong>月度额度已用完</strong>
+                  <strong>{t("月度额度已用完")}</strong>
                   <small>
-                    任务可以保存，但会保持暂停；提高额度后再手动开始运行。
+                    
+                    {t("任务可以保存，但会保持暂停；提高额度后再手动开始运行。")}
                   </small>
                 </span>
               </div>
             )}
 
-            <nav className="task-composer-progress" aria-label="任务配置步骤">
+            <nav className="task-composer-progress" aria-label={t("任务配置步骤")}>
               <span className="task-composer-progress-meta">
                 <strong>{taskComposerReadyCount}/3</strong>
-                项配置就绪
+                
+                {t("项配置就绪")}
               </span>
               <div>
                 <button
@@ -15491,8 +15556,8 @@ export default function HomePage() {
                 >
                   <i>{taskDefinitionReady ? <Check size={15} /> : "1"}</i>
                   <span>
-                    <strong>定义任务</strong>
-                    <small>来源与交付结果</small>
+                    <strong>{t("定义任务")}</strong>
+                    <small>{t("来源与交付结果")}</small>
                   </span>
                 </button>
                 <button
@@ -15502,7 +15567,7 @@ export default function HomePage() {
                 >
                   <i>{taskScheduleReady ? <Check size={15} /> : "2"}</i>
                   <span>
-                    <strong>运行计划</strong>
+                    <strong>{t("运行计划")}</strong>
                     <small>{formatSchedule(taskSchedule, taskScheduleTime, taskScheduleDay)}</small>
                   </span>
                 </button>
@@ -15513,8 +15578,8 @@ export default function HomePage() {
                 >
                   <i><Check size={15} /></i>
                   <span>
-                    <strong>安全确认</strong>
-                    <small>{taskApproval ? "敏感操作先确认" : "按范围自动执行"}</small>
+                    <strong>{t("安全确认")}</strong>
+                    <small>{(taskApproval ? t("敏感操作先确认") : t("按范围自动执行"))}</small>
                   </span>
                 </button>
               </div>
@@ -15528,20 +15593,20 @@ export default function HomePage() {
                 <header className="task-composer-section-heading">
                   <span>01</span>
                   <div>
-                    <h3>定义任务</h3>
-                    <p>告诉 AI 去哪里工作，以及最终要交付什么。</p>
+                    <h3>{t("定义任务")}</h3>
+                    <p>{t("告诉 AI 去哪里工作，以及最终要交付什么。")}</p>
                   </div>
                   <strong className={taskDefinitionReady ? "is-ready" : ""}>
                     {taskDefinitionReady ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-                    {taskDefinitionReady ? "已完整" : "待完善"}
+                    {(taskDefinitionReady ? t("已完整") : t("待完善"))}
                   </strong>
                 </header>
 
                 {!editingTaskId && (
-                  <section className="task-template-picker" aria-label="快速模板">
+                  <section className="task-template-picker" aria-label={t("快速模板")}>
                     <span>
-                      <strong>选择一个起点</strong>
-                      <small>点击模板会填入一套可继续修改的配置</small>
+                      <strong>{t("选择一个起点")}</strong>
+                      <small>{t("点击模板会填入一套可继续修改的配置")}</small>
                     </span>
                     <div>
                       {taskTemplates.map((template) => (
@@ -15567,7 +15632,7 @@ export default function HomePage() {
 
                 <div className="composer-field-grid">
                   <label className={taskFormSubmitted && taskFormErrors.name ? "has-error" : ""}>
-                    <span>任务名称</span>
+                    <span>{t("任务名称")}</span>
                     <input
                       ref={taskNameRef}
                       autoFocus
@@ -15581,7 +15646,7 @@ export default function HomePage() {
                           : undefined
                       }
                       value={taskName}
-                      placeholder="例如：每天跟踪竞品更新"
+                      placeholder={t("例如：每天跟踪竞品更新")}
                       onChange={(event) => setTaskName(event.target.value)}
                     />
                     {taskFormSubmitted && taskFormErrors.name && (
@@ -15593,7 +15658,7 @@ export default function HomePage() {
                   </label>
 
                   <label className={taskFormSubmitted && taskFormErrors.target ? "has-error" : ""}>
-                    <span>数据来源或网址</span>
+                    <span>{t("数据来源或网址")}</span>
                     <input
                       ref={taskTargetRef}
                       required
@@ -15607,7 +15672,7 @@ export default function HomePage() {
                       value={taskTarget}
                       placeholder={
                         activeTaskTemplate?.targetHint ??
-                        "网页、文件夹或资料库"
+                        t("网页、文件夹或资料库")
                       }
                       onChange={(event) => setTaskTarget(event.target.value)}
                     />
@@ -15625,7 +15690,7 @@ export default function HomePage() {
                     taskFormSubmitted && taskFormErrors.description ? "has-error" : ""
                   }`}
                 >
-                  <span>希望得到什么结果</span>
+                  <span>{t("希望得到什么结果")}</span>
                   <textarea
                     ref={taskDescriptionRef}
                     required
@@ -15639,7 +15704,7 @@ export default function HomePage() {
                         : undefined
                     }
                     value={taskDescription}
-                    placeholder="说清楚要做什么、保留哪些证据，以及最终交付什么结果。"
+                    placeholder={t("说清楚要做什么、保留哪些证据，以及最终交付什么结果。")}
                     onChange={(event) => setTaskDescription(event.target.value)}
                   />
                   <span className="composer-field-meta">
@@ -15649,7 +15714,7 @@ export default function HomePage() {
                         {taskFormErrors.description}
                       </small>
                     ) : (
-                      <small>描述交付结果，AI 会自行规划执行步骤</small>
+                      <small>{t("描述交付结果，AI 会自行规划执行步骤")}</small>
                     )}
                     <small>{taskDescription.length}/500</small>
                   </span>
@@ -15669,23 +15734,23 @@ export default function HomePage() {
                   </span>
                   <div>
                     <strong>
-                      {!editingTaskId && budgetRunBlocked
-                        ? "任务会先保存，不会运行"
-                        : "任务启动预览"}
+                      {t(!editingTaskId && budgetRunBlocked
+                        ? t("任务会先保存，不会运行")
+                        : t("任务启动预览"))}
                     </strong>
                     <p>
                       {!editingTaskId && budgetRunBlocked ? (
                         <>
-                          当前已使用 <b>{usedCredits} / {usageSettings.monthlyBudget} 点</b>；
-                          预算保护会把任务保存为已暂停，提高额度后可手动继续。
+                          
+                          {t("当前已使用")} <b>{t("{usedCredits} / {monthlyBudget} 点", { usedCredits, monthlyBudget: usageSettings.monthlyBudget })}</b>{t("； 预算保护会把任务保存为已暂停，提高额度后可手动继续。")}
                         </>
                       ) : (
                         <>
-                          AI 将从 <b>{taskTarget.trim() || "你指定的数据来源"}</b> 开始，
-                          按 <b>{formatSchedule(taskSchedule, taskScheduleTime, taskScheduleDay)}</b>
-                          {taskApproval
-                            ? " 执行；遇到敏感操作会等待你确认。"
-                            : " 自动执行已授权的步骤。"}
+                          
+                          {t("AI 将从")} <b>{taskTarget.trim() || t("你指定的数据来源")}</b>  {t("开始， 按")} <b>{formatSchedule(taskSchedule, taskScheduleTime, taskScheduleDay)}</b>
+                          {t(taskApproval
+                            ? t(" 执行；遇到敏感操作会等待你确认。")
+                            : t(" 自动执行已授权的步骤。"))}
                         </>
                       )}
                     </p>
@@ -15701,18 +15766,18 @@ export default function HomePage() {
                   <header className="task-composer-section-heading">
                     <span>02</span>
                     <div>
-                      <h3>运行计划</h3>
-                      <p>决定什么时候开始，以及多久执行一次。</p>
+                      <h3>{t("运行计划")}</h3>
+                      <p>{t("决定什么时候开始，以及多久执行一次。")}</p>
                     </div>
                     <strong className={taskScheduleReady ? "is-ready" : ""}>
                       {taskScheduleReady ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-                      {taskScheduleReady ? "已设置" : "待设置"}
+                      {(taskScheduleReady ? t("已设置") : t("待设置"))}
                     </strong>
                   </header>
 
-                  <section className="composer-schedule" aria-label="运行频率">
-                    <span>运行频率</span>
-                    <div role="radiogroup" aria-label="选择运行频率">
+                  <section className="composer-schedule" aria-label={t("运行频率")}>
+                    <span>{t("运行频率")}</span>
+                    <div role="radiogroup" aria-label={t("选择运行频率")}>
                       {(["仅运行一次", "每天", "每周"] as TaskSchedule[]).map((schedule) => (
                         <button
                           className={taskSchedule === schedule ? "active" : ""}
@@ -15722,7 +15787,7 @@ export default function HomePage() {
                           aria-checked={taskSchedule === schedule}
                           onClick={() => setTaskSchedule(schedule)}
                         >
-                          {schedule}
+                          {t(schedule)}
                         </button>
                       ))}
                     </div>
@@ -15733,33 +15798,33 @@ export default function HomePage() {
                       <div className="schedule-once-note">
                         <Play size={16} />
                         <span>
-                          <strong>创建后立即开始</strong>
-                          <small>只运行一次，完成后保留结果和审计记录。</small>
+                          <strong>{t("创建后立即开始")}</strong>
+                          <small>{t("只运行一次，完成后保留结果和审计记录。")}</small>
                         </span>
                       </div>
                     ) : (
                       <>
                         {taskSchedule === "每周" && (
                           <label>
-                            <span>星期</span>
+                            <span>{t("星期")}</span>
                             <select
-                              aria-label="选择每周运行日期"
+                              aria-label={t("选择每周运行日期")}
                               value={taskScheduleDay}
                               onChange={(event) =>
                                 setTaskScheduleDay(event.target.value as Weekday)
                               }
                             >
                               {weekdays.map((day) => (
-                                <option key={day} value={day}>{day}</option>
+                                <option key={day} value={day}>{t(day)}</option>
                               ))}
                             </select>
                           </label>
                         )}
                         <label>
-                          <span>运行时间</span>
+                          <span>{t("运行时间")}</span>
                           <input
                             ref={taskScheduleTimeRef}
-                            aria-label="选择运行时间"
+                            aria-label={t("选择运行时间")}
                             type="time"
                             required
                             aria-invalid={Boolean(
@@ -15787,7 +15852,8 @@ export default function HomePage() {
                         </label>
                         <span className="schedule-timezone">
                           <Clock3 size={15} />
-                          北京时间
+                          
+                          {t("本地时间")}
                         </span>
                       </>
                     )}
@@ -15801,8 +15867,8 @@ export default function HomePage() {
                   <header className="task-composer-section-heading">
                     <span>03</span>
                     <div>
-                      <h3>安全确认</h3>
-                      <p>为外部操作保留一道人工确认。</p>
+                      <h3>{t("安全确认")}</h3>
+                      <p>{t("为外部操作保留一道人工确认。")}</p>
                     </div>
                   </header>
 
@@ -15811,15 +15877,15 @@ export default function HomePage() {
                       <ShieldCheck size={18} />
                     </span>
                     <span>
-                      <strong>敏感操作需要确认</strong>
-                      <small>对外发送、登录访问和写入文件前先询问你。</small>
+                      <strong>{t("敏感操作需要确认")}</strong>
+                      <small>{t("对外发送、登录访问和写入文件前先询问你。")}</small>
                     </span>
                     <button
                       className={`switch-control ${taskApproval ? "on" : ""}`}
                       type="button"
                       role="switch"
                       aria-checked={taskApproval}
-                      aria-label="敏感操作需要确认"
+                      aria-label={t("敏感操作需要确认")}
                       onClick={() => setTaskApproval((value) => !value)}
                     >
                       <i />
@@ -15834,7 +15900,8 @@ export default function HomePage() {
               {taskFormSubmitted && taskFormHasErrors && (
                 <span className="composer-error-summary" role="alert">
                   <AlertTriangle size={14} />
-                  请先修正标出的内容
+                  
+                  {t("请先修正标出的内容")}
                 </span>
               )}
               {!(taskFormSubmitted && taskFormHasErrors) && taskComposerDirty && (
@@ -15855,11 +15922,11 @@ export default function HomePage() {
                   ) : (
                     <Save size={14} />
                   )}
-                  {taskDraftSaveFailed
-                    ? "草稿保存失败，请立即提交"
+                  {t(taskDraftSaveFailed
+                    ? t("草稿保存失败，请立即提交")
                     : taskDraftIsAutoSaved
-                      ? "草稿已自动保存，仍需提交"
-                      : "正在保护你的修改"}
+                      ? t("草稿已自动保存，仍需提交")
+                      : t("正在保护你的修改"))}
                 </span>
               )}
               <button
@@ -15867,7 +15934,8 @@ export default function HomePage() {
                 disabled={isSavingTask}
                 onClick={requestCloseComposer}
               >
-                取消
+                
+                {t("取消")}
               </button>
               <button className="confirm" type="submit" disabled={isSavingTask}>
                 {isSavingTask ? (
@@ -15879,19 +15947,19 @@ export default function HomePage() {
                 ) : (
                   <Sparkles size={16} />
                 )}
-                {isSavingTask
+                {t(isSavingTask
                   ? editingTaskId
-                    ? "正在保存"
+                    ? t("正在保存")
                     : isOnline && !budgetRunBlocked
-                      ? "正在创建"
-                      : "正在保存"
+                      ? t("正在创建")
+                      : t("正在保存")
                   : editingTaskId
-                    ? "保存修改"
+                    ? t("保存修改")
                     : budgetRunBlocked
-                      ? "保存为已暂停"
+                      ? t("保存为已暂停")
                     : isOnline
-                      ? "创建并运行"
-                      : "保存，联网后运行"}
+                      ? t("创建并运行")
+                      : t("保存，联网后运行"))}
               </button>
             </div>
           </form>
@@ -15913,7 +15981,7 @@ export default function HomePage() {
           >
             <button
               type="button"
-              aria-label="关闭放弃任务草稿确认"
+              aria-label={t("关闭放弃任务草稿确认")}
               onClick={() => setTaskDiscardOpen(false)}
             >
               <X size={17} />
@@ -15921,14 +15989,14 @@ export default function HomePage() {
             <span>
               <AlertTriangle size={20} />
             </span>
-            <small>未保存修改</small>
+            <small>{t("未保存修改")}</small>
             <h2 id="task-discard-title">
-              {editingTaskId ? "放弃任务修改？" : "放弃这个新任务？"}
+              {(editingTaskId ? t("放弃任务修改？") : t("放弃这个新任务？"))}
             </h2>
             <p id="task-discard-description">
               {editingTaskId
-                ? `对“${taskDraftBaseline?.name ?? taskName}”的配置修改还没有保存，放弃后无法恢复。`
-                : "名称、目标、运行计划和审批设置还没有创建，放弃后需要重新填写。"}
+                ? t("对“{value}”的配置修改还没有保存，放弃后无法恢复。", { value: taskDraftBaseline?.name ?? taskName })
+                : t("名称、目标、运行计划和审批设置还没有创建，放弃后需要重新填写。")}
             </p>
             <div>
               <button
@@ -15936,14 +16004,15 @@ export default function HomePage() {
                 data-overlay-initial-focus
                 onClick={() => setTaskDiscardOpen(false)}
               >
-                继续编辑
+                
+                {t("继续编辑")}
               </button>
               <button
                 className="danger"
                 type="button"
                 onClick={confirmDiscardTaskDraft}
               >
-                {editingTaskId ? "放弃修改" : "放弃草稿"}
+                {(editingTaskId ? t("放弃修改") : t("放弃草稿"))}
               </button>
             </div>
           </section>
@@ -15974,16 +16043,13 @@ export default function HomePage() {
                 <Pencil size={20} />
               </span>
               <div>
-                <span>成果编辑</span>
-                <h2 id="artifact-editor-title">修订内容并保存新版本</h2>
-                <p id="artifact-editor-description">
-                  保存不会覆盖原文件。当前 v{editingArtifactVersion} 会进入版本记录，
-                  新内容保存为 v{editingArtifactVersion + 1}。
-                </p>
+                <span>{t("成果编辑")}</span>
+                <h2 id="artifact-editor-title">{t("修订内容并保存新版本")}</h2>
+                <p id="artifact-editor-description">{t("保存不会覆盖原文件。当前 v{editingArtifactVersion} 会进入版本记录， 新内容保存为 v{value}。", { editingArtifactVersion, value: editingArtifactVersion + 1 })}</p>
               </div>
               <button
                 type="button"
-                aria-label="关闭成果编辑器"
+                aria-label={t("关闭成果编辑器")}
                 disabled={isSavingArtifact}
                 onClick={requestCloseArtifactEditor}
               >
@@ -16001,7 +16067,7 @@ export default function HomePage() {
                         : ""
                     }
                   >
-                    <span>成果名称</span>
+                    <span>{t("成果名称")}</span>
                     <input
                       ref={artifactTitleRef}
                       data-overlay-initial-focus
@@ -16038,7 +16104,7 @@ export default function HomePage() {
                         : ""
                     }
                   >
-                    <span>文件名</span>
+                    <span>{t("文件名")}</span>
                     <input
                       ref={artifactFilenameRef}
                       required
@@ -16077,8 +16143,8 @@ export default function HomePage() {
                   }`}
                 >
                   <span>
-                    <strong>内容</strong>
-                    <small>{editingArtifact.format} · 支持 Markdown</small>
+                    <strong>{t("内容")}</strong>
+                    <small>{t("{format} · 支持 Markdown", { format: editingArtifact.format })}</small>
                   </span>
                   <textarea
                     ref={artifactContentRef}
@@ -16109,7 +16175,8 @@ export default function HomePage() {
                       </small>
                     ) : (
                       <small id="artifact-content-meta">
-                        人工修订会写入审计，不改变来源任务与原始证据。
+                        
+                        {t("人工修订会写入审计，不改变来源任务与原始证据。")}
                       </small>
                     )}
                     <small>
@@ -16123,17 +16190,18 @@ export default function HomePage() {
                 <div className="artifact-version-current">
                   <span>
                     <History size={17} />
-                    当前版本
+                    
+                    {t("当前版本")}
                   </span>
                   <strong>v{editingArtifactVersion}</strong>
                   <p>{editingArtifact.filename}</p>
                   <dl>
                     <div>
-                      <dt>状态</dt>
-                      <dd>{editingArtifact.status}</dd>
+                      <dt>{t("状态")}</dt>
+                      <dd>{t(editingArtifact.status)}</dd>
                     </div>
                     <div>
-                      <dt>最近编辑</dt>
+                      <dt>{t("最近编辑")}</dt>
                       <dd>{editingArtifact.editedBy ?? "Unzoo One AI"}</dd>
                     </div>
                   </dl>
@@ -16141,8 +16209,8 @@ export default function HomePage() {
 
                 <div className="artifact-version-history">
                   <div>
-                    <span>历史版本</span>
-                    <em>{artifactRevisionHistory.length} 个</em>
+                    <span>{t("历史版本")}</span>
+                    <em>{t("{length} 个", { length: artifactRevisionHistory.length })}</em>
                   </div>
                   {artifactRevisionHistory.length > 0 ? (
                     <div>
@@ -16158,7 +16226,7 @@ export default function HomePage() {
                             <small>
                               {revision.editor} ·{" "}
                               {new Date(revision.createdAt).toLocaleDateString(
-                                "zh-CN",
+                                dateLocale(),
                                 { month: "numeric", day: "numeric" },
                               )}
                             </small>
@@ -16170,8 +16238,8 @@ export default function HomePage() {
                   ) : (
                     <div className="artifact-version-empty">
                       <History size={20} />
-                      <strong>这是第一个版本</strong>
-                      <small>首次保存修改后，v1 会保留在这里。</small>
+                      <strong>{t("这是第一个版本")}</strong>
+                      <small>{t("首次保存修改后，v1 会保留在这里。")}</small>
                     </div>
                   )}
                 </div>
@@ -16179,8 +16247,8 @@ export default function HomePage() {
                 <div className="artifact-version-safety">
                   <ShieldCheck size={16} />
                   <span>
-                    <strong>原始记录受保护</strong>
-                    <small>数据和证据不可编辑；报告修订会保留全部版本。</small>
+                    <strong>{t("原始记录受保护")}</strong>
+                    <small>{t("数据和证据不可编辑；报告修订会保留全部版本。")}</small>
                   </span>
                 </div>
               </aside>
@@ -16200,19 +16268,20 @@ export default function HomePage() {
                 aria-live="polite"
               >
                 <i />
-                {artifactEditorDirty
+                {t(artifactEditorDirty
                   ? artifactDraftSaveFailed
-                    ? "草稿保存失败，请立即保存版本"
+                    ? t("草稿保存失败，请立即保存版本")
                     : artifactDraftIsAutoSaved
-                      ? "草稿已自动保存，仍需保存版本"
-                      : "正在保护你的修改"
-                  : "当前内容未修改"}
+                      ? t("草稿已自动保存，仍需保存版本")
+                      : t("正在保护你的修改")
+                  : t("当前内容未修改"))}
                 <kbd>Ctrl S</kbd>
               </span>
               {artifactEditSubmitted && artifactFormHasErrors && (
                 <span className="artifact-editor-summary" role="alert">
                   <AlertTriangle size={14} />
-                  请先修正标出的内容
+                  
+                  {t("请先修正标出的内容")}
                 </span>
               )}
               <button
@@ -16220,7 +16289,8 @@ export default function HomePage() {
                 disabled={isSavingArtifact}
                 onClick={requestCloseArtifactEditor}
               >
-                取消
+                
+                {t("取消")}
               </button>
               <button
                 className="confirm"
@@ -16233,8 +16303,8 @@ export default function HomePage() {
                   <Save size={16} />
                 )}
                 {isSavingArtifact
-                  ? "正在保存"
-                  : `保存为 v${editingArtifactVersion + 1}`}
+                  ? t("正在保存")
+                  : t("保存为 v{value}", { value: editingArtifactVersion + 1 })}
               </button>
             </footer>
           </form>
@@ -16256,7 +16326,7 @@ export default function HomePage() {
           >
             <button
               type="button"
-              aria-label="关闭放弃修改确认"
+              aria-label={t("关闭放弃修改确认")}
               onClick={() => setArtifactDiscardOpen(false)}
             >
               <X size={17} />
@@ -16264,25 +16334,25 @@ export default function HomePage() {
             <span>
               <AlertTriangle size={20} />
             </span>
-            <small>未保存修改</small>
-            <h2 id="artifact-discard-title">放弃这次成果修订？</h2>
-            <p id="artifact-discard-description">
-              对“{editingArtifact.title}”的修改还没有保存，关闭后无法恢复。
-            </p>
+            <small>{t("未保存修改")}</small>
+            <h2 id="artifact-discard-title">{t("放弃这次成果修订？")}</h2>
+            <p id="artifact-discard-description">{t("对“{title}”的修改还没有保存，关闭后无法恢复。", { title: editingArtifact.title })}</p>
             <div>
               <button
                 type="button"
                 data-overlay-initial-focus
                 onClick={() => setArtifactDiscardOpen(false)}
               >
-                继续编辑
+                
+                {t("继续编辑")}
               </button>
               <button
                 className="danger"
                 type="button"
                 onClick={confirmDiscardArtifactDraft}
               >
-                放弃修改
+                
+                {t("放弃修改")}
               </button>
             </div>
           </section>
@@ -16305,7 +16375,7 @@ export default function HomePage() {
             <button
               className="artifact-delete-close"
               type="button"
-              aria-label="关闭成果删除确认"
+              aria-label={t("关闭成果删除确认")}
               onClick={() => setArtifactDeleteId(null)}
             >
               <X size={17} />
@@ -16316,12 +16386,11 @@ export default function HomePage() {
                 <Trash2 size={21} />
               </span>
               <div>
-                <small>删除成果</small>
-                <h2 id="artifact-delete-title">
-                  删除“{deletingArtifact.title}”？
-                </h2>
+                <small>{t("删除成果")}</small>
+                <h2 id="artifact-delete-title">{t("删除“{title}”？", { title: deletingArtifact.title })}</h2>
                 <p id="artifact-delete-description">
-                  文件与全部修订版本将从当前工作区移除，完成后可在底部提示中撤销。
+                  
+                  {t("文件与全部修订版本将从当前工作区移除，完成后可在底部提示中撤销。")}
                 </p>
               </div>
             </header>
@@ -16339,32 +16408,31 @@ export default function HomePage() {
                   {deletingArtifact.sizeKb.toFixed(1)} KB
                 </small>
               </span>
-              <em>{deletingArtifact.status}</em>
+              <em>{t(deletingArtifact.status)}</em>
             </div>
 
-            <div className="artifact-delete-facts" aria-label="删除影响">
+            <div className="artifact-delete-facts" aria-label={t("删除影响")}>
               <span>
-                <small>将移除</small>
-                <strong>
-                  {(deletingArtifact.revisions?.length ?? 0) + 1} 个版本
-                </strong>
+                <small>{t("将移除")}</small>
+                <strong>{t("{value} 个版本", { value: (deletingArtifact.revisions?.length ?? 0) + 1 })}</strong>
               </span>
               <span>
-                <small>关联任务</small>
-                <strong>{deletingArtifactTask?.title ?? "原任务已移除"}</strong>
+                <small>{t("关联任务")}</small>
+                <strong>{deletingArtifactTask?.title ?? t("原任务已移除")}</strong>
               </span>
               <span>
-                <small>撤销时间</small>
-                <strong>10 秒</strong>
+                <small>{t("撤销时间")}</small>
+                <strong>{t("10 秒")}</strong>
               </span>
             </div>
 
             <div className="artifact-delete-safety">
               <ShieldCheck size={18} />
               <span>
-                <strong>任务和审计记录不会被删除</strong>
+                <strong>{t("任务和审计记录不会被删除")}</strong>
                 <small>
-                  系统会保留来源任务及删除事件，方便后续追溯是谁在何时执行了操作。
+                  
+                  {t("系统会保留来源任务及删除事件，方便后续追溯是谁在何时执行了操作。")}
                 </small>
               </span>
             </div>
@@ -16375,7 +16443,8 @@ export default function HomePage() {
                 data-overlay-initial-focus
                 onClick={() => setArtifactDeleteId(null)}
               >
-                保留成果
+                
+                {t("保留成果")}
               </button>
               <button
                 className="danger"
@@ -16383,7 +16452,8 @@ export default function HomePage() {
                 onClick={confirmDeleteArtifact}
               >
                 <Trash2 size={15} />
-                确认删除
+                
+                {t("确认删除")}
               </button>
             </div>
           </section>
@@ -16407,7 +16477,7 @@ export default function HomePage() {
             <button
               className="workspace-profile-close"
               type="button"
-              aria-label="关闭工作区资料"
+              aria-label={t("关闭工作区资料")}
               onClick={requestCloseWorkspaceProfile}
             >
               <X size={17} />
@@ -16416,19 +16486,20 @@ export default function HomePage() {
             <span className="workspace-profile-icon">
               <Building2 size={21} />
             </span>
-            <span className="workspace-profile-eyebrow">工作区资料</span>
-            <h2 id="workspace-profile-title">让团队看到一致的工作区身份</h2>
+            <span className="workspace-profile-eyebrow">{t("工作区资料")}</span>
+            <h2 id="workspace-profile-title">{t("让团队看到一致的工作区身份")}</h2>
             <p id="workspace-profile-description">
-              名称会显示在全局入口，说明用于帮助成员确认当前工作范围。
+              
+              {t("名称会显示在全局入口，说明用于帮助成员确认当前工作范围。")}
             </p>
 
-            <div className="workspace-profile-preview" aria-label="工作区资料预览">
+            <div className="workspace-profile-preview" aria-label={t("工作区资料预览")}>
               <span>{getWorkspaceInitial(workspaceNameDraft)}</span>
               <span>
-                <small>Team 方案</small>
-                <strong>{workspaceNameDraft.trim() || "未命名工作区"}</strong>
+                <small>{t("Team 方案")}</small>
+                <strong>{workspaceNameDraft.trim() || t("未命名工作区")}</strong>
                 <em>
-                  {workspaceDescriptionDraft.trim() || "尚未填写工作区说明"}
+                  {workspaceDescriptionDraft.trim() || t("尚未填写工作区说明")}
                 </em>
               </span>
               <ShieldCheck size={18} />
@@ -16442,7 +16513,7 @@ export default function HomePage() {
               }`}
             >
               <span>
-                <strong>工作区名称</strong>
+                <strong>{t("工作区名称")}</strong>
                 <small>{workspaceNameDraft.length}/40</small>
               </span>
               <input
@@ -16459,7 +16530,7 @@ export default function HomePage() {
                     : undefined
                 }
                 value={workspaceNameDraft}
-                placeholder="例如：增长运营中心"
+                placeholder={t("例如：增长运营中心")}
                 onChange={(event) => setWorkspaceNameDraft(event.target.value)}
               />
               {workspaceProfileSubmitted && workspaceProfileFormErrors.name && (
@@ -16483,7 +16554,7 @@ export default function HomePage() {
               }`}
             >
               <span>
-                <strong>工作区说明</strong>
+                <strong>{t("工作区说明")}</strong>
                 <small>{workspaceDescriptionDraft.length}/100</small>
               </span>
               <textarea
@@ -16501,7 +16572,7 @@ export default function HomePage() {
                     : undefined
                 }
                 value={workspaceDescriptionDraft}
-                placeholder="说明团队会在这里运行和审核哪些 AI 工作"
+                placeholder={t("说明团队会在这里运行和审核哪些 AI 工作")}
                 onChange={(event) =>
                   setWorkspaceDescriptionDraft(event.target.value)
                 }
@@ -16522,10 +16593,11 @@ export default function HomePage() {
             <div className="workspace-profile-actions">
               <span>
                 <HardDrive size={14} />
-                {settings.local ? "修改会自动保存在本机" : "当前为临时会话"}
+                {(settings.local ? t("修改会自动保存在本机") : t("当前为临时会话"))}
               </span>
               <button type="button" onClick={requestCloseWorkspaceProfile}>
-                取消
+                
+                {t("取消")}
               </button>
               <button
                 className="confirm"
@@ -16533,7 +16605,8 @@ export default function HomePage() {
                 disabled={!workspaceProfileDirty}
               >
                 <Save size={15} />
-                保存资料
+                
+                {t("保存资料")}
               </button>
             </div>
           </form>
@@ -16555,7 +16628,7 @@ export default function HomePage() {
           >
             <button
               type="button"
-              aria-label="关闭放弃设置确认"
+              aria-label={t("关闭放弃设置确认")}
               onClick={() => setSettingsDiscardTarget(null)}
             >
               <X size={17} />
@@ -16576,7 +16649,8 @@ export default function HomePage() {
                 data-overlay-initial-focus
                 onClick={() => setSettingsDiscardTarget(null)}
               >
-                继续编辑
+                
+                {t("继续编辑")}
               </button>
               <button
                 className="danger"
@@ -16606,7 +16680,7 @@ export default function HomePage() {
             <button
               className="plan-center-close"
               type="button"
-              aria-label="关闭方案中心"
+              aria-label={t("关闭方案中心")}
               data-overlay-initial-focus
               onClick={closePlanCenter}
             >
@@ -16618,25 +16692,24 @@ export default function HomePage() {
                 <Sparkles size={22} />
               </span>
               <span>
-                <span className="plan-center-eyebrow">当前方案</span>
-                <h2 id="plan-center-title">Team 方案</h2>
+                <span className="plan-center-eyebrow">{t("当前方案")}</span>
+                <h2 id="plan-center-title">{t("Team 方案")}</h2>
                 <p id="plan-center-description">
-                  当前工作区的额度、席位和安全能力都在这里汇总，可直接调整预算或管理成员。
+                  
+                  {t("当前工作区的额度、席位和安全能力都在这里汇总，可直接调整预算或管理成员。")}
                 </p>
               </span>
             </div>
 
             <div className="plan-center-status">
               <span>
-                <small>本月 AI 额度</small>
-                <strong>
-                  {usedCredits} / {usageSettings.monthlyBudget} 点
-                </strong>
+                <small>{t("本月 AI 额度")}</small>
+                <strong>{t("{usedCredits} / {monthlyBudget} 点", { usedCredits, monthlyBudget: usageSettings.monthlyBudget })}</strong>
               </span>
               <div
                 className="plan-center-progress"
                 role="progressbar"
-                aria-label="Team 方案本月额度使用"
+                aria-label={t("Team 方案本月额度使用")}
                 aria-valuemin={0}
                 aria-valuemax={usageSettings.monthlyBudget}
                 aria-valuenow={Math.min(
@@ -16648,67 +16721,67 @@ export default function HomePage() {
               </div>
               <em>
                 {budgetExceeded
-                  ? "额度已用完"
+                  ? t("额度已用完")
                   : budgetAlertReached
-                    ? "接近预算上限"
-                    : `${remainingCredits} 点可用`}
+                    ? t("接近预算上限")
+                    : t("{remainingCredits} 点可用", { remainingCredits })}
               </em>
             </div>
 
-            <div className="plan-center-metrics" aria-label="方案用量概览">
+            <div className="plan-center-metrics" aria-label={t("方案用量概览")}>
               <span>
                 <Users size={18} />
-                <small>团队席位</small>
+                <small>{t("团队席位")}</small>
                 <strong>
                   {teamMembers.length} / {teamSeatLimit}
                 </strong>
-                <em>{availableSeatCount} 个可用</em>
+                <em>{t("{availableSeatCount} 个可用", { availableSeatCount })}</em>
               </span>
               <span>
                 <Activity size={18} />
-                <small>连接器健康</small>
+                <small>{t("连接器健康")}</small>
                 <strong>
                   {healthyConnectorCount} / {connectorCatalog.length}
                 </strong>
-                <em>{connectedConnectorCount} 项已连接</em>
+                <em>{t("{connectedConnectorCount} 项已连接", { connectedConnectorCount })}</em>
               </span>
               <span>
                 <ShieldCheck size={18} />
-                <small>到限保护</small>
-                <strong>{usageSettings.pauseAtLimit ? "已开启" : "仅提醒"}</strong>
-                <em>{usageSettings.alertThreshold}% 触发提醒</em>
+                <small>{t("到限保护")}</small>
+                <strong>{(usageSettings.pauseAtLimit ? t("已开启") : t("仅提醒"))}</strong>
+                <em>{t("{alertThreshold}% 触发提醒", { alertThreshold: usageSettings.alertThreshold })}</em>
               </span>
               <span>
                 <Clock3 size={18} />
-                <small>额度刷新</small>
-                <strong>8 月 1 日</strong>
-                <em>自动进入新周期</em>
+                <small>{t("额度刷新")}</small>
+                <strong>{t("8 月 1 日")}</strong>
+                <em>{t("自动进入新周期")}</em>
               </span>
             </div>
 
             <div className="plan-center-body">
               <div className="plan-center-included">
-                <span className="plan-center-section-title">已包含</span>
+                <span className="plan-center-section-title">{t("已包含")}</span>
                 <ul>
                   <li>
                     <CheckCircle2 size={17} />
                     <span>
-                      <strong>审批边界与完整审计</strong>
-                      <small>任何外部发送、权限访问和关键修改都可追溯。</small>
+                      <strong>{t("审批边界与完整审计")}</strong>
+                      <small>{t("任何外部发送、权限访问和关键修改都可追溯。")}</small>
                     </span>
                   </li>
                   <li>
                     <CheckCircle2 size={17} />
                     <span>
-                      <strong>工作区备份与恢复</strong>
-                      <small>导入前校验，替换前可先生成本地备份。</small>
+                      <strong>{t("工作区备份与恢复")}</strong>
+                      <small>{t("导入前校验，替换前可先生成本地备份。")}</small>
                     </span>
                   </li>
                   <li>
                     <CheckCircle2 size={17} />
                     <span>
-                      <strong>连接器健康检查</strong>
-                      <small>浏览器、邮件、日历和长期记忆的状态集中展示。</small>
+                      <strong>{t("连接器健康检查")}</strong>
+                      <small>{t("浏览器、邮件、日历和长期记忆的状态集中展示。")}</small>
                     </span>
                   </li>
                 </ul>
@@ -16718,31 +16791,31 @@ export default function HomePage() {
                 <span>
                   <ShieldCheck size={19} />
                 </span>
-                <small>安全策略</small>
+                <small>{t("安全策略")}</small>
                 <strong>
-                  {usageSettings.pauseAtLimit
-                    ? "到限自动保护已开启"
-                    : "到限后仅提醒，不会自动暂停任务"}
+                  {t(usageSettings.pauseAtLimit
+                    ? t("到限自动保护已开启")
+                    : t("到限后仅提醒，不会自动暂停任务"))}
                 </strong>
-                <p>
-                  当前提醒线为 {usageSettings.alertThreshold}%；
-                  本月预计消耗 {forecastCredits} 点。
-                </p>
+                <p>{t("当前提醒线为 {alertThreshold}%； 本月预计消耗 {forecastCredits} 点。", { alertThreshold: usageSettings.alertThreshold, forecastCredits })}</p>
               </div>
             </div>
 
             <div className="plan-center-actions">
               <button type="button" onClick={exportUsageReport}>
                 <Download size={16} />
-                导出用量
+                
+                {t("导出用量")}
               </button>
               <button type="button" onClick={openPlanMembers}>
                 <Users size={16} />
-                管理成员
+                
+                {t("管理成员")}
               </button>
               <button className="confirm" type="button" onClick={openPlanBudget}>
                 <Pencil size={16} />
-                调整预算
+                
+                {t("调整预算")}
               </button>
             </div>
           </section>
@@ -16765,7 +16838,7 @@ export default function HomePage() {
             <button
               className="usage-budget-close"
               type="button"
-              aria-label="关闭预算设置"
+              aria-label={t("关闭预算设置")}
               onClick={requestCloseUsageBudget}
             >
               <X size={17} />
@@ -16775,33 +16848,34 @@ export default function HomePage() {
                 <Sparkles size={21} />
               </span>
               <span>
-                <span className="usage-budget-eyebrow">用量与预算</span>
-                <h2 id="usage-budget-title">设置月度额度和到限保护</h2>
+                <span className="usage-budget-eyebrow">{t("用量与预算")}</span>
+                <h2 id="usage-budget-title">{t("设置月度额度和到限保护")}</h2>
                 <p id="usage-budget-description">
-                  先预览提醒点位和月底影响，再保存到当前工作区。
+                  
+                  {t("先预览提醒点位和月底影响，再保存到当前工作区。")}
                 </p>
               </span>
             </div>
 
             <div className="usage-budget-facts">
               <span>
-                <small>当前已用</small>
-                <strong>{usedCredits} 点</strong>
+                <small>{t("当前已用")}</small>
+                <strong>{t("{usedCredits} 点", { usedCredits })}</strong>
               </span>
               <span>
-                <small>当前预算</small>
-                <strong>{usageSettings.monthlyBudget} 点</strong>
+                <small>{t("当前预算")}</small>
+                <strong>{t("{monthlyBudget} 点", { monthlyBudget: usageSettings.monthlyBudget })}</strong>
               </span>
               <span>
-                <small>月底预计</small>
-                <strong>{forecastCredits} 点</strong>
+                <small>{t("月底预计")}</small>
+                <strong>{t("{forecastCredits} 点", { forecastCredits })}</strong>
               </span>
             </div>
 
             <label className="usage-budget-field">
               <span>
-                <strong>月度额度</strong>
-                <small>100 - 50,000 点</small>
+                <strong>{t("月度额度")}</strong>
+                <small>{t("100 - 50,000 点")}</small>
               </span>
               <span className={usageBudgetDraftInvalid ? "has-error" : ""}>
                 <input
@@ -16810,7 +16884,7 @@ export default function HomePage() {
                   min={100}
                   max={50000}
                   step={50}
-                  aria-label="月度 AI 额度"
+                  aria-label={t("月度 AI 额度")}
                   aria-invalid={usageBudgetDraftInvalid}
                   value={usageBudgetDraft}
                   onChange={(event) => {
@@ -16818,16 +16892,17 @@ export default function HomePage() {
                     setUsagePauseConfirmed(false);
                   }}
                 />
-                <em>点 / 月</em>
+                <em>{t("点 / 月")}</em>
               </span>
               {usageBudgetDraftInvalid && (
                 <small className="usage-budget-error" role="alert">
-                  请输入 100 到 50,000 之间的整数额度。
+                  
+                  {t("请输入 100 到 50,000 之间的整数额度。")}
                 </small>
               )}
             </label>
 
-            <div className="usage-budget-presets" aria-label="常用额度">
+            <div className="usage-budget-presets" aria-label={t("常用额度")}>
               {[500, 1000, 2000, 5000].map((value) => (
                 <button
                   className={
@@ -16839,18 +16914,16 @@ export default function HomePage() {
                     setUsageBudgetDraft(String(value));
                     setUsagePauseConfirmed(false);
                   }}
-                >
-                  {value.toLocaleString()} 点
-                </button>
+                >{t("{toLocaleString} 点", { toLocaleString: value.toLocaleString() })}</button>
               ))}
             </div>
 
             <fieldset className="usage-alert-threshold">
               <legend>
-                <strong>提醒阈值</strong>
-                <small>达到预算比例时显示提醒</small>
+                <strong>{t("提醒阈值")}</strong>
+                <small>{t("达到预算比例时显示提醒")}</small>
               </legend>
-              <div role="radiogroup" aria-label="预算提醒阈值">
+              <div role="radiogroup" aria-label={t("预算提醒阈值")}>
                 {([50, 75, 90] as const).map((threshold) => (
                   <button
                     className={usageAlertDraft === threshold ? "active" : ""}
@@ -16867,9 +16940,9 @@ export default function HomePage() {
                     <small>
                       {usageBudgetDraftInvalid
                         ? "—"
-                        : `${Math.round(
+                        : t("{toLocaleString} 点", { toLocaleString: Math.round(
                             usageBudgetDraftValue * (threshold / 100),
-                          ).toLocaleString()} 点`}
+                          ).toLocaleString() })}
                     </small>
                   </button>
                 ))}
@@ -16880,10 +16953,8 @@ export default function HomePage() {
               <span>
                 <Pause size={17} />
                 <span>
-                  <strong>达到预算后暂停运行中任务</strong>
-                  <small>
-                    当前有 {usageRunningTaskCount} 个任务运行中；暂停不会删除进度和证据。
-                  </small>
+                  <strong>{t("达到预算后暂停运行中任务")}</strong>
+                  <small>{t("当前有 {usageRunningTaskCount} 个任务运行中；暂停不会删除进度和证据。", { usageRunningTaskCount })}</small>
                 </span>
               </span>
               <button
@@ -16891,7 +16962,7 @@ export default function HomePage() {
                 type="button"
                 role="switch"
                 aria-checked={usagePauseDraft}
-                aria-label="达到预算后暂停运行中任务"
+                aria-label={t("达到预算后暂停运行中任务")}
                 onClick={() => {
                   setUsagePauseDraft((current) => !current);
                   setUsagePauseConfirmed(false);
@@ -16924,30 +16995,26 @@ export default function HomePage() {
                 )}
               </span>
               <span>
-                <small>保存后影响</small>
+                <small>{t("保存后影响")}</small>
                 <strong>
                   {usageBudgetDraftInvalid
-                    ? "输入有效额度后显示影响"
+                    ? t("输入有效额度后显示影响")
                     : usageDraftRemaining < 0
-                      ? `当前用量将超出新额度 ${Math.abs(usageDraftRemaining)} 点`
+                      ? t("当前用量将超出新额度 {abs} 点", { abs: Math.abs(usageDraftRemaining) })
                       : usageDraftForecastVariance < 0
-                        ? `月底预计超出 ${Math.abs(usageDraftForecastVariance)} 点`
-                        : `月底预计仍有 ${usageDraftForecastVariance} 点可用`}
+                        ? t("月底预计超出 {abs} 点", { abs: Math.abs(usageDraftForecastVariance) })
+                        : t("月底预计仍有 {usageDraftForecastVariance} 点可用", { usageDraftForecastVariance })}
                 </strong>
                 {!usageBudgetDraftInvalid && (
-                  <em>
-                    {usageBudgetChange === 0
-                      ? "额度不变"
-                      : `比当前${usageBudgetChange > 0 ? "增加" : "减少"} ${Math.abs(usageBudgetChange)} 点`}
-                    {" · "}
-                    {usageDraftAlertCreditLevel} 点时提醒
-                  </em>
+                  <em>{t("{value}{value2}{usageDraftAlertCreditLevel} 点时提醒", { value: usageBudgetChange === 0
+                      ? t("额度不变")
+                      : t("比当前{value} {abs} 点", { value: t(usageBudgetChange > 0 ? t("增加") : t("减少")), abs: Math.abs(usageBudgetChange) }), value2: " · ", usageDraftAlertCreditLevel })}</em>
                 )}
               </span>
               {!usageBudgetDraftInvalid && (
                 <b>
                   {Math.round((usedCredits / usageBudgetDraftValue) * 100)}%
-                  <small>已使用</small>
+                  <small>{t("已使用")}</small>
                 </b>
               )}
             </div>
@@ -16956,7 +17023,8 @@ export default function HomePage() {
               <div className="usage-budget-warning is-conflict" role="alert">
                 <AlertTriangle size={16} />
                 <span>
-                  另一窗口已经更新预算。请先处理顶部的版本冲突，再保存这次调整。
+                  
+                  {t("另一窗口已经更新预算。请先处理顶部的版本冲突，再保存这次调整。")}
                 </span>
               </div>
             )}
@@ -16965,7 +17033,8 @@ export default function HomePage() {
               <div className="usage-budget-warning is-unprotected">
                 <AlertTriangle size={16} />
                 <span>
-                  到达额度后任务仍会继续运行，只显示提醒，可能产生额外消耗。
+                  
+                  {t("到达额度后任务仍会继续运行，只显示提醒，可能产生额外消耗。")}
                 </span>
               </div>
             )}
@@ -16974,7 +17043,7 @@ export default function HomePage() {
               <label className="usage-budget-confirm">
                 <input
                   type="checkbox"
-                  aria-label={`确认立即暂停 ${usageRunningTaskCount} 个运行中任务`}
+                  aria-label={t("确认立即暂停 {usageRunningTaskCount} 个运行中任务", { usageRunningTaskCount })}
                   checked={usagePauseConfirmed}
                   onChange={(event) =>
                     setUsagePauseConfirmed(event.target.checked)
@@ -16984,11 +17053,10 @@ export default function HomePage() {
                   <Check size={14} />
                 </span>
                 <span>
-                  <strong>
-                    我已确认立即暂停 {usageRunningTaskCount} 个运行中任务
-                  </strong>
+                  <strong>{t("我已确认立即暂停 {usageRunningTaskCount} 个运行中任务", { usageRunningTaskCount })}</strong>
                   <small>
-                    任务进度和证据会保留，提高额度后可以手动继续。
+                    
+                    {t("任务进度和证据会保留，提高额度后可以手动继续。")}
                   </small>
                 </span>
               </label>
@@ -17001,19 +17069,21 @@ export default function HomePage() {
                 <div className="usage-budget-warning">
                   <AlertTriangle size={16} />
                   <span>
-                    当前用量已经达到新额度；保存后，新建、继续和重试任务都会被预算保护阻止。
+                    
+                    {t("当前用量已经达到新额度；保存后，新建、继续和重试任务都会被预算保护阻止。")}
                   </span>
                 </div>
               )}
 
             <div className="usage-budget-actions">
               <span>
-                {usageBudgetDirty
-                  ? "更改会写入运行记录"
-                  : "修改任一设置后即可保存"}
+                {t(usageBudgetDirty
+                  ? t("更改会写入运行记录")
+                  : t("修改任一设置后即可保存"))}
               </span>
               <button type="button" onClick={requestCloseUsageBudget}>
-                取消
+                
+                {t("取消")}
               </button>
               <button
                 className="confirm"
@@ -17023,8 +17093,8 @@ export default function HomePage() {
               >
                 <Check size={15} />
                 {usageBudgetRequiresConfirmation
-                  ? `确认并暂停 ${usageRunningTaskCount} 个任务`
-                  : "保存预算"}
+                  ? t("确认并暂停 {usageRunningTaskCount} 个任务", { usageRunningTaskCount })
+                  : t("保存预算")}
               </button>
             </div>
           </section>
@@ -17050,7 +17120,7 @@ export default function HomePage() {
             <button
               className="bulk-approval-close"
               type="button"
-              aria-label="关闭批量审批确认"
+              aria-label={t("关闭批量审批确认")}
               onClick={() => {
                 setBulkApprovalDecision(null);
                 setApprovalRejectReason("");
@@ -17066,44 +17136,41 @@ export default function HomePage() {
               )}
             </span>
             <span className="bulk-approval-eyebrow">
-              {bulkApprovalDecision === "approve"
-                ? "批量批准操作"
-                : "批量拒绝操作"}
+              {t(bulkApprovalDecision === "approve"
+                ? t("批量批准操作")
+                : t("批量拒绝操作"))}
             </span>
             <h2 id="bulk-approval-title">
               {bulkApprovalDecision === "approve"
-                ? `批准 ${bulkApprovableApprovals.length} 项操作？`
-                : `拒绝 ${selectedApprovals.length} 项操作？`}
+                ? t("批准 {length} 项操作？", { length: bulkApprovableApprovals.length })
+                : t("拒绝 {length} 项操作？", { length: selectedApprovals.length })}
             </h2>
             <p id="bulk-approval-description">
-              {bulkApprovalDecision === "approve"
-                ? "每项授权都只在原申请范围内生效，并会分别写入审计记录。"
-                : "系统不会执行这些外部操作，关联任务将暂停；完成后可在底部提示中撤销。"}
+              {t(bulkApprovalDecision === "approve"
+                ? t("每项授权都只在原申请范围内生效，并会分别写入审计记录。")
+                : t("系统不会执行这些外部操作，关联任务将暂停；完成后可在底部提示中撤销。"))}
             </p>
 
             <div className="bulk-approval-facts">
               <span>
-                <small>当前选择</small>
-                <strong>{selectedApprovals.length} 项</strong>
+                <small>{t("当前选择")}</small>
+                <strong>{t("{length} 项", { length: selectedApprovals.length })}</strong>
               </span>
               <span>
                 <small>
-                  {bulkApprovalDecision === "approve" ? "可以批准" : "将拒绝"}
+                  {t(bulkApprovalDecision === "approve" ? t("可以批准") : t("将拒绝"))}
                 </small>
-                <strong>
-                  {bulkApprovalDecision === "approve"
+                <strong>{t("{value}{value2}项", { value: bulkApprovalDecision === "approve"
                     ? bulkApprovableApprovals.length
-                    : selectedApprovals.length}{" "}
-                  项
-                </strong>
+                    : selectedApprovals.length, value2: " " })}</strong>
               </span>
               <span>
-                <small>关联任务</small>
-                <strong>{selectedApprovalTaskCount} 个</strong>
+                <small>{t("关联任务")}</small>
+                <strong>{t("{selectedApprovalTaskCount} 个", { selectedApprovalTaskCount })}</strong>
               </span>
             </div>
 
-            <div className="bulk-approval-list" aria-label="批量审批项目">
+            <div className="bulk-approval-list" aria-label={t("批量审批项目")}>
               {(bulkApprovalDecision === "approve"
                 ? bulkApprovableApprovals
                 : selectedApprovals
@@ -17116,20 +17183,16 @@ export default function HomePage() {
                       <small>{approval.target}</small>
                     </span>
                     <em className={`risk-${approval.risk}`}>
-                      {approval.risk}
+                      {t(approval.risk)}
                     </em>
                   </span>
                 ))}
               {(bulkApprovalDecision === "approve"
                 ? bulkApprovableApprovals.length
                 : selectedApprovals.length) > 4 && (
-                <small>
-                  另有{" "}
-                  {(bulkApprovalDecision === "approve"
+                <small>{t("另有{value}{value2}{value3}项操作", { value: " ", value2: (bulkApprovalDecision === "approve"
                     ? bulkApprovableApprovals.length
-                    : selectedApprovals.length) - 4}{" "}
-                  项操作
-                </small>
+                    : selectedApprovals.length) - 4, value3: " " })}</small>
               )}
             </div>
 
@@ -17137,29 +17200,27 @@ export default function HomePage() {
               selectedHighRiskApprovalCount > 0 && (
                 <div className="bulk-approval-protected-note">
                   <ShieldCheck size={16} />
-                  <span>
-                    {selectedHighRiskApprovalCount} 项高风险操作不会被批量批准，将保留在队列中逐项审核。
-                  </span>
+                  <span>{t("{selectedHighRiskApprovalCount} 项高风险操作不会被批量批准，将保留在队列中逐项审核。", { selectedHighRiskApprovalCount })}</span>
                 </div>
               )}
 
             {bulkApprovalDecision === "reject" && (
               <label className="approval-reject-reason">
                 <span>
-                  <strong>拒绝原因</strong>
-                  <small>将写入每一条审批记录</small>
+                  <strong>{t("拒绝原因")}</strong>
+                  <small>{t("将写入每一条审批记录")}</small>
                 </span>
                 <textarea
                   data-overlay-initial-focus
-                  aria-label="批量拒绝原因"
+                  aria-label={t("批量拒绝原因")}
                   maxLength={120}
-                  placeholder="例如：执行对象不正确，需要重新确认授权范围"
+                  placeholder={t("例如：执行对象不正确，需要重新确认授权范围")}
                   value={approvalRejectReason}
                   onChange={(event) =>
                     setApprovalRejectReason(event.target.value)
                   }
                 />
-                <small>{approvalRejectReason.trim().length} / 120，至少 4 个字</small>
+                <small>{t("{length} / 120，至少 4 个字", { length: approvalRejectReason.trim().length })}</small>
               </label>
             )}
 
@@ -17174,7 +17235,8 @@ export default function HomePage() {
                   setApprovalRejectReason("");
                 }}
               >
-                返回检查
+                
+                {t("返回检查")}
               </button>
               <button
                 className={
@@ -17197,8 +17259,8 @@ export default function HomePage() {
                   <Ban size={15} />
                 )}
                 {bulkApprovalDecision === "approve"
-                  ? `批准 ${bulkApprovableApprovals.length} 项`
-                  : `拒绝 ${selectedApprovals.length} 项`}
+                  ? t("批准 {length} 项", { length: bulkApprovableApprovals.length })
+                  : t("拒绝 {length} 项", { length: selectedApprovals.length })}
               </button>
             </div>
           </section>
@@ -17221,7 +17283,7 @@ export default function HomePage() {
             <button
               className="bulk-delete-close"
               type="button"
-              aria-label="关闭批量删除确认"
+              aria-label={t("关闭批量删除确认")}
               onClick={() => setBulkDeleteOpen(false)}
             >
               <X size={17} />
@@ -17229,48 +17291,47 @@ export default function HomePage() {
             <span className="bulk-delete-icon">
               <Trash2 size={21} />
             </span>
-            <span className="bulk-delete-eyebrow">批量删除任务</span>
-            <h2 id="bulk-delete-title">
-              删除 {deletableSelectedTasks.length} 个任务？
-            </h2>
+            <span className="bulk-delete-eyebrow">{t("批量删除任务")}</span>
+            <h2 id="bulk-delete-title">{t("删除 {length} 个任务？", { length: deletableSelectedTasks.length })}</h2>
             <p id="bulk-delete-description">
-              关联成果、审批事项和任务运行记录会一并移除。完成后可在底部提示中撤销。
+              
+              {t("关联成果、审批事项和任务运行记录会一并移除。完成后可在底部提示中撤销。")}
             </p>
 
             <div className="bulk-delete-facts">
               <span>
-                <small>当前选择</small>
-                <strong>{selectedTasks.length} 个</strong>
+                <small>{t("当前选择")}</small>
+                <strong>{t("{length} 个", { length: selectedTasks.length })}</strong>
               </span>
               <span>
-                <small>可以删除</small>
-                <strong>{deletableSelectedTasks.length} 个</strong>
+                <small>{t("可以删除")}</small>
+                <strong>{t("{length} 个", { length: deletableSelectedTasks.length })}</strong>
               </span>
               <span>
-                <small>受保护</small>
-                <strong>{protectedSelectedTaskCount} 个</strong>
+                <small>{t("受保护")}</small>
+                <strong>{t("{protectedSelectedTaskCount} 个", { protectedSelectedTaskCount })}</strong>
               </span>
             </div>
 
-            <div className="bulk-delete-list" aria-label="将删除的任务">
+            <div className="bulk-delete-list" aria-label={t("将删除的任务")}>
               {deletableSelectedTasks.slice(0, 4).map((task) => (
                 <span key={task.id}>
                   <span>
                     <strong>{task.title}</strong>
                     <small>{task.target}</small>
                   </span>
-                  <em>{task.status}</em>
+                  <em>{t(task.status)}</em>
                 </span>
               ))}
               {deletableSelectedTasks.length > 4 && (
-                <small>另有 {deletableSelectedTasks.length - 4} 个任务</small>
+                <small>{t("另有 {value} 个任务", { value: deletableSelectedTasks.length - 4 })}</small>
               )}
             </div>
 
             {protectedSelectedTaskCount > 0 && (
               <div className="bulk-delete-protected-note">
                 <Pin size={16} />
-                <span>首页主任务受到保护，不会被删除。</span>
+                <span>{t("首页主任务受到保护，不会被删除。")}</span>
               </div>
             )}
 
@@ -17280,7 +17341,8 @@ export default function HomePage() {
                 data-overlay-initial-focus
                 onClick={() => setBulkDeleteOpen(false)}
               >
-                返回检查
+                
+                {t("返回检查")}
               </button>
               <button
                 className="danger"
@@ -17288,7 +17350,8 @@ export default function HomePage() {
                 onClick={confirmBulkDelete}
               >
                 <Trash2 size={15} />
-                删除 {deletableSelectedTasks.length} 个任务
+                
+                {t("删除")} {deletableSelectedTasks.length}  {t("个任务")}
               </button>
             </div>
           </section>
@@ -17311,7 +17374,7 @@ export default function HomePage() {
             <button
               className="confirm-delete-close"
               type="button"
-              aria-label="关闭删除确认"
+              aria-label={t("关闭删除确认")}
               onClick={() => setDeleteTaskId(null)}
             >
               <X size={17} />
@@ -17319,19 +17382,19 @@ export default function HomePage() {
             <span className="confirm-delete-icon">
               <Trash2 size={21} />
             </span>
-            <span className="confirm-delete-eyebrow">删除任务</span>
-            <h2 id="delete-task-title">确定删除“{deletingTask.title}”吗？</h2>
+            <span className="confirm-delete-eyebrow">{t("删除任务")}</span>
+            <h2 id="delete-task-title">{t("确定删除“{title}”吗？", { title: deletingTask.title })}</h2>
             <p id="delete-task-description">
-              任务配置、关联成果、审批和本机运行记录将移出工作区；完成后 10
-              秒内可以恢复，原始数据源不会被删除。
+              
+              {t("任务配置、关联成果、审批和本机运行记录将移出工作区；完成后 10 秒内可以恢复，原始数据源不会被删除。")}
             </p>
             <div className="confirm-delete-facts">
               <span>
-                <small>运行频率</small>
+                <small>{t("运行频率")}</small>
                 <strong>{formatTaskSchedule(deletingTask)}</strong>
               </span>
               <span>
-                <small>数据来源</small>
+                <small>{t("数据来源")}</small>
                 <strong>{deletingTask.target}</strong>
               </span>
             </div>
@@ -17341,11 +17404,13 @@ export default function HomePage() {
                 data-overlay-initial-focus
                 onClick={() => setDeleteTaskId(null)}
               >
-                保留任务
+                
+                {t("保留任务")}
               </button>
               <button className="danger" type="button" onClick={confirmDeleteTask}>
                 <Trash2 size={15} />
-                确认删除
+                
+                {t("确认删除")}
               </button>
             </div>
           </section>
@@ -17368,7 +17433,7 @@ export default function HomePage() {
             <button
               className="approval-confirm-close"
               type="button"
-              aria-label="关闭高风险审批确认"
+              aria-label={t("关闭高风险审批确认")}
               onClick={cancelApprovalConfirmation}
             >
               <X size={17} />
@@ -17376,25 +17441,24 @@ export default function HomePage() {
             <span className="approval-confirm-icon">
               <ShieldCheck size={22} />
             </span>
-            <span className="approval-confirm-eyebrow">高风险操作 · 二次核对</span>
-            <h2 id="approval-confirm-title">
-              确认批准“{approvalConfirmTarget.title}”？
-            </h2>
+            <span className="approval-confirm-eyebrow">{t("高风险操作 · 二次核对")}</span>
+            <h2 id="approval-confirm-title">{t("确认批准“{title}”？", { title: approvalConfirmTarget.title })}</h2>
             <p id="approval-confirm-description">
-              批准后系统会立即执行这项操作。本次授权只生效一次，并完整写入审计记录。
+              
+              {t("批准后系统会立即执行这项操作。本次授权只生效一次，并完整写入审计记录。")}
             </p>
 
             <div className="approval-confirm-facts">
               <span>
-                <small>执行对象</small>
+                <small>{t("执行对象")}</small>
                 <strong>{approvalConfirmTarget.target}</strong>
               </span>
               <span>
-                <small>授权范围</small>
+                <small>{t("授权范围")}</small>
                 <strong>{approvalConfirmTarget.scope}</strong>
               </span>
               <span>
-                <small>授权失效</small>
+                <small>{t("授权失效")}</small>
                 <strong>{approvalConfirmTarget.expiresAt}</strong>
               </span>
             </div>
@@ -17402,7 +17466,7 @@ export default function HomePage() {
             <div className="approval-confirm-impact">
               <AlertTriangle size={17} />
               <span>
-                <strong>执行后会发生什么</strong>
+                <strong>{t("执行后会发生什么")}</strong>
                 <small>{approvalConfirmTarget.impact}</small>
               </span>
             </div>
@@ -17410,7 +17474,7 @@ export default function HomePage() {
             <label className="approval-confirm-check">
               <input
                 type="checkbox"
-                aria-label="我已核对执行对象和授权范围"
+                aria-label={t("我已核对执行对象和授权范围")}
                 data-overlay-initial-focus
                 checked={approvalConfirmAcknowledged}
                 onChange={(event) =>
@@ -17421,14 +17485,15 @@ export default function HomePage() {
                 <Check size={14} />
               </span>
               <span>
-                <strong>我已核对执行对象和授权范围</strong>
-                <small>这不是长期授权，任务结束或超时后会自动失效。</small>
+                <strong>{t("我已核对执行对象和授权范围")}</strong>
+                <small>{t("这不是长期授权，任务结束或超时后会自动失效。")}</small>
               </span>
             </label>
 
             <div className="approval-confirm-actions">
               <button type="button" onClick={cancelApprovalConfirmation}>
-                返回检查
+                
+                {t("返回检查")}
               </button>
               <button
                 className="confirm"
@@ -17437,7 +17502,8 @@ export default function HomePage() {
                 onClick={confirmHighRiskApproval}
               >
                 <ShieldCheck size={16} />
-                确认批准并执行
+                
+                {t("确认批准并执行")}
               </button>
             </div>
           </section>
@@ -17460,7 +17526,7 @@ export default function HomePage() {
             <button
               className="approval-snooze-close"
               type="button"
-              aria-label="关闭稍后处理"
+              aria-label={t("关闭稍后处理")}
               onClick={() => setApprovalSnoozeId(null)}
             >
               <X size={17} />
@@ -17468,11 +17534,9 @@ export default function HomePage() {
             <span className="approval-snooze-icon">
               <Clock3 size={21} />
             </span>
-            <span className="approval-snooze-eyebrow">稍后处理</span>
-            <h2 id="approval-snooze-title">什么时候重新提醒你？</h2>
-            <p id="approval-snooze-description">
-              “{approvalSnoozeTarget.title}”会暂时移出当前待办，到期后自动回来；期间不会执行任何外部操作。
-            </p>
+            <span className="approval-snooze-eyebrow">{t("稍后处理")}</span>
+            <h2 id="approval-snooze-title">{t("什么时候重新提醒你？")}</h2>
+            <p id="approval-snooze-description">{t("“{title}”会暂时移出当前待办，到期后自动回来；期间不会执行任何外部操作。", { title: approvalSnoozeTarget.title })}</p>
 
             <div className="approval-snooze-target">
               <approvalSnoozeTarget.icon size={17} />
@@ -17481,32 +17545,32 @@ export default function HomePage() {
                 <small>{approvalSnoozeTarget.scope}</small>
               </span>
               <em className={`approval-risk risk-${approvalSnoozeTarget.risk}`}>
-                {approvalSnoozeTarget.risk}
+                {t(approvalSnoozeTarget.risk)}
               </em>
             </div>
 
             <div
               className="approval-snooze-options"
               role="group"
-              aria-label="重新提醒时间"
+              aria-label={t("重新提醒时间")}
             >
               {[
                 {
                   id: "15m" as const,
-                  label: "15 分钟后",
-                  detail: "短暂离开当前队列",
+                  label: t("15 分钟后"),
+                  detail: t("短暂离开当前队列"),
                   icon: Timer,
                 },
                 {
                   id: "1h" as const,
-                  label: "1 小时后",
-                  detail: "留到稍后的工作时段",
+                  label: t("1 小时后"),
+                  detail: t("留到稍后的工作时段"),
                   icon: Clock3,
                 },
                 {
                   id: "tomorrow" as const,
-                  label: "明天 09:00",
-                  detail: "下一个工作日再决定",
+                  label: t("明天 09:00"),
+                  detail: t("下一个工作日再决定"),
                   icon: CalendarDays,
                 },
               ].map((option, index) => {
@@ -17545,7 +17609,8 @@ export default function HomePage() {
               type="button"
               onClick={() => setApprovalSnoozeId(null)}
             >
-              保持当前待办
+              
+              {t("保持当前待办")}
             </button>
           </section>
         </div>
@@ -17570,7 +17635,7 @@ export default function HomePage() {
             <button
               className="approval-reject-close"
               type="button"
-              aria-label="关闭拒绝确认"
+              aria-label={t("关闭拒绝确认")}
               onClick={() => {
                 setRejectApprovalId(null);
                 setApprovalRejectReason("");
@@ -17581,22 +17646,20 @@ export default function HomePage() {
             <span className="approval-reject-icon">
               <Ban size={21} />
             </span>
-            <span className="approval-reject-eyebrow">拒绝操作</span>
-            <h2 id="approval-reject-title">确认不允许这次操作？</h2>
-            <p id="approval-reject-description">
-              系统不会执行“{rejectedApproval.title}”，并会暂停关联任务，等待你修改任务或重新启动。
-            </p>
+            <span className="approval-reject-eyebrow">{t("拒绝操作")}</span>
+            <h2 id="approval-reject-title">{t("确认不允许这次操作？")}</h2>
+            <p id="approval-reject-description">{t("系统不会执行“{title}”，并会暂停关联任务，等待你修改任务或重新启动。", { title: rejectedApproval.title })}</p>
             <div className="approval-reject-facts">
               <span>
-                <small>执行对象</small>
+                <small>{t("执行对象")}</small>
                 <strong>{rejectedApproval.target}</strong>
               </span>
               <span>
-                <small>授权范围</small>
+                <small>{t("授权范围")}</small>
                 <strong>{rejectedApproval.scope}</strong>
               </span>
               <span>
-                <small>关联任务</small>
+                <small>{t("关联任务")}</small>
                 <strong>
                   {tasks.find((task) => task.id === rejectedApproval.taskId)?.title ??
                     rejectedApproval.taskId}
@@ -17605,25 +17668,26 @@ export default function HomePage() {
             </div>
             <label className="approval-reject-reason">
               <span>
-                <strong>拒绝原因</strong>
-                <small>将写入这条审批的审计记录</small>
+                <strong>{t("拒绝原因")}</strong>
+                <small>{t("将写入这条审批的审计记录")}</small>
               </span>
               <textarea
                 data-overlay-initial-focus
-                aria-label="拒绝原因"
+                aria-label={t("拒绝原因")}
                 maxLength={120}
-                placeholder="例如：执行对象不正确，需要重新确认授权范围"
+                placeholder={t("例如：执行对象不正确，需要重新确认授权范围")}
                 value={approvalRejectReason}
                 onChange={(event) =>
                   setApprovalRejectReason(event.target.value)
                 }
               />
-              <small>{approvalRejectReason.trim().length} / 120，至少 4 个字</small>
+              <small>{t("{length} / 120，至少 4 个字", { length: approvalRejectReason.trim().length })}</small>
             </label>
             <div className="approval-reject-note">
               <ShieldCheck size={16} />
               <span>
-                不会发生任何外部操作；完成后 10 秒内可以撤销，决定仍会写入审计记录。
+                
+                {t("不会发生任何外部操作；完成后 10 秒内可以撤销，决定仍会写入审计记录。")}
               </span>
             </div>
             <div className="approval-reject-actions">
@@ -17634,7 +17698,8 @@ export default function HomePage() {
                   setApprovalRejectReason("");
                 }}
               >
-                返回审核
+                
+                {t("返回审核")}
               </button>
               <button
                 className="danger"
@@ -17643,7 +17708,8 @@ export default function HomePage() {
                 onClick={confirmRejectApproval}
               >
                 <Ban size={15} />
-                确认拒绝
+                
+                {t("确认拒绝")}
               </button>
             </div>
           </section>
@@ -17666,7 +17732,7 @@ export default function HomePage() {
             <button
               className="workspace-import-close"
               type="button"
-              aria-label="关闭备份恢复预览"
+              aria-label={t("关闭备份恢复预览")}
               onClick={closeWorkspaceImportPreview}
             >
               <X size={17} />
@@ -17674,19 +17740,18 @@ export default function HomePage() {
             <span className="workspace-import-icon">
               <Upload size={21} />
             </span>
-            <span className="workspace-import-eyebrow">备份已通过校验</span>
-            <h2 id="workspace-import-title">
-              恢复“{pendingWorkspaceImport.fileName}”中的工作区？
-            </h2>
+            <span className="workspace-import-eyebrow">{t("备份已通过校验")}</span>
+            <h2 id="workspace-import-title">{t("恢复“{fileName}”中的工作区？", { fileName: pendingWorkspaceImport.fileName })}</h2>
             <p id="workspace-import-description">
-              确认后，当前任务、成果、团队成员、审批状态、运行记录和设置会被这份备份替换。
+              
+              {t("确认后，当前任务、成果、团队成员、审批状态、运行记录和设置会被这份备份替换。")}
             </p>
 
             <div className="workspace-import-meta">
               <span>
                 <Clock3 size={16} />
                 <span>
-                  <small>备份时间</small>
+                  <small>{t("备份时间")}</small>
                   <strong>
                     {formatAuditTimestamp(
                       pendingWorkspaceImport.backup.exportedAt,
@@ -17697,7 +17762,7 @@ export default function HomePage() {
               <span>
                 <FileJson size={16} />
                 <span>
-                  <small>文件大小</small>
+                  <small>{t("文件大小")}</small>
                   <strong>
                     {(pendingWorkspaceImport.fileSize / 1024).toFixed(1)} KB
                   </strong>
@@ -17705,23 +17770,23 @@ export default function HomePage() {
               </span>
             </div>
 
-            <div className="workspace-import-facts" aria-label="备份内容">
+            <div className="workspace-import-facts" aria-label={t("备份内容")}>
               <span>
-                <small>任务</small>
+                <small>{t("任务")}</small>
                 <strong>{pendingWorkspaceImport.backup.tasks.length}</strong>
               </span>
               <span>
-                <small>成果</small>
+                <small>{t("成果")}</small>
                 <strong>
                   {(pendingWorkspaceImport.backup.artifacts ?? workspaceDefaults.artifacts).length}
                 </strong>
               </span>
               <span>
-                <small>运行记录</small>
+                <small>{t("运行记录")}</small>
                 <strong>{pendingWorkspaceImport.backup.activity.length}</strong>
               </span>
               <span>
-                <small>待确认</small>
+                <small>{t("待确认")}</small>
                 <strong>
                   {
                     workspaceDefaults.approvals.filter((item) =>
@@ -17734,24 +17799,21 @@ export default function HomePage() {
 
             <div className="workspace-import-comparison">
               <span>
-                <small>当前工作区</small>
-                <strong>{tasks.length} 个任务 · {artifacts.length} 项成果</strong>
+                <small>{t("当前工作区")}</small>
+                <strong>{t("{length} 个任务 · {length2} 项成果", { length: tasks.length, length2: artifacts.length })}</strong>
               </span>
               <i><ChevronRight size={17} /></i>
               <span>
-                <small>恢复后</small>
-                <strong>
-                  {pendingWorkspaceImport.backup.tasks.length} 个任务 ·{" "}
-                  {(pendingWorkspaceImport.backup.artifacts ?? workspaceDefaults.artifacts).length}
-                  {" "}项成果
-                </strong>
+                <small>{t("恢复后")}</small>
+                <strong>{t("{length} 个任务 ·{value}{length2}{value2}项成果", { length: pendingWorkspaceImport.backup.tasks.length, value: " ", length2: (pendingWorkspaceImport.backup.artifacts ?? workspaceDefaults.artifacts).length, value2: " " })}</strong>
               </span>
             </div>
 
             <div className="workspace-import-note">
               <ShieldCheck size={16} />
               <span>
-                文件只在当前设备中读取。恢复前仍可先导出一份当前工作区备份。
+                
+                {t("文件只在当前设备中读取。恢复前仍可先导出一份当前工作区备份。")}
               </span>
             </div>
 
@@ -17769,8 +17831,8 @@ export default function HomePage() {
               />
               <ShieldCheck size={17} />
               <span>
-                <strong>确认替换当前工作区</strong>
-                <small>恢复完成后，只能通过另一份备份找回当前内容。</small>
+                <strong>{t("确认替换当前工作区")}</strong>
+                <small>{t("恢复完成后，只能通过另一份备份找回当前内容。")}</small>
               </span>
             </label>
 
@@ -17786,9 +17848,9 @@ export default function HomePage() {
               ) : (
                 <Download size={16} />
               )}
-              {recoveryBackupCreated
-                ? "当前工作区已备份"
-                : "先备份当前工作区"}
+              {t(recoveryBackupCreated
+                ? t("当前工作区已备份")
+                : t("先备份当前工作区"))}
             </button>
 
             <div className="workspace-import-actions">
@@ -17797,7 +17859,8 @@ export default function HomePage() {
                 data-overlay-initial-focus
                 onClick={closeWorkspaceImportPreview}
               >
-                取消恢复
+                
+                {t("取消恢复")}
               </button>
               <button
                 className="confirm"
@@ -17806,7 +17869,7 @@ export default function HomePage() {
                 onClick={confirmWorkspaceImport}
               >
                 <Upload size={15} />
-                {workspaceImportAcknowledged ? "确认并恢复" : "请先确认"}
+                {(workspaceImportAcknowledged ? t("确认并恢复") : t("请先确认"))}
               </button>
             </div>
           </section>
@@ -17829,7 +17892,7 @@ export default function HomePage() {
             <button
               className="temporary-session-close"
               type="button"
-              aria-label="关闭临时会话确认"
+              aria-label={t("关闭临时会话确认")}
               onClick={() => setTemporaryModeOpen(false)}
             >
               <X size={17} />
@@ -17837,29 +17900,31 @@ export default function HomePage() {
             <span className="temporary-session-icon">
               <Timer size={21} />
             </span>
-            <span className="temporary-session-eyebrow">数据保存方式</span>
-            <h2 id="temporary-session-title">切换到临时会话？</h2>
+            <span className="temporary-session-eyebrow">{t("数据保存方式")}</span>
+            <h2 id="temporary-session-title">{t("切换到临时会话？")}</h2>
             <p id="temporary-session-description">
-              当前页面仍可继续使用，但刷新或关闭页面后，不会自动恢复这次工作区。
+              
+              {t("当前页面仍可继续使用，但刷新或关闭页面后，不会自动恢复这次工作区。")}
             </p>
             <div className="temporary-session-facts">
               <span>
-                <small>当前任务</small>
-                <strong>{tasks.length} 个</strong>
+                <small>{t("当前任务")}</small>
+                <strong>{t("{length} 个", { length: tasks.length })}</strong>
               </span>
               <span>
-                <small>任务成果</small>
-                <strong>{artifacts.length} 项</strong>
+                <small>{t("任务成果")}</small>
+                <strong>{t("{length} 项", { length: artifacts.length })}</strong>
               </span>
               <span>
-                <small>运行记录</small>
-                <strong>{activityLog.length} 条</strong>
+                <small>{t("运行记录")}</small>
+                <strong>{t("{length} 条", { length: activityLog.length })}</strong>
               </span>
             </div>
             <div className="temporary-session-note">
               <ShieldCheck size={16} />
               <span>
-                这不会上传或立即删除当前页面中的数据。离开前重新开启保存即可保留。
+                
+                {t("这不会上传或立即删除当前页面中的数据。离开前重新开启保存即可保留。")}
               </span>
             </div>
             <button
@@ -17868,7 +17933,8 @@ export default function HomePage() {
               onClick={exportWorkspace}
             >
               <Download size={16} />
-              先导出工作区备份
+              
+              {t("先导出工作区备份")}
             </button>
             <div className="temporary-session-actions">
               <button
@@ -17876,7 +17942,8 @@ export default function HomePage() {
                 data-overlay-initial-focus
                 onClick={() => setTemporaryModeOpen(false)}
               >
-                保持本机保存
+                
+                {t("保持本机保存")}
               </button>
               <button
                 className="warning"
@@ -17884,7 +17951,8 @@ export default function HomePage() {
                 onClick={confirmTemporaryMode}
               >
                 <Timer size={15} />
-                使用临时会话
+                
+                {t("使用临时会话")}
               </button>
             </div>
           </section>
@@ -17907,7 +17975,7 @@ export default function HomePage() {
             <button
               className="workspace-reset-close"
               type="button"
-              aria-label="关闭重置确认"
+              aria-label={t("关闭重置确认")}
               onClick={closeWorkspaceReset}
             >
               <X size={17} />
@@ -17915,41 +17983,45 @@ export default function HomePage() {
             <span className="workspace-reset-icon">
               <RotateCcw size={21} />
             </span>
-            <span className="workspace-reset-eyebrow">恢复初始状态</span>
-            <h2 id="workspace-reset-title">重置当前本机工作区？</h2>
+            <span className="workspace-reset-eyebrow">{t("恢复初始状态")}</span>
+            <h2 id="workspace-reset-title">{t("重置当前本机工作区？")}</h2>
             <p id="workspace-reset-description">
-              当前任务、审批状态、运行记录和设置会被示例工作区替换。建议先导出备份。
+              
+              {t("当前任务、审批状态、运行记录和设置会被示例工作区替换。建议先导出备份。")}
             </p>
             <div className="workspace-reset-facts">
               <span>
-                <small>当前任务</small>
-                <strong>{tasks.length} 个</strong>
+                <small>{t("当前任务")}</small>
+                <strong>{t("{length} 个", { length: tasks.length })}</strong>
               </span>
               <span>
-                <small>任务成果</small>
-                <strong>{artifacts.length} 项</strong>
+                <small>{t("任务成果")}</small>
+                <strong>{t("{length} 项", { length: artifacts.length })}</strong>
               </span>
               <span>
-                <small>运行记录</small>
-                <strong>{activityLog.length} 条</strong>
+                <small>{t("运行记录")}</small>
+                <strong>{t("{length} 条", { length: activityLog.length })}</strong>
               </span>
               <span>
-                <small>待确认</small>
-                <strong>{approvals.length} 件</strong>
+                <small>{t("待确认")}</small>
+                <strong>{t("{length} 件", { length: approvals.length })}</strong>
               </span>
             </div>
             <div className="workspace-reset-impact">
               <span>
                 <X size={13} />
-                当前任务配置
+                
+                {t("当前任务配置")}
               </span>
               <span>
                 <X size={13} />
-                当前成员与权限
+                
+                {t("当前成员与权限")}
               </span>
               <span>
                 <X size={13} />
-                当前运行与审计记录
+                
+                {t("当前运行与审计记录")}
               </span>
             </div>
             <label
@@ -17966,8 +18038,8 @@ export default function HomePage() {
               />
               <AlertTriangle size={17} />
               <span>
-                <strong>我确认恢复为示例工作区</strong>
-                <small>此操作会立即替换当前本机数据。</small>
+                <strong>{t("我确认恢复为示例工作区")}</strong>
+                <small>{t("此操作会立即替换当前本机数据。")}</small>
               </span>
             </label>
             <button
@@ -17982,7 +18054,7 @@ export default function HomePage() {
               ) : (
                 <Download size={16} />
               )}
-              {recoveryBackupCreated ? "当前工作区已备份" : "先导出备份"}
+              {(recoveryBackupCreated ? t("当前工作区已备份") : t("先导出备份"))}
             </button>
             <div className="workspace-reset-actions">
               <button
@@ -17990,7 +18062,8 @@ export default function HomePage() {
                 data-overlay-initial-focus
                 onClick={closeWorkspaceReset}
               >
-                保留当前数据
+                
+                {t("保留当前数据")}
               </button>
               <button
                 className="danger"
@@ -17999,7 +18072,7 @@ export default function HomePage() {
                 onClick={resetWorkspace}
               >
                 <RotateCcw size={15} />
-                {workspaceResetAcknowledged ? "确认重置" : "请先确认"}
+                {(workspaceResetAcknowledged ? t("确认重置") : t("请先确认"))}
               </button>
             </div>
           </section>
@@ -18030,7 +18103,8 @@ export default function HomePage() {
               onClick={undoTaskDelete}
             >
               <RotateCcw size={14} />
-              恢复任务
+              
+              {t("恢复任务")}
             </button>
           )}
           {artifactUndoAvailable && (
@@ -18040,7 +18114,8 @@ export default function HomePage() {
               onClick={undoArtifactDelete}
             >
               <RotateCcw size={14} />
-              撤销
+              
+              {t("撤销")}
             </button>
           )}
           {approvalRejectUndoAvailable && (
@@ -18050,13 +18125,14 @@ export default function HomePage() {
               onClick={undoApprovalReject}
             >
               <RotateCcw size={14} />
-              撤销拒绝
+              
+              {t("撤销拒绝")}
             </button>
           )}
           <button
             className="clarity-toast-close"
             type="button"
-            aria-label="关闭提示"
+            aria-label={t("关闭提示")}
             onClick={() => {
               setNotice("");
               setTaskDeleteSnapshot(null);

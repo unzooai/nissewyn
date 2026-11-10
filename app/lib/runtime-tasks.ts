@@ -10,6 +10,7 @@
  */
 
 import type { TaskItem, TaskRun, TaskRunStatus, TaskStatus, Weekday } from "../types";
+import { dateLocale, t } from "../i18n";
 
 export type RuntimeSchedule =
   | { kind: "daily"; time: string }
@@ -72,7 +73,7 @@ export function scheduleOf(task: TaskItem): RuntimeSchedule | null {
 
 /** 交给智能体的那段话：标题、说明、目标。和页面直接跑任务时说的一样。 */
 export function promptOf(task: Pick<TaskItem, "title" | "description" | "target">): string {
-  return [task.title, task.description, task.target && `目标：${task.target}`].filter(Boolean).join("\n");
+  return [task.title, task.description, task.target && t("目标：{target}", { target: task.target })].filter(Boolean).join("\n");
 }
 
 /**
@@ -122,16 +123,16 @@ export function toTaskRun(run: RuntimeRun): TaskRun {
   const started = Date.parse(run.started_at);
   const ended = run.ended_at ? Date.parse(run.ended_at) : NaN;
   const summary = run.summary?.trim() ?? "";
-  const scheduled = run.trigger === "schedule" ? "按计划运行 · " : "";
+  const scheduled = run.trigger === "schedule" ? `${t("按计划运行")} · ` : "";
   let text: string;
   if (status === "运行中") {
-    text = run.waiting ? "等你在收件箱确认一次工具调用" : summary ? summary.slice(-120) : "智能体正在处理";
+    text = run.waiting ? t("等你在收件箱确认一次工具调用") : summary ? summary.slice(-120) : t("智能体正在处理");
   } else if (status === "成功") {
-    text = summary ? summary.slice(-160) : "运行完成";
+    text = summary ? summary.slice(-160) : t("运行完成");
   } else if (status === "已取消") {
-    text = "已停止";
+    text = t("已停止");
   } else {
-    text = run.error?.trim() || (summary ? summary.slice(-160) : "运行失败");
+    text = run.error?.trim() || (summary ? summary.slice(-160) : t("运行失败"));
   }
   return {
     id: run.id,
@@ -142,6 +143,7 @@ export function toTaskRun(run: RuntimeRun): TaskRun {
     summary: `${scheduled}${text}`,
     errorMessage: status === "失败" ? run.error ?? undefined : undefined,
     sessionId: run.session_id ?? undefined,
+    waiting: status === "运行中" && run.waiting === true,
   };
 }
 
@@ -220,7 +222,7 @@ export function mergeRuntimeTasks(
             target: "",
             status: "待确认",
             progress: 0,
-            updated: "刚刚",
+            updated: t("刚刚"),
           } satisfies TaskItem);
       return [merge(base, task)];
     });
@@ -230,18 +232,18 @@ export function mergeRuntimeTasks(
 /** "最后更新"那一栏：最近一次运行何时结束、怎么结束的。 */
 export function updatedFrom(latest: RuntimeRun | undefined, status: TaskStatus, fallback: string): string {
   if (!latest) return fallback;
-  if (status === "运行中") return latest.waiting ? "等你确认" : "运行中";
+  if (status === "运行中") return latest.waiting ? t("等你确认") : t("运行中");
   const at = Date.parse(latest.ended_at ?? latest.started_at);
   if (Number.isNaN(at)) return fallback;
-  const when = new Date(at).toLocaleString("zh-CN", {
+  const when = new Date(at).toLocaleString(dateLocale(), {
     month: "numeric",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
-  const verb = latest.state === "succeeded" ? "完成" : latest.state === "cancelled" ? "停止" : "失败";
-  return `${when} ${verb}`;
+  const verb = latest.state === "succeeded" ? t("完成") : latest.state === "cancelled" ? t("停止") : t("失败");
+  return t("{when} {verb}", { when, verb });
 }
 
 /** 是否该快一点刷新：有任务在跑。 */

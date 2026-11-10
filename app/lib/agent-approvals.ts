@@ -9,6 +9,7 @@
  * 纯函数，不碰网络和 DOM：provider-live 负责取数据，页面负责轮询。
  */
 
+import { t } from "../i18n";
 import { Terminal } from "lucide-react";
 import type { ApprovalItem, ApprovalRisk } from "../types";
 
@@ -72,18 +73,18 @@ function targetOf(args: unknown): string {
       if (typeof value === "string" && value.trim()) return value.trim();
     }
   }
-  if (args === undefined || args === null) return "（未提供参数）";
+  if (args === undefined || args === null) return t("（未提供参数）");
   const text = JSON.stringify(args);
   return text.length > 240 ? `${text.slice(0, 240)}…` : text;
 }
 
 function relativeLabel(at: string | undefined, now: number): string {
   const time = at ? Date.parse(at) : NaN;
-  if (Number.isNaN(time)) return "刚刚";
+  if (Number.isNaN(time)) return t("刚刚");
   const minutes = Math.floor((now - time) / 60000);
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes} 分钟前`;
-  return `${Math.floor(minutes / 60)} 小时前`;
+  if (minutes < 1) return t("刚刚");
+  if (minutes < 60) return t("{minutes} 分钟前", { minutes });
+  return t("{floor} 小时前", { floor: Math.floor(minutes / 60) });
 }
 
 export function toApprovalItem(raw: RawAgentApproval, now: number = Date.now()): ApprovalItem {
@@ -91,24 +92,24 @@ export function toApprovalItem(raw: RawAgentApproval, now: number = Date.now()):
   const agent = AGENT_LABEL[raw.adapter ?? ""] ?? raw.adapter ?? "Agent";
   const kind = kindOf(tool);
   const action =
-    kind === "shell" ? "执行命令" : kind === "edit" ? "修改文件" : kind === "permissions" ? "授予权限" : `调用 ${tool}`;
+    kind === "shell" ? t("执行命令") : kind === "edit" ? t("修改文件") : kind === "permissions" ? t("授予权限") : t("调用 {tool}", { tool });
   // 执行命令和改文件都会改变本机状态；授予权限会放宽之后的所有调用，单列高风险。
   const risk: ApprovalRisk = kind === "permissions" ? "高风险" : kind === "other" ? "低风险" : "中风险";
   const target = targetOf(raw.approval.tool_call.arguments);
   return {
     id: agentApprovalId(raw.session_id, raw.approval.request_id),
     taskId: raw.task_id ?? "",
-    title: `${agent} 请求${action}`,
-    reason: raw.approval.description?.trim() || `${agent} 在托管会话中要使用 ${tool}，执行前需要你确认。`,
-    impact: kind === "shell" ? `批准后会在本机执行：${target}` : `批准后 ${agent} 会使用 ${tool}：${target}`,
+    title: t("{agent} 请求{action}", { agent, action }),
+    reason: raw.approval.description?.trim() || t("{agent} 在托管会话中要使用 {tool}，执行前需要你确认。", { agent, tool }),
+    impact: kind === "shell" ? t("批准后会在本机执行：{target}", { target }) : t("批准后 {agent} 会使用 {tool}：{target}", { agent, tool, target }),
     action,
     target,
     // 只答复这一次调用，不授予更大范围：和 contracts 的 allow_once 一致。
-    scope: "仅本次调用",
+    scope: t("仅本次调用"),
     risk,
     requestedAt: relativeLabel(raw.at, now),
-    expiresAt: "会话关闭时自动拒绝",
-    policy: "托管会话：执行前询问",
+    expiresAt: t("会话关闭时自动拒绝"),
+    policy: t("托管会话：执行前询问"),
     icon: Terminal,
   };
 }

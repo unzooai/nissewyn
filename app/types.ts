@@ -357,6 +357,8 @@ export type TaskRun = {
    * unterm 重启过，也能接着它原来的对话说下一句。
    */
   sessionId?: string;
+  /** 正等人在收件箱批准一次工具调用。 */
+  waiting?: boolean;
 };
 
 export type TaskRunStageStatus = "成功" | "失败" | "运行中" | "已取消" | "已跳过";

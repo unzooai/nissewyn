@@ -113,13 +113,13 @@ fn ensure_core() -> Result<CoreConnection, String> {
         }
         if found.http_port.is_none() && found.pid != 0 && pid_alive(found.pid) {
             return Err(
-                "正在运行的后台服务版本太旧，不提供 Unzoo One 的接口。请退出它（或重启电脑）后再打开 Unzoo One。"
+                "An older background service is running that does not offer what Unzoo One needs. Quit it (or restart your computer), then open Unzoo One again."
                     .into(),
             );
         }
     }
-    let program = core_program().ok_or("找不到 Unzoo One 的后台服务程序（unterm-core）。请重新安装 Unzoo One。")?;
-    start_core(&program).map_err(|e| format!("后台服务没能启动：{e}"))?;
+    let program = core_program().ok_or("The Unzoo One background service is missing. Please reinstall Unzoo One.")?;
+    start_core(&program).map_err(|e| format!("The background service could not start: {e}"))?;
     let deadline = Instant::now() + Duration::from_secs(20);
     while Instant::now() < deadline {
         if let Some(connection) = read_discovery().as_ref().and_then(live) {
@@ -127,7 +127,7 @@ fn ensure_core() -> Result<CoreConnection, String> {
         }
         std::thread::sleep(Duration::from_millis(250));
     }
-    Err("后台服务启动后 20 秒内没有就绪。".into())
+    Err("The background service did not become ready within 20 seconds.".into())
 }
 
 #[cfg(windows)]

@@ -9,6 +9,7 @@ import {
   type AgentRunSettings,
 } from "./lib/agent-run-settings";
 import type { AgentRule, AgentRulePort, BrainAgent, BrainPort, RuntimeTaskPort } from "./lib/provider";
+import { t } from "./i18n";
 
 /**
  * 设置 › 智能体：任务交给 agent 时在哪个目录跑、是否受管，以及托管会话的
@@ -57,7 +58,7 @@ export function AgentRunPanel({
           setCwdDraft(stored.cwd);
         })
         .catch((error: unknown) => {
-          if (live) notify(`读不到运行设置：${error instanceof Error ? error.message : String(error)}`);
+          if (live) notify(t("读不到运行设置：{error}", { error: error instanceof Error ? error.message : String(error) }));
         });
       return () => {
         live = false;
@@ -123,25 +124,25 @@ export function AgentRunPanel({
         .catch((error: unknown) => {
           setSettings(previous);
           setCwdDraft(previous.cwd);
-          notify(`没有保存：${error instanceof Error ? error.message : String(error)}`);
+          notify(t("没有保存：{error}", { error: error instanceof Error ? error.message : String(error) }));
         });
       return;
     }
     setSettings(next);
-    notify(writeAgentRunSettings(next) ? message : `${message}（这个浏览器不能保存设置，刷新后会恢复默认）`);
+    notify(writeAgentRunSettings(next) ? message : t("{message}（这个浏览器不能保存设置，刷新后会恢复默认）", { message }));
   }
 
   function saveCwd() {
     const cwd = cwdDraft.trim();
     if (cwd === settings.cwd) return;
-    save({ ...settings, cwd }, cwd ? `智能体的工作目录已设为 ${cwd}` : "已清除智能体的工作目录");
+    save({ ...settings, cwd }, cwd ? t("智能体的工作目录已设为 {cwd}", { cwd }) : t("已清除智能体的工作目录"));
   }
 
   async function addRule(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!tool.trim() || busy) return;
     if (scoped && !settings.cwd) {
-      notify("先设好工作目录，或者取消“只在工作目录里生效”");
+      notify(t("先设好工作目录，或者取消“只在工作目录里生效”"));
       return;
     }
     setBusy(true);
@@ -154,9 +155,9 @@ export function AgentRunPanel({
       });
       setRules((items) => [...items, rule]);
       setPrefix("");
-      notify(`已添加规则：${describeRule(rule)}`);
+      notify(t("已添加规则：{rule}", { rule: describeRule(rule) }));
     } catch (error) {
-      notify(`没能添加规则：${error instanceof Error ? error.message : String(error)}`);
+      notify(t("没能添加规则：{error}", { error: error instanceof Error ? error.message : String(error) }));
     } finally {
       setBusy(false);
     }
@@ -167,9 +168,9 @@ export function AgentRunPanel({
     try {
       await rulePort.remove(rule.id);
       setRules((items) => items.filter((item) => item.id !== rule.id));
-      notify(`已删除规则：${describeRule(rule)}`);
+      notify(t("已删除规则：{rule}", { rule: describeRule(rule) }));
     } catch (error) {
-      notify(`没能删除规则：${error instanceof Error ? error.message : String(error)}`);
+      notify(t("没能删除规则：{error}", { error: error instanceof Error ? error.message : String(error) }));
     } finally {
       setBusy(false);
     }
@@ -178,42 +179,42 @@ export function AgentRunPanel({
   return (
     <div className="settings-group agent-run-group" id="settings-agents">
       <div>
-        <span>智能体执行</span>
-        <h2>工作目录、受管模式与常设规则</h2>
+        <span>{t("智能体执行")}</span>
+        <h2>{t("工作目录、受管模式与常设规则")}</h2>
       </div>
 
       <label className="setting-row agent-run-agent">
         <span>
-          <strong>交给哪个智能体</strong>
+          <strong>{t("交给哪个智能体")}</strong>
           <small>
             {agentsError
-              ? `读不到智能体清单：${agentsError}`
+              ? t("读不到智能体清单：{error}", { error: agentsError })
               : chosen && !chosen.installed
-                ? `${chosen.name} 没装在这台机器上，任务会启动失败。`
+                ? t("{name} 没装在这台机器上，任务会启动失败。", { name: chosen.name })
                 : chosen && !chosen.governed && settings.governed
-                  ? `${chosen.name} 不支持受管，会以托管模式运行：每次工具调用照样先进收件箱。`
-                  : "新建、继续和重试的任务都交给它。继续对话沿用那次运行原来的智能体。"}
+                  ? t("{name} 不支持受管，会以托管模式运行：每次工具调用照样先进收件箱。", { name: chosen.name })
+                  : t("新建、继续和重试的任务都交给它。继续对话沿用那次运行原来的智能体。")}
           </small>
         </span>
         <span className="agent-run-input agent-run-select">
           <Bot size={14} aria-hidden="true" />
           <select
-            aria-label="交给哪个智能体"
+            aria-label={t("交给哪个智能体")}
             value={settings.agent}
             disabled={!agents}
             onChange={(event) => {
               const next = agents?.find((agent) => agent.id === event.target.value);
-              if (next) save({ ...settings, agent: next.id }, `任务改为交给 ${next.name}`);
+              if (next) save({ ...settings, agent: next.id }, t("任务改为交给 {name}", { name: next.name }));
             }}
           >
-            {!agents && <option value={settings.agent}>正在读取…</option>}
+            {!agents && <option value={settings.agent}>{t("正在读取…")}</option>}
             {agents && !chosen && (
-              <option value={settings.agent}>{settings.agent}（清单里没有）</option>
+              <option value={settings.agent}>{t("{agent}（清单里没有）", { agent: settings.agent })}</option>
             )}
             {agents?.map((agent) => (
               <option key={agent.id} value={agent.id}>
                 {agent.name}
-                {agent.installed ? (agent.version ? ` ${agent.version}` : "") : "（未安装）"}
+                {agent.installed ? (agent.version ? ` ${agent.version}` : "") : t("（未安装）")}
               </option>
             ))}
           </select>
@@ -228,32 +229,31 @@ export function AgentRunPanel({
         }}
       >
         <span>
-          <strong>工作目录</strong>
-          <small>任务交给智能体后，它在这个目录里读写文件、执行命令。留空则用 Unterm 自己的目录。</small>
+          <strong>{t("工作目录")}</strong>
+          <small>{t("任务交给智能体后，它在这个目录里读写文件、执行命令。留空则用 Unzoo One 后台服务自己的目录。")}</small>
           <span className="agent-run-input">
             <FolderOpen size={14} aria-hidden="true" />
             <input
               type="text"
               value={cwdDraft}
               spellCheck={false}
-              placeholder="例如 C:\code\my-project"
-              aria-label="智能体的工作目录"
+              placeholder={t("例如 C:\\code\\my-project")}
+              aria-label={t("智能体的工作目录")}
               onChange={(event) => setCwdDraft(event.target.value)}
               onBlur={saveCwd}
             />
           </span>
         </span>
         <button type="submit" disabled={cwdDraft.trim() === settings.cwd}>
-          保存
+          {t("保存")}
         </button>
       </form>
 
       <label className="setting-row">
         <span>
-          <strong>受管模式</strong>
+          <strong>{t("受管模式")}</strong>
           <small>
-            关掉 Claude Code 自带的 Bash、PowerShell 和联网工具，命令只能经 Unterm 执行，每一步都先进收件箱。
-            目前只有 Claude Code 支持；其它智能体以托管模式运行：用自己的工具，但同样逐条等你批准。
+            {t("关掉 Claude Code 自带的 Bash、PowerShell 和联网工具，命令只能经 Unzoo One 执行，每一步都先进收件箱。目前只有 Claude Code 支持；其它智能体以托管模式运行：用自己的工具，但同样逐条等你批准。")}
           </small>
         </span>
         <button
@@ -261,11 +261,11 @@ export function AgentRunPanel({
           type="button"
           role="switch"
           aria-checked={settings.governed}
-          aria-label="受管模式"
+          aria-label={t("受管模式")}
           onClick={() =>
             save(
               { ...settings, governed: !settings.governed },
-              settings.governed ? "已改为托管模式" : "已改为受管模式",
+              settings.governed ? t("已改为托管模式") : t("已改为受管模式"),
             )
           }
         >
@@ -273,29 +273,29 @@ export function AgentRunPanel({
         </button>
       </label>
 
-      <section className="agent-rules" aria-label="常设规则">
+      <section className="agent-rules" aria-label={t("常设规则")}>
         <header>
           <span>
-            <strong>常设规则</strong>
+            <strong>{t("常设规则")}</strong>
             <small>
-              命中的工具调用不再进收件箱，直接放行或拒绝。只有人能定规则；放行规则不会匹配拼接命令（&、|、;、重定向）。各家的命令行工具（Bash、PowerShell、shell、run_command）算同一个，写哪个都对它们全部生效。
+              {t("命中的工具调用不再进收件箱，直接放行或拒绝。只有人能定规则；放行规则不会匹配拼接命令（&、|、;、重定向）。各家的命令行工具（Bash、PowerShell、shell、run_command）算同一个，写哪个都对它们全部生效。")}
             </small>
           </span>
-          <button type="button" aria-label="刷新规则" title="刷新规则" onClick={() => void reload()} disabled={loading}>
+          <button type="button" aria-label={t("刷新规则")} title={t("刷新规则")} onClick={() => void reload()} disabled={loading}>
             <RefreshCw size={14} className={loading ? "is-spinning" : undefined} />
           </button>
         </header>
 
         {loadError ? (
-          <p className="agent-rules-empty">读取规则失败：{loadError}</p>
+          <p className="agent-rules-empty">{t("读取规则失败：{error}", { error: loadError })}</p>
         ) : rules.length === 0 ? (
-          <p className="agent-rules-empty">{loading ? "正在读取…" : "还没有规则。每次工具调用都会进收件箱。"}</p>
+          <p className="agent-rules-empty">{loading ? t("正在读取…") : t("还没有规则。每次工具调用都会进收件箱。")}</p>
         ) : (
           <ul>
             {rules.map((rule) => (
               <li key={rule.id} data-rule-id={rule.id}>
                 <em className={rule.decision === "allow" ? "is-allow" : "is-deny"}>
-                  {rule.decision === "allow" ? "放行" : "拒绝"}
+                  {rule.decision === "allow" ? t("放行") : t("拒绝")}
                 </em>
                 <span>
                   <code>
@@ -303,15 +303,15 @@ export function AgentRunPanel({
                     {rule.commandPrefix ? ` · ${rule.commandPrefix}` : ""}
                   </code>
                   <small>
-                    {rule.workspace ? `只在 ${rule.workspace}` : "所有工作区"}
+                    {rule.workspace ? t("只在 {workspace}", { workspace: rule.workspace }) : t("所有工作区")}
                     {" · "}
-                    {rule.createdBy === "remember" ? "审批时记住" : "在设置里添加"}
+                    {rule.createdBy === "remember" ? t("审批时记住") : t("在设置里添加")}
                   </small>
                 </span>
                 <button
                   type="button"
-                  aria-label={`删除规则 ${describeRule(rule)}`}
-                  title="删除规则"
+                  aria-label={t("删除规则 {rule}", { rule: describeRule(rule) })}
+                  title={t("删除规则")}
                   disabled={busy}
                   onClick={() => void removeRule(rule)}
                 >
@@ -323,38 +323,38 @@ export function AgentRunPanel({
         )}
 
         <form className="agent-rule-form" onSubmit={addRule}>
-          <select aria-label="规则的决定" value={decision} onChange={(event) => setDecision(event.target.value as "allow" | "deny")}>
-            <option value="deny">拒绝</option>
-            <option value="allow">放行</option>
+          <select aria-label={t("规则的决定")} value={decision} onChange={(event) => setDecision(event.target.value as "allow" | "deny")}>
+            <option value="deny">{t("拒绝")}</option>
+            <option value="allow">{t("放行")}</option>
           </select>
           <input
             type="text"
-            aria-label="工具名"
-            placeholder="工具，如 Bash"
+            aria-label={t("工具名")}
+            placeholder={t("工具，如 Bash")}
             value={tool}
             spellCheck={false}
             onChange={(event) => setTool(event.target.value)}
           />
           <input
             type="text"
-            aria-label="命令前缀"
-            placeholder="命令前缀（可选），如 git push"
+            aria-label={t("命令前缀")}
+            placeholder={t("命令前缀（可选），如 git push")}
             value={prefix}
             spellCheck={false}
             onChange={(event) => setPrefix(event.target.value)}
           />
           <label>
             <input type="checkbox" checked={scoped} onChange={(event) => setScoped(event.target.checked)} />
-            只在工作目录里生效
+            {t("只在工作目录里生效")}
           </label>
           <button type="submit" disabled={busy || !tool.trim()}>
             <Plus size={14} />
-            添加
+            {t("添加")}
           </button>
         </form>
         {store && (
           <small className="agent-rules-store">
-            <ShieldCheck size={12} aria-hidden="true" /> 规则保存在 {store}
+            <ShieldCheck size={12} aria-hidden="true" /> {t("规则保存在 {store}", { store })}
           </small>
         )}
       </section>
@@ -363,6 +363,6 @@ export function AgentRunPanel({
 }
 
 function describeRule(rule: AgentRule): string {
-  const verb = rule.decision === "allow" ? "放行" : "拒绝";
+  const verb = rule.decision === "allow" ? t("放行") : t("拒绝");
   return `${verb} ${rule.tool}${rule.commandPrefix ? ` ${rule.commandPrefix}` : ""}`;
 }

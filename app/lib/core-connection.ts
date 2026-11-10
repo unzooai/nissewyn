@@ -9,6 +9,8 @@
  *   /bootstrap.json 取。
  */
 
+import { t } from "../i18n";
+
 export type CoreConnection = {
   /** 接口地址前缀，如 http://127.0.0.1:19877；同源时为空串。 */
   base: string;
@@ -46,13 +48,13 @@ async function resolve(): Promise<CoreConnection> {
   const invoke = tauri()?.core?.invoke;
   if (invoke) {
     const value = (await invoke("core_connection")) as Partial<CoreConnection> | null;
-    if (!value?.base || !value.token) throw new Error("Unzoo One 的后台服务还没有就绪");
+    if (!value?.base || !value.token) throw new Error(t("Unzoo One 的后台服务还没有就绪"));
     return { base: value.base.replace(/\/+$/, ""), token: value.token };
   }
   const response = await fetch("/bootstrap.json");
-  if (!response.ok) throw new Error(`bootstrap.json 返回 ${response.status}`);
+  if (!response.ok) throw new Error(t("bootstrap.json 返回 {status}", { status: response.status }));
   const body = (await response.json()) as { auth_token?: string };
-  if (!body.auth_token) throw new Error("bootstrap.json 里没有 auth_token");
+  if (!body.auth_token) throw new Error(t("bootstrap.json 里没有 auth_token"));
   return { base: "", token: body.auth_token };
 }
 

@@ -13,6 +13,7 @@
  *   环境读不到文件。要么 unterm 给个固定入口，要么让用户在设置里填。
  */
 
+import { t } from "../i18n";
 import type { ConnectorCheckResult, ConnectorId } from "../types";
 import {
   isAgentApprovalId,
@@ -47,12 +48,12 @@ async function callUnzoo<T>(tool: string, args?: Record<string, unknown>): Promi
     body: JSON.stringify({ tool, args }),
   });
   const body = (await response.json()) as UnzooResponse<T>;
-  if ("error" in body) throw new Error(body.detail ? `${body.error}（${body.detail}）` : body.error);
+  if ("error" in body) throw new Error(body.detail ? t("{error}（{detail}）", { error: body.error, detail: body.detail }) : body.error);
   return body.data;
 }
 
 function nowLabel(): string {
-  return "刚刚";
+  return t("刚刚");
 }
 
 /**
@@ -72,7 +73,7 @@ async function getUnterm<T>(path: string): Promise<T> {
     headers: { authorization: `Bearer ${connection.token}` },
   });
   const body = (await response.json()) as T & { error?: string };
-  if (!response.ok || body?.error) throw new Error(body?.error ?? `unterm 返回 ${response.status}`);
+  if (!response.ok || body?.error) throw new Error(body?.error ?? t("后台服务返回 {status}", { status: response.status }));
   return body;
 }
 
@@ -84,7 +85,7 @@ const answeredAgentApprovals = new Set<string>();
 
 async function decideAgentApproval(id: string, decision: ApprovalDecision): Promise<void> {
   const parsed = parseAgentApprovalId(id);
-  if (!parsed) throw new Error(`不是托管会话的审批：${id}`);
+  if (!parsed) throw new Error(t("不是托管会话的审批：{id}", { id }));
   answeredAgentApprovals.add(id);
   try {
     await callUnterm("/api/agent/decide", {
@@ -119,7 +120,7 @@ async function callUnterm<T>(path: string, payload: Record<string, unknown>): Pr
     body: JSON.stringify(payload),
   });
   const body = (await response.json()) as T & { error?: string };
-  if (!response.ok || body?.error) throw new Error(body?.error ?? `unterm 返回 ${response.status}`);
+  if (!response.ok || body?.error) throw new Error(body?.error ?? t("后台服务返回 {status}", { status: response.status }));
   return body;
 }
 
@@ -350,7 +351,7 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
         if (!inBrowser || !(await untermReachable())) return fallback.agentRules.add(draft);
         const data = await callUnterm<{ rule: RawAgentRule }>("/api/agent/policy", fromAgentRuleDraft(draft));
         const rule = toAgentRule(data.rule);
-        if (!rule) throw new Error("unterm 返回的规则不完整");
+        if (!rule) throw new Error(t("后台服务返回的规则不完整"));
         return rule;
       },
       async remove(id) {
