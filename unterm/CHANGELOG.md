@@ -1,5 +1,77 @@
 # Changelog
 
+## v0.71.25 — 2026-11-11
+
+### Added
+
+- **Hosted & governed agent sessions (`agent_session.*`), resumption & standing approval policies (#50–#61).**
+  - Adds structured `unterm-brain` adapters for Gemini CLI, OpenCode, and Antigravity (`agy`), emitting `contracts/v0` (`brain_event.v0`) events (#50).
+  - Drives headless and multi-turn **hosted sessions** across Claude Code (`stream-json` + `--permission-prompt-tool stdio`), Codex (`codex app-server`), OpenCode (`opencode acp`), and Antigravity (`agy acp`), routing every tool permission prompt into `approval.requested` events and the Console inbox (`agent_session.decide` / `agent_session.approvals`, #51–#54).
+  - Adds standing approval rules (`agent_policy`, #55, #59, #60) that unify shell tool names across CLIs and enforce safe command prefix boundaries (never crossing single `&`, compound operators, or quoted subshells).
+  - Adds **governed sessions** (`governed: true`, #56) with `UNTERM_HOSTED_GRANT` so agents execute commands exclusively through Unterm's MCP server without double-prompting already-approved calls, and supports resuming conversations after process exit (`agent_session.resume`, #57, #58).
+- **Runtime-managed console tasks, Core-hosted Settings/Console server & custom product branding (#62–#67).**
+  - Supports caller-supplied task and run IDs plus task renaming in `unterm-tasks` (#62), and moves Console task storage, execution, scheduling, and runtime termination reason codes into the Unterm runtime (`/api/console/tasks/*`, #63, #66).
+  - Hosts the Settings UI, Console UI, and REST API directly from `unterm-core` so attached windows reuse Core's server (#64), enables CORS for packaged desktop origins (`tauri://localhost`, #65), and allows host launchers to customize the terminal window product name via `UNTERM_PRODUCT_NAME` (#67).
+
+## v0.71.24 — 2026-11-10
+
+### Added
+
+- **First-party `agy` (Google Antigravity CLI) & `qwen-code` (Alibaba Qwen Code CLI) manifests, plus China Coding Plan modes.**
+  - Ships signed manifests (`unterm-2026-5`) for `agy` (v2) and `qwen-code` (v1), and adds first-class China Coding Plan (`cn_coding_plan`) authentication modes for `claude-code` (v4), `kimi-code` (v3), `opencode` (v3), and `trae-agent` (v2) covering Zhipu GLM, Aliyun Bailian / DashScope, Volcengine Ark, DeepSeek, MiniMax, and Moonshot Kimi endpoints.
+  - Supports headless execution (`unterm-cli agent run` / `agent_session.start`) and MCP auto-wiring (`~/.gemini/antigravity/mcp_config.json`, `~/.qwen/settings.json`), plus `agy` lifecycle hooks (`~/.gemini/settings.json`) and process detection across `unterm-services`, `unterm-cli`, and `unterm-settings`.
+- **Guided AI agent installation & one-click PATH repair (`unterm-cli agent repair-path` / `fix-path`).**
+  - `unterm-cli agent launch <id> [--install]`, `unterm-cli agent run <id> [--install]`, and `unterm-cli setup-ai [--install <id|all>]` now detect missing agent binaries, prompt or auto-run the official platform installer, handle Unix `npm install -g` `EACCES` fallback to `~/.local/bin`, and automatically persist the binary directory to the user's shell RC files (`.zshrc`, `.bashrc`, `.bash_profile`, `config.fish`) or Windows `HKCU\Environment\Path`.
+  - Adds `unterm-cli agent repair-path [id]` (alias `fix-path`), `POST /api/agents/repair-path`, `POST /api/agents/<id>/repair-path`, and **Repair PATH / 修复 PATH** actions in the Web Settings AI Agents tab.
+- **AtomGit mainland China mirror & high-speed release downloads.**
+  - Mirrors repository and release artifacts to `https://atomgit.com/zhitongblog/unterm`, adds `make release-atomgit` (`ci/release-to-atomgit.sh`), and routes mainland China downloads and `--cn` / `--mirror=atomgit` install scripts through AtomGit CDN links.
+
+### Fixed
+
+- **macOS & cross-platform ghost command completion history.**
+  - Preloads recent commands from `~/.zsh_history`, `~/.bash_history`, Fish history, and PowerShell PSReadLine history on startup, persists Unterm's own command history across restarts (`~/.unterm/command_history.json`), and adds built-in command/flag completion for `agy` (`antigravity`).
+
+## v0.71.23 — 2026-11-09
+
+### Fixed
+
+- **Windows borderless maximize & taskbar visibility.**
+  - Handles `WM_GETMINMAXINFO` on borderless custom-caption windows (`win_chrome.rs`)
+    to constrain OS maximize (`Win+Up`, Snap Layouts) to the monitor's `rcWork` area,
+    leaving 1px at the bottom when `rcWork == rcMonitor` so auto-hide taskbars can
+    still be triggered by moving the cursor to the bottom edge.
+  - Routes custom title-bar double-click through `toggle_maximize()` and preserves
+    unmaximized geometry across session restore.
+- **MCP write confirmation visibility & interaction (#45).**
+  - Dispatches each incoming `HostCall` on its own worker thread in
+    `HostChannelClient::attach` so blocking `ask_confirmation` requests never
+    head-of-line block `request_repaint`, `list_windows`, or `focus_window`.
+  - Wakes parked tray instances, unminimizes and raises the target window owning
+    `pane_id`, switches to the target tab/pane, and requests critical taskbar
+    attention when a confirmation banner arrives.
+  - Adds mouse hit-testing (`decision_at_column` / `click_confirmation_banner`) so
+    `[Enter] Allow`, `[A] Always allow`, and `[Esc] Block` can be clicked directly.
+  - Syncs `AlwaysAllow` decisions back to `unterm-core`'s `confirmed_agents` and
+    `grant_agent_trust`, and surfaces `pending_input_confirmations` /
+    `recent_input_confirmations` (`cfm_<id>`) in `approval.list` and `approval.decide`.
+- **`contracts/v0` provider manifest & agent session stream alignment (#30).**
+  - Publishes per-method risk and capability declarations (`tools` list and
+    `method_map` lookup with all 7 risk fields) in `terminal_provider::manifest()`.
+  - Emits both `text` and `message` on `output.delta` stream events in
+    `agent_session.rs`.
+- **Screenshots & scrollback capture.**
+  - Sets `DWMWA_CLOAK` and `DWMWA_TRANSITIONS_FORCEDISABLED` alongside `LWA_ALPHA=0`
+    in `set_capture_cloak` across all open Unterm windows so hidden region captures
+    leave no DWM shadow or Mica backdrop behind, and guards against premature
+    uncloaking while `ms-screenclip:` is starting.
+  - Launches `ms-screenclip:` via `ShellExecuteW` and retries clipboard image reads
+    across transient `OpenClipboard` lock contention with `SnippingTool.exe`.
+  - Skips DWM-cloaked, minimized, and zero-area helper windows in
+    `window_capture::find_window`, and includes `CAPTUREBLT` in `screen_under`.
+  - Uses `FontIndex::cached()` in `FontStack::system`, renders combining marks,
+    underlines, and strikethroughs in scrollback PNGs, and copies quick-menu
+    scrollback screenshots to the clipboard as images.
+
 ## v0.71.22 — 2026-11-05
 
 ### Added

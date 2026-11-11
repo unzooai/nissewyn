@@ -28,12 +28,14 @@ fn baked_envelope_verifies_and_lists_known_agents() {
     // update both the manifest folder and this test.
     let ids: Vec<&str> = envelope.manifests.iter().map(|m| m.id.as_str()).collect();
     let must = [
+        "agy",
         "claude-code",
         "codex-cli",
         "gemini-cli",
         "opencode",
         "aider",
         "kimi-code",
+        "qwen-code",
         "trae-agent",
     ];
     for id in must {
@@ -58,6 +60,19 @@ fn baked_envelope_verifies_and_lists_known_agents() {
         kimi_install_text.contains("https://code.kimi.com/kimi-code/install.sh")
             && kimi_install_text.contains("https://code.kimi.com/kimi-code/install.ps1"),
         "Kimi Code manifest should advertise official macOS/Linux and Windows installers"
+    );
+
+    let agy = envelope
+        .manifests
+        .iter()
+        .find(|m| m.id == "agy")
+        .expect("agy manifest present");
+    let agy_install_text =
+        serde_json::to_string(&agy.install).expect("serialize agy install spec");
+    assert!(
+        agy_install_text.contains("https://antigravity.google/cli/install.sh")
+            && agy_install_text.contains("https://antigravity.google/cli/install.ps1"),
+        "Antigravity CLI (agy) manifest should advertise official macOS/Linux and Windows installers"
     );
 }
 

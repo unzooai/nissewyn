@@ -51,7 +51,20 @@ pub struct ManifestSet {
 
 impl ManifestSet {
     pub fn find(&self, agent_id: &str) -> Option<&AgentManifest> {
-        self.envelope.manifests.iter().find(|m| m.id == agent_id)
+        let canonical = match agent_id.trim().to_ascii_lowercase().as_str() {
+            "antigravity" | "antigravity-cli" => "agy",
+            "claude" => "claude-code",
+            "codex" => "codex-cli",
+            "gemini" => "gemini-cli",
+            "kimi" => "kimi-code",
+            "qwen" => "qwen-code",
+            "trae" | "trae-cli" | "trae_agent" => "trae-agent",
+            _ => agent_id,
+        };
+        self.envelope
+            .manifests
+            .iter()
+            .find(|m| m.id == canonical || m.id == agent_id)
     }
 
     pub fn for_current_platform(&self) -> Vec<&AgentManifest> {
@@ -79,7 +92,8 @@ pub fn fetch_manifests_offline() -> Result<ManifestSet> {
     let cache_path = paths::manifest_cache_path()?;
     if cache_path.exists() {
         if let Ok(bytes) = std::fs::read(&cache_path) {
-            if let Ok(env) = envelope::verify_envelope(&bytes) {
+            if let Ok(mut env) = envelope::verify_envelope(&bytes) {
+                fetch::merge_newer_baked_manifests(&mut env);
                 return Ok(ManifestSet {
                     envelope: env,
                     source: Source::Cache,

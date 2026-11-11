@@ -67,6 +67,17 @@ pub enum AgentSubCommand {
     /// Run the uninstall command. Does NOT delete agent settings — use
     /// `unterm agent configure <id> --reset` if you want that.
     Uninstall { id: String },
+    /// Detect installed agent binary location(s) and repair user PATH
+    /// (.zshrc / .bashrc / .bash_profile / config.fish / Windows User Path).
+    #[command(visible_alias = "fix-path")]
+    RepairPath {
+        /// Optional agent ID (e.g. `agy`, `claude-code`). If omitted, repairs
+        /// PATH for all installed agents.
+        id: Option<String>,
+        /// If an agent ID is specified and not yet installed, install it first.
+        #[arg(long)]
+        install: bool,
+    },
     /// Authenticate. With no flags, runs the manifest's primary auth
     /// (typically `<bin> login`). Use `--api-key` to skip OAuth and store
     /// a raw key in the keychain.
@@ -121,13 +132,17 @@ pub enum AgentSubCommand {
         profile: Option<String>,
         #[arg(long)]
         cwd: Option<String>,
+        /// Automatically install the agent (and add its binary dir to PATH) if
+        /// it is not installed yet.
+        #[arg(long)]
+        install: bool,
     },
     /// Run an agent task non-interactively and wait for it to finish.
     ///
-    /// Supported today: `codex-cli` (`codex exec`), `claude-code`
-    /// (`claude -p`), `gemini-cli` (`gemini -p`), and `opencode`
-    /// (`opencode run`). The command reuses the same profile, auth, launch
-    /// flags, and MCP autowiring as `agent launch`.
+    /// Supported today: `agy` (`agy -p`), `codex-cli` (`codex exec`), `claude-code`
+    /// (`claude -p`), `gemini-cli` (`gemini -p`), `opencode` (`opencode run`),
+    /// `kimi-code` (`kimi -p`), `qwen-code` (`qwen -p`), and `trae-agent` (`trae-cli run`).
+    /// The command reuses the same profile, auth, launch flags, and MCP autowiring as `agent launch`.
     Run {
         id: String,
         #[arg(long)]
@@ -141,6 +156,10 @@ pub enum AgentSubCommand {
         /// Print the exact command that would run, with sensitive env redacted.
         #[arg(long)]
         dry_run: bool,
+        /// Automatically install the agent (and add its binary dir to PATH) if
+        /// it is not installed yet.
+        #[arg(long)]
+        install: bool,
         #[arg(trailing_var_arg = true)]
         prompt: Vec<String>,
     },
@@ -220,6 +239,9 @@ pub fn run(cmd: AgentCommand, json_out: bool) -> Result<()> {
         } => run_install(&id, no_check_requires, json_out),
         AgentSubCommand::Update { id } => run_update(&id, json_out),
         AgentSubCommand::Uninstall { id } => run_uninstall(&id, json_out),
+        AgentSubCommand::RepairPath { id, install } => {
+            run_repair_path(id.as_deref(), install, json_out)
+        }
         AgentSubCommand::Auth {
             id,
             api_key_stdin,
@@ -237,15 +259,19 @@ pub fn run(cmd: AgentCommand, json_out: bool) -> Result<()> {
         AgentSubCommand::Plan { id, profile, cwd } => {
             run_plan(&id, profile.as_deref(), cwd.as_deref(), json_out)
         }
-        AgentSubCommand::Launch { id, profile, cwd } => {
-            run_launch(&id, profile.as_deref(), cwd.as_deref())
-        }
+        AgentSubCommand::Launch {
+            id,
+            profile,
+            cwd,
+            install,
+        } => run_launch(&id, profile.as_deref(), cwd.as_deref(), install),
         AgentSubCommand::Run {
             id,
             profile,
             cwd,
             stdin,
             dry_run,
+            install,
             prompt,
         } => run_headless(
             &id,
@@ -253,6 +279,7 @@ pub fn run(cmd: AgentCommand, json_out: bool) -> Result<()> {
             cwd.as_deref(),
             stdin,
             dry_run,
+            install,
             &prompt,
             json_out,
         ),
@@ -370,10 +397,17 @@ fn run_cockpit_signal(
         super::client::set_target_instance(Some(&id));
     }
     // A hook must never break the agent that invokes it: when no Unterm
-    // GUI is reachable, exit 0 silently instead of erroring.
+    // GUI is reachable, exit 0 silently instead of erroring. When `--json`
+    // is passed (e.g. Antigravity CLI hooks), always emit `{}` so the caller's
+    // JSON stdout parser succeeds.
     let mut client = match McpClient::connect() {
         Ok(c) => c,
-        Err(_) => return Ok(()),
+        Err(_) => {
+            if json_out {
+                println!("{{}}");
+            }
+            return Ok(());
+        }
     };
     let pane_id = pane
         .map(|s| s.to_string())
@@ -395,7 +429,12 @@ fn run_cockpit_signal(
         }
         // Same never-break-the-hook rule for server-side rejection
         // (e.g. the pane died between the event and the report).
-        Err(_) => Ok(()),
+        Err(_) => {
+            if json_out {
+                println!("{{}}");
+            }
+            Ok(())
+        }
     }
 }
 
@@ -572,6 +611,7 @@ fn run_list(only_installed: bool, json_out: bool) -> Result<()> {
                 "popularity_rank": m.popularity_rank,
                 "category": m.category,
                 "installed": detect.ok,
+                "on_path": detect.on_path,
                 "detected_version": detect.version,
                 "binary_path": detect.binary_path,
             })
@@ -587,19 +627,25 @@ fn run_list(only_installed: bool, json_out: bool) -> Result<()> {
         }));
     } else {
         println!(
-            "{:<14} {:<24} {:<12} {}",
-            "ID", "NAME", "INSTALLED", "VERSION"
+            "{:<14} {:<24} {:<12} {:<8} {}",
+            "ID", "NAME", "INSTALLED", "PATH", "VERSION"
         );
         for row in &rows {
+            let installed = row["installed"].as_bool().unwrap_or(false);
+            let on_path = row["on_path"].as_bool().unwrap_or(false);
+            let path_col = if !installed {
+                "-"
+            } else if on_path {
+                "ok"
+            } else {
+                "fix"
+            };
             println!(
-                "{:<14} {:<24} {:<12} {}",
+                "{:<14} {:<24} {:<12} {:<8} {}",
                 row["id"].as_str().unwrap_or(""),
                 row["name"].as_str().unwrap_or(""),
-                if row["installed"].as_bool().unwrap_or(false) {
-                    "yes"
-                } else {
-                    "no"
-                },
+                if installed { "yes" } else { "no" },
+                path_col,
                 row["detected_version"].as_str().unwrap_or("-"),
             );
         }
@@ -620,6 +666,7 @@ fn run_show(id: &str, json_out: bool) -> Result<()> {
             "manifest": manifest,
             "detect": serde_json::json!({
                 "ok": detect.ok,
+                "on_path": detect.on_path,
                 "version": detect.version,
                 "binary_path": detect.binary_path,
                 "stderr_sample": detect.stderr_sample,
@@ -640,6 +687,7 @@ fn run_show(id: &str, json_out: bool) -> Result<()> {
         }
         if let Some(p) = &detect.binary_path {
             println!("  binary path: {p}");
+            println!("  on PATH: {}", detect.on_path);
         }
         println!("\nSchema:");
         for s in &manifest.settings_schema {
@@ -693,6 +741,9 @@ fn run_install(id: &str, _no_check_requires: bool, json_out: bool) -> Result<()>
                 r.label,
                 r.exit_code
             );
+            if r.label.starts_with("configure PATH") && !r.stdout_tail.is_empty() {
+                println!("       {}", r.stdout_tail);
+            }
         }
         println!("\nInstalled {} ({})", manifest.name, manifest.id);
     }
@@ -724,6 +775,70 @@ fn run_uninstall(id: &str, json_out: bool) -> Result<()> {
         }));
     } else {
         println!("uninstall: {} (exit {:?})", report.label, report.exit_code);
+    }
+    Ok(())
+}
+
+fn run_repair_path(id: Option<&str>, install_if_missing: bool, json_out: bool) -> Result<()> {
+    let reports = if let Some(target_id) = id {
+        let (_, manifest) = lookup(target_id)?;
+        let initial = installer::detect(&manifest.detect);
+        if !initial.ok && install_if_missing {
+            installer::run_install(&manifest).map_err(|e| anyhow!(e.to_string()))?;
+        }
+        let report = installer::repair_agent_path(&manifest);
+        if report.binary_path.is_none() {
+            return Err(anyhow!(
+                "{} ({}) is not installed yet. Run `unterm-cli agent install {}` or pass `--install`.",
+                manifest.name,
+                manifest.id,
+                manifest.id
+            ));
+        }
+        vec![report]
+    } else {
+        let set = fetch_manifests().map_err(|e| anyhow!(e.to_string()))?;
+        let manifests: Vec<AgentManifest> =
+            set.for_current_platform().into_iter().cloned().collect();
+        installer::repair_all_agents_path(&manifests)
+            .into_iter()
+            .filter(|r| r.binary_path.is_some())
+            .collect()
+    };
+
+    if json_out {
+        print_json(&serde_json::json!({
+            "ok": true,
+            "reports": reports,
+        }));
+    } else if reports.is_empty() {
+        println!("no installed AI agents detected.");
+    } else {
+        println!(
+            "{:<14} {:<10} {:<36} {}",
+            "ID", "STATUS", "BIN_DIR", "UPDATED_FILES"
+        );
+        for r in &reports {
+            let status = if !r.updated_files.is_empty() || (!r.on_path_before && r.on_path_after) {
+                "repaired"
+            } else if r.on_path_after {
+                "ok"
+            } else {
+                "checked"
+            };
+            let files = if r.updated_files.is_empty() {
+                "-".to_string()
+            } else {
+                r.updated_files.join(", ")
+            };
+            println!(
+                "{:<14} {:<10} {:<36} {}",
+                r.id,
+                status,
+                r.bin_dir.as_deref().unwrap_or("-"),
+                files
+            );
+        }
     }
     Ok(())
 }
@@ -1038,8 +1153,70 @@ fn checkpoint_before_agent_launch(cwd: Option<&str>, agent: &str) -> Result<()> 
     Ok(())
 }
 
-fn run_launch(id: &str, profile: Option<&str>, cwd: Option<&str>) -> Result<()> {
+/// Ensure the agent binary is installed and its directory is on the user's PATH.
+/// If the binary is missing and `auto_install` is true (or the user confirms on
+/// an interactive terminal), runs `installer::run_install(manifest)` automatically.
+fn ensure_installed_and_on_path(manifest: &AgentManifest, auto_install: bool) -> Result<()> {
+    let det = installer::detect(&manifest.detect);
+    if det.ok {
+        if let Some(bin_path) = &det.binary_path {
+            if let Some(bin_dir) = std::path::Path::new(bin_path).parent() {
+                let _ = installer::ensure_dir_on_user_path(bin_dir);
+            }
+        }
+        return Ok(());
+    }
+
+    let should_install = if auto_install {
+        true
+    } else if std::io::IsTerminal::is_terminal(&std::io::stdin())
+        && std::io::IsTerminal::is_terminal(&std::io::stderr())
+    {
+        use std::io::Write;
+        eprint!(
+            "{} ({}) is not installed. Install it now and configure PATH? [Y/n]: ",
+            manifest.name, manifest.id
+        );
+        let _ = std::io::stderr().flush();
+        let mut line = String::new();
+        if std::io::stdin().read_line(&mut line).is_ok() {
+            let trimmed = line.trim().to_ascii_lowercase();
+            trimmed.is_empty() || trimmed == "y" || trimmed == "yes"
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    if !should_install {
+        return Err(anyhow!(
+            "{} ({}) is not installed. Run `unterm-cli agent install {}` or pass `--install` to install it and configure PATH automatically.",
+            manifest.name,
+            manifest.id,
+            manifest.id
+        ));
+    }
+
+    eprintln!("Installing {} ({})...", manifest.name, manifest.id);
+    let reports = installer::run_install(manifest).map_err(|e| anyhow!(e.to_string()))?;
+    for r in &reports {
+        eprintln!(
+            "  [{}] {}",
+            if r.success { "ok" } else { "fail" },
+            if !r.stdout_tail.is_empty() && r.label.starts_with("configure PATH") {
+                &r.stdout_tail
+            } else {
+                &r.label
+            }
+        );
+    }
+    Ok(())
+}
+
+fn run_launch(id: &str, profile: Option<&str>, cwd: Option<&str>, auto_install: bool) -> Result<()> {
     let (_, manifest) = lookup(id)?;
+    ensure_installed_and_on_path(&manifest, auto_install)?;
     let profile_id = profile_or_default(profile)?;
     let mut state =
         SettingsState::load(&profile_id, &manifest.id).map_err(|e| anyhow!(e.to_string()))?;
@@ -1085,14 +1262,14 @@ fn build_plan_for_run(
     id: &str,
     profile: Option<&str>,
     cwd: Option<&str>,
-) -> Result<unterm_agents::launcher::LaunchPlan> {
+) -> Result<(AgentManifest, unterm_agents::launcher::LaunchPlan)> {
     let (_, manifest) = lookup(id)?;
     let profile_id = profile_or_default(profile)?;
     let mut state =
         SettingsState::load(&profile_id, &manifest.id).map_err(|e| anyhow!(e.to_string()))?;
     state.merge_defaults(&manifest.settings_schema);
     let wire = mcp_wire_info();
-    unterm_agents::launcher::build_launch_plan(&unterm_agents::launcher::LaunchInputs {
+    let plan = unterm_agents::launcher::build_launch_plan(&unterm_agents::launcher::LaunchInputs {
         manifest: &manifest,
         profile_id: &profile_id,
         settings: &state,
@@ -1100,22 +1277,28 @@ fn build_plan_for_run(
         project_root: cwd,
         mcp: wire.as_ref(),
     })
-    .map_err(|e| anyhow!(e.to_string()))
+    .map_err(|e| anyhow!(e.to_string()))?;
+    Ok((manifest, plan))
 }
 
 fn headless_args(id: &str, mut base_args: Vec<String>, prompt: &str) -> Result<Vec<String>> {
     match id {
-        "claude-code" => {
+        "claude-code" | "claude" => {
             base_args.push("-p".to_string());
             base_args.push(prompt.to_string());
             Ok(base_args)
         }
-        "codex-cli" => {
+        "agy" | "antigravity" | "antigravity-cli" => {
+            base_args.push("-p".to_string());
+            base_args.push(prompt.to_string());
+            Ok(base_args)
+        }
+        "codex-cli" | "codex" => {
             base_args.push("exec".to_string());
             base_args.push(prompt.to_string());
             Ok(base_args)
         }
-        "gemini-cli" => {
+        "gemini-cli" | "gemini" => {
             base_args.push("-p".to_string());
             base_args.push(prompt.to_string());
             Ok(base_args)
@@ -1125,18 +1308,23 @@ fn headless_args(id: &str, mut base_args: Vec<String>, prompt: &str) -> Result<V
             base_args.push(prompt.to_string());
             Ok(base_args)
         }
-        "kimi-code" => {
+        "kimi-code" | "kimi" => {
             base_args.push("-p".to_string());
             base_args.push(prompt.to_string());
             Ok(base_args)
         }
-        "trae-agent" => {
+        "qwen-code" | "qwen" => {
+            base_args.push("-p".to_string());
+            base_args.push(prompt.to_string());
+            Ok(base_args)
+        }
+        "trae-agent" | "trae" | "trae-cli" => {
             base_args.push("run".to_string());
             base_args.push(prompt.to_string());
             Ok(base_args)
         }
         other => Err(anyhow!(
-            "agent run currently supports codex-cli, claude-code, gemini-cli, opencode, kimi-code, and trae-agent, not {other}"
+            "agent run currently supports agy, codex-cli, claude-code, gemini-cli, opencode, kimi-code, qwen-code, and trae-agent, not {other}"
         )),
     }
 }
@@ -1147,6 +1335,7 @@ fn run_headless(
     cwd: Option<&str>,
     read_stdin: bool,
     dry_run: bool,
+    auto_install: bool,
     prompt_parts: &[String],
     json_out: bool,
 ) -> Result<()> {
@@ -1166,7 +1355,12 @@ fn run_headless(
             "agent run needs a prompt argument, or pass --stdin and pipe one in"
         ));
     }
-    let plan = build_plan_for_run(id, profile, cwd)?;
+    let (manifest, mut plan) = build_plan_for_run(id, profile, cwd)?;
+    if !dry_run {
+        ensure_installed_and_on_path(&manifest, auto_install)?;
+        // Rebuild plan in case installation just placed the binary in ~/.local/bin.
+        (_, plan) = build_plan_for_run(id, profile, cwd)?;
+    }
     let args = headless_args(id, plan.args.clone(), &prompt)?;
 
     if dry_run {
@@ -1352,8 +1546,16 @@ mod tests {
             vec!["--model", "openai/gpt-5", "run", prompt]
         );
         assert_eq!(
+            headless_args("agy", vec!["--model".into(), "gemini-4-argon-medium".into()], prompt).unwrap(),
+            vec!["--model", "gemini-4-argon-medium", "-p", prompt]
+        );
+        assert_eq!(
             headless_args("kimi-code", vec!["--continue".into()], prompt).unwrap(),
             vec!["--continue", "-p", prompt]
+        );
+        assert_eq!(
+            headless_args("qwen-code", vec!["--yolo".into()], prompt).unwrap(),
+            vec!["--yolo", "-p", prompt]
         );
         assert_eq!(
             headless_args("trae-agent", vec!["--model".into(), "gpt-5".into()], prompt).unwrap(),

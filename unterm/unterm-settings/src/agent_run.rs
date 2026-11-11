@@ -23,10 +23,12 @@ use unterm_mcp::handler::McpHandler;
 /// that produce one live here, next to the code that depends on them.
 fn headless_args(agent_id: &str) -> Option<&'static [&'static str]> {
     match agent_id {
-        // ClaudeAdapter reads the `type: system|assistant|result` lines that
-        // `--output-format stream-json` emits. `--verbose` is what makes it
-        // stream rather than buffer to a single final message.
-        "claude-code" => Some(&["-p", "--output-format", "stream-json", "--verbose"]),
+        // ClaudeAdapter and AgyAdapter read the `type: system|assistant|result`
+        // lines that `--output-format stream-json` emits. `--verbose` is what
+        // makes it stream rather than buffer to a single final message.
+        "claude-code" | "agy" | "antigravity" => {
+            Some(&["-p", "--output-format", "stream-json", "--verbose"])
+        }
         // CodexAdapter's JSONL is the reference format.
         "codex-cli" => Some(&["exec", "--json"]),
         _ => None,
@@ -35,16 +37,15 @@ fn headless_args(agent_id: &str) -> Option<&'static [&'static str]> {
 
 /// Arguments for a *hosted* run: the agent is driven over its host protocol
 /// (unterm-brain's `host` module adds the rest -- Claude's stream-json and
-/// stdio permission prompts, `codex app-server`, `opencode acp`), stdin
-/// stays open for follow-up turns, and every tool that needs permission
+/// stdio permission prompts, `codex app-server`, `opencode acp`, `agy acp`),
+/// stdin stays open for follow-up turns, and every tool that needs permission
 /// comes to the console's inbox instead of being pre-approved or skipped.
 fn hosted_args(agent_id: &str) -> Option<&'static [&'static str]> {
     match agent_id {
         "claude-code" => Some(&["-p"]),
         "codex-cli" => Some(&[]),
         "opencode" => Some(&[]),
-        // `agy acp`: the host adds `acp`.
-        "agy" => Some(&[]),
+        "agy" | "antigravity" => Some(&[]),
         _ => None,
     }
 }
@@ -139,7 +140,7 @@ fn adapter_of(agent_id: &str) -> &'static str {
         "claude-code" => "claude",
         "codex-cli" => "codex",
         "opencode" => "opencode",
-        "agy" => "agy",
+        "agy" | "antigravity" => "agy",
         _ => "generic",
     }
 }

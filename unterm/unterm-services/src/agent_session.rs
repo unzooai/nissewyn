@@ -730,11 +730,14 @@ fn describe(event: &BrainEvent) -> Value {
             Some(model) => json!({"event": "turn.started", "model": model}),
             None => json!({"event": "turn.started"}),
         },
+        // `message` duplicates `text` for readers of the older contract
+        // wording (unterm#30). The contract's field is `text`; the alias is
+        // kept until those readers have moved, and must always equal it.
         BrainEvent::Text { text } => {
-            json!({"event": "output.delta", "stream": "assistant", "text": text})
+            json!({"event": "output.delta", "stream": "assistant", "text": text, "message": text})
         }
         BrainEvent::Reasoning { text } => {
-            json!({"event": "output.delta", "stream": "reasoning", "text": text})
+            json!({"event": "output.delta", "stream": "reasoning", "text": text, "message": text})
         }
         BrainEvent::ToolRequested {
             call_id,
@@ -1245,6 +1248,7 @@ mod tests {
             (&["sh", "-c", "codex exec --json -"], "codex"),
             (&["C:\\Users\\me\\AppData\\Roaming\\npm\\claude.cmd", "-p"], "claude"),
             (&["/opt/homebrew/bin/claude", "-p"], "claude"),
+            (&["/opt/homebrew/bin/agy", "-p"], "agy"),
         ];
         for (command, expected) in cases {
             assert_eq!(
@@ -1395,7 +1399,10 @@ printf '%s\n' 'not json at all'
                 "output.delta" => {
                     assert!(matches!(event["stream"].as_str(), Some("assistant" | "reasoning")), "{event}");
                     assert!(event["text"].is_string(), "{event}");
-                    assert!(event.get("message").is_none(), "{event}");
+                    // The compatibility alias, if present, says the same thing.
+                    if let Some(alias) = event.get("message") {
+                        assert_eq!(alias, &event["text"], "{event}");
+                    }
                     turns.push(turn_id(event));
                 }
                 "tool_call.requested" => {
