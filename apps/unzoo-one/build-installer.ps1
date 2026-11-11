@@ -11,18 +11,24 @@ Steps:
   1. Release-build the runtime and the terminal (unterm/ workspace).
   2. Build the interface (npm run build:static -> dist/client).
   3. Stage the runtime files into src-tauri/payload.
-  4. Bundle with Tauri (WiX); the MSI lands in src-tauri/target/release/bundle/msi.
+  4. Sign them, when a certificate is configured (see sign.ps1).
+  5. Bundle with Tauri (WiX); Tauri signs the client and the MSI with the same
+     script. The MSI lands in src-tauri/target/release/bundle/msi.
 
 Usage (from the repository root):
   powershell -File apps\unzoo-one\build-installer.ps1
   powershell -File apps\unzoo-one\build-installer.ps1 -SkipRuntimeBuild
+  # A release: refuse to build without a certificate.
+  $env:UNZOO_SIGN_THUMBPRINT = "<sha1>"; powershell -File apps\unzoo-one\build-installer.ps1 -RequireSignature
 #>
 [CmdletBinding()]
 param(
   # Reuse unterm/target/release as it is (it was just built).
   [switch]$SkipRuntimeBuild,
   # Reuse dist/client as it is.
-  [switch]$SkipInterfaceBuild
+  [switch]$SkipInterfaceBuild,
+  # Fail unless a signing certificate is configured: for release builds.
+  [switch]$RequireSignature
 )
 $ErrorActionPreference = "Stop"
 
@@ -30,6 +36,14 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $unterm = Join-Path $root "unterm"
 $tauri = Join-Path $PSScriptRoot "src-tauri"
 $release = Join-Path $unterm "target\release"
+
+$sign = Join-Path $PSScriptRoot "sign.ps1"
+& powershell -NoProfile -ExecutionPolicy Bypass -File $sign -Check
+$signing = $LASTEXITCODE -eq 0
+if ($RequireSignature -and -not $signing) {
+  throw "no signing certificate: set UNZOO_SIGN_THUMBPRINT, or UNZOO_SIGN_PFX and UNZOO_SIGN_PFX_PASSWORD"
+}
+if (-not $signing) { Write-Host "==> building UNSIGNED (no UNZOO_SIGN_* set); Windows will warn when it is installed" }
 
 function Run([string]$what, [scriptblock]$block) {
   Write-Host "==> $what"
@@ -85,9 +99,32 @@ foreach ($font in "SymbolsNerdFontMono-Regular.ttf", "NotoColorEmoji.ttf", "JetB
 }
 Write-Host "==> staged $((Get-ChildItem $payload -Recurse -File).Count) runtime files"
 
+$buildArgs = @("--no-install", "tauri", "build")
+if ($signing) {
+  foreach ($binary in Get-ChildItem $payload -Recurse -Include *.exe, *.dll) {
+    Run "sign $($binary.Name)" { & powershell -NoProfile -ExecutionPolicy Bypass -File $sign $binary.FullName }
+  }
+  # Tauri signs what it builds -- the client and each MSI -- with the same script.
+  $override = Join-Path $tauri "target\sign-config.json"
+  New-Item -ItemType Directory -Force -Path (Split-Path $override) | Out-Null
+  @{ bundle = @{ windows = @{ signCommand = @{
+    cmd  = "powershell"
+    args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $sign, "%1")
+  } } } } | ConvertTo-Json -Depth 6 | ForEach-Object {
+    # No byte-order mark: Windows PowerShell's utf8 writes one, and JSON parsers refuse it.
+    [IO.File]::WriteAllText($override, $_, (New-Object Text.UTF8Encoding $false))
+  }
+  $buildArgs += @("--config", $override)
+}
+
 Push-Location $PSScriptRoot
-try { Run "installer (tauri build)" { npx --no-install tauri build } }
+try { Run "installer (tauri build)" { npx @buildArgs } }
 finally { Pop-Location }
 
-$msi = Get-ChildItem (Join-Path $tauri "target\release\bundle\msi") -Filter *.msi | Sort-Object LastWriteTime | Select-Object -Last 1
-Write-Host "==> $($msi.FullName)"
+$msis = Get-ChildItem (Join-Path $tauri "target\release\bundle\msi") -Filter *.msi | Sort-Object LastWriteTime | Select-Object -Last 2
+foreach ($msi in $msis) {
+  $signature = Get-AuthenticodeSignature $msi.FullName
+  $by = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { "nobody" }
+  Write-Host "==> $($msi.FullName) (signature: $($signature.Status), by $by)"
+  if ($RequireSignature -and -not $signature.SignerCertificate) { throw "$($msi.Name) came out unsigned" }
+}
