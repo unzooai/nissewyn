@@ -5,6 +5,7 @@ import {
   mergeRuntimeArtifacts,
   mergeRuntimeTasks,
   runtimeArtifacts,
+  usageSummary,
   putSignature,
   scheduleOf,
   statusFrom,
@@ -204,4 +205,27 @@ test("运行写下的文件进成果：同一文件只留最近一次，版本�
   assert.equal(next.content, "");
   assert.equal(next.file.loaded, false);
   assert.equal(next.starred, true);
+});
+
+test("用量：只算本月，按智能体、按任务合计，多的在前", () => {
+  const run = (id, agent, started_at, input, output) => ({
+    id, attempt: 1, state: "succeeded", started_at, agent, usage: { input_tokens: input, output_tokens: output, cached_input_tokens: 10 },
+  });
+  const remote = [
+    { id: "a", title: "Report", created_at: "", updated_at: "", paused: false, runs: [
+      run("r1", "codex-cli", "2026-11-10T09:00:00Z", 1000, 100),
+      run("r0", "codex-cli", "2026-10-30T09:00:00Z", 9999, 9999),
+    ] },
+    { id: "b", title: "Scan", created_at: "", updated_at: "", paused: false, runs: [
+      run("r2", "claude-code", "2026-11-11T09:00:00Z", 5000, 500),
+      { id: "r3", attempt: 1, state: "failed", started_at: "2026-11-11T10:00:00Z", agent: "claude-code" },
+    ] },
+  ];
+  const summary = usageSummary(remote, new Date(2026, 10, 15));
+  assert.equal(summary.runs, 3, "October's run is not this month's");
+  assert.equal(summary.input, 6000);
+  assert.equal(summary.output, 600);
+  assert.equal(summary.cached, 20);
+  assert.deepEqual(summary.byAgent.map((row) => [row.label, row.runs]), [["Claude Code", 2], ["Codex CLI", 1]]);
+  assert.deepEqual(summary.byTask.map((row) => row.label), ["Scan", "Report"]);
 });

@@ -34,7 +34,7 @@ export type RuntimeRun = {
   error_code?: string | null;
   /** 正等人在收件箱批准一次工具调用。 */
   waiting?: boolean;
-  usage?: { input_tokens?: number; output_tokens?: number } | null;
+  usage?: { input_tokens?: number; output_tokens?: number; cached_input_tokens?: number } | null;
   /** 这次运行所在的目录。 */
   workdir?: string | null;
   /** 这次运行写下或改过的文件，相对 workdir，新的在前。 */
@@ -389,4 +389,67 @@ export function mergeRuntimeArtifacts(local: ArtifactItem[], fromRuntime: Artifa
       : { ...item, starred: known.starred };
   });
   return [...fresh, ...local.filter((item) => !item.file)];
+}
+
+export type UsageRow = { key: string; label: string; runs: number; input: number; output: number; cached: number };
+
+export type UsageSummary = {
+  /** 统计从这一刻起（本月 1 日 0 点，本地时间）。 */
+  since: string;
+  runs: number;
+  input: number;
+  output: number;
+  cached: number;
+  byAgent: UsageRow[];
+  byTask: UsageRow[];
+};
+
+const agentNames: Record<string, string> = {
+  "claude-code": "Claude Code",
+  "codex-cli": "Codex CLI",
+  opencode: "OpenCode",
+  agy: "Antigravity CLI (agy)",
+};
+
+/**
+ * 本月各次运行报的 token 用量：合计、按智能体、按任务（多的在前）。
+ * 运行时每个任务只回最近 20 次运行，跑得很勤的任务会少算更早的。
+ */
+export function usageSummary(remote: RuntimeTask[], now: Date = new Date()): UsageSummary {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const empty = (key: string, label: string): UsageRow => ({ key, label, runs: 0, input: 0, output: 0, cached: 0 });
+  const agents = new Map<string, UsageRow>();
+  const tasks = new Map<string, UsageRow>();
+  const total = empty("total", "");
+  for (const task of remote) {
+    for (const run of task.runs) {
+      const at = Date.parse(run.started_at);
+      if (Number.isNaN(at) || at < start.getTime()) continue;
+      const input = run.usage?.input_tokens ?? 0;
+      const output = run.usage?.output_tokens ?? 0;
+      const cached = run.usage?.cached_input_tokens ?? 0;
+      const agentKey = run.agent ?? "unknown";
+      const rows = [
+        total,
+        agents.get(agentKey) ?? agents.set(agentKey, empty(agentKey, agentNames[agentKey] ?? agentKey)).get(agentKey)!,
+        tasks.get(task.id) ?? tasks.set(task.id, empty(task.id, task.title)).get(task.id)!,
+      ];
+      for (const row of rows) {
+        row.runs += 1;
+        row.input += input;
+        row.output += output;
+        row.cached += cached;
+      }
+    }
+  }
+  const byTokens = (a: UsageRow, b: UsageRow) => b.input + b.output - (a.input + a.output) || b.runs - a.runs;
+  return {
+    since: start.toISOString(),
+    runs: total.runs,
+    input: total.input,
+    output: total.output,
+    cached: total.cached,
+    byAgent: [...agents.values()].sort(byTokens),
+    byTask: [...tasks.values()].sort(byTokens).slice(0, 8),
+  };
 }

@@ -25170,3 +25170,85 @@ body {
 .agent-run-signin-actions button {
   white-space: nowrap;
 }
+
+.runtime-usage-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px 18px 4px;
+}
+
+.runtime-usage-totals span {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid #e3e9f0;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.runtime-usage-totals small {
+  color: #6a7789;
+  font-size: 11px;
+}
+
+.runtime-usage-totals strong {
+  color: #1b2533;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.runtime-usage-table {
+  padding: 10px 18px 0;
+  overflow-x: auto;
+}
+
+.runtime-usage-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.runtime-usage-table caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.runtime-usage-table th,
+.runtime-usage-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #edf1f5;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.runtime-usage-table th:first-child {
+  text-align: left;
+  font-weight: 600;
+  color: #2b3747;
+}
+
+.runtime-usage-table thead th {
+  color: #6a7789;
+  font-weight: 500;
+}
+
+.runtime-usage-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 18px 16px;
+  color: #6a7789;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+@media (max-width: 680px) {
+  .runtime-usage-totals {
+    grid-template-columns: 1fr;
+  }
+}

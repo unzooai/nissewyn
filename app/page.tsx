@@ -230,12 +230,15 @@ import {
   mergeRuntimeArtifacts,
   mergeRuntimeTasks,
   runtimeArtifacts,
+  usageSummary,
+  type RuntimeTask,
   promptOf,
   putSignature,
   toRuntimePut,
 } from "./lib/runtime-tasks";
 import { AgentRunPanel } from "./agent-run-panel";
 import { RuntimeFocusCard } from "./runtime-focus";
+import { RuntimeUsagePanel } from "./runtime-usage";
 import { autostartEnabled, inDesktopApp, openTerminal, revealPath, setAutostart } from "./lib/core-connection";
 import { applyDocumentLanguage, chooseLocale, dateLocale, locale, locales, t, type Locale } from "./i18n";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
@@ -1561,6 +1564,9 @@ export default function HomePage() {
   // 首次设置要知道：任务交给哪个智能体，它装了没有、登录了没有。
   const [runtimeAgents, setRuntimeAgents] = useState<BrainAgent[] | null>(null);
   const [runtimeAgentId, setRuntimeAgentId] = useState<string | null>(null);
+  // 运行时最近一次读回来的任务和运行，用量从这里算。
+  const [runtimeSnapshot, setRuntimeSnapshot] = useState<RuntimeTask[] | null>(null);
+  const runtimeUsage = useMemo(() => (runtimeSnapshot ? usageSummary(runtimeSnapshot) : null), [runtimeSnapshot]);
   const runtimeSent = useRef(new Map<string, string>());
   // Only known in the browser: false for the server render, then the truth.
   const [desktopApp, setDesktopApp] = useState(false);
@@ -9447,6 +9453,7 @@ export default function HomePage() {
     for (const task of merged) runtimeSent.current.set(task.id, putSignature(task));
     setTasks(merged);
     const outputs = runtimeArtifacts(remote);
+    setRuntimeSnapshot(remote);
     const demoApprovalIds = new Set(workspaceDefaults.approvals.map((item) => item.id));
     setApprovals((items) => items.filter((item) => !demoApprovalIds.has(item.id)));
     const demoArtifactIds = new Set(workspaceDefaults.artifacts.map((item) => item.id));
@@ -9508,6 +9515,7 @@ export default function HomePage() {
         mergeRuntimeTasks(items, remote, Date.now(), runtimeRemoved.current),
       );
       const outputs = runtimeArtifacts(remote);
+      setRuntimeSnapshot(remote);
       setArtifacts((items) => mergeRuntimeArtifacts(items, outputs));
     } catch {
       // 下一轮再试。
@@ -12791,7 +12799,13 @@ export default function HomePage() {
                 </span>
               </div>
               <div className="settings-section-links">
-                {settingsSections.map((section) => {
+                {settingsSections
+                  // 单机版没有团队：成员、席位是企业版的事。
+                  .filter((section) => !(runtimeMode && section.id === "team"))
+                  .map((section) =>
+                    runtimeMode && section.id === "usage" ? { ...section, description: t("智能体 token") } : section,
+                  )
+                  .map((section) => {
                   const SectionIcon = section.icon;
                   const isActive = settingsSection === section.id;
                   return (
@@ -12872,6 +12886,9 @@ export default function HomePage() {
               </div>
             </div>
 
+            {runtimeMode ? (
+              <RuntimeUsagePanel summary={runtimeUsage} />
+            ) : (
             <section
               id="settings-usage"
               className={`settings-usage-center ${
@@ -13126,7 +13143,9 @@ export default function HomePage() {
                 </span>
               </footer>
             </section>
+            )}
 
+            {!runtimeMode && (
             <section className="settings-team-center" id="settings-team">
               <header className="settings-team-heading">
                 <div>
@@ -13293,6 +13312,7 @@ export default function HomePage() {
                 <span>{t("只有所有者和管理员可以邀请成员或修改角色。")}</span>
               </footer>
             </section>
+            )}
 
             <div
               className="settings-group settings-preferences-group"
