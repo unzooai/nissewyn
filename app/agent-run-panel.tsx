@@ -94,10 +94,10 @@ export function AgentRunPanel({
   }, [reload]);
 
   const [checking, setChecking] = useState(false);
-  const loadAgents = useCallback(async () => {
+  const loadAgents = useCallback(async (refresh = false) => {
     setChecking(true);
     try {
-      const list = await brain.agents();
+      const list = await brain.agents(refresh ? { refresh: true } : undefined);
       // 只列能托管的：交给不能托管的 agent，工具调用就进不了收件箱。
       setAgents(list.filter((agent) => agent.hosted));
       setAgentsError(null);
@@ -249,7 +249,7 @@ export function AgentRunPanel({
                 {t("打开终端")}
               </button>
             )}
-            <button type="button" onClick={() => void loadAgents()} disabled={checking}>
+            <button type="button" onClick={() => void loadAgents(true)} disabled={checking}>
               <RefreshCw size={14} aria-hidden="true" className={checking ? "is-spinning" : undefined} />
               {t("重新检查")}
             </button>

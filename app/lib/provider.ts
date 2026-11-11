@@ -221,7 +221,8 @@ export type BrainStatus = {
  */
 export interface BrainPort {
   /** 能交任务的 agent（unterm 的 agent 清单 + 本机检测结果）。 */
-  agents(): Promise<BrainAgent[]>;
+  /** refresh：不用后台服务缓存的检测结果（刚装好、刚登录时）。 */
+  agents(options?: { refresh?: boolean }): Promise<BrainAgent[]>;
   start(input: {
     agent: BrainId;
     prompt: string;
@@ -314,6 +315,13 @@ export type WorkspaceSnapshot = {
  * 按计划定时跑，页面关了也照样。云端演示版没有运行时，available() 为 false，
  * 页面退回本地演示。
  */
+/** 这台机器上智能体能用的：Unzoo One 的终端、Unzoo 浏览器。 */
+export type RuntimeCapabilities = {
+  /** 受管模式要把 Unzoo One 终端挂给智能体，靠 unterm-cli。 */
+  terminal: { governedReady: boolean };
+  browser: { installed: boolean; path?: string };
+};
+
 export interface RuntimeTaskPort {
   available(): Promise<boolean>;
   list(): Promise<RuntimeTask[]>;
@@ -323,6 +331,8 @@ export interface RuntimeTaskPort {
   run(input: { taskId: string; runId?: string; prompt?: string; continueFrom?: string }): Promise<RuntimeRun>;
   /** 停掉正在跑的那次。没有在跑的返回 false。 */
   stop(taskId: string): Promise<boolean>;
+  /** 这台机器上有哪些能力。 */
+  capabilities(): Promise<RuntimeCapabilities>;
   /** 读一次运行写下的一个文件（只能读运行记录里列出的）。 */
   output(input: { taskId: string; runId: string; path: string }): Promise<RuntimeOutputContent>;
   /** 运行时跑任务用的设置：交给哪个 agent、在哪个目录、是否受管。 */

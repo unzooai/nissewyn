@@ -32,7 +32,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeCapabilities, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -178,17 +178,19 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
      * 让界面显示一段根本没发生过的事。
      */
     brain: {
-      async agents() {
-        if (!inBrowser) return fallback.brain.agents();
+      async agents(options) {
+        if (!inBrowser) return fallback.brain.agents(options);
         try {
-          const data = await getUnterm<{ agents?: Record<string, unknown>[] }>("/api/agents/list");
+          const data = await getUnterm<{ agents?: Record<string, unknown>[] }>(
+            options?.refresh ? "/api/agents/list?refresh=1" : "/api/agents/list",
+          );
           return (data.agents ?? [])
             .map(toBrainAgent)
             .filter((agent): agent is BrainAgent => agent !== null);
         } catch (error) {
           // unterm 在跑但清单读不到（离线、签名过期）要报出来；连 unterm 都没有才退回演示。
           if (await untermReachable()) throw error;
-          return fallback.brain.agents();
+          return fallback.brain.agents(options);
         }
       },
       async start(input) {
@@ -321,6 +323,16 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       async stop(taskId) {
         const data = await callUnterm<{ stopped?: boolean }>("/api/console/tasks/stop", { task_id: taskId });
         return data.stopped === true;
+      },
+      async capabilities(): Promise<RuntimeCapabilities> {
+        const data = await getUnterm<{
+          terminal?: { governed_ready?: boolean };
+          browser?: { installed?: boolean; path?: string | null };
+        }>("/api/console/capabilities");
+        return {
+          terminal: { governedReady: data.terminal?.governed_ready === true },
+          browser: { installed: data.browser?.installed === true, path: data.browser?.path ?? undefined },
+        };
       },
       async output({ taskId, runId, path }): Promise<RuntimeOutputContent> {
         const { output } = await callUnterm<{

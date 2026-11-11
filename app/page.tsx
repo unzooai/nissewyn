@@ -222,7 +222,7 @@ import {
   teamRoleDetails,
   teamSeatLimit,
 } from "./data/mock";
-import type { BrainAgent, BrainEvent } from "./lib/provider";
+import type { BrainAgent, BrainEvent, RuntimeCapabilities } from "./lib/provider";
 import { brainModeFor, readAgentRunSettings } from "./lib/agent-run-settings";
 import { turnOutcome } from "./lib/brain-events";
 import {
@@ -239,6 +239,7 @@ import {
 import { AgentRunPanel } from "./agent-run-panel";
 import { RuntimeFocusCard } from "./runtime-focus";
 import { RuntimeUsagePanel } from "./runtime-usage";
+import { RuntimeCapabilitiesPanel } from "./runtime-capabilities";
 import { autostartEnabled, inDesktopApp, openTerminal, revealPath, setAutostart } from "./lib/core-connection";
 import { applyDocumentLanguage, chooseLocale, dateLocale, locale, locales, t, type Locale } from "./i18n";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
@@ -624,6 +625,11 @@ function isArtifactItem(value: unknown): value is ArtifactItem {
     (item.editedBy === undefined || typeof item.editedBy === "string") &&
     validRevisions
   );
+}
+
+/** 大数字说短一点：31,412 → 31K。 */
+function compactNumber(value: number): string {
+  return new Intl.NumberFormat(dateLocale(), { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
 /** 本机文件的内容不进浏览器存储：它在磁盘上，下次选中时再读。 */
@@ -1566,7 +1572,22 @@ export default function HomePage() {
   const [runtimeAgentId, setRuntimeAgentId] = useState<string | null>(null);
   // 运行时最近一次读回来的任务和运行，用量从这里算。
   const [runtimeSnapshot, setRuntimeSnapshot] = useState<RuntimeTask[] | null>(null);
+  const [runtimeCapabilities, setRuntimeCapabilities] = useState<RuntimeCapabilities | null>(null);
+  const [runtimeCapabilitiesError, setRuntimeCapabilitiesError] = useState<string | null>(null);
+  const [runtimeChecking, setRuntimeChecking] = useState(false);
   const runtimeUsage = useMemo(() => (runtimeSnapshot ? usageSummary(runtimeSnapshot) : null), [runtimeSnapshot]);
+  // 设置的各节，按单机版说：没有团队；用量是 token；连接器是本机能力。
+  const visibleSettingsSections = runtimeMode
+    ? settingsSections
+        .filter((section) => section.id !== "team")
+        .map((section) =>
+          section.id === "usage"
+            ? { ...section, description: t("智能体 token") }
+            : section.id === "connectors"
+              ? { ...section, label: t("能力"), description: t("终端、浏览器与智能体") }
+              : section,
+        )
+    : settingsSections;
   const runtimeSent = useRef(new Map<string, string>());
   // Only known in the browser: false for the server render, then the truth.
   const [desktopApp, setDesktopApp] = useState(false);
@@ -8334,11 +8355,28 @@ export default function HomePage() {
               block: "start",
             });
         }
-        settingsSectionScrollTimerRef.current = window.setTimeout(() => {
+        // 上面的面板（智能体清单、用量）可能在滚动途中才读完数据、把这一节
+        // 往下推；滚完再看一眼，差得多就再对一次，最多两次。
+        const settle = (attempt: number) => {
+          const element =
+            section === "overview" ? null : document.getElementById(getSettingsSectionElementId(section));
+          const before = element?.getBoundingClientRect().top;
+          if (element && attempt < 2) {
+            element.scrollIntoView({ behavior: "auto", block: "start" });
+            const after = element.getBoundingClientRect().top;
+            if (before !== undefined && Math.abs(after - before) > 4) {
+              settingsSectionScrollTimerRef.current = window.setTimeout(() => settle(attempt + 1), 500);
+              return;
+            }
+          }
           settingsSectionScrollTargetRef.current = null;
           settingsSectionScrollTimerRef.current = null;
           window.dispatchEvent(new Event("scroll"));
-        }, resolvedBehavior === "smooth" ? 650 : 0);
+        };
+        settingsSectionScrollTimerRef.current = window.setTimeout(
+          () => settle(0),
+          resolvedBehavior === "smooth" ? 650 : 0,
+        );
       }),
     );
   }
@@ -8580,7 +8618,7 @@ export default function HomePage() {
       canReturnToWorkspaceParent(),
     );
     const sectionLabel =
-      settingsSections.find((section) => section.id === settingsSection)
+      visibleSettingsSections.find((section) => section.id === settingsSection)
         ?.label ?? t("当前");
     await copyCurrentViewLink(t("{sectionLabel}设置链接", { sectionLabel }));
   }
@@ -9549,6 +9587,30 @@ export default function HomePage() {
   }, [runtimeMode, tasks]);
 
   // 回到首页时重新看一眼智能体：可能刚在设置里换了，或者刚在终端里登录。
+  async function checkRuntimeCapabilities(refresh = false) {
+    setRuntimeChecking(true);
+    const [capabilities, agents] = await Promise.all([
+      workspaceProvider.runtime.capabilities().then(
+        (value) => {
+          setRuntimeCapabilitiesError(null);
+          return value;
+        },
+        (error: unknown) => {
+          setRuntimeCapabilitiesError(error instanceof Error ? error.message : String(error));
+          return null;
+        },
+      ),
+      workspaceProvider.brain.agents(refresh ? { refresh: true } : undefined).catch(() => [] as BrainAgent[]),
+    ]);
+    if (capabilities) setRuntimeCapabilities(capabilities);
+    setRuntimeAgents(agents.filter((agent) => agent.hosted));
+    setRuntimeChecking(false);
+  }
+  useEffect(() => {
+    if (runtimeMode && activeView === "settings") void checkRuntimeCapabilities();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runtimeMode, activeView]);
+
   useEffect(() => {
     if (!runtimeMode || activeView !== "home") return;
     let live = true;
@@ -10331,6 +10393,22 @@ export default function HomePage() {
                     </button>
                   </header>
 
+                  {runtimeMode ? (
+                    <div className="workspace-menu-summary" aria-label={t("工作区状态")}>
+                      <span>
+                        <small>{t("任务")}</small>
+                        <strong>{tasks.length}</strong>
+                      </span>
+                      <span>
+                        <small>{t("正在运行")}</small>
+                        <strong>{runningTaskCount}</strong>
+                      </span>
+                      <span>
+                        <small>{t("本月 token")}</small>
+                        <strong>{runtimeUsage ? compactNumber(runtimeUsage.input + runtimeUsage.output) : "…"}</strong>
+                      </span>
+                    </div>
+                  ) : (
                   <div className="workspace-menu-summary" aria-label={t("工作区状态")}>
                     <span>
                       <small>{t("团队成员")}</small>
@@ -10349,6 +10427,7 @@ export default function HomePage() {
                       <strong>{usagePercent}%</strong>
                     </span>
                   </div>
+                  )}
 
                   <nav className="workspace-menu-nav" aria-label={t("工作区快捷操作")}>
                     <button type="button" onClick={openWorkspaceProfile}>
@@ -10361,6 +10440,7 @@ export default function HomePage() {
                       </span>
                       <ChevronRight size={15} />
                     </button>
+                    {!runtimeMode && (
                     <button
                       type="button"
                       onClick={() => openWorkspaceSection("team")}
@@ -10374,13 +10454,20 @@ export default function HomePage() {
                       </span>
                       <ChevronRight size={15} />
                     </button>
-                    <button type="button" onClick={openWorkspaceBudget}>
+                    )}
+                    <button type="button" onClick={runtimeMode ? () => openWorkspaceSection("usage") : openWorkspaceBudget}>
                       <span className="tone-violet">
                         <Sparkles size={17} />
                       </span>
                       <span>
-                        <strong>{t("用量与预算")}</strong>
-                        <small>{t("已使用 {usedCredits} / {monthlyBudget} 点", { usedCredits, monthlyBudget: usageSettings.monthlyBudget })}</small>
+                        <strong>{runtimeMode ? t("用量") : t("用量与预算")}</strong>
+                        <small>
+                          {runtimeMode
+                            ? runtimeUsage
+                              ? t("本月 {runs} 次运行", { runs: runtimeUsage.runs })
+                              : t("正在读取用量…")
+                            : t("已使用 {usedCredits} / {monthlyBudget} 点", { usedCredits, monthlyBudget: usageSettings.monthlyBudget })}
+                        </small>
                       </span>
                       <ChevronRight size={15} />
                     </button>
@@ -10396,9 +10483,11 @@ export default function HomePage() {
                         <Link2 size={17} />
                       </span>
                       <span>
-                        <strong>{t("能力连接")}</strong>
+                        <strong>{runtimeMode ? t("能力") : t("能力连接")}</strong>
                         <small>
-                          {connectorIssueCount > 0
+                          {runtimeMode
+                            ? t("终端、浏览器与智能体")
+                            : connectorIssueCount > 0
                             ? t("{connectorIssueCount} 项需要处理", { connectorIssueCount })
                             : t("{connectedConnectorCount} 项已连接", { connectedConnectorCount })}
                         </small>
@@ -10411,7 +10500,7 @@ export default function HomePage() {
                       </span>
                       <span>
                         <strong>{t("首次设置")}</strong>
-                        <small>{t("{onboardingCompletedCount}/4 项已完成", { onboardingCompletedCount })}</small>
+                        <small>{t("{onboardingCompletedCount}/{total} 项已完成", { onboardingCompletedCount, total: onboardingSteps.length })}</small>
                       </span>
                       <ChevronRight size={15} />
                     </button>
@@ -10427,6 +10516,7 @@ export default function HomePage() {
                     </button>
                   </nav>
 
+                  {!runtimeMode && (
                   <footer className="workspace-menu-footer">
                     <div
                       className="workspace-menu-people"
@@ -10449,6 +10539,7 @@ export default function HomePage() {
                       {t("邀请成员")}
                     </button>
                   </footer>
+                  )}
                   </div>
                 </>
               )}
@@ -12792,20 +12883,14 @@ export default function HomePage() {
                 <span>
                   <small>{t("设置中心")}</small>
                   <strong>
-                    {settingsSections.find(
+                    {visibleSettingsSections.find(
                       (section) => section.id === settingsSection,
                     )?.label ?? t("概览")}
                   </strong>
                 </span>
               </div>
               <div className="settings-section-links">
-                {settingsSections
-                  // 单机版没有团队：成员、席位是企业版的事。
-                  .filter((section) => !(runtimeMode && section.id === "team"))
-                  .map((section) =>
-                    runtimeMode && section.id === "usage" ? { ...section, description: t("智能体 token") } : section,
-                  )
-                  .map((section) => {
+                {visibleSettingsSections.map((section) => {
                   const SectionIcon = section.icon;
                   const isActive = settingsSection === section.id;
                   return (
@@ -13630,6 +13715,17 @@ export default function HomePage() {
               </footer>
             </section>
 
+            {runtimeMode ? (
+              <RuntimeCapabilitiesPanel
+                capabilities={runtimeCapabilities}
+                agents={runtimeAgents}
+                error={runtimeCapabilitiesError}
+                checking={runtimeChecking}
+                onRefresh={() => void checkRuntimeCapabilities(true)}
+                onOpenAgents={() => openSettingsSection("agents")}
+                onOpenTerminal={desktopApp ? openTerminalFromPage : undefined}
+              />
+            ) : (
             <section
               className="settings-connectors-center"
               id="settings-connectors"
@@ -13826,6 +13922,7 @@ export default function HomePage() {
                 })}
               </div>
             </section>
+            )}
 
             <section className="settings-trust-center" id="settings-security">
               <header className="settings-trust-heading">
