@@ -199,6 +199,61 @@ fn reveal_path(path: String) -> Result<(), String> {
     spawned.map(|_| ()).map_err(|e| format!("The folder could not be opened: {e}"))
 }
 
+// ---- start with the system -------------------------------------------------
+
+/// Where Windows keeps what starts at sign-in, for this user only.
+#[cfg(windows)]
+const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+#[cfg(windows)]
+const RUN_VALUE: &str = "Unzoo One";
+
+#[cfg(windows)]
+fn reg(args: &[&str]) -> std::io::Result<std::process::Output> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    Command::new("reg.exe").args(args).creation_flags(CREATE_NO_WINDOW).output()
+}
+
+/// Whether Unzoo One starts its background service when the user signs in.
+#[tauri::command]
+fn autostart_get() -> Result<bool, String> {
+    #[cfg(windows)]
+    {
+        let out = reg(&["query", RUN_KEY, "/v", RUN_VALUE]).map_err(|e| e.to_string())?;
+        Ok(out.status.success())
+    }
+    #[cfg(not(windows))]
+    Err("Starting with the system is only available on Windows for now.".into())
+}
+
+/// Start (or stop starting) the background service at sign-in: this program
+/// with `--background`, which starts the service and opens no window. Scheduled
+/// tasks need it after a restart, before anyone opens Unzoo One.
+#[tauri::command]
+fn autostart_set(enabled: bool) -> Result<bool, String> {
+    #[cfg(windows)]
+    {
+        let out = if enabled {
+            let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+            let command = format!("\"{}\" --background", exe.display());
+            reg(&["add", RUN_KEY, "/v", RUN_VALUE, "/t", "REG_SZ", "/d", &command, "/f"])
+        } else {
+            reg(&["delete", RUN_KEY, "/v", RUN_VALUE, "/f"])
+        }
+        .map_err(|e| e.to_string())?;
+        // Deleting a value that is not there is already the wanted state.
+        if !out.status.success() && enabled {
+            return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+        }
+        autostart_get()
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = enabled;
+        Err("Starting with the system is only available on Windows for now.".into())
+    }
+}
+
 /// The connection, found once and kept; asked again only after a failure,
 /// so a Core that is still starting is waited for rather than given up on.
 struct Connection(Mutex<Option<CoreConnection>>);
@@ -222,6 +277,14 @@ fn port_of(base: &str) -> u16 {
 }
 
 fn main() {
+    // Started at sign-in: bring the background service up and leave, no window.
+    if std::env::args().any(|arg| arg == "--background") {
+        if let Err(error) = ensure_core() {
+            eprintln!("unzoo-one: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     tauri::Builder::default()
         .manage(Connection(Mutex::new(None)))
         .setup(|_| {
@@ -233,7 +296,7 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![core_connection, open_terminal, reveal_path])
+        .invoke_handler(tauri::generate_handler![core_connection, open_terminal, reveal_path, autostart_get, autostart_set])
         .run(tauri::generate_context!())
         .expect("Unzoo One could not start");
 }

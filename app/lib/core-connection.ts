@@ -70,6 +70,19 @@ export async function openTerminal(): Promise<void> {
   await invoke("open_terminal");
 }
 
+/** Whether the background service starts at sign-in (desktop app on Windows). */
+export async function autostartEnabled(): Promise<boolean> {
+  const invoke = tauri()?.core?.invoke;
+  if (!invoke) throw new Error(t("只有 Unzoo One 桌面版能设置开机启动"));
+  return Boolean(await invoke("autostart_get"));
+}
+
+export async function setAutostart(enabled: boolean): Promise<boolean> {
+  const invoke = tauri()?.core?.invoke;
+  if (!invoke) throw new Error(t("只有 Unzoo One 桌面版能设置开机启动"));
+  return Boolean(await invoke("autostart_set", { enabled }));
+}
+
 /** Show a file in the system's file manager (desktop app only). */
 export async function revealPath(path: string): Promise<void> {
   const invoke = tauri()?.core?.invoke;

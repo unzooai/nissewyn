@@ -218,4 +218,11 @@ export const enPage8: Record<string, string> = {
   "任务交给 {name}": "Tasks go to {name}",
   "去登录": "Sign in",
   "选择智能体": "Choose an agent",
+  "只有 Unzoo One 桌面版能设置开机启动": "Only the Unzoo One desktop app can start with the system",
+  "登录系统后，Unzoo One 会在后台启动": "Unzoo One will start in the background when you sign in",
+  "登录系统后不再自动启动": "Unzoo One will no longer start when you sign in",
+  "没能修改开机启动：{error}": "Could not change starting at sign-in: {error}",
+  "登录系统后在后台运行": "Run in the background after sign-in",
+  "你有定时任务。不打开这项，电脑重启后要等你打开 Unzoo One，定时任务才会接着跑。": "You have scheduled tasks. Without this, after a restart they wait until you open Unzoo One.",
+  "定时任务需要后台服务一直在。打开后，重启电脑不用手动打开 Unzoo One。": "Scheduled tasks need the background service running. With this on, you don’t have to open Unzoo One after a restart.",
 };

@@ -236,7 +236,7 @@ import {
 } from "./lib/runtime-tasks";
 import { AgentRunPanel } from "./agent-run-panel";
 import { RuntimeFocusCard } from "./runtime-focus";
-import { inDesktopApp, openTerminal, revealPath } from "./lib/core-connection";
+import { autostartEnabled, inDesktopApp, openTerminal, revealPath, setAutostart } from "./lib/core-connection";
 import { applyDocumentLanguage, chooseLocale, dateLocale, locale, locales, t, type Locale } from "./i18n";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
 import { isAgentApprovalId, reconcileAgentApprovals } from "./lib/agent-approvals";
@@ -1565,6 +1565,26 @@ export default function HomePage() {
   // Only known in the browser: false for the server render, then the truth.
   const [desktopApp, setDesktopApp] = useState(false);
   useEffect(() => setDesktopApp(inDesktopApp()), []);
+  // 桌面版：登录系统后在后台启动服务。null：还没读到，或这个系统不支持。
+  const [autostart, setAutostartState] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!desktopApp) return;
+    autostartEnabled()
+      .then(setAutostartState)
+      .catch(() => setAutostartState(null));
+  }, [desktopApp]);
+  function toggleAutostart() {
+    if (autostart === null) return;
+    const next = !autostart;
+    setAutostart(next)
+      .then((enabled) => {
+        setAutostartState(enabled);
+        setNotice(enabled ? t("登录系统后，Unzoo One 会在后台启动") : t("登录系统后不再自动启动"));
+      })
+      .catch((error: unknown) =>
+        setNotice(t("没能修改开机启动：{error}", { error: error instanceof Error ? error.message : String(error) })),
+      );
+  }
   // <html lang> follows the language actually shown, not the server default.
   useEffect(() => applyDocumentLanguage(), []);
   const runtimeRemoved = useRef(new Set<string>());
@@ -13302,6 +13322,28 @@ export default function HomePage() {
                   </select>
                 </span>
               </label>
+              {desktopApp && autostart !== null && (
+                <label className="setting-row">
+                  <span>
+                    <strong>{t("登录系统后在后台运行")}</strong>
+                    <small>
+                      {tasks.some((task) => task.schedule === "每天" || task.schedule === "每周") && !autostart
+                        ? t("你有定时任务。不打开这项，电脑重启后要等你打开 Unzoo One，定时任务才会接着跑。")
+                        : t("定时任务需要后台服务一直在。打开后，重启电脑不用手动打开 Unzoo One。")}
+                    </small>
+                  </span>
+                  <button
+                    className={`switch-control ${autostart ? "on" : ""}`}
+                    type="button"
+                    role="switch"
+                    aria-checked={autostart}
+                    aria-label={t("登录系统后在后台运行")}
+                    onClick={toggleAutostart}
+                  >
+                    <i />
+                  </button>
+                </label>
+              )}
               <label className="setting-row">
                 <span>
                   <strong>{t("外部操作前必须确认")}</strong>
