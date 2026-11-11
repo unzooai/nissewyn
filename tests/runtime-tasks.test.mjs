@@ -6,6 +6,8 @@ import {
   mergeRuntimeTasks,
   runtimeArtifacts,
   usageSummary,
+  titleFromRequest,
+  promptOf,
   putSignature,
   scheduleOf,
   statusFrom,
@@ -228,4 +230,29 @@ test("用量：只算本月，按智能体、按任务合计，多的在前", ()
   assert.equal(summary.cached, 20);
   assert.deepEqual(summary.byAgent.map((row) => [row.label, row.runs]), [["Claude Code", 2], ["Codex CLI", 1]]);
   assert.deepEqual(summary.byTask.map((row) => row.label), ["Scan", "Report"]);
+});
+
+test("直接输入需求：任务名取第一行，交给智能体时不重复", () => {
+  assert.equal(titleFromRequest("Summarize this week's sales\nUse the CSVs in C:\\reports"), "Summarize this week's sales");
+  assert.equal(titleFromRequest("Say hello in one short sentence. Do not use any tools, just reply."), "Say hello in one short sentence");
+  assert.equal(titleFromRequest("整理本周销售数据。汇总成周报。"), "整理本周销售数据");
+  assert.equal(titleFromRequest("Check example.com for broken links"), "Check example.com for broken links", "a dot inside a word is not a sentence end");
+  // 只有一句、以句号结尾：去掉句号。
+  assert.equal(titleFromRequest("Draft the release notes."), "Draft the release notes");
+  const long = "Go through every invoice in the shared drive and list the ones that are overdue by more than thirty days";
+  const title = titleFromRequest(long);
+  assert.ok(title.endsWith("…") && title.length <= 61, title);
+  assert.ok(long.startsWith(title.slice(0, -1)), "a prefix, cut at a word");
+  assert.equal(titleFromRequest("整理本周的销售数据，按地区汇总成一页周报，存成 report.md，并标出环比下降超过百分之十的地区", 20).length, 21);
+
+  const request = "Summarize this week's sales\nUse the CSVs in C:\\reports";
+  assert.equal(promptOf({ title: titleFromRequest(request), description: request, target: "" }), request);
+  assert.equal(promptOf({ title: titleFromRequest(long), description: long, target: "" }), long);
+  // 名字是人改过的，就照旧放在最前面。
+  assert.equal(promptOf({ title: "Weekly sales", description: request, target: "" }), `Weekly sales\n${request}`);
+});
+
+test("任务名取第一句时，交给智能体的话也不重复", () => {
+  const request = "Say hello in one short sentence. Do not use any tools, just reply.";
+  assert.equal(promptOf({ title: titleFromRequest(request), description: request, target: "" }), request);
 });

@@ -92,9 +92,29 @@ export function scheduleOf(task: TaskItem): RuntimeSchedule | null {
   return null;
 }
 
-/** 交给智能体的那段话：标题、说明、目标。和页面直接跑任务时说的一样。 */
+/**
+ * 交给智能体的那段话：标题、说明、目标。和页面直接跑任务时说的一样。
+ * 标题是从说明第一行取的（直接输入需求时），就不再重复一遍。
+ */
 export function promptOf(task: Pick<TaskItem, "title" | "description" | "target">): string {
-  return [task.title, task.description, task.target && t("目标：{target}", { target: task.target })].filter(Boolean).join("\n");
+  const description = task.description.trim();
+  const titleStem = task.title.replace(/…$/, "").trim();
+  const title = titleStem && description.startsWith(titleStem) ? "" : task.title;
+  return [title, description, task.target && t("目标：{target}", { target: task.target })].filter(Boolean).join("\n");
+}
+
+/** 直接输入需求时，任务名取第一行，长了在词边界截断。 */
+export function titleFromRequest(request: string, max = 60): string {
+  const firstLine = request.trim().split(/\r?\n/)[0]?.trim() ?? "";
+  // 第一句话放得下就只取第一句：“Say hello. Don't use tools.” → “Say hello”。
+  // 英文的句号后面要有空格（example.com 不算句末），中文的不用。
+  const sentence = /^(.{4,}?)(?:[.!?](?:\s|$)|[。！？])/u.exec(firstLine)?.[1]?.trim();
+  if (sentence && sentence.length <= max && sentence.length < firstLine.length) return sentence;
+  if (firstLine.length <= max) return firstLine;
+  const cut = firstLine.slice(0, max);
+  // 英文在空格处断；中文没有空格，按字数断。
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[\s,.;:，。；：、]+$/, "")}…`;
 }
 
 /**

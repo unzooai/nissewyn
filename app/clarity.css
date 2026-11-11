@@ -25358,3 +25358,53 @@ body {
     grid-template-columns: auto minmax(0, 1fr);
   }
 }
+
+.task-composer-simple {
+  display: grid;
+  gap: 14px;
+  padding: 4px 24px 8px;
+}
+
+.task-composer-simple .composer-request textarea {
+  min-height: 168px;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.composer-request-name {
+  display: grid;
+  gap: 6px;
+}
+
+.composer-request-name > span {
+  color: #435166;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.composer-request-name input {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #d5dee8;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.composer-request-schedule {
+  display: grid;
+  gap: 10px;
+}
+
+@media (max-width: 680px) {
+  .task-composer-simple {
+    padding: 4px 16px 8px;
+  }
+}
+
+.composer-request .composer-field-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+

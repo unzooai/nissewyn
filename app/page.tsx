@@ -159,6 +159,8 @@ const settingsDraftDiscardCopy: Record<
 const weekdays: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 const taskSchedules: TaskSchedule[] = ["仅运行一次", "每天", "每周"];
 const taskDraftRecoveryKey = "unzoo-one-task-draft-recovery";
+/** 直接输入需求时一段话的上限；演示版的“结果要求”仍是 500。 */
+const requestMaxLength = 4000;
 const artifactDraftRecoveryKey = "unzoo-one-artifact-draft-recovery";
 const workspaceSyncKey = "unzoo-one-workspace-sync";
 const workspaceLastBackupKey = "unzoo-one-last-backup-at";
@@ -234,6 +236,7 @@ import {
   type RuntimeTask,
   promptOf,
   putSignature,
+  titleFromRequest,
   toRuntimePut,
 } from "./lib/runtime-tasks";
 import { AgentRunPanel } from "./agent-run-panel";
@@ -278,7 +281,7 @@ function isTaskDraftSnapshot(value: unknown): value is TaskDraftSnapshot {
     typeof draft.target === "string" &&
     draft.target.length <= 240 &&
     typeof draft.description === "string" &&
-    draft.description.length <= 500 &&
+    draft.description.length <= requestMaxLength &&
     typeof draft.schedule === "string" &&
     taskSchedules.includes(draft.schedule as TaskSchedule) &&
     typeof draft.scheduleTime === "string" &&
@@ -2261,8 +2264,9 @@ export default function HomePage() {
   );
   const usageProgressPercent = Math.min(100, usagePercent);
   const budgetExceeded = usedCredits >= usageSettings.monthlyBudget;
+  // 单机版没有额度：演示用的点数不能拦住真的任务。
   const budgetRunBlocked =
-    usageSettings.pauseAtLimit && budgetExceeded;
+    !runtimeMode && usageSettings.pauseAtLimit && budgetExceeded;
   const budgetAlertReached =
     usagePercent >= usageSettings.alertThreshold || budgetExceeded;
   const remainingCredits = Math.max(
@@ -2367,14 +2371,14 @@ export default function HomePage() {
     const normalizedName = workspaceNameDraft.trim();
     const normalizedDescription = workspaceDescriptionDraft.trim();
     if (normalizedName.length < 2) {
-      errors.name = "工作区名称至少需要 2 个字";
+      errors.name = t("工作区名称至少需要 2 个字");
     } else if (normalizedName.length > 40) {
-      errors.name = "工作区名称不能超过 40 个字";
+      errors.name = t("工作区名称不能超过 40 个字");
     }
     if (normalizedDescription.length < 4) {
-      errors.description = "请用至少 4 个字说明这个工作区的用途";
+      errors.description = t("请用至少 4 个字说明这个工作区的用途");
     } else if (normalizedDescription.length > 100) {
-      errors.description = "工作区说明不能超过 100 个字";
+      errors.description = t("工作区说明不能超过 100 个字");
     }
     return errors;
   }, [workspaceDescriptionDraft, workspaceNameDraft]);
@@ -2440,27 +2444,27 @@ export default function HomePage() {
     const normalizedContent = artifactContentDraft.trim();
 
     if (!normalizedTitle) {
-      errors.title = "请输入成果名称";
+      errors.title = t("请输入成果名称");
     } else if (normalizedTitle.length > 100) {
-      errors.title = "成果名称不能超过 100 个字";
+      errors.title = t("成果名称不能超过 100 个字");
     }
 
     if (!normalizedFilename) {
-      errors.filename = "请输入文件名";
+      errors.filename = t("请输入文件名");
     } else if (normalizedFilename.length > 120) {
-      errors.filename = "文件名不能超过 120 个字符";
+      errors.filename = t("文件名不能超过 120 个字符");
     } else if (/[/\\:*?"<>|]/.test(normalizedFilename)) {
-      errors.filename = "文件名不能包含 / \\ : * ? \" < > |";
+      errors.filename = t("文件名不能包含 / \\ : * ? \" < > |");
     } else if (!/\.[a-z0-9]{1,10}$/i.test(normalizedFilename)) {
-      errors.filename = "请保留文件扩展名，例如 .md";
+      errors.filename = t("请保留文件扩展名，例如 .md");
     }
 
     if (!normalizedContent) {
-      errors.content = "成果内容不能为空";
+      errors.content = t("成果内容不能为空");
     } else if (normalizedContent.length < 20) {
-      errors.content = "成果内容至少需要 20 个字";
+      errors.content = t("成果内容至少需要 20 个字");
     } else if (artifactContentDraft.length > 100000) {
-      errors.content = "成果内容不能超过 100,000 个字符";
+      errors.content = t("成果内容不能超过 100,000 个字符");
     }
 
     return errors;
@@ -2533,43 +2537,57 @@ export default function HomePage() {
     const normalizedTarget = taskTarget.trim();
     const normalizedDescription = taskDescription.trim();
 
+    // 装好的产品：直接输入需求。名字不填就从需求里取，来源写在需求里就行。
+    if (runtimeMode) {
+      if (normalizedName.length > 80) errors.name = t("任务名称不能超过 80 个字");
+      if (!normalizedDescription) {
+        errors.description = t("写下你想让智能体做什么");
+      } else if (normalizedDescription.length > requestMaxLength) {
+        errors.description = t("需求不能超过 {max} 个字", { max: requestMaxLength });
+      }
+      if (taskSchedule !== "仅运行一次" && !taskScheduleTime) {
+        errors.scheduleTime = t("请选择自动运行时间");
+      }
+      return errors;
+    }
+
     if (!normalizedName) {
-      errors.name = "请给任务起一个容易识别的名称";
+      errors.name = t("请给任务起一个容易识别的名称");
     } else if (normalizedName.length > 80) {
-      errors.name = "任务名称不能超过 80 个字";
+      errors.name = t("任务名称不能超过 80 个字");
     }
 
     if (!normalizedTarget) {
-      errors.target = "请填写网页、文件夹或资料库";
+      errors.target = t("请填写网页、文件夹或资料库");
     } else if (normalizedTarget.length < 3) {
-      errors.target = "请把数据来源写得更具体一些";
+      errors.target = t("请把数据来源写得更具体一些");
     } else if (normalizedTarget.length > 240) {
-      errors.target = "数据来源不能超过 240 个字";
+      errors.target = t("数据来源不能超过 240 个字");
     } else if (/^https?:\/\//i.test(normalizedTarget)) {
       try {
         const parsedTarget = new URL(normalizedTarget);
         if (!parsedTarget.hostname) {
-          errors.target = "请填写完整的网址，例如 https://example.com";
+          errors.target = t("请填写完整的网址，例如 https://example.com");
         }
       } catch {
-        errors.target = "请填写完整的网址，例如 https://example.com";
+        errors.target = t("请填写完整的网址，例如 https://example.com");
       }
     }
 
     if (!normalizedDescription) {
-      errors.description = "请描述 AI 最终需要交付什么";
+      errors.description = t("请描述 AI 最终需要交付什么");
     } else if (normalizedDescription.length < 8) {
-      errors.description = "再补充一点结果要求，至少写 8 个字";
+      errors.description = t("再补充一点结果要求，至少写 8 个字");
     } else if (normalizedDescription.length > 500) {
-      errors.description = "结果要求不能超过 500 个字";
+      errors.description = t("结果要求不能超过 500 个字");
     }
 
     if (taskSchedule !== "仅运行一次" && !taskScheduleTime) {
-      errors.scheduleTime = "请选择自动运行时间";
+      errors.scheduleTime = t("请选择自动运行时间");
     }
 
     return errors;
-  }, [taskDescription, taskName, taskSchedule, taskScheduleTime, taskTarget]);
+  }, [runtimeMode, taskDescription, taskName, taskSchedule, taskScheduleTime, taskTarget]);
   const taskFormHasErrors = Object.keys(taskFormErrors).length > 0;
   const taskDefinitionReady = Boolean(
     taskName.trim() &&
@@ -2626,18 +2644,18 @@ export default function HomePage() {
     const normalizedName = inviteName.trim();
     const normalizedEmail = inviteEmail.trim().toLowerCase();
     if (!normalizedName) {
-      errors.name = "请输入成员姓名";
+      errors.name = t("请输入成员姓名");
     } else if (normalizedName.length > 40) {
-      errors.name = "成员姓名不能超过 40 个字";
+      errors.name = t("成员姓名不能超过 40 个字");
     }
     if (!normalizedEmail) {
-      errors.email = "请输入工作邮箱";
+      errors.email = t("请输入工作邮箱");
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      errors.email = "请输入有效的邮箱地址";
+      errors.email = t("请输入有效的邮箱地址");
     } else if (
       teamMembers.some((member) => member.email.toLowerCase() === normalizedEmail)
     ) {
-      errors.email = "这个邮箱已经在当前工作区中";
+      errors.email = t("这个邮箱已经在当前工作区中");
     }
     return errors;
   }, [inviteEmail, inviteName, teamMembers]);
@@ -6618,6 +6636,8 @@ export default function HomePage() {
     taskSavingRef.current = true;
     setIsSavingTask(true);
     await new Promise((resolve) => window.setTimeout(resolve, 260));
+    // 名字没填（直接输入需求）就取需求的第一行。
+    const taskTitle = taskName.trim() || titleFromRequest(taskDescription);
 
     try {
       if (editingTaskId) {
@@ -6625,7 +6645,7 @@ export default function HomePage() {
         if (!task) return;
         syncBackend(
           workspaceProvider.tasks.update(editingTaskId, {
-            title: taskName.trim(),
+            title: taskTitle,
             description: taskDescription.trim(),
             target: taskTarget.trim(),
             schedule: taskSchedule,
@@ -6640,7 +6660,7 @@ export default function HomePage() {
             item.id === editingTaskId
               ? {
                   ...item,
-                  title: taskName.trim(),
+                  title: taskTitle,
                   description: taskDescription.trim(),
                   target: taskTarget.trim(),
                   schedule: taskSchedule,
@@ -6656,7 +6676,7 @@ export default function HomePage() {
         closeComposer({ clearRecovery: true });
         setSelectedTaskId(task.id);
         recordActivity({
-          title: t("任务配置已更新：{trim}", { trim: taskName.trim() }),
+          title: t("任务配置已更新：{trim}", { trim: taskTitle }),
           detail: `${formatSchedule(
             taskSchedule,
             taskScheduleTime,
@@ -6669,22 +6689,26 @@ export default function HomePage() {
           kind: "任务",
           taskId: task.id,
         });
-        setNotice(t("任务“{trim}”已更新", { trim: taskName.trim() }));
+        setNotice(t("任务“{trim}”已更新", { trim: taskTitle }));
         return;
       }
 
       const budgetBlocksRun = budgetRunBlocked;
-      const startImmediately = isOnline && !budgetBlocksRun;
+      // 装好的产品里，定时任务到点再跑，不在创建时先跑一次。
+      const waitsForSchedule = Boolean(runtimeMode) && taskSchedule !== "仅运行一次";
+      const startImmediately = isOnline && !budgetBlocksRun && !waitsForSchedule;
       const newTask: TaskItem = {
         id: `task-${Date.now()}`,
-        title: taskName.trim(),
+        title: taskTitle,
         description: taskDescription.trim(),
         target: taskTarget.trim(),
-        status: startImmediately ? "运行中" : "已暂停",
+        status: startImmediately ? "运行中" : waitsForSchedule ? "待确认" : "已暂停",
         progress: startImmediately ? 3 : 0,
         updated: startImmediately
           ? t("刚刚创建")
-          : budgetBlocksRun
+          : waitsForSchedule
+            ? formatSchedule(taskSchedule, taskScheduleTime, taskScheduleDay)
+            : budgetBlocksRun
             ? t("已保存，等待调整预算")
             : t("已保存，等待网络"),
         schedule: taskSchedule,
@@ -6724,13 +6748,15 @@ export default function HomePage() {
       setTaskScheduleDay("周一");
       setTaskApproval(true);
       recordActivity({
-        title: t("{value}：{title}", { value: t(startImmediately
+        title: t("{value}：{title}", { value: t(startImmediately || waitsForSchedule
             ? t("任务已创建")
             : budgetBlocksRun
               ? t("任务已保存，预算保护阻止运行")
               : t("离线任务已保存")), title: newTask.title }),
-        detail: startImmediately
-          ? t("{formatTaskSchedule} · 目标：{target}", { formatTaskSchedule: formatTaskSchedule(newTask), target: newTask.target })
+        detail: startImmediately || waitsForSchedule
+          ? newTask.target
+            ? t("{formatTaskSchedule} · 目标：{target}", { formatTaskSchedule: formatTaskSchedule(newTask), target: newTask.target })
+            : formatTaskSchedule(newTask)
           : budgetBlocksRun
             ? t("{formatTaskSchedule} · 当前已使用 {usedCredits} / {monthlyBudget} 点，调整额度后可手动开始。", { formatTaskSchedule: formatTaskSchedule(newTask), usedCredits, monthlyBudget: usageSettings.monthlyBudget })
           : t("{formatTaskSchedule} · 已保存配置，恢复网络后可手动开始运行。", { formatTaskSchedule: formatTaskSchedule(newTask) }),
@@ -6742,7 +6768,12 @@ export default function HomePage() {
       setNotice(
         startImmediately
           ? t("任务“{title}”已开始运行", { title: newTask.title })
-          : budgetBlocksRun
+          : waitsForSchedule
+            ? t("任务“{title}”已保存，{schedule}自动运行", {
+                title: newTask.title,
+                schedule: formatSchedule(taskSchedule, taskScheduleTime, taskScheduleDay),
+              })
+            : budgetBlocksRun
             ? t("任务“{title}”已保存；月度额度已用完，暂未运行", { title: newTask.title })
           : t("任务“{title}”已保存，联网后可以开始运行", { title: newTask.title }),
       );
@@ -6750,6 +6781,97 @@ export default function HomePage() {
       taskSavingRef.current = false;
       setIsSavingTask(false);
     }
+  }
+
+  /** 运行频率与时间：新建、编辑任务的两种表单共用。 */
+  function renderTaskSchedule() {
+    return (
+      <>
+                  <section className="composer-schedule" aria-label={t("运行频率")}>
+                    <span>{t("运行频率")}</span>
+                    <div role="radiogroup" aria-label={t("选择运行频率")}>
+                      {(["仅运行一次", "每天", "每周"] as TaskSchedule[]).map((schedule) => (
+                        <button
+                          className={taskSchedule === schedule ? "active" : ""}
+                          key={schedule}
+                          type="button"
+                          role="radio"
+                          aria-checked={taskSchedule === schedule}
+                          onClick={() => setTaskSchedule(schedule)}
+                        >
+                          {t(schedule)}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <div className="composer-schedule-detail">
+                    {taskSchedule === "仅运行一次" ? (
+                      <div className="schedule-once-note">
+                        <Play size={16} />
+                        <span>
+                          <strong>{t("创建后立即开始")}</strong>
+                          <small>{t("只运行一次，完成后保留结果和审计记录。")}</small>
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        {taskSchedule === "每周" && (
+                          <label>
+                            <span>{t("星期")}</span>
+                            <select
+                              aria-label={t("选择每周运行日期")}
+                              value={taskScheduleDay}
+                              onChange={(event) =>
+                                setTaskScheduleDay(event.target.value as Weekday)
+                              }
+                            >
+                              {weekdays.map((day) => (
+                                <option key={day} value={day}>{t(day)}</option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                        <label>
+                          <span>{t("运行时间")}</span>
+                          <input
+                            ref={taskScheduleTimeRef}
+                            aria-label={t("选择运行时间")}
+                            type="time"
+                            required
+                            aria-invalid={Boolean(
+                              taskFormSubmitted && taskFormErrors.scheduleTime,
+                            )}
+                            aria-describedby={
+                              taskFormSubmitted && taskFormErrors.scheduleTime
+                                ? "task-schedule-error"
+                                : undefined
+                            }
+                            value={taskScheduleTime}
+                            onInput={(event) =>
+                              setTaskScheduleTime((event.target as HTMLInputElement).value)
+                            }
+                          />
+                          {taskFormSubmitted && taskFormErrors.scheduleTime && (
+                            <small
+                              className="composer-field-error"
+                              id="task-schedule-error"
+                            >
+                              <AlertTriangle size={13} />
+                              {taskFormErrors.scheduleTime}
+                            </small>
+                          )}
+                        </label>
+                        <span className="schedule-timezone">
+                          <Clock3 size={15} />
+                          
+                          {t("本地时间")}
+                        </span>
+                      </>
+                    )}
+                  </div>
+      </>
+    );
   }
 
   function beginCreateTask() {
@@ -15533,6 +15655,8 @@ export default function HomePage() {
             </section>
 
             <section className="task-detail-facts">
+              {/* 直接输入需求的任务没有单独的目标：网址、文件夹写在需求里。 */}
+              {selectedTask.target.trim() && (
               <div>
                 <Globe2 size={17} />
                 <span>
@@ -15540,6 +15664,7 @@ export default function HomePage() {
                   <strong>{selectedTask.target}</strong>
                 </span>
               </div>
+              )}
               <div>
                 <CalendarDays size={17} />
                 <span>
@@ -15822,12 +15947,18 @@ export default function HomePage() {
               <div>
                 <span>{(editingTaskId ? t("编辑配置") : t("任务配置"))}</span>
                 <h2 id="task-composer-title">
-                  {(editingTaskId ? t("更新任务设置") : t("交给 Unzoo One 一项工作"))}
+                  {editingTaskId
+                    ? t("更新任务设置")
+                    : runtimeMode
+                      ? t("交给智能体一项工作")
+                      : t("交给 Unzoo One 一项工作")}
                 </h2>
                 <p>
-                  {t(editingTaskId
+                  {editingTaskId
                     ? t("修改会立即保存，正在运行的任务会使用新配置。")
-                    : t("描述结果，选择节奏，然后让 AI 持续执行。"))}
+                    : runtimeMode
+                      ? t("说清楚要做什么、交付什么，智能体会自己规划步骤；每次要动手前都会先问你。")
+                      : t("描述结果，选择节奏，然后让 AI 持续执行。")}
                 </p>
               </div>
               <button
@@ -15866,6 +15997,7 @@ export default function HomePage() {
               </div>
             )}
 
+            {!runtimeMode && (
             <nav className="task-composer-progress" aria-label={t("任务配置步骤")}>
               <span className="task-composer-progress-meta">
                 <strong>{taskComposerReadyCount}/3</strong>
@@ -15908,7 +16040,81 @@ export default function HomePage() {
                 </button>
               </div>
             </nav>
+            )}
 
+            {runtimeMode ? (
+              <div className="task-composer-simple">
+                <label
+                  className={`composer-instruction composer-request ${
+                    taskFormSubmitted && taskFormErrors.description ? "has-error" : ""
+                  }`}
+                >
+                  <span>{t("你想让智能体做什么？")}</span>
+                  <textarea
+                    ref={taskDescriptionRef}
+                    autoFocus
+                    data-overlay-initial-focus
+                    required
+                    rows={7}
+                    maxLength={requestMaxLength}
+                    aria-invalid={Boolean(taskFormSubmitted && taskFormErrors.description)}
+                    aria-describedby={
+                      taskFormSubmitted && taskFormErrors.description ? "task-description-error" : undefined
+                    }
+                    value={taskDescription}
+                    placeholder={t("例如：把 Downloads 里本周的销售表汇总成一页英文周报，存成 report.md，标出下降超过 10% 的地区。")}
+                    onChange={(event) => setTaskDescription(event.target.value)}
+                    onKeyDown={(event) => {
+                      // Ctrl/⌘ + Enter 直接提交。
+                      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                        event.preventDefault();
+                        event.currentTarget.form?.requestSubmit();
+                      }
+                    }}
+                  />
+                  <span className="composer-field-meta">
+                    {taskFormSubmitted && taskFormErrors.description ? (
+                      <small className="composer-field-error" id="task-description-error">
+                        <AlertTriangle size={13} />
+                        {taskFormErrors.description}
+                      </small>
+                    ) : (
+                      <small>
+                        {editingTaskId
+                          ? t("要用到的网址、文件夹直接写在里面。Ctrl + Enter 保存。")
+                          : t("要用到的网址、文件夹直接写在里面。Ctrl + Enter 开始。")}
+                      </small>
+                    )}
+                    <small>
+                      {taskDescription.length}/{requestMaxLength}
+                    </small>
+                  </span>
+                </label>
+
+                {editingTaskId && (
+                  <label className={`composer-request-name ${taskFormSubmitted && taskFormErrors.name ? "has-error" : ""}`}>
+                    <span>{t("任务名称")}</span>
+                    <input
+                      ref={taskNameRef}
+                      maxLength={80}
+                      value={taskName}
+                      placeholder={titleFromRequest(taskDescription) || t("不填就用需求的第一行")}
+                      onChange={(event) => setTaskName(event.target.value)}
+                    />
+                    {taskFormSubmitted && taskFormErrors.name && (
+                      <small className="composer-field-error">
+                        <AlertTriangle size={13} />
+                        {taskFormErrors.name}
+                      </small>
+                    )}
+                  </label>
+                )}
+
+                <section className="task-composer-section task-composer-schedule-section composer-request-schedule">
+                  {renderTaskSchedule()}
+                </section>
+              </div>
+            ) : (
             <div className="task-composer-workspace">
               <section
                 className="task-composer-section task-composer-definition"
@@ -16099,89 +16305,7 @@ export default function HomePage() {
                     </strong>
                   </header>
 
-                  <section className="composer-schedule" aria-label={t("运行频率")}>
-                    <span>{t("运行频率")}</span>
-                    <div role="radiogroup" aria-label={t("选择运行频率")}>
-                      {(["仅运行一次", "每天", "每周"] as TaskSchedule[]).map((schedule) => (
-                        <button
-                          className={taskSchedule === schedule ? "active" : ""}
-                          key={schedule}
-                          type="button"
-                          role="radio"
-                          aria-checked={taskSchedule === schedule}
-                          onClick={() => setTaskSchedule(schedule)}
-                        >
-                          {t(schedule)}
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-
-                  <div className="composer-schedule-detail">
-                    {taskSchedule === "仅运行一次" ? (
-                      <div className="schedule-once-note">
-                        <Play size={16} />
-                        <span>
-                          <strong>{t("创建后立即开始")}</strong>
-                          <small>{t("只运行一次，完成后保留结果和审计记录。")}</small>
-                        </span>
-                      </div>
-                    ) : (
-                      <>
-                        {taskSchedule === "每周" && (
-                          <label>
-                            <span>{t("星期")}</span>
-                            <select
-                              aria-label={t("选择每周运行日期")}
-                              value={taskScheduleDay}
-                              onChange={(event) =>
-                                setTaskScheduleDay(event.target.value as Weekday)
-                              }
-                            >
-                              {weekdays.map((day) => (
-                                <option key={day} value={day}>{t(day)}</option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
-                        <label>
-                          <span>{t("运行时间")}</span>
-                          <input
-                            ref={taskScheduleTimeRef}
-                            aria-label={t("选择运行时间")}
-                            type="time"
-                            required
-                            aria-invalid={Boolean(
-                              taskFormSubmitted && taskFormErrors.scheduleTime,
-                            )}
-                            aria-describedby={
-                              taskFormSubmitted && taskFormErrors.scheduleTime
-                                ? "task-schedule-error"
-                                : undefined
-                            }
-                            value={taskScheduleTime}
-                            onInput={(event) =>
-                              setTaskScheduleTime((event.target as HTMLInputElement).value)
-                            }
-                          />
-                          {taskFormSubmitted && taskFormErrors.scheduleTime && (
-                            <small
-                              className="composer-field-error"
-                              id="task-schedule-error"
-                            >
-                              <AlertTriangle size={13} />
-                              {taskFormErrors.scheduleTime}
-                            </small>
-                          )}
-                        </label>
-                        <span className="schedule-timezone">
-                          <Clock3 size={15} />
-                          
-                          {t("本地时间")}
-                        </span>
-                      </>
-                    )}
-                  </div>
+                  {renderTaskSchedule()}
                 </section>
 
                 <section
@@ -16219,6 +16343,7 @@ export default function HomePage() {
                 </section>
               </div>
             </div>
+            )}
 
             <div className="clarity-dialog-actions">
               {taskFormSubmitted && taskFormHasErrors && (
@@ -16279,6 +16404,10 @@ export default function HomePage() {
                       : t("正在保存")
                   : editingTaskId
                     ? t("保存修改")
+                    : runtimeMode && taskSchedule !== "仅运行一次"
+                      ? t("保存，到点运行")
+                    : runtimeMode
+                      ? t("开始")
                     : budgetRunBlocked
                       ? t("保存为已暂停")
                     : isOnline
@@ -16320,7 +16449,9 @@ export default function HomePage() {
             <p id="task-discard-description">
               {editingTaskId
                 ? t("对“{value}”的配置修改还没有保存，放弃后无法恢复。", { value: taskDraftBaseline?.name ?? taskName })
-                : t("名称、目标、运行计划和审批设置还没有创建，放弃后需要重新填写。")}
+                : runtimeMode
+                  ? t("写好的需求还没有交给智能体，放弃后需要重新输入。")
+                  : t("名称、目标、运行计划和审批设置还没有创建，放弃后需要重新填写。")}
             </p>
             <div>
               <button
