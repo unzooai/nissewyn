@@ -84,3 +84,36 @@ test("托管审批：轮询结果并进队列，只动托管的那些，没变�
 
   assert.deepEqual(reconcileAgentApprovals(next, []).map((x) => x.id), ["send-summary"], "unterm 那边空了就全清掉");
 });
+
+test("受管模式下经 MCP 的调用说人话：开终端、执行命令、打开网页", () => {
+  const base = { session_id: "ags_1", adapter: "claude", at: new Date().toISOString() };
+  const open = toApprovalItem({
+    ...base,
+    approval: { request_id: "r1", tool_call: { tool: "mcp__unterm__session_create", arguments: {} } },
+  });
+  assert.equal(open.title, "Claude Code wants to open a terminal");
+  assert.equal(open.risk, "低风险");
+  assert.equal(open.target, "(no arguments)");
+
+  const run = toApprovalItem({
+    ...base,
+    approval: { request_id: "r2", tool_call: { tool: "mcp__unterm__exec_run_wait", arguments: { command: "whoami", pane_id: 1 } } },
+  });
+  assert.equal(run.title, "Claude Code wants to run a command");
+  assert.equal(run.target, "whoami");
+  assert.equal(run.risk, "中风险");
+  assert.match(run.impact, /whoami/);
+
+  const browse = toApprovalItem({
+    ...base,
+    approval: { request_id: "r3", tool_call: { tool: "mcp__unzoo__browser_navigate", arguments: { url: "https://example.com" } } },
+  });
+  assert.equal(browse.title, "Claude Code wants to open a web page");
+  assert.equal(browse.target, "https://example.com");
+
+  const other = toApprovalItem({
+    ...base,
+    approval: { request_id: "r4", tool_call: { tool: "mcp__github__create_issue", arguments: { title: "x" } } },
+  });
+  assert.equal(other.title, "Claude Code wants to use create_issue from github");
+});

@@ -1376,12 +1376,12 @@ const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: 
     description: t("任务正在后台运行，只有需要你决定时才会停下来。"),
   },
   tasks: {
-    eyebrow: "任务",
+    eyebrow: t("任务"),
     title: t("所有任务"),
     description: t("查看运行、确认、失败恢复与已完成任务。"),
   },
   approvals: {
-    eyebrow: "待确认",
+    eyebrow: t("待确认"),
     title: t("需要你决定的操作"),
     description: t("Unzoo One 不会在你确认前执行外部发送或敏感访问。"),
   },

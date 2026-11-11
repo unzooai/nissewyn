@@ -56,7 +56,9 @@ const AGENT_LABEL: Record<string, string> = {
 const SHELL_TOOLS = new Set(["bash", "powershell", "shell", "run_command", "execute", "exec_command"]);
 const EDIT_TOOLS = new Set(["write", "edit", "multiedit", "notebookedit", "apply_patch", "write_file", "edit_file"]);
 
-function kindOf(tool: string): "shell" | "edit" | "permissions" | "other" {
+type Kind = "shell" | "edit" | "permissions" | "other";
+
+function kindOf(tool: string): Kind {
   const name = tool.toLowerCase();
   if (SHELL_TOOLS.has(name)) return "shell";
   if (EDIT_TOOLS.has(name)) return "edit";
@@ -64,17 +66,51 @@ function kindOf(tool: string): "shell" | "edit" | "permissions" | "other" {
   return "other";
 }
 
+/** `mcp__<server>__<method>`：智能体经 MCP 调的工具（受管模式下就是 Unzoo One 的终端和浏览器）。 */
+export function mcpToolOf(tool: string): { server: string; method: string } | null {
+  const match = /^mcp__([^_]+(?:_[^_]+)*?)__(.+)$/.exec(tool);
+  return match ? { server: match[1], method: match[2] } : null;
+}
+
+/**
+ * 一次 MCP 调用用人话说是什么。Unzoo One 自己的终端（unterm）和浏览器（unzoo）
+ * 认得出来；别的服务器的说"使用某某的某某"。
+ */
+function describeMcp(server: string, method: string): { kind: Kind; action: string; tool: string } {
+  const name = method.toLowerCase();
+  if (server === "unterm") {
+    const tool = t("Unzoo One 终端");
+    if (/^(session_create|session_split|tab_create|workspace_open)/.test(name)) return { kind: "other", action: t("打开一个终端"), tool };
+    if (/^(exec_|session_input|session_send|session_paste|keys_send|input_)/.test(name)) return { kind: "shell", action: t("执行命令"), tool };
+    if (/^(fs_write|fs_edit|file_write|file_edit|fs_delete|fs_move)/.test(name)) return { kind: "edit", action: t("修改文件"), tool };
+    if (/^(session_close|session_kill|session_destroy|process_kill)/.test(name)) return { kind: "shell", action: t("关闭终端或进程"), tool };
+    if (/(read|list|get|status|screen|snapshot|search|find)/.test(name)) return { kind: "other", action: t("查看终端内容"), tool };
+    return { kind: "other", action: t("使用终端的 {method}", { method }), tool };
+  }
+  if (server === "unzoo") {
+    const tool = t("Unzoo 浏览器");
+    if (/^(browser_navigate|tab_create)/.test(name)) return { kind: "other", action: t("打开网页"), tool };
+    if (/^(browser_(click|type|fill|select|press|drag|upload|set_input)|page_(click|type|select|batch)|human_|form_)/.test(name))
+      return { kind: "edit", action: t("在网页上操作"), tool };
+    if (/^(download|media_download|ytdlp)/.test(name)) return { kind: "edit", action: t("下载文件"), tool };
+    if (/^(cookie_(set|delete|import)|session_clear)/.test(name)) return { kind: "permissions", action: t("修改浏览器登录状态"), tool };
+    return { kind: "other", action: t("读取网页"), tool };
+  }
+  return { kind: "other", action: t("使用 {server} 的 {method}", { server, method }), tool: `${server} · ${method}` };
+}
+
 /** 要做的那件事，一行字：命令本身、文件路径，否则参数的 JSON。 */
 function targetOf(args: unknown): string {
   if (args && typeof args === "object") {
     const record = args as Record<string, unknown>;
-    for (const key of ["command", "CommandLine", "cmd", "file_path", "path", "url"]) {
+    for (const key of ["command", "CommandLine", "cmd", "text", "file_path", "path", "url", "cwd"]) {
       const value = record[key];
       if (typeof value === "string" && value.trim()) return value.trim();
     }
   }
   if (args === undefined || args === null) return t("（未提供参数）");
   const text = JSON.stringify(args);
+  if (text === "{}") return t("（未提供参数）");
   return text.length > 240 ? `${text.slice(0, 240)}…` : text;
 }
 
@@ -88,11 +124,15 @@ function relativeLabel(at: string | undefined, now: number): string {
 }
 
 export function toApprovalItem(raw: RawAgentApproval, now: number = Date.now()): ApprovalItem {
-  const tool = raw.approval.tool_call.tool;
+  const rawTool = raw.approval.tool_call.tool;
   const agent = AGENT_LABEL[raw.adapter ?? ""] ?? raw.adapter ?? "Agent";
-  const kind = kindOf(tool);
+  const mcp = mcpToolOf(rawTool);
+  const described = mcp ? describeMcp(mcp.server, mcp.method) : null;
+  const tool = described?.tool ?? rawTool;
+  const kind = described?.kind ?? kindOf(rawTool);
   const action =
-    kind === "shell" ? t("执行命令") : kind === "edit" ? t("修改文件") : kind === "permissions" ? t("授予权限") : t("调用 {tool}", { tool });
+    described?.action ??
+    (kind === "shell" ? t("执行命令") : kind === "edit" ? t("修改文件") : kind === "permissions" ? t("授予权限") : t("调用 {tool}", { tool }));
   // 执行命令和改文件都会改变本机状态；授予权限会放宽之后的所有调用，单列高风险。
   const risk: ApprovalRisk = kind === "permissions" ? "高风险" : kind === "other" ? "低风险" : "中风险";
   const target = targetOf(raw.approval.tool_call.arguments);
