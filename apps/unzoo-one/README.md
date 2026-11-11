@@ -32,3 +32,41 @@ powershell -File apps\unzoo-one\build-installer.ps1
 再由 Tauri 打出 MSI（`src-tauri/target/release/bundle/msi`）。安装目录是平铺的：
 `Unzoo One.exe`、`unterm-core.exe`、`unterm.exe`、`unterm-cli.exe` 和终端的辅助文件，
 各自都在同一目录里找彼此。
+
+### 签名
+
+不签名的安装包，Windows SmartScreen 会拦一道“已保护你的电脑”。发布用的包要用代码签名证书签：
+
+```powershell
+# 证书在系统证书库里（EV 证书的 USB 令牌、或云 HSM 的 KSP 通常是这样）
+$env:UNZOO_SIGN_THUMBPRINT = "<证书 SHA-1 指纹>"
+# 或者是 .pfx 文件
+$env:UNZOO_SIGN_PFX = "C:\path\to\codesign.pfx"; $env:UNZOO_SIGN_PFX_PASSWORD = "..."
+# 可选：时间戳服务器，默认 http://timestamp.digicert.com
+$env:UNZOO_SIGN_TIMESTAMP = "http://timestamp.digicert.com"
+
+powershell -File apps\unzoo-one\build-installer.ps1 -RequireSignature
+```
+
+- `sign.ps1` 用 Windows SDK 的 `signtool`（SHA-256，带 RFC 3161 时间戳，证书过期后签名仍有效）。
+- 先签放进安装包的运行时文件（`unterm*.exe`、DLL）；客户端本身和两个 MSI 由 Tauri 用同一个脚本签
+  （`bundle.windows.signCommand`，构建时临时加上）。已经带有效签名的文件（微软的 `OpenConsole.exe`、
+  `conpty.dll`）原样保留。
+- 没配证书时照样能打包，脚本开头会说明这是未签名的包；`-RequireSignature` 下没证书直接失败，
+  打完还会检查两个 MSI 确实带了签名。
+- 买证书：面向欧美用户建议 EV 代码签名证书，SmartScreen 立即信任；普通（OV）证书要积累下载量后
+  才不再提示。
+
+## 开机后台运行
+
+设置 › 运行偏好的“登录系统后在后台运行”：打开后，登录系统时以 `--background` 启动客户端，
+它只把后台服务拉起来、不开窗口，随即退出。重启电脑后定时任务不用等人打开 Unzoo One。
+
+| 系统 | 写在哪里 |
+|---|---|
+| Windows | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 的 `Unzoo One` |
+| macOS | `~/Library/LaunchAgents/ai.unzoo.one.background.plist`（RunAtLoad） |
+| Linux | `$XDG_CONFIG_HOME/autostart/ai.unzoo.one.desktop`（默认 `~/.config`） |
+
+都只属于当前用户，不需要管理员权限，也都会出现在系统自己的“登录项 / 启动应用”列表里。
+macOS 和 Linux 的安装包还没有做（`build-installer.ps1` 只打 Windows MSI），这部分代码先就位。

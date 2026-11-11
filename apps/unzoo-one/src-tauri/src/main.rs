@@ -223,12 +223,18 @@ fn autostart_get() -> Result<bool, String> {
         Ok(out.status.success())
     }
     #[cfg(not(windows))]
-    Err("Starting with the system is only available on Windows for now.".into())
+    {
+        Ok(autostart_file()?.is_file())
+    }
 }
 
 /// Start (or stop starting) the background service at sign-in: this program
 /// with `--background`, which starts the service and opens no window. Scheduled
 /// tasks need it after a restart, before anyone opens Unzoo One.
+///
+/// Windows: a value under the user's Run key. macOS: a LaunchAgent. Linux and
+/// other desktops: an XDG autostart entry. All three are the user's own, need
+/// no administrator, and are what each system's settings list as login items.
 #[tauri::command]
 fn autostart_set(enabled: bool) -> Result<bool, String> {
     #[cfg(windows)]
@@ -249,8 +255,126 @@ fn autostart_set(enabled: bool) -> Result<bool, String> {
     }
     #[cfg(not(windows))]
     {
-        let _ = enabled;
-        Err("Starting with the system is only available on Windows for now.".into())
+        let file = autostart_file()?;
+        if enabled {
+            let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+            #[cfg(target_os = "macos")]
+            let contents = launch_agent_plist(&exe);
+            #[cfg(not(target_os = "macos"))]
+            let contents = desktop_entry(&exe);
+            if let Some(dir) = file.parent() {
+                std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+            }
+            std::fs::write(&file, contents).map_err(|e| e.to_string())?;
+        } else if let Err(error) = std::fs::remove_file(&file) {
+            if error.kind() != std::io::ErrorKind::NotFound {
+                return Err(error.to_string());
+            }
+        }
+        autostart_get()
+    }
+}
+
+/// The login item this user's system reads: a LaunchAgent on macOS, an XDG
+/// autostart entry elsewhere.
+#[cfg(not(windows))]
+fn autostart_file() -> Result<PathBuf, String> {
+    let home = std::env::var_os("HOME").map(PathBuf::from).ok_or("There is no home folder.")?;
+    #[cfg(target_os = "macos")]
+    {
+        Ok(home.join("Library/LaunchAgents").join(format!("{LOGIN_ITEM_ID}.plist")))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let config = std::env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .filter(|dir| dir.is_absolute())
+            .unwrap_or_else(|| home.join(".config"));
+        Ok(config.join("autostart").join("ai.unzoo.one.desktop"))
+    }
+}
+
+#[cfg_attr(windows, allow(dead_code))]
+const LOGIN_ITEM_ID: &str = "ai.unzoo.one.background";
+
+/// A LaunchAgent that runs `<exe> --background` once at login. No KeepAlive:
+/// `--background` starts the service and exits, and the service keeps itself.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn launch_agent_plist(exe: &std::path::Path) -> String {
+    let xml = |text: &str| {
+        text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;").replace('\'', "&apos;")
+    };
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
+<plist version=\"1.0\">\n\
+<dict>\n\
+\t<key>Label</key>\n\t<string>{LOGIN_ITEM_ID}</string>\n\
+\t<key>ProgramArguments</key>\n\t<array>\n\t\t<string>{}</string>\n\t\t<string>--background</string>\n\t</array>\n\
+\t<key>RunAtLoad</key>\n\t<true/>\n\
+\t<key>ProcessType</key>\n\t<string>Background</string>\n\
+</dict>\n\
+</plist>\n",
+        xml(&exe.display().to_string())
+    )
+}
+
+/// An XDG autostart entry that runs `<exe> --background` at login.
+#[cfg_attr(any(windows, target_os = "macos"), allow(dead_code))]
+fn desktop_entry(exe: &std::path::Path) -> String {
+    // Exec quoting (Desktop Entry spec): inside double quotes, `"`, `` ` ``,
+    // `$` and `\` take a backslash -- and the file's own string escaping then
+    // doubles every backslash, so a literal `\` is four. `%` is a field code
+    // unless doubled.
+    let mut quoted = String::new();
+    for c in exe.display().to_string().chars() {
+        match c {
+            '"' | '`' | '$' => {
+                quoted.push_str("\\\\");
+                quoted.push(c);
+            }
+            '\\' => quoted.push_str("\\\\\\\\"),
+            '%' => quoted.push_str("%%"),
+            _ => quoted.push(c),
+        }
+    }
+    format!(
+        "[Desktop Entry]\n\
+Type=Application\n\
+Name=Unzoo One\n\
+Comment=Starts the Unzoo One background service so scheduled tasks run\n\
+Exec=\"{quoted}\" --background\n\
+Terminal=false\n\
+NoDisplay=true\n\
+X-GNOME-Autostart-enabled=true\n"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn a_launch_agent_runs_the_client_in_the_background_once_at_login() {
+        let plist = launch_agent_plist(Path::new("/Applications/Unzoo One.app/Contents/MacOS/unzoo-one"));
+        assert!(plist.contains("<string>ai.unzoo.one.background</string>"));
+        assert!(plist.contains("<string>/Applications/Unzoo One.app/Contents/MacOS/unzoo-one</string>"));
+        assert!(plist.contains("<string>--background</string>"));
+        assert!(plist.contains("<key>RunAtLoad</key>\n\t<true/>"));
+        assert!(!plist.contains("KeepAlive"), "the service keeps itself; the launcher just exits");
+        let odd = launch_agent_plist(Path::new("/Users/a&b/<x>/unzoo-one"));
+        assert!(odd.contains("/Users/a&amp;b/&lt;x&gt;/unzoo-one"), "{odd}");
+    }
+
+    #[test]
+    fn a_desktop_entry_quotes_the_path_the_way_the_spec_says() {
+        let entry = desktop_entry(Path::new("/opt/Unzoo One/unzoo-one"));
+        assert!(entry.starts_with("[Desktop Entry]\n"));
+        assert!(entry.contains("Exec=\"/opt/Unzoo One/unzoo-one\" --background\n"));
+        assert!(entry.contains("NoDisplay=true"));
+        let odd = desktop_entry(Path::new("/home/me/100%/$HOME/a\"b/unzoo-one"));
+        assert!(odd.contains(r#"Exec="/home/me/100%%/\\$HOME/a\\"b/unzoo-one" --background"#), "{odd}");
     }
 }
 
