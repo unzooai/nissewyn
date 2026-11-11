@@ -145,7 +145,7 @@ export interface PolicyPort {
 }
 
 /** 能驱动的 brain。和 unterm agent manifest 里的 id 对齐。 */
-export type BrainId = "claude-code" | "codex-cli" | "opencode";
+export type BrainId = "claude-code" | "codex-cli" | "opencode" | "agy";
 
 /** 能交任务的一个 agent：这台机器上装了没有，能用哪些模式。 */
 export type BrainAgent = {
@@ -157,6 +157,10 @@ export type BrainAgent = {
   hosted: boolean;
   /** 能受管：自带 shell 关掉，命令只能经 Unterm。 */
   governed: boolean;
+  /** 登录了没有；null 是从外面看不出来（钥匙串之类），不猜。 */
+  signedIn?: boolean | null;
+  /** 在终端里登录要敲的命令。 */
+  signInCommand?: string;
 };
 
 /**

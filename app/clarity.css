@@ -20584,6 +20584,7 @@ body {
 }
 
 .agent-run-cwd > button,
+.agent-run-signin-actions button,
 .agent-rules header button,
 .agent-rules li button,
 .agent-rule-form button {
@@ -20603,6 +20604,7 @@ body {
 }
 
 .agent-run-cwd > button:disabled,
+.agent-run-signin-actions button:disabled,
 .agent-rules button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -25133,4 +25135,38 @@ body {
 
 .clarity-sidebar-terminal + .clarity-sidebar-status {
   margin-top: 0;
+}
+
+.agent-run-signin {
+  align-items: center;
+  border-radius: 10px;
+  background: #fff8eb;
+  border: 1px solid #f3d9a4;
+}
+
+.agent-run-signin strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-run-signin code {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid #ecdcbc;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+}
+
+.agent-run-signin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.agent-run-signin-actions button {
+  white-space: nowrap;
 }

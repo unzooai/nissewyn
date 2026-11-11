@@ -99,7 +99,7 @@ export function turnOutcome(events: BrainEvent[]): { done: boolean; state?: stri
   return { done: false };
 }
 
-const brainIds: readonly BrainId[] = ["claude-code", "codex-cli", "opencode"];
+const brainIds: readonly BrainId[] = ["claude-code", "codex-cli", "opencode", "agy"];
 
 export function isBrainId(value: unknown): value is BrainId {
   return typeof value === "string" && (brainIds as readonly string[]).includes(value);
@@ -118,6 +118,8 @@ export function toBrainAgent(raw: Record<string, unknown>): BrainAgent | null {
     version: typeof raw.detected_version === "string" ? raw.detected_version : undefined,
     hosted: raw.hosted_supported === true,
     governed: raw.governed_supported === true,
+    signedIn: typeof raw.signed_in === "boolean" ? raw.signed_in : null,
+    signInCommand: typeof raw.sign_in_command === "string" ? raw.sign_in_command : undefined,
   };
 }
 
@@ -125,5 +127,6 @@ export function toBrainAgent(raw: Record<string, unknown>): BrainAgent | null {
 export function agentForAdapter(adapter: string | undefined): BrainId {
   if (adapter === "codex") return "codex-cli";
   if (adapter === "opencode") return "opencode";
+  if (adapter === "agy") return "agy";
   return "claude-code";
 }

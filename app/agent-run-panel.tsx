@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, FolderOpen, Plus, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
+import { Bot, FolderOpen, KeyRound, Plus, RefreshCw, ShieldCheck, SquareTerminal, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   defaultAgentRunSettings,
@@ -22,6 +22,7 @@ export function AgentRunPanel({
   brain,
   runtime,
   notify,
+  openTerminal,
 }: {
   rules: AgentRulePort;
   brain: Pick<BrainPort, "agents">;
@@ -31,6 +32,8 @@ export function AgentRunPanel({
    */
   runtime?: Pick<RuntimeTaskPort, "settings" | "saveSettings"> | null;
   notify: (message: string) => void;
+  /** 桌面版：打开终端去登录。 */
+  openTerminal?: () => void;
 }) {
   const [settings, setSettings] = useState<AgentRunSettings>({ ...defaultAgentRunSettings });
   const [agents, setAgents] = useState<BrainAgent[] | null>(null);
@@ -90,23 +93,24 @@ export function AgentRunPanel({
     void reload();
   }, [reload]);
 
-  useEffect(() => {
-    let live = true;
-    brain
-      .agents()
-      .then((list) => {
-        if (!live) return;
-        // 只列能托管的：交给不能托管的 agent，工具调用就进不了收件箱。
-        setAgents(list.filter((agent) => agent.hosted));
-        setAgentsError(null);
-      })
-      .catch((error: unknown) => {
-        if (live) setAgentsError(error instanceof Error ? error.message : String(error));
-      });
-    return () => {
-      live = false;
-    };
+  const [checking, setChecking] = useState(false);
+  const loadAgents = useCallback(async () => {
+    setChecking(true);
+    try {
+      const list = await brain.agents();
+      // 只列能托管的：交给不能托管的 agent，工具调用就进不了收件箱。
+      setAgents(list.filter((agent) => agent.hosted));
+      setAgentsError(null);
+    } catch (error: unknown) {
+      setAgentsError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setChecking(false);
+    }
   }, [brain]);
+
+  useEffect(() => {
+    void loadAgents();
+  }, [loadAgents]);
 
   const chosen = agents?.find((agent) => agent.id === settings.agent);
 
@@ -191,6 +195,8 @@ export function AgentRunPanel({
               ? t("读不到智能体清单：{error}", { error: agentsError })
               : chosen && !chosen.installed
                 ? t("{name} 没装在这台机器上，任务会启动失败。", { name: chosen.name })
+                : chosen && chosen.signedIn === false
+                  ? t("{name} 还没登录，任务会在第一步失败。", { name: chosen.name })
                 : chosen && !chosen.governed && settings.governed
                   ? t("{name} 不支持受管，会以托管模式运行：每次工具调用照样先进收件箱。", { name: chosen.name })
                   : t("新建、继续和重试的任务都交给它。继续对话沿用那次运行原来的智能体。")}
@@ -214,12 +220,42 @@ export function AgentRunPanel({
             {agents?.map((agent) => (
               <option key={agent.id} value={agent.id}>
                 {agent.name}
-                {agent.installed ? (agent.version ? ` ${agent.version}` : "") : t("（未安装）")}
+                {agent.installed
+                  ? `${agent.version ? ` ${agent.version}` : ""}${agent.signedIn === false ? t("（未登录）") : ""}`
+                  : t("（未安装）")}
               </option>
             ))}
           </select>
         </span>
       </label>
+
+      {chosen && chosen.installed && chosen.signedIn === false && (
+        <div className="setting-row agent-run-signin" role="status">
+          <span>
+            <strong>
+              <KeyRound size={14} aria-hidden="true" /> {t("先登录 {name}", { name: chosen.name })}
+            </strong>
+            <small>
+              {chosen.signInCommand
+                ? t("在终端里运行下面的命令，按提示用浏览器登录，再回来点“重新检查”。")
+                : t("按 {name} 自己的说明登录，再回来点“重新检查”。", { name: chosen.name })}
+            </small>
+            {chosen.signInCommand && <code>{chosen.signInCommand}</code>}
+          </span>
+          <span className="agent-run-signin-actions">
+            {openTerminal && (
+              <button type="button" onClick={openTerminal}>
+                <SquareTerminal size={14} aria-hidden="true" />
+                {t("打开终端")}
+              </button>
+            )}
+            <button type="button" onClick={() => void loadAgents()} disabled={checking}>
+              <RefreshCw size={14} aria-hidden="true" className={checking ? "is-spinning" : undefined} />
+              {t("重新检查")}
+            </button>
+          </span>
+        </div>
+      )}
 
       <form
         className="setting-row agent-run-cwd"

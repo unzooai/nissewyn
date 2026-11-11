@@ -182,7 +182,7 @@ const workspacePreferenceStorageKeys = [
 const taskDraftRecoveryMaxAge = 7 * 24 * 60 * 60 * 1000;
 const workspaceSyncSectionLabels: Record<WorkspaceSyncSection, string> = {
   profile: t("工作区资料"),
-  tasks: "任务",
+  tasks: t("任务"),
   approvals: t("待确认操作"),
   artifacts: t("成果"),
   activity: t("运行记录"),
@@ -222,7 +222,7 @@ import {
   teamRoleDetails,
   teamSeatLimit,
 } from "./data/mock";
-import type { BrainEvent } from "./lib/provider";
+import type { BrainAgent, BrainEvent } from "./lib/provider";
 import { brainModeFor, readAgentRunSettings } from "./lib/agent-run-settings";
 import { turnOutcome } from "./lib/brain-events";
 import {
@@ -1558,6 +1558,9 @@ export default function HomePage() {
    * true：任务从运行时读、改动推给运行时、运行由运行时启动和收尾。
    */
   const [runtimeMode, setRuntimeMode] = useState<boolean | null>(null);
+  // 首次设置要知道：任务交给哪个智能体，它装了没有、登录了没有。
+  const [runtimeAgents, setRuntimeAgents] = useState<BrainAgent[] | null>(null);
+  const [runtimeAgentId, setRuntimeAgentId] = useState<string | null>(null);
   const runtimeSent = useRef(new Map<string, string>());
   // Only known in the browser: false for the server render, then the truth.
   const [desktopApp, setDesktopApp] = useState(false);
@@ -2054,7 +2057,25 @@ export default function HomePage() {
       connectorIssueTasks[connector.id].length === 0 &&
       connectorCheckResults[connector.id] !== null,
   ).length;
-  const onboardingSteps: Array<{
+  const onboardingAgent = runtimeAgents?.find((agent) => agent.id === runtimeAgentId) ?? null;
+  const onboardingAgentReady = Boolean(onboardingAgent?.installed && onboardingAgent.signedIn !== false);
+  const agentStep = {
+    id: "agent" as const,
+    label: t("准备好智能体"),
+    description: !runtimeAgents
+      ? t("正在检查这台机器上的智能体…")
+      : !onboardingAgent
+        ? t("选一个装在这台机器上的智能体")
+        : !onboardingAgent.installed
+          ? t("{name} 还没安装", { name: onboardingAgent.name })
+          : onboardingAgent.signedIn === false
+            ? t("{name} 还没登录", { name: onboardingAgent.name })
+            : t("任务交给 {name}", { name: onboardingAgent.name }),
+    actionLabel: onboardingAgent?.installed && onboardingAgent.signedIn === false ? t("去登录") : t("选择智能体"),
+    complete: onboardingAgentReady,
+    icon: Bot,
+  };
+  const allOnboardingSteps: Array<{
     id: OnboardingStepId;
     label: string;
     description: string;
@@ -2062,6 +2083,7 @@ export default function HomePage() {
     complete: boolean;
     icon: typeof Building2;
   }> = [
+    agentStep,
     {
       id: "profile",
       label: t("命名工作区"),
@@ -2099,6 +2121,10 @@ export default function HomePage() {
       icon: Sparkles,
     },
   ];
+  // 装好的产品：智能体、审批边界、第一项任务。演示版没有真的智能体，沿用原来的几步。
+  const onboardingSteps = allOnboardingSteps.filter((step) =>
+    runtimeMode ? ["agent", "security", "task"].includes(step.id) : step.id !== "agent",
+  );
   const onboardingCompletedCount = onboardingSteps.filter(
     (step) => step.complete,
   ).length;
@@ -8571,7 +8597,17 @@ export default function HomePage() {
     }, 180);
   }
 
+  function openTerminalFromPage() {
+    openTerminal().catch((error: unknown) =>
+      setNotice(t("没能打开终端：{error}", { error: error instanceof Error ? error.message : String(error) })),
+    );
+  }
+
   function runOnboardingStep(step: OnboardingStepId) {
+    if (step === "agent") {
+      openSettingsSection("agents");
+      return;
+    }
     if (step === "profile") {
       openWorkspaceProfile();
       return;
@@ -9484,6 +9520,23 @@ export default function HomePage() {
     }
   }, [runtimeMode, tasks]);
 
+  // 回到首页时重新看一眼智能体：可能刚在设置里换了，或者刚在终端里登录。
+  useEffect(() => {
+    if (!runtimeMode || activeView !== "home") return;
+    let live = true;
+    void Promise.all([
+      workspaceProvider.brain.agents().catch(() => [] as BrainAgent[]),
+      workspaceProvider.runtime.settings().catch(() => null),
+    ]).then(([agents, runSettings]) => {
+      if (!live) return;
+      if (agents) setRuntimeAgents(agents.filter((agent) => agent.hosted));
+      if (runSettings) setRuntimeAgentId(runSettings.agent);
+    });
+    return () => {
+      live = false;
+    };
+  }, [runtimeMode, activeView]);
+
   // 运行记录和任务状态从运行时读回来：有任务在跑时两秒一次，平时十五秒，
   // 定时任务自己跑起来了也能看见。
   const tasksRunning = anyRunning(tasks);
@@ -9797,11 +9850,7 @@ export default function HomePage() {
           <button
             className="clarity-sidebar-terminal"
             type="button"
-            onClick={() => {
-              openTerminal().catch((error: unknown) =>
-                setNotice(t("没能打开终端：{error}", { error: error instanceof Error ? error.message : String(error) })),
-              );
-            }}
+            onClick={openTerminalFromPage}
           >
             <SquareTerminal size={17} aria-hidden="true" />
             <span>{t("打开终端")}</span>
@@ -10722,7 +10771,7 @@ export default function HomePage() {
                         }`}
                         key={step.id}
                         type="button"
-                        aria-label={t("{label}，{value}", { label: step.label, value: step.complete ? "已完成" : step.actionLabel })}
+                        aria-label={t("{label}，{value}", { label: step.label, value: step.complete ? t("已完成") : step.actionLabel })}
                         onClick={() => runOnboardingStep(step.id)}
                       >
                         <span>
@@ -10736,7 +10785,7 @@ export default function HomePage() {
                           <strong>{step.label}</strong>
                           <small>{step.description}</small>
                         </span>
-                        <em>{step.complete ? "已完成" : step.actionLabel}</em>
+                        <em>{step.complete ? t("已完成") : step.actionLabel}</em>
                         <ChevronRight size={15} />
                       </button>
                     );
@@ -13315,6 +13364,7 @@ export default function HomePage() {
               brain={workspaceProvider.brain}
               runtime={runtimeMode ? workspaceProvider.runtime : null}
               notify={setNotice}
+              openTerminal={desktopApp ? openTerminalFromPage : undefined}
             />
 
             <section className="settings-data-center" id="settings-data">

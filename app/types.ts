@@ -18,7 +18,7 @@ export type SettingsSectionId =
   | "connectors"
   | "security";
 
-export type OnboardingStepId = "profile" | "connectors" | "security" | "task";
+export type OnboardingStepId = "agent" | "profile" | "connectors" | "security" | "task";
 
 export type WorkspaceRoute = {
   view: ViewId;

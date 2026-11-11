@@ -102,6 +102,8 @@ test("agent 清单：只认得能驱动的，模式照 unterm 说的", () => {
     detected_version: "0.167.0",
     hosted_supported: true,
     governed_supported: false,
+    signed_in: false,
+    sign_in_command: "codex login",
   });
   assert.deepEqual(codex, {
     id: "codex-cli",
@@ -110,11 +112,16 @@ test("agent 清单：只认得能驱动的，模式照 unterm 说的", () => {
     version: "0.167.0",
     hosted: true,
     governed: false,
+    signedIn: false,
+    signInCommand: "codex login",
   });
+  // 看不出登录没登录（钥匙串里）的，不猜。
+  assert.equal(toBrainAgent({ id: "agy", installed: true, hosted_supported: true, signed_in: null }).signedIn, null);
   assert.equal(toBrainAgent({ id: "aider", installed: true }), null);
   // 旧版 unterm 不报 hosted_supported：当作不能托管，不会被列出来。
   assert.equal(toBrainAgent({ id: "claude-code", installed: true }).hosted, false);
   assert.equal(agentForAdapter("codex"), "codex-cli");
   assert.equal(agentForAdapter("opencode"), "opencode");
+  assert.equal(agentForAdapter("agy"), "agy");
   assert.equal(agentForAdapter("claude"), "claude-code");
 });

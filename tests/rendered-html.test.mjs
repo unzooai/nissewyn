@@ -67,7 +67,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /className="clarity-brand"[\s\S]*aria-label=\{t\("返回首页"\)\}/);
   assert.match(page, /const onboardingPreferenceKey =/);
   assert.match(page, /type OnboardingStepId =/);
-  assert.match(page, /const onboardingSteps:/);
+  assert.match(page, /const onboardingSteps\s*[:=]/);
   assert.match(page, /function openOnboarding\(\)/);
   assert.match(page, /function continueOnboarding\(\)/);
   assert.match(page, /id="workspace-onboarding"/);

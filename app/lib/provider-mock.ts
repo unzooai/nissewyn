@@ -291,9 +291,9 @@ export function createMockProvider(): WorkspaceProvider {
   const brainPort: BrainPort = {
     async agents() {
       return [
-        { id: "claude-code", name: "Claude Code", installed: true, hosted: true, governed: true },
-        { id: "codex-cli", name: "Codex CLI", installed: true, hosted: true, governed: false },
-        { id: "opencode", name: "OpenCode", installed: false, hosted: true, governed: false },
+        { id: "claude-code", name: "Claude Code", installed: true, hosted: true, governed: true, signedIn: true, signInCommand: "claude" },
+        { id: "codex-cli", name: "Codex CLI", installed: true, hosted: true, governed: false, signedIn: true, signInCommand: "codex login" },
+        { id: "opencode", name: "OpenCode", installed: false, hosted: true, governed: false, signedIn: false, signInCommand: "opencode auth login" },
       ];
     },
     async start({ agent, prompt, taskId, runId, stepId }) {
