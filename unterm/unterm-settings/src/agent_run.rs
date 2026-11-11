@@ -43,6 +43,8 @@ fn hosted_args(agent_id: &str) -> Option<&'static [&'static str]> {
         "claude-code" => Some(&["-p"]),
         "codex-cli" => Some(&[]),
         "opencode" => Some(&[]),
+        // `agy acp`: the host adds `acp`.
+        "agy" => Some(&[]),
         _ => None,
     }
 }
@@ -137,6 +139,7 @@ fn adapter_of(agent_id: &str) -> &'static str {
         "claude-code" => "claude",
         "codex-cli" => "codex",
         "opencode" => "opencode",
+        "agy" => "agy",
         _ => "generic",
     }
 }
@@ -193,30 +196,43 @@ pub(crate) fn start_session(handler: &McpHandler, body: &Value) -> Result<Value,
         ));
     };
 
-    let set = match fetch_manifests() {
-        Ok(set) => set,
-        Err(e) => return Err((503, "Service Unavailable", format!("manifest fetch: {e}"))),
-    };
-    let Some(manifest) = set
-        .for_current_platform()
-        .into_iter()
-        .find(|m| m.id == agent_id)
-    else {
-        return Err((404, "Not Found", format!("no agent named {agent_id}")));
-    };
+    let binary = match super::local_agents::local_agent(agent_id) {
+        // Built in: found where its installer puts it.
+        Some(local) => match local.binary() {
+            Some(path) => path.display().to_string(),
+            None => {
+                return Err((503, "Service Unavailable", format!("{} is not installed on this machine", local.name)))
+            }
+        },
+        None => {
+            let set = match fetch_manifests() {
+                Ok(set) => set,
+                Err(e) => return Err((503, "Service Unavailable", format!("manifest fetch: {e}"))),
+            };
+            let Some(manifest) = set
+                .for_current_platform()
+                .into_iter()
+                .find(|m| m.id == agent_id)
+            else {
+                return Err((404, "Not Found", format!("no agent named {agent_id}")));
+            };
 
-    // Resolve once, here: on Windows the binary is a .cmd shim that a bare
-    // name does not spawn, and the detected path is already absolute.
-    let detected = installer::detect(&manifest.detect);
-    if !detected.ok {
-        return Err((
-            503,
-            "Service Unavailable",
-            format!("{} is not installed on this machine", manifest.name),
-        ));
-    }
-    let Some(binary) = detected.binary_path else {
-        return Err((503, "Service Unavailable", "the agent has no resolved path".to_string()));
+            // Resolve once, here: on Windows the binary is a .cmd shim that a
+            // bare name does not spawn, and the detected path is already
+            // absolute.
+            let detected = installer::detect(&manifest.detect);
+            if !detected.ok {
+                return Err((
+                    503,
+                    "Service Unavailable",
+                    format!("{} is not installed on this machine", manifest.name),
+                ));
+            }
+            let Some(binary) = detected.binary_path else {
+                return Err((503, "Service Unavailable", "the agent has no resolved path".to_string()));
+            };
+            binary
+        }
     };
 
     let mut command = vec![json!(binary)];
@@ -453,7 +469,7 @@ mod tests {
 
     #[test]
     fn hosted_runs_are_offered_only_for_agents_with_a_host_protocol() {
-        for agent in ["claude-code", "codex-cli", "opencode"] {
+        for agent in ["claude-code", "codex-cli", "opencode", "agy"] {
             assert!(hosted_args(agent).is_some(), "{agent}");
             let adapter = adapter_of(agent);
             assert!(
