@@ -77,6 +77,9 @@ fn core_program() -> Option<PathBuf> {
 fn start_core(program: &PathBuf) -> std::io::Result<()> {
     let mut command = Command::new(program);
     command.arg("--headless");
+    // Its folders and messages are Unzoo One's: tasks work in
+    // Documents\Unzoo One\<task>, not in a folder named after the runtime.
+    command.env("UNTERM_PRODUCT_NAME", "Unzoo One");
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -166,6 +169,36 @@ fn open_terminal() -> Result<(), String> {
         .map_err(|e| format!("The terminal could not start: {e}"))
 }
 
+/// Show a file a task made in the system's file manager, selected. Only an
+/// existing file or folder; nothing is run but the file manager itself.
+#[tauri::command]
+fn reveal_path(path: String) -> Result<(), String> {
+    let target = PathBuf::from(&path);
+    if !target.exists() {
+        return Err(format!("{path} is no longer there"));
+    }
+    #[cfg(windows)]
+    let spawned = {
+        use std::os::windows::process::CommandExt;
+        // Explorer parses its own command line: `/select,"C:\a b\c.md"`.
+        // Quoting the whole argument, as `arg` would for a path with a
+        // space, makes it fall back to opening Documents.
+        let quoted = format!("\"{}\"", target.display());
+        if target.is_dir() {
+            Command::new("explorer.exe").raw_arg(&quoted).spawn()
+        } else {
+            Command::new("explorer.exe").raw_arg(format!("/select,{quoted}")).spawn()
+        }
+    };
+    #[cfg(target_os = "macos")]
+    let spawned = Command::new("open").arg("-R").arg(&target).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let spawned = Command::new("xdg-open")
+        .arg(if target.is_dir() { target.as_path() } else { target.parent().unwrap_or(&target) })
+        .spawn();
+    spawned.map(|_| ()).map_err(|e| format!("The folder could not be opened: {e}"))
+}
+
 /// The connection, found once and kept; asked again only after a failure,
 /// so a Core that is still starting is waited for rather than given up on.
 struct Connection(Mutex<Option<CoreConnection>>);
@@ -200,7 +233,7 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![core_connection, open_terminal])
+        .invoke_handler(tauri::generate_handler![core_connection, open_terminal, reveal_path])
         .run(tauri::generate_context!())
         .expect("Unzoo One could not start");
 }

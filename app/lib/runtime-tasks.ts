@@ -9,7 +9,7 @@
  * 这里全是纯函数，页面和测试共用。
  */
 
-import type { TaskItem, TaskRun, TaskRunStatus, TaskStatus, Weekday } from "../types";
+import type { ArtifactItem, ArtifactType, TaskItem, TaskRun, TaskRunStatus, TaskStatus, Weekday } from "../types";
 import { dateLocale, t } from "../i18n";
 
 export type RuntimeSchedule =
@@ -35,6 +35,23 @@ export type RuntimeRun = {
   /** 正等人在收件箱批准一次工具调用。 */
   waiting?: boolean;
   usage?: { input_tokens?: number; output_tokens?: number } | null;
+  /** 这次运行所在的目录。 */
+  workdir?: string | null;
+  /** 这次运行写下或改过的文件，相对 workdir，新的在前。 */
+  outputs?: RuntimeOutput[];
+};
+
+/** 一次运行写下的一个文件。 */
+export type RuntimeOutput = { path: string; size: number; modified: string };
+
+/** 读回来的一个产出文件。 */
+export type RuntimeOutputContent = {
+  path: string;
+  absolutePath: string;
+  size: number;
+  truncated: boolean;
+  binary: boolean;
+  text: string | null;
 };
 
 export type RuntimeTask = {
@@ -47,6 +64,8 @@ export type RuntimeTask = {
   paused: boolean;
   /** 控制台自己的那份任务，运行时原样存、原样还。 */
   console?: unknown;
+  /** 运行设置没指定目录时，这个任务自己的文件夹（第一次运行时才有）。 */
+  workdir?: string | null;
   /** 最新的在前。 */
   runs: RuntimeRun[];
 };
@@ -271,4 +290,103 @@ export function updatedFrom(latest: RuntimeRun | undefined, status: TaskStatus, 
 /** 是否该快一点刷新：有任务在跑。 */
 export function anyRunning(tasks: TaskItem[]): boolean {
   return tasks.some((task) => task.status === "运行中");
+}
+
+const imageOrLog = /\.(png|jpe?g|gif|webp|bmp|svg|log|har)$/i;
+const dataFile = /\.(csv|tsv|json|jsonl|xlsx?|parquet|sql|xml|ya?ml)$/i;
+
+function outputType(path: string): ArtifactType {
+  if (imageOrLog.test(path)) return "证据";
+  if (dataFile.test(path)) return "数据";
+  return "报告";
+}
+
+function baseName(path: string): string {
+  return path.split("/").pop() || path;
+}
+
+function joinPath(dir: string, path: string): string {
+  const separator = dir.includes("\\") ? "\\" : "/";
+  return `${dir.replace(/[\\/]+$/, "")}${separator}${path.split("/").join(separator)}`;
+}
+
+/** 成果的 id：同一任务里的同一个文件只占一条，后来的运行覆盖前面的。 */
+export function outputArtifactId(taskId: string, path: string): string {
+  return `out:${taskId}:${path}`;
+}
+
+/**
+ * 运行时里各次运行写下的文件 → "成果"里的条目。同一个文件被几次运行写过，
+ * 只留最近那次，版本号记写过几次。内容这时还没读，选中时再读。
+ */
+export function runtimeArtifacts(remote: RuntimeTask[]): ArtifactItem[] {
+  const items: ArtifactItem[] = [];
+  for (const task of remote) {
+    const seen = new Map<string, ArtifactItem>();
+    for (const run of task.runs) {
+      const workdir = run.workdir ?? task.workdir ?? "";
+      for (const output of run.outputs ?? []) {
+        const known = seen.get(output.path);
+        if (known) {
+          known.version = (known.version ?? 1) + 1;
+          continue;
+        }
+        const name = baseName(output.path);
+        const extension = name.includes(".") ? name.split(".").pop()!.toUpperCase() : t("文件");
+        const modified = Date.parse(output.modified);
+        const when = Number.isNaN(modified)
+          ? output.modified
+          : new Date(modified).toLocaleString(dateLocale(), {
+              month: "numeric",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            });
+        const item: ArtifactItem = {
+          id: outputArtifactId(task.id, output.path),
+          taskId: task.id,
+          title: name,
+          filename: name,
+          description: t("“{task}”运行时写下的文件", { task: task.title }),
+          type: outputType(output.path),
+          status: "已完成",
+          format: extension,
+          sizeKb: Math.round((output.size / 1024) * 10) / 10,
+          updated: when,
+          createdAt: Number.isNaN(modified) ? output.modified : new Date(modified).toISOString(),
+          content: "",
+          highlights: [output.path],
+          version: 1,
+          file: {
+            runId: run.id,
+            path: output.path,
+            modified: output.modified,
+            absolutePath: workdir ? joinPath(workdir, output.path) : undefined,
+            loaded: false,
+          },
+        };
+        seen.set(output.path, item);
+        items.push(item);
+      }
+    }
+  }
+  return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/**
+ * 把运行时的产出并进页面的成果列表：页面自己的成果不动；产出文件以运行时
+ * 为准，已经读过的内容和重点标记在文件没变时留着。
+ */
+export function mergeRuntimeArtifacts(local: ArtifactItem[], fromRuntime: ArtifactItem[]): ArtifactItem[] {
+  const localById = new Map(local.map((item) => [item.id, item]));
+  const fresh = fromRuntime.map((item) => {
+    const known = localById.get(item.id);
+    if (!known?.file) return item;
+    const same = known.file.runId === item.file?.runId && known.file.modified === item.file?.modified;
+    return same
+      ? { ...item, content: known.content, file: { ...item.file!, ...known.file, absolutePath: item.file!.absolutePath ?? known.file.absolutePath }, starred: known.starred }
+      : { ...item, starred: known.starred };
+  });
+  return [...fresh, ...local.filter((item) => !item.file)];
 }

@@ -437,6 +437,9 @@ export function createMockProvider(): WorkspaceProvider {
       async stop() {
         return false;
       },
+      async output() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
       async settings() {
         throw new Error(t("演示版没有本机运行时"));
       },

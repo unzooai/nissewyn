@@ -12119,6 +12119,15 @@ body {
   white-space: pre-wrap;
 }
 
+.artifact-file-note {
+  margin: 0;
+  padding: 14px 19px;
+  color: #5b6779;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
 .artifact-table-wrap {
   max-width: 100%;
   overflow-x: auto;

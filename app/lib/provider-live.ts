@@ -31,7 +31,7 @@ import {
 } from "./brain-events";
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
-import type { RuntimeRun, RuntimeTask } from "./runtime-tasks";
+import type { RuntimeOutputContent, RuntimeRun, RuntimeTask } from "./runtime-tasks";
 import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
@@ -321,6 +321,19 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       async stop(taskId) {
         const data = await callUnterm<{ stopped?: boolean }>("/api/console/tasks/stop", { task_id: taskId });
         return data.stopped === true;
+      },
+      async output({ taskId, runId, path }): Promise<RuntimeOutputContent> {
+        const { output } = await callUnterm<{
+          output: { path: string; absolute_path: string; size: number; truncated: boolean; binary: boolean; text: string | null };
+        }>("/api/console/tasks/output", { task_id: taskId, run_id: runId, path });
+        return {
+          path: output.path,
+          absolutePath: output.absolute_path,
+          size: output.size,
+          truncated: output.truncated,
+          binary: output.binary,
+          text: output.text,
+        };
       },
       async settings() {
         const data = await getUnterm<{ settings: Record<string, unknown> }>("/api/console/run-settings");

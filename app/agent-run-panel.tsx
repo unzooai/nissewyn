@@ -230,7 +230,7 @@ export function AgentRunPanel({
       >
         <span>
           <strong>{t("工作目录")}</strong>
-          <small>{t("任务交给智能体后，它在这个目录里读写文件、执行命令。留空则用 Unzoo One 后台服务自己的目录。")}</small>
+          <small>{t("任务交给智能体后，它在这个目录里读写文件、执行命令。留空则每个任务用自己的文件夹：文档 › Unzoo One › 任务名。")}</small>
           <span className="agent-run-input">
             <FolderOpen size={14} aria-hidden="true" />
             <input

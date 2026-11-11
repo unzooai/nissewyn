@@ -51,8 +51,8 @@ export const en: Record<string, string> = {
   "{agent}（清单里没有）": "{agent} (not in the list)",
   "（未安装）": " (not installed)",
   "工作目录": "Working directory",
-  "任务交给智能体后，它在这个目录里读写文件、执行命令。留空则用 Unzoo One 后台服务自己的目录。":
-    "The agent reads and writes files and runs commands in this folder. Leave it empty to use the Unzoo One service's own folder.",
+  "任务交给智能体后，它在这个目录里读写文件、执行命令。留空则每个任务用自己的文件夹：文档 › Unzoo One › 任务名。":
+    "The agent reads and writes files and runs commands in this folder. Leave it empty and each task gets its own folder: Documents › Unzoo One › task name.",
   "例如 C:\\code\\my-project": "e.g. C:\\code\\my-project",
   "智能体的工作目录": "Agent working directory",
   "保存": "Save",

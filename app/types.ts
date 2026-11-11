@@ -424,6 +424,21 @@ export type ArtifactItem = {
   editedAt?: string;
   editedBy?: string;
   revisions?: ArtifactRevision[];
+  /** 智能体运行时写在本机的文件：内容在磁盘上，页面只读。 */
+  file?: ArtifactFile;
+};
+
+export type ArtifactFile = {
+  runId: string;
+  /** 相对运行目录。 */
+  path: string;
+  modified: string;
+  absolutePath?: string;
+  /** 内容读回来了没有；读不了时是原因。 */
+  loaded: boolean;
+  binary?: boolean;
+  truncated?: boolean;
+  error?: string;
 };
 
 export type ApprovalItem = {

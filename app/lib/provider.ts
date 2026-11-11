@@ -36,7 +36,7 @@
  */
 
 import type { AgentRunSettings } from "./agent-run-settings";
-import type { RuntimeRun, RuntimeTask, RuntimeTaskPut } from "./runtime-tasks";
+import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeTaskPut } from "./runtime-tasks";
 import type {
   ActivityItem,
   ApprovalItem,
@@ -319,6 +319,8 @@ export interface RuntimeTaskPort {
   run(input: { taskId: string; runId?: string; prompt?: string; continueFrom?: string }): Promise<RuntimeRun>;
   /** 停掉正在跑的那次。没有在跑的返回 false。 */
   stop(taskId: string): Promise<boolean>;
+  /** 读一次运行写下的一个文件（只能读运行记录里列出的）。 */
+  output(input: { taskId: string; runId: string; path: string }): Promise<RuntimeOutputContent>;
   /** 运行时跑任务用的设置：交给哪个 agent、在哪个目录、是否受管。 */
   settings(): Promise<AgentRunSettings>;
   saveSettings(settings: AgentRunSettings): Promise<AgentRunSettings>;

@@ -196,4 +196,12 @@ export const enPage8: Record<string, string> = {
   "撤销": "Undo",
   "撤销拒绝": "Undo rejection",
   "关闭提示": "Dismiss",
+  "只有 Unzoo One 桌面版能打开本机文件夹": "Only the Unzoo One desktop app can open local folders",
+  "文件": "File",
+  "“{task}”运行时写下的文件": "Written by a run of “{task}”",
+  "在文件夹中显示": "Show in folder",
+  "读不到这个文件：{error}": "This file could not be read: {error}",
+  "正在读取文件…": "Reading the file…",
+  "这个文件不是文本，无法在这里预览。": "This file is not text, so it cannot be previewed here.",
+  "文件较大，这里只显示前 1 MB。": "This file is large; only the first 1 MB is shown.",
 };

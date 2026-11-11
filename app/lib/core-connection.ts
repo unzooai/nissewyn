@@ -69,3 +69,10 @@ export async function openTerminal(): Promise<void> {
   if (!invoke) throw new Error(t("终端只能在 Unzoo One 桌面版里打开"));
   await invoke("open_terminal");
 }
+
+/** Show a file in the system's file manager (desktop app only). */
+export async function revealPath(path: string): Promise<void> {
+  const invoke = tauri()?.core?.invoke;
+  if (!invoke) throw new Error(t("只有 Unzoo One 桌面版能打开本机文件夹"));
+  await invoke("reveal_path", { path });
+}

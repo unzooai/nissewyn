@@ -26,6 +26,7 @@ import {
   FileJson,
   FileText,
   Files,
+  FolderOpen,
   Globe2,
   HardDrive,
   History,
@@ -226,14 +227,16 @@ import { brainModeFor, readAgentRunSettings } from "./lib/agent-run-settings";
 import { turnOutcome } from "./lib/brain-events";
 import {
   anyRunning,
+  mergeRuntimeArtifacts,
   mergeRuntimeTasks,
+  runtimeArtifacts,
   promptOf,
   putSignature,
   toRuntimePut,
 } from "./lib/runtime-tasks";
 import { AgentRunPanel } from "./agent-run-panel";
 import { RuntimeFocusCard } from "./runtime-focus";
-import { inDesktopApp, openTerminal } from "./lib/core-connection";
+import { inDesktopApp, openTerminal, revealPath } from "./lib/core-connection";
 import { applyDocumentLanguage, chooseLocale, dateLocale, locale, locales, t, type Locale } from "./i18n";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
 import { isAgentApprovalId, reconcileAgentApprovals } from "./lib/agent-approvals";
@@ -618,6 +621,11 @@ function isArtifactItem(value: unknown): value is ArtifactItem {
     (item.editedBy === undefined || typeof item.editedBy === "string") &&
     validRevisions
   );
+}
+
+/** 本机文件的内容不进浏览器存储：它在磁盘上，下次选中时再读。 */
+function persistableArtifact(item: ArtifactItem): ArtifactItem {
+  return item.file ? { ...item, content: "", file: { ...item.file, loaded: false, error: undefined } } : item;
 }
 
 function isActivityItem(value: unknown): value is ActivityItem {
@@ -3611,7 +3619,7 @@ export default function HomePage() {
       approvalIds: approvals.map((item) => item.id),
       approvalDeferrals,
       activity: activityLog.slice(0, 100),
-      artifacts: artifacts.slice(0, 100),
+      artifacts: artifacts.slice(0, 100).map(persistableArtifact),
     };
     const signature = workspaceSyncSignature(workspaceData);
 
@@ -3751,7 +3759,7 @@ export default function HomePage() {
         approvalIds: approvals.map((approval) => approval.id),
         approvalDeferrals,
         activity: activityLog.slice(0, 100),
-        artifacts: artifacts.slice(0, 100),
+        artifacts: artifacts.slice(0, 100).map(persistableArtifact),
       };
       const sections = getWorkspaceSyncSections(currentData, incoming);
       if (sections.length === 0) {
@@ -4426,6 +4434,41 @@ export default function HomePage() {
     filteredArtifacts.find((artifact) => artifact.id === selectedArtifactId) ??
     filteredArtifacts[0] ??
     null;
+  // 本机文件选中时才去读：列表里可能有几十个，不必一次全读。
+  const selectedFile =
+    selectedArtifact?.file && !selectedArtifact.file.loaded && !selectedArtifact.file.error
+      ? { id: selectedArtifact.id, taskId: selectedArtifact.taskId, ...selectedArtifact.file }
+      : null;
+  useEffect(() => {
+    if (!selectedFile) return;
+    let cancelled = false;
+    const settle = (patch: Partial<ArtifactItem>, file: Partial<NonNullable<ArtifactItem["file"]>>) =>
+      setArtifacts((items) =>
+        items.map((item) =>
+          item.id === selectedFile.id && item.file?.runId === selectedFile.runId
+            ? { ...item, ...patch, file: { ...item.file!, ...file } }
+            : item,
+        ),
+      );
+    workspaceProvider.runtime
+      .output({ taskId: selectedFile.taskId, runId: selectedFile.runId, path: selectedFile.path })
+      .then((output) => {
+        if (cancelled) return;
+        settle(
+          { content: output.text ?? "", sizeKb: Math.round((output.size / 1024) * 10) / 10 },
+          { loaded: true, binary: output.binary, truncated: output.truncated, absolutePath: output.absolutePath },
+        );
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        settle({}, { error: error instanceof Error ? error.message : String(error) });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // 只在换了要读的文件时读。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFile?.id, selectedFile?.runId]);
   useEffect(() => {
     if (!tasksReady || activeView !== "artifacts") return;
     const nextArtifactId = selectedArtifact?.id ?? "";
@@ -5290,6 +5333,8 @@ export default function HomePage() {
   }
 
   function artifactCanBeEdited(artifact: ArtifactItem) {
+    // 本机文件以磁盘上的为准，在这里改了也写不回去。
+    if (artifact.file) return false;
     return artifact.type === "报告" || artifact.type === "草稿";
   }
 
@@ -9345,10 +9390,16 @@ export default function HomePage() {
     const merged = remote.length ? mergeRuntimeTasks([], remote) : mine;
     for (const task of merged) runtimeSent.current.set(task.id, putSignature(task));
     setTasks(merged);
+    const outputs = runtimeArtifacts(remote);
     const demoApprovalIds = new Set(workspaceDefaults.approvals.map((item) => item.id));
     setApprovals((items) => items.filter((item) => !demoApprovalIds.has(item.id)));
     const demoArtifactIds = new Set(workspaceDefaults.artifacts.map((item) => item.id));
-    setArtifacts((items) => items.filter((item) => !demoArtifactIds.has(item.id)));
+    setArtifacts((items) =>
+      mergeRuntimeArtifacts(
+        items.filter((item) => !demoArtifactIds.has(item.id)),
+        outputs,
+      ),
+    );
     const demoActivityIds = new Set(workspaceDefaults.activity.map((item) => item.id));
     setActivityLog((items) => items.filter((item) => !demoActivityIds.has(item.id)));
     setIsRunning(false);
@@ -9400,6 +9451,8 @@ export default function HomePage() {
       setTasks((items) =>
         mergeRuntimeTasks(items, remote, Date.now(), runtimeRemoved.current),
       );
+      const outputs = runtimeArtifacts(remote);
+      setArtifacts((items) => mergeRuntimeArtifacts(items, outputs));
     } catch {
       // 下一轮再试。
     }
@@ -12176,25 +12229,45 @@ export default function HomePage() {
                         <Copy size={16} />
                         <span>{t("复制")}</span>
                       </button>
-                      <button
-                        className="delete"
-                        type="button"
-                        aria-label={t("删除成果")}
-                        title={t("删除成果")}
-                        onClick={() => requestDeleteArtifact(selectedArtifact)}
-                      >
-                        <Trash2 size={16} />
-                        <span>{t("删除")}</span>
-                      </button>
-                      <button
-                        className="download"
-                        type="button"
-                        onClick={() => downloadArtifact(selectedArtifact)}
-                      >
-                        <Download size={16} />
-                        
-                        {t("下载")}
-                      </button>
+                      {selectedArtifact.file ? (
+                        desktopApp && selectedArtifact.file.absolutePath ? (
+                          <button
+                            type="button"
+                            aria-label={t("在文件夹中显示")}
+                            title={selectedArtifact.file.absolutePath}
+                            onClick={() =>
+                              revealPath(selectedArtifact.file!.absolutePath!).catch((error: unknown) =>
+                                setNotice(error instanceof Error ? error.message : String(error)),
+                              )
+                            }
+                          >
+                            <FolderOpen size={16} />
+                            <span>{t("在文件夹中显示")}</span>
+                          </button>
+                        ) : null
+                      ) : (
+                        <button
+                          className="delete"
+                          type="button"
+                          aria-label={t("删除成果")}
+                          title={t("删除成果")}
+                          onClick={() => requestDeleteArtifact(selectedArtifact)}
+                        >
+                          <Trash2 size={16} />
+                          <span>{t("删除")}</span>
+                        </button>
+                      )}
+                      {!selectedArtifact.file?.binary && (
+                        <button
+                          className="download"
+                          type="button"
+                          disabled={Boolean(selectedArtifact.file && !selectedArtifact.file.loaded)}
+                          onClick={() => downloadArtifact(selectedArtifact)}
+                        >
+                          <Download size={16} />
+                          {t("下载")}
+                        </button>
+                      )}
                     </div>
                   </header>
 
@@ -12260,8 +12333,24 @@ export default function HomePage() {
                           </tbody>
                         </table>
                       </div>
+                    ) : selectedArtifact.file && !selectedArtifact.file.loaded ? (
+                      <p className="artifact-file-note">
+                        {selectedArtifact.file.error
+                          ? t("读不到这个文件：{error}", { error: selectedArtifact.file.error })
+                          : t("正在读取文件…")}
+                      </p>
+                    ) : selectedArtifact.file?.binary ? (
+                      <p className="artifact-file-note">
+                        {t("这个文件不是文本，无法在这里预览。")}
+                        {selectedArtifact.file.absolutePath ? ` ${selectedArtifact.file.absolutePath}` : ""}
+                      </p>
                     ) : (
-                      <pre>{selectedArtifact.content}</pre>
+                      <>
+                        <pre>{selectedArtifact.content}</pre>
+                        {selectedArtifact.file?.truncated && (
+                          <p className="artifact-file-note">{t("文件较大，这里只显示前 1 MB。")}</p>
+                        )}
+                      </>
                     )}
                   </section>
 

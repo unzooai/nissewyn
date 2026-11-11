@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  mergeRuntimeArtifacts,
   mergeRuntimeTasks,
+  runtimeArtifacts,
   putSignature,
   scheduleOf,
   statusFrom,
@@ -135,4 +137,71 @@ test("合并：只动运行时说了算的，刚发起的运行不闪掉，别�
   const later = mergeRuntimeTasks(local, remote, now + 60_000).find((t) => t.id === "task-1");
   assert.equal(later.status, "已完成");
   assert.deepEqual(later.runs.map((r) => r.id), ["run-old"]);
+});
+
+test("运行写下的文件进成果：同一文件只留最近一次，版本记写过几次", () => {
+  const remote = [
+    {
+      id: "task-9",
+      title: "Market scan",
+      created_at: "2026-11-01T00:00:00Z",
+      updated_at: "2026-11-01T00:00:00Z",
+      paused: false,
+      workdir: "C:\\Users\\me\\Documents\\Unzoo One\\Market scan",
+      runs: [
+        {
+          id: "run-2",
+          attempt: 1,
+          state: "succeeded",
+          started_at: "2026-11-11T09:00:00Z",
+          workdir: "C:\\Users\\me\\Documents\\Unzoo One\\Market scan",
+          outputs: [
+            { path: "report.md", size: 2048, modified: "2026-11-11T09:05:00Z" },
+            { path: "data/prices.csv", size: 512, modified: "2026-11-11T09:04:00Z" },
+          ],
+        },
+        {
+          id: "run-1",
+          attempt: 1,
+          state: "succeeded",
+          started_at: "2026-11-10T09:00:00Z",
+          outputs: [{ path: "report.md", size: 1024, modified: "2026-11-10T09:05:00Z" }],
+        },
+      ],
+    },
+  ];
+  const items = runtimeArtifacts(remote);
+  assert.equal(items.length, 2);
+  const report = items.find((item) => item.filename === "report.md");
+  assert.equal(report.id, "out:task-9:report.md");
+  assert.equal(report.type, "报告");
+  assert.equal(report.format, "MD");
+  assert.equal(report.sizeKb, 2);
+  assert.equal(report.version, 2, "written by two runs");
+  assert.equal(report.file.runId, "run-2", "the latest run's copy");
+  assert.equal(report.file.absolutePath, "C:\\Users\\me\\Documents\\Unzoo One\\Market scan\\report.md");
+  assert.equal(report.content, "", "read when chosen");
+  const prices = items.find((item) => item.filename === "prices.csv");
+  assert.equal(prices.type, "数据");
+  assert.equal(prices.file.absolutePath, "C:\\Users\\me\\Documents\\Unzoo One\\Market scan\\data\\prices.csv");
+
+  // 读过的内容和重点标记，文件没变时留着；页面自己的成果不动；任务没了的产出不留。
+  const loaded = { ...report, content: "# Report", starred: true, file: { ...report.file, loaded: true } };
+  const own = { ...report, id: "artifact-own", file: undefined, content: "mine" };
+  const stale = { ...prices, id: "out:task-gone:x.md" };
+  const merged = mergeRuntimeArtifacts([loaded, own, stale], items);
+  assert.deepEqual(merged.map((item) => item.id).sort(), ["artifact-own", "out:task-9:data/prices.csv", "out:task-9:report.md"]);
+  const kept = merged.find((item) => item.id === report.id);
+  assert.equal(kept.content, "# Report");
+  assert.equal(kept.starred, true);
+  assert.equal(kept.file.loaded, true);
+
+  // 下一次运行改了这个文件：内容要重读，重点标记还在。
+  const rewritten = runtimeArtifacts([
+    { ...remote[0], runs: [{ ...remote[0].runs[0], id: "run-3", outputs: [{ path: "report.md", size: 4096, modified: "2026-11-12T09:05:00Z" }] }] },
+  ]);
+  const next = mergeRuntimeArtifacts(merged, rewritten).find((item) => item.id === report.id);
+  assert.equal(next.content, "");
+  assert.equal(next.file.loaded, false);
+  assert.equal(next.starred, true);
 });
