@@ -41,6 +41,39 @@ export type RuntimeRun = {
   outputs?: RuntimeOutput[];
 };
 
+/**
+ * 智能体在一轮里做的一件事（一次工具调用），由运行时整理好：verb 是哪类事，
+ * target 是命令、路径或网址（已截成一行）。
+ */
+export type RuntimeActivity = {
+  call_id?: string | null;
+  tool: string;
+  /** run read search edit delete terminal watch open look click type download upload plan use */
+  verb: string;
+  target?: string | null;
+  /** 网关的风险等级：read local_mutation exec external_side_effect credential_access financial destructive */
+  risk?: string | null;
+  /** 这件事问过人：问的那一条的 id。 */
+  request_id?: string | null;
+  /** 谁放行或拒绝的：autonomy（按自主程度）、policy（常设规则）、person（人）。 */
+  decided_by?: string | null;
+  decision?: "allow" | "deny" | null;
+  ok?: boolean | null;
+  at?: string | null;
+};
+
+/** 对话里的一轮：一次运行，加上说了什么、做了什么、答了什么。 */
+export type RuntimeTurn = RuntimeRun & {
+  prompt?: string | null;
+  reply?: string | null;
+  activity: RuntimeActivity[];
+  /** 追问时有：true 接上了原来的对话，false 没有可接的、开了新的。 */
+  continued?: boolean | null;
+};
+
+/** 一个任务作为一段对话。 */
+export type RuntimeThread = Omit<RuntimeTask, "runs"> & { turns: RuntimeTurn[] };
+
 /** 一次运行写下的一个文件。 */
 export type RuntimeOutput = { path: string; size: number; modified: string };
 

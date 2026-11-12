@@ -3,9 +3,11 @@
 import { Bot, FolderOpen, KeyRound, Plus, RefreshCw, ShieldCheck, SquareTerminal, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
+  agentAutonomyLevels,
   defaultAgentRunSettings,
   readAgentRunSettings,
   writeAgentRunSettings,
+  type AgentAutonomy,
   type AgentRunSettings,
 } from "./lib/agent-run-settings";
 import type { AgentRule, AgentRulePort, BrainAgent, BrainPort, RuntimeTaskPort } from "./lib/provider";
@@ -289,7 +291,7 @@ export function AgentRunPanel({
         <span>
           <strong>{t("受管模式")}</strong>
           <small>
-            {t("关掉 Claude Code 自带的 Bash、PowerShell 和联网工具，命令只能经 Unzoo One 执行，每一步都先进收件箱。目前只有 Claude Code 支持；其它智能体以托管模式运行：用自己的工具，但同样逐条等你批准。")}
+            {t("关掉 Claude Code 自带的 Bash、PowerShell 和联网工具，命令只能经 Unzoo One 的终端执行，网页只能经 Unzoo 浏览器打开。目前只有 Claude Code 支持；其它智能体用自己的工具。哪些操作要先问你，由下面的自主程度决定。")}
           </small>
         </span>
         <button
@@ -309,6 +311,33 @@ export function AgentRunPanel({
         </button>
       </label>
 
+      {runtime && (
+        <fieldset className="setting-row agent-autonomy">
+          <legend>
+            <strong>{t("自主程度")}</strong>
+            <small>{t("智能体不问你就能做多少。删除、读取账号或密钥、花钱，任何一档都会先问你；下面的常设规则优先。")}</small>
+          </legend>
+          <div className="agent-autonomy-options" role="radiogroup" aria-label={t("自主程度")}>
+            {agentAutonomyLevels.map((level) => (
+              <button
+                key={level}
+                type="button"
+                role="radio"
+                aria-checked={settings.autonomy === level}
+                className={settings.autonomy === level ? "active" : ""}
+                onClick={() =>
+                  settings.autonomy !== level &&
+                  save({ ...settings, autonomy: level }, t("自主程度已改为“{level}”", { level: autonomyName(level) }))
+                }
+              >
+                <strong>{autonomyName(level)}</strong>
+                <small>{autonomyDetail(level)}</small>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
       <section className="agent-rules" aria-label={t("常设规则")}>
         <header>
           <span>
@@ -325,7 +354,7 @@ export function AgentRunPanel({
         {loadError ? (
           <p className="agent-rules-empty">{t("读取规则失败：{error}", { error: loadError })}</p>
         ) : rules.length === 0 ? (
-          <p className="agent-rules-empty">{loading ? t("正在读取…") : t("还没有规则。每次工具调用都会进收件箱。")}</p>
+          <p className="agent-rules-empty">{loading ? t("正在读取…") : t("还没有规则。")}</p>
         ) : (
           <ul>
             {rules.map((rule) => (
@@ -396,6 +425,21 @@ export function AgentRunPanel({
       </section>
     </div>
   );
+}
+
+function autonomyName(level: AgentAutonomy): string {
+  return level === "cautious" ? t("谨慎") : level === "autonomous" ? t("放手") : t("平衡");
+}
+
+function autonomyDetail(level: AgentAutonomy): string {
+  switch (level) {
+    case "cautious":
+      return t("只有看文件、看网页不问；改文件、运行命令、打开网页都先问你。");
+    case "autonomous":
+      return t("除了删除、账号密钥和花钱，都不问；包括推送、上传、改工作文件夹以外的文件。");
+    default:
+      return t("看、在工作文件夹里改文件、运行普通命令、在它自己的浏览器里操作都不问；推送、上传、发请求、改工作文件夹以外的文件会问。");
+  }
 }
 
 function describeRule(rule: AgentRule): string {

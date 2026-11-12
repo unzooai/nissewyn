@@ -33,6 +33,7 @@ import {
   Home,
   ListChecks,
   Link2,
+  MessagesSquare,
   LoaderCircle,
   Mail,
   Pause,
@@ -224,13 +225,14 @@ import {
   teamRoleDetails,
   teamSeatLimit,
 } from "./data/mock";
-import type { BrainAgent, BrainEvent, RuntimeCapabilities } from "./lib/provider";
+import type { ApprovalDecision, BrainAgent, BrainEvent, RuntimeCapabilities } from "./lib/provider";
 import { brainModeFor, readAgentRunSettings } from "./lib/agent-run-settings";
 import { turnOutcome } from "./lib/brain-events";
 import {
   anyRunning,
   mergeRuntimeArtifacts,
   mergeRuntimeTasks,
+  outputArtifactId,
   runtimeArtifacts,
   usageSummary,
   type RuntimeTask,
@@ -241,12 +243,13 @@ import {
 } from "./lib/runtime-tasks";
 import { AgentRunPanel } from "./agent-run-panel";
 import { RuntimeFocusCard } from "./runtime-focus";
+import { Conversations } from "./conversations";
 import { RuntimeUsagePanel } from "./runtime-usage";
 import { RuntimeCapabilitiesPanel } from "./runtime-capabilities";
 import { autostartEnabled, inDesktopApp, openTerminal, revealPath, setAutostart } from "./lib/core-connection";
 import { applyDocumentLanguage, chooseLocale, dateLocale, locale, locales, t, type Locale } from "./i18n";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
-import { isAgentApprovalId, reconcileAgentApprovals } from "./lib/agent-approvals";
+import { agentApprovalId, isAgentApprovalId, reconcileAgentApprovals } from "./lib/agent-approvals";
 
 // 组件不再直接读 mock：首屏种子和出厂数据都从 provider 拿，换实现时这里不用动。
 const workspaceProvider = getWorkspaceProvider();
@@ -1057,6 +1060,17 @@ const navItems: Array<{
   { id: "settings", label: t("设置"), mobileLabel: t("设置"), icon: Settings2 },
 ];
 
+/**
+ * 装好的产品：首页就是对话（任务就是一段对话），没有单独的任务页；运行记录
+ * 是演示版的本地日志，这里也不要。
+ */
+const runtimeNavItems: typeof navItems = [
+  { id: "home", label: t("对话"), mobileLabel: t("对话"), icon: MessagesSquare },
+  { id: "approvals", label: t("待确认的操作"), mobileLabel: t("确认"), icon: ShieldCheck },
+  { id: "artifacts", label: t("成果"), mobileLabel: t("成果"), icon: Files },
+  { id: "settings", label: t("设置"), mobileLabel: t("设置"), icon: Settings2 },
+];
+
 const settingsSections: Array<{
   id: SettingsSectionId;
   label: string;
@@ -1656,6 +1670,9 @@ export default function HomePage() {
   const [taskDeleteSnapshot, setTaskDeleteSnapshot] =
     useState<TaskDeleteSnapshot | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  /** 对话页打开的那段对话；null 是“新对话”。 */
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationNonce, setConversationNonce] = useState(0);
   const [inspectedRunTaskId, setInspectedRunTaskId] =
     useState<string | null>(null);
   const [inspectedRunId, setInspectedRunId] = useState<string | null>(null);
@@ -1853,7 +1870,13 @@ export default function HomePage() {
               : t("数据保存在本机")
             : t("临时会话 · 关闭后清空");
   const pageTitle =
-    activeView === "home"
+    activeView === "home" && runtimeMode
+      ? {
+          eyebrow: workspaceToday.eyebrow,
+          title: t("对话"),
+          description: t("说一句话，智能体用这台电脑的终端和浏览器替你去做。"),
+        }
+      : activeView === "home"
       ? {
           ...viewTitles.home,
           eyebrow: workspaceToday.eyebrow,
@@ -6875,6 +6898,13 @@ export default function HomePage() {
   }
 
   function beginCreateTask() {
+    // 装好的产品里，新建就是开一段新对话。
+    if (runtimeMode) {
+      setConversationId(null);
+      setConversationNonce((value) => value + 1);
+      openView("home");
+      return;
+    }
     const draft: TaskDraftSnapshot = {
       name: "",
       target: "",
@@ -9634,7 +9664,8 @@ export default function HomePage() {
     task: TaskItem,
     runId: string,
     continueFrom?: { sessionId: string; prompt: string },
-  ) {
+    options: { prompt?: string; followUp?: boolean } = {},
+  ): Promise<string | null> {
     try {
       const current = tasks.find((item) => item.id === task.id) ?? task;
       await workspaceProvider.runtime.put(toRuntimePut(current));
@@ -9642,8 +9673,9 @@ export default function HomePage() {
       await workspaceProvider.runtime.run({
         taskId: task.id,
         runId,
-        prompt: continueFrom?.prompt,
+        prompt: continueFrom?.prompt ?? options.prompt,
         continueFrom: continueFrom?.sessionId,
+        followUp: options.followUp,
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -9664,9 +9696,175 @@ export default function HomePage() {
         ),
       );
       setNotice(t("任务没能开始：{message}", { message }));
+      void refreshFromRuntime();
+      return message;
+    }
+    void refreshFromRuntime();
+    return null;
+  }
+
+  // ---- 对话（装好的产品的首页）------------------------------------------
+
+  /** 说一句话就开一段对话：建任务、立刻交给智能体。 */
+  async function startConversation(request: string): Promise<string | null> {
+    const now = Date.now();
+    const runId = `run-${now}`;
+    const newTask: TaskItem = {
+      id: `task-${now}`,
+      title: titleFromRequest(request),
+      description: request,
+      target: "",
+      status: "运行中",
+      progress: 3,
+      updated: t("刚刚创建"),
+      schedule: "仅运行一次",
+      requiresApproval: true,
+      retryCount: 0,
+      runs: [{ id: runId, status: "运行中", startedAt: new Date(now).toISOString(), summary: "" }],
+    };
+    setTasks((items) => [newTask, ...items]);
+    setConversationId(newTask.id);
+    await runOnRuntime(newTask, runId);
+    return newTask.id;
+  }
+
+  /** 接着一段对话说：同一个智能体会话续接，它记得前面说过和做过的。 */
+  async function sendConversationFollowUp(taskId: string, text: string) {
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) throw new Error(t("这段对话已经不在了"));
+    const now = Date.now();
+    const runId = `run-${now}`;
+    setTasks((items) =>
+      items.map((item) =>
+        item.id === taskId
+          ? {
+              ...item,
+              status: "运行中",
+              runs: [
+                { id: runId, status: "运行中", startedAt: new Date(now).toISOString(), summary: "" },
+                ...(item.runs ?? []),
+              ],
+            }
+          : item,
+      ),
+    );
+    const failed = await runOnRuntime(task, runId, undefined, { prompt: text, followUp: true });
+    if (failed) throw new Error(failed);
+  }
+
+  async function stopConversation(taskId: string) {
+    try {
+      await workspaceProvider.runtime.stop(taskId);
+    } catch (error) {
+      setNotice(t("没能停下：{message}", { message: error instanceof Error ? error.message : String(error) }));
     }
     void refreshFromRuntime();
   }
+
+  function renameConversation(taskId: string, title: string) {
+    setTasks((items) => items.map((item) => (item.id === taskId ? { ...item, title } : item)));
+  }
+
+  function deleteConversation(taskId: string) {
+    const task = tasks.find((item) => item.id === taskId);
+    setTasks((items) => items.filter((item) => item.id !== taskId));
+    setConversationId(null);
+    if (task) setNotice(t("已删除对话“{title}”", { title: task.title }));
+  }
+
+  function scheduleConversation(taskId: string, schedule: TaskSchedule, time: string, day: Weekday) {
+    setTasks((items) =>
+      items.map((item) =>
+        item.id === taskId
+          ? {
+              ...item,
+              schedule,
+              scheduleTime: schedule === "仅运行一次" ? undefined : time,
+              scheduleDay: schedule === "每周" ? day : undefined,
+            }
+          : item,
+      ),
+    );
+    setNotice(
+      schedule === "仅运行一次"
+        ? t("不再重复运行")
+        : t("已设为{schedule}自动运行", { schedule: formatSchedule(schedule, time, day) }),
+    );
+  }
+
+  function openConversationOutput(taskId: string, path: string) {
+    openArtifact(outputArtifactId(taskId, path));
+  }
+
+  async function decideInConversation(sessionId: string, requestId: string, decision: ApprovalDecision) {
+    await workspaceProvider.approvals.decide(agentApprovalId(sessionId, requestId), decision);
+  }
+
+  const loadConversationThread = useMemo(
+    () => (taskId: string) => workspaceProvider.runtime.thread(taskId),
+    [],
+  );
+
+  /**
+   * 智能体没准备好时，新对话页上的一张卡片。不再有单独的引导：装好又登录了
+   * 就直接用；没有才在这里说清楚差哪一步。
+   */
+  const conversationAgent = runtimeAgents?.find((agent) => agent.id === runtimeAgentId) ?? null;
+  const usableAgent = runtimeAgents?.find((agent) => agent.installed && agent.signedIn !== false) ?? null;
+  const conversationNotice =
+    runtimeAgents === null ? null : !conversationAgent?.installed && !usableAgent ? (
+      <div className="conversation-ready" role="status">
+        <AlertTriangle size={16} aria-hidden="true" />
+        <span>
+          <strong>{t("这台电脑上还没有可用的智能体")}</strong>
+          <small>{t("Unzoo One 让智能体替你干活，需要先装一个，比如 Claude Code 或 Codex。装好后点“重新检查”。")}</small>
+        </span>
+        <span className="conversation-ready-actions">
+          <button type="button" onClick={() => openSettingsSection("agents")}>
+            {t("查看智能体")}
+          </button>
+          <button type="button" onClick={() => void checkRuntimeCapabilities(true)} disabled={runtimeChecking}>
+            <RefreshCw size={14} aria-hidden="true" className={runtimeChecking ? "is-spinning" : undefined} />
+            {t("重新检查")}
+          </button>
+        </span>
+      </div>
+    ) : conversationAgent && conversationAgent.installed && conversationAgent.signedIn === false ? (
+      <div className="conversation-ready" role="status">
+        <AlertTriangle size={16} aria-hidden="true" />
+        <span>
+          <strong>{t("先登录 {name}", { name: conversationAgent.name })}</strong>
+          <small>
+            {conversationAgent.signInCommand
+              ? t("在终端里运行下面的命令，按提示用浏览器登录，再回来点“重新检查”。")
+              : t("按 {name} 自己的说明登录，再回来点“重新检查”。", { name: conversationAgent.name })}
+          </small>
+          {conversationAgent.signInCommand && <code>{conversationAgent.signInCommand}</code>}
+        </span>
+        <span className="conversation-ready-actions">
+          {desktopApp && (
+            <button type="button" onClick={openTerminalFromPage}>
+              <SquareTerminal size={14} aria-hidden="true" />
+              {t("打开终端")}
+            </button>
+          )}
+          <button type="button" onClick={() => void checkRuntimeCapabilities(true)} disabled={runtimeChecking}>
+            <RefreshCw size={14} aria-hidden="true" className={runtimeChecking ? "is-spinning" : undefined} />
+            {t("重新检查")}
+          </button>
+        </span>
+      </div>
+    ) : null;
+
+  // 别处（收件箱、成果、通知）打开某个任务时，装好的产品里打开的是那段对话。
+  useEffect(() => {
+    if (!runtimeMode) return;
+    if (activeView === "tasks" || activeView === "activity") {
+      if (selectedTaskId) setConversationId(selectedTaskId);
+      setSelectedTaskId(null);
+      setActiveView("home");
+    }
+  }, [runtimeMode, activeView, selectedTaskId]);
 
   async function refreshFromRuntime() {
     try {
@@ -10038,7 +10236,7 @@ export default function HomePage() {
         </button>
 
         <nav className="clarity-nav">
-          {navItems.map((item) => (
+          {(runtimeMode ? runtimeNavItems : navItems).map((item) => (
             <button
               className={activeView === item.id ? "active" : ""}
               key={item.id}
@@ -10104,8 +10302,8 @@ export default function HomePage() {
           <button
             className="clarity-mobile-create"
             type="button"
-            aria-label={t("新建任务")}
-            title={t("新建任务")}
+            aria-label={runtimeMode ? t("新对话") : t("新建任务")}
+            title={runtimeMode ? t("新对话") : t("新建任务")}
             onClick={beginCreateTask}
           >
             <Plus size={19} />
@@ -10673,8 +10871,8 @@ export default function HomePage() {
               onClick={beginCreateTask}
             >
               <Plus size={17} />
-              
-              {t("新建任务")}
+
+              {runtimeMode ? t("新对话") : t("新建任务")}
             </button>
           </div>
         </header>
@@ -10920,7 +11118,36 @@ export default function HomePage() {
           />
         )}
 
-        {activeView === "home" && (
+        {activeView === "home" && runtimeMode && tasksReady && (
+          <Conversations
+            tasks={tasks}
+            selectedId={conversationId}
+            onSelect={setConversationId}
+            newNonce={conversationNonce}
+            onStart={startConversation}
+            onFollowUp={sendConversationFollowUp}
+            onStop={stopConversation}
+            onRename={renameConversation}
+            onDelete={deleteConversation}
+            onSchedule={scheduleConversation}
+            onOpenOutput={openConversationOutput}
+            onRevealFolder={
+              desktopApp
+                ? (path) =>
+                    void revealPath(path).catch((error: unknown) =>
+                      setNotice(t("打不开文件夹：{message}", { message: error instanceof Error ? error.message : String(error) })),
+                    )
+                : undefined
+            }
+            onDecide={decideInConversation}
+            loadThread={loadConversationThread}
+            scheduleLabel={formatTaskSchedule}
+            agentName={conversationAgent?.name}
+            notice={conversationNotice}
+          />
+        )}
+
+        {activeView === "home" && !runtimeMode && (
           <section className="home-view">
             {tasksReady && !onboardingDismissed && (
               <section

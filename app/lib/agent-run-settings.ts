@@ -17,7 +17,19 @@ export type AgentRunSettings = {
    * 的要求）。关掉则是托管：CLI 用自己的工具，但每次调用都先进收件箱。
    */
   governed: boolean;
+  /**
+   * 智能体不问人就能做多少（按网关的风险等级）：
+   * - cautious（谨慎）：只放行只读；
+   * - balanced（平衡，默认）：只读、工作文件夹里改文件、普通命令、在它自己的浏览器身份里操作；
+   * - autonomous（放手）：再加上对外发送。
+   * 删除、读取账号密钥、花钱任何一档都要人答。
+   */
+  autonomy: AgentAutonomy;
 };
+
+export type AgentAutonomy = "cautious" | "balanced" | "autonomous";
+
+export const agentAutonomyLevels: readonly AgentAutonomy[] = ["cautious", "balanced", "autonomous"];
 
 export const AGENT_RUN_SETTINGS_KEY = "unzoo-one.agent-run";
 
@@ -25,9 +37,10 @@ export const defaultAgentRunSettings: AgentRunSettings = {
   agent: "claude-code",
   cwd: "",
   governed: true,
+  autonomy: "balanced",
 };
 
-const knownAgents: readonly string[] = ["claude-code", "codex-cli", "opencode"];
+const knownAgents: readonly string[] = ["claude-code", "codex-cli", "opencode", "agy"];
 
 export function parseAgentRunSettings(text: string | null): AgentRunSettings {
   if (!text) return { ...defaultAgentRunSettings };
@@ -40,6 +53,9 @@ export function parseAgentRunSettings(text: string | null): AgentRunSettings {
           : defaultAgentRunSettings.agent,
       cwd: typeof raw.cwd === "string" ? raw.cwd.trim() : defaultAgentRunSettings.cwd,
       governed: typeof raw.governed === "boolean" ? raw.governed : defaultAgentRunSettings.governed,
+      autonomy: agentAutonomyLevels.includes(raw.autonomy as AgentAutonomy)
+        ? (raw.autonomy as AgentAutonomy)
+        : defaultAgentRunSettings.autonomy,
     };
   } catch {
     return { ...defaultAgentRunSettings };

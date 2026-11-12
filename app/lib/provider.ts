@@ -36,7 +36,7 @@
  */
 
 import type { AgentRunSettings } from "./agent-run-settings";
-import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeTaskPut } from "./runtime-tasks";
+import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeTaskPut, RuntimeThread } from "./runtime-tasks";
 import type {
   ActivityItem,
   ApprovalItem,
@@ -327,8 +327,19 @@ export interface RuntimeTaskPort {
   list(): Promise<RuntimeTask[]>;
   put(task: RuntimeTaskPut): Promise<void>;
   remove(id: string): Promise<void>;
-  /** 跑一次。continueFrom：接着那个会话原来的对话说。 */
-  run(input: { taskId: string; runId?: string; prompt?: string; continueFrom?: string }): Promise<RuntimeRun>;
+  /**
+   * 跑一次。continueFrom：接着那个会话原来的对话说。followUp：接着这个任务
+   * 自己的对话说（运行时找最近一次的会话；没有可接的就开新的）。
+   */
+  run(input: {
+    taskId: string;
+    runId?: string;
+    prompt?: string;
+    continueFrom?: string;
+    followUp?: boolean;
+  }): Promise<RuntimeRun>;
+  /** 这个任务的整段对话：每一轮说了什么、做了什么、答了什么，旧的在前。 */
+  thread(taskId: string): Promise<RuntimeThread>;
   /** 停掉正在跑的那次。没有在跑的返回 false。 */
   stop(taskId: string): Promise<boolean>;
   /** 这台机器上有哪些能力。 */

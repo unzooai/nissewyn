@@ -79,13 +79,14 @@ test("规则草稿：空串当作没给，不会生成只匹配空命令的规�
 });
 
 test("运行设置：坏数据退回默认，受管只给 Claude Code", () => {
-  const fallback = { agent: "claude-code", cwd: "", governed: true };
+  const fallback = { agent: "claude-code", cwd: "", governed: true, autonomy: "balanced" };
   assert.deepEqual(parseAgentRunSettings(null), fallback);
   assert.deepEqual(parseAgentRunSettings("{oops"), fallback);
   assert.deepEqual(parseAgentRunSettings('{"cwd":" C:\\\\w ","governed":false}'), {
     agent: "claude-code",
     cwd: "C:\\w",
     governed: false,
+    autonomy: "balanced",
   });
   assert.equal(parseAgentRunSettings('{"agent":"codex-cli"}').agent, "codex-cli");
   assert.equal(parseAgentRunSettings('{"agent":"rm -rf"}').agent, "claude-code", "不认识的 agent 退回默认");

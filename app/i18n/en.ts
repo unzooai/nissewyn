@@ -7,6 +7,7 @@ import { enPage6 } from "./en-page-6";
 import { enPage7 } from "./en-page-7";
 import { enPage8 } from "./en-page-8";
 import { enDemo } from "./en-demo";
+import { enPage9 } from "./en-page-9";
 
 /**
  * English, keyed by the Chinese source text (see ./index.ts).
@@ -15,6 +16,8 @@ import { enDemo } from "./en-demo";
  * fails on one that is missing. Keep `{placeholders}` identical.
  */
 export const en: Record<string, string> = {
+  // First, so a key an older catalog already translates keeps that wording.
+  ...enPage9,
   ...enPage1,
   ...enPage2,
   ...enPage3,

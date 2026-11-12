@@ -31,7 +31,7 @@ import {
 } from "./brain-events";
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
-import type { RuntimeOutputContent, RuntimeRun, RuntimeTask } from "./runtime-tasks";
+import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
 import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeCapabilities, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
@@ -311,14 +311,19 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       async remove(id) {
         await callUnterm("/api/console/tasks/delete", { id });
       },
-      async run({ taskId, runId, prompt, continueFrom }) {
+      async run({ taskId, runId, prompt, continueFrom, followUp }) {
         const data = await callUnterm<{ run: RuntimeRun }>("/api/console/tasks/run", {
           task_id: taskId,
           ...(runId ? { run_id: runId } : {}),
           ...(prompt ? { prompt } : {}),
           ...(continueFrom ? { continue_from: continueFrom } : {}),
+          ...(followUp ? { follow_up: true } : {}),
         });
         return data.run;
+      },
+      async thread(taskId) {
+        const data = await callUnterm<{ thread: RuntimeThread }>("/api/console/tasks/thread", { task_id: taskId });
+        return { ...data.thread, turns: data.thread.turns ?? [] };
       },
       async stop(taskId) {
         const data = await callUnterm<{ stopped?: boolean }>("/api/console/tasks/stop", { task_id: taskId });
