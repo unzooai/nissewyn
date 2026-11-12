@@ -54,7 +54,7 @@ export function RuntimeCapabilitiesPanel({
               {!capabilities
                 ? t("正在检查…")
                 : capabilities.terminal.governedReady
-                  ? t("受管模式下，智能体的每条命令都经这里执行，并先进收件箱。")
+                  ? t("受管模式下，智能体的命令都经这里执行；有风险的先进收件箱，你点头才做。")
                   : t("找不到 unterm-cli，受管模式用不了；请重新安装 Unzoo One。")}
             </small>
           </span>
@@ -78,7 +78,7 @@ export function RuntimeCapabilitiesPanel({
               {!capabilities
                 ? t("正在检查…")
                 : capabilities.browser.installed
-                  ? t("受管模式下，智能体用它打开和操作网页，每一步同样先进收件箱。")
+                  ? t("受管模式下，智能体用它打开和操作网页；上传、读取账号这类操作先进收件箱。")
                   : t("没有安装。受管模式下智能体就没有浏览器可用，只能用终端。")}
             </small>
           </span>

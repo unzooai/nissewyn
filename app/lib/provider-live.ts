@@ -16,10 +16,13 @@
 import { t } from "../i18n";
 import type { ConnectorCheckResult, ConnectorId } from "../types";
 import {
+  CONFIRMATION_SESSION,
+  confirmationToApprovalItem,
   isAgentApprovalId,
   parseAgentApprovalId,
   toApprovalItem,
   type RawAgentApproval,
+  type RawInputConfirmation,
 } from "./agent-approvals";
 import {
   agentForAdapter,
@@ -32,7 +35,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeSkill, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimeSkill, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -87,6 +90,20 @@ async function decideAgentApproval(id: string, decision: ApprovalDecision): Prom
   const parsed = parseAgentApprovalId(id);
   if (!parsed) throw new Error(t("不是托管会话的审批：{id}", { id }));
   answeredAgentApprovals.add(id);
+  if (parsed.sessionId === CONFIRMATION_SESSION) {
+    try {
+      await callUnterm("/api/approvals/decide", {
+        approval: `cfm_${parsed.requestId}`,
+        allowed: decision.kind === "approve",
+        // “记住”＝一直信任这个客户端到这个风险等级（unterm 记成一条授权，可撤销）。
+        ...(decision.kind === "approve" && decision.remember ? { remember: "agent" } : {}),
+      });
+    } catch (error) {
+      answeredAgentApprovals.delete(id);
+      throw error;
+    }
+    return;
+  }
   try {
     await callUnterm("/api/agent/decide", {
       session_id: parsed.sessionId,
@@ -144,11 +161,18 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       async live() {
         if (!inBrowser) return [];
         try {
-          const data = await getUnterm<{ approvals?: RawAgentApproval[] }>("/api/agent/approvals");
+          const [data, gate] = await Promise.all([
+            getUnterm<{ approvals?: RawAgentApproval[] }>("/api/agent/approvals"),
+            // 外部客户端经终端要写入的确认；老版本没有这个接口就当没有。
+            getUnterm<{ pending_input_confirmations?: RawInputConfirmation[] }>("/api/approvals").catch(() => ({
+              pending_input_confirmations: [] as RawInputConfirmation[],
+            })),
+          ]);
           const now = Date.now();
-          return (data.approvals ?? [])
-            .map((raw) => toApprovalItem(raw, now))
-            .filter((item) => !answeredAgentApprovals.has(item.id));
+          return [
+            ...(data.approvals ?? []).map((raw) => toApprovalItem(raw, now)),
+            ...(gate.pending_input_confirmations ?? []).map((raw) => confirmationToApprovalItem(raw, now)),
+          ].filter((item) => !answeredAgentApprovals.has(item.id));
         } catch {
           return [];
         }
@@ -397,6 +421,26 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       },
       async activateTab(tabId) {
         await callUnterm("/api/console/computer/tab/activate", { tab_id: tabId });
+      },
+      async clients(): Promise<RuntimeClients> {
+        const data = await getUnterm<{
+          server: string;
+          terminal_ready?: boolean;
+          browser_installed?: boolean;
+          clients?: RuntimeClient[];
+        }>("/api/console/clients");
+        return {
+          server: data.server,
+          terminalReady: data.terminal_ready === true,
+          browserInstalled: data.browser_installed === true,
+          clients: data.clients ?? [],
+        };
+      },
+      async connectClient(id, connect) {
+        await callUnterm("/api/console/clients/connect", { id, connect });
+      },
+      async setupBrowserForClients() {
+        await callUnterm("/api/console/clients/browser", {});
       },
       async skills() {
         const data = await getUnterm<{ skills?: RuntimeSkill[] }>("/api/console/skills");

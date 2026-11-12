@@ -35,7 +35,7 @@
 | 1 | 对话优先：对话即任务、追问续接、按风险自动放行、审批就地处理 | 完成（2026-11-12，实测见 3.5） |
 | 2 | 智能体的电脑：对话旁边实时显示它用的终端和浏览器，人可以接手 | 完成（2026-11-12，见 4.2） |
 | 3 | 技能：自带的终端/浏览器技能、统一管理、“存为技能” | 完成（2026-11-13，见 5.1） |
-| 4 | 对外提供 MCP：Claude 桌面版、Cursor 等接入 | 待做 |
+| 4 | 对外提供 MCP：Claude 桌面版、Cursor 等接入 | 完成（2026-11-13，见 6.1） |
 
 ## 3. 第 1 步：对话优先（详细设计）
 
@@ -264,6 +264,32 @@
 
 - 设置 › 接入：一键把 Unzoo One 的终端和浏览器 MCP 写进 Claude 桌面版、Claude Code、Cursor、Codex 的配置。
 - 外部客户端的调用照样经过网关、按自主程度放行、进收件箱、留审计。
+
+### 6.1 实现与实测（2026-11-13）
+
+- **审批进收件箱**：外部客户端经终端写入、或做无法撤销的操作时，运行时原来要在终端窗口里弹确认；没有窗口就直接拒绝。现在规则是：
+  - 有窗口，照旧问窗口；
+  - 没有窗口、但控制台 90 秒内取过待审批列表（`note_console_watching`），就把问题挂进本地队列，至少等 2 分钟；
+  - 控制台用 `approval.decide` 回答（只有进程内调用能答，外部智能体答不了自己的问题）；
+  - 两者都没有才拒绝。
+- **识别来源**：桥接程序（`unterm-cli mcp-stdio`）在握手时记下 MCP 的 `clientInfo`，第一次调用工具前发 `agent.identify`。收件箱里显示的是“Claude Desktop 请求在终端里执行”，不再是 anonymous；审计和“总是允许”也按客户端区分。
+- **一键接入**：设置 › 能力 › 接入其它 AI 客户端。
+  - 列出本机装了的 Claude Desktop、Claude Code、Cursor、Codex、Windsurf、Antigravity、Gemini CLI、OpenCode、Kimi、Qwen；
+  - 终端以产品名 `unzoo-one` 写进它们的 MCP 配置，或者移出：只动这一条，同一个桥接程序的旧条目一并去掉，经临时文件写入，配置坏了就报错、不覆盖；
+  - 浏览器的接入状态只读，“接入 Unzoo 浏览器”运行 Unzoo 自己的 `setup-mcp.ps1`：它会接入所有客户端，并备份后移除其它浏览器自动化工具，界面上写明了这一点。
+- **接口**：
+  - `GET /api/console/clients`；
+  - `POST /api/console/clients/connect {id, connect}`；
+  - `POST /api/console/clients/browser`；
+  - 控制台额外轮询 `GET /api/approvals` 取外部客户端的确认，用 `POST /api/approvals/decide` 回答。
+- **实测**（隔离服务，用临时家目录 `UNTERM_CLIENTS_HOME`，没碰真实配置）：
+  - 认到 Claude Desktop、Claude Code、Cursor、Codex 四个客户端；点“接入终端”后，Claude Desktop 的配置里多了 `unzoo-one`；
+  - 用这条配置里的命令模拟 Claude Desktop 执行 `echo`：请求进了收件箱，显示“Claude Desktop 请求在终端里执行”；
+  - 批准后命令执行并把结果返回；另一次点拒绝，客户端收到 refused，命令没执行。
+- **限制**：
+  - Unzoo One 没打开时，外部客户端第一次写入终端会被拒绝（没人能答）；
+  - 外部客户端在会话期间按 unterm 原有规则只问第一次写入和无法撤销的操作，不走对话里的“自主程度”；
+  - 网关的其它待批事项（如对外发送）还没进收件箱。
 
 ## 7. 智能体的浏览器身份（2026-11-12 定）
 

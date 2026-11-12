@@ -464,6 +464,15 @@ export function createMockProvider(): WorkspaceProvider {
       async skills() {
         return [];
       },
+      async clients() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async connectClient() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async setupBrowserForClients() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
       async setSkillEnabled() {
         throw new Error(t("演示版没有本机运行时"));
       },

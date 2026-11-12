@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  CONFIRMATION_SESSION,
+  clientLabel,
+  confirmationToApprovalItem,
   agentApprovalId,
   isAgentApprovalId,
   parseAgentApprovalId,
@@ -116,4 +119,29 @@ test("受管模式下经 MCP 的调用说人话：开终端、执行命令、打
     approval: { request_id: "r4", tool_call: { tool: "mcp__github__create_issue", arguments: { title: "x" } } },
   });
   assert.equal(other.title, "Claude Code wants to use create_issue from github");
+});
+
+test("an external client's terminal write becomes an inbox item that can be answered", () => {
+  const item = confirmationToApprovalItem({
+    id: 12,
+    request_id: "cfm_12",
+    agent: "claude-ai",
+    method: "exec.run",
+    input_preview: "npm test",
+    risk: "exec",
+    requested_at: new Date().toISOString(),
+    state: "pending",
+  });
+  assert.equal(item.id, agentApprovalId(CONFIRMATION_SESSION, "12"));
+  assert.ok(isAgentApprovalId(item.id), "polled and reconciled like the hosted ones");
+  assert.deepEqual(parseAgentApprovalId(item.id), { sessionId: "cfm", requestId: "12" });
+  assert.equal(item.target, "npm test");
+  assert.equal(item.risk, "中风险");
+  assert.match(item.title, /Claude Desktop/);
+
+  const destroy = confirmationToApprovalItem({ id: 13, request_id: "cfm_13", agent: "", method: "session.destroy", input_preview: "", risk: "destructive" });
+  assert.equal(destroy.risk, "高风险");
+  assert.equal(destroy.target, "session.destroy");
+  assert.equal(clientLabel("cursor"), "Cursor");
+  assert.equal(clientLabel("some-new-client"), "some-new-client");
 });

@@ -37,6 +37,67 @@ export function isAgentApprovalId(id: string): boolean {
   return id.startsWith(PREFIX);
 }
 
+/**
+ * 外部 AI 客户端（Claude 桌面版、Cursor…）经 Unzoo One 终端要写入时的确认：
+ * unterm 的 pending_input_confirmations 里的一条。没有终端窗口时由控制台来答。
+ */
+export type RawInputConfirmation = {
+  id: number;
+  request_id: string;
+  agent: string;
+  method: string;
+  input_preview: string;
+  risk: string;
+  requested_at?: string;
+  state?: string;
+};
+
+/** 外部客户端确认在收件箱里的“会话”名：不是 ags_ 开头，不会和托管会话撞。 */
+export const CONFIRMATION_SESSION = "cfm";
+
+const CLIENT_LABEL: Record<string, string> = {
+  "claude-ai": "Claude Desktop",
+  "claude-desktop": "Claude Desktop",
+  "claude-code": "Claude Code",
+  cursor: "Cursor",
+  "cursor-vscode": "Cursor",
+  codex: "Codex",
+  "codex-mcp-client": "Codex",
+  windsurf: "Windsurf",
+  gemini: "Gemini CLI",
+  "gemini-cli-mcp-client": "Gemini CLI",
+  opencode: "OpenCode",
+};
+
+export function clientLabel(agent: string): string {
+  const key = agent.trim().toLowerCase();
+  return CLIENT_LABEL[key] ?? (agent.trim() || t("外部客户端"));
+}
+
+/** 外部客户端的一条写入确认 → 收件箱里的一条审批。 */
+export function confirmationToApprovalItem(raw: RawInputConfirmation, now: number = Date.now()): ApprovalItem {
+  const agent = clientLabel(raw.agent);
+  const destructive = raw.risk === "destructive";
+  const typing = /^(exec\.|session\.input|session\.paste)/.test(raw.method);
+  const action = destructive ? t("执行无法撤销的操作") : typing ? t("在终端里执行") : t("使用终端的 {method}", { method: raw.method });
+  const target = raw.input_preview?.trim() || raw.method;
+  return {
+    id: agentApprovalId(CONFIRMATION_SESSION, String(raw.id)),
+    taskId: "",
+    title: t("{agent} 请求{action}", { agent, action }),
+    reason: t("{agent} 通过 Unzoo One 的终端要做这件事，做之前需要你确认。", { agent }),
+    impact: t("批准后会在本机执行：{target}", { target }),
+    action,
+    target,
+    scope: t("仅本次调用"),
+    risk: destructive ? "高风险" : "中风险",
+    requestedAt: relativeLabel(raw.requested_at, now),
+    expiresAt: t("约 2 分钟内不答复就不执行"),
+    policy: t("外部客户端：写入终端前询问"),
+    icon: Terminal,
+  };
+}
+
 /** 反解 id。会话 id 是 `ags_` 加十六进制，不含冒号；请求 id 可能含，所以只切第一个。 */
 export function parseAgentApprovalId(id: string): { sessionId: string; requestId: string } | null {
   if (!isAgentApprovalId(id)) return null;

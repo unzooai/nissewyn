@@ -358,6 +358,25 @@ export type RuntimeSkill = {
   path: string;
 };
 
+/** 这台机器上的一个 AI 客户端，以及它能不能用 Unzoo One 的终端和浏览器。 */
+export type RuntimeClient = {
+  id: string;
+  name: string;
+  detected: boolean;
+  config: string;
+  terminal: boolean;
+  browser: boolean;
+  error?: string;
+};
+
+export type RuntimeClients = {
+  /** 终端在客户端配置里的名字（产品名，如 unzoo-one）。 */
+  server: string;
+  terminalReady: boolean;
+  browserInstalled: boolean;
+  clients: RuntimeClient[];
+};
+
 export interface RuntimeTaskPort {
   available(): Promise<boolean>;
   list(): Promise<RuntimeTask[]>;
@@ -399,6 +418,12 @@ export interface RuntimeTaskPort {
   deleteSkill(name: string): Promise<RuntimeSkill[]>;
   /** 导入一个含 SKILL.md 的文件夹。 */
   importSkill(path: string, replace?: boolean): Promise<{ imported: string; skills: RuntimeSkill[] }>;
+  /** 本机的 AI 客户端（Claude 桌面版、Cursor、Codex…）接没接 Unzoo One。 */
+  clients(): Promise<RuntimeClients>;
+  /** 把 Unzoo One 的终端接入（或移出）某个客户端。 */
+  connectClient(id: string, connect: boolean): Promise<void>;
+  /** 运行 Unzoo 浏览器自己的接入程序（它会接入所有它认识的客户端）。 */
+  setupBrowserForClients(): Promise<void>;
   /** 读一次运行写下的一个文件（只能读运行记录里列出的）。 */
   output(input: { taskId: string; runId: string; path: string }): Promise<RuntimeOutputContent>;
   /** 运行时跑任务用的设置：交给哪个 agent、在哪个目录、是否受管。 */

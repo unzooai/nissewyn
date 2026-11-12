@@ -245,6 +245,7 @@ import { AgentRunPanel } from "./agent-run-panel";
 import { RuntimeFocusCard } from "./runtime-focus";
 import { Conversations } from "./conversations";
 import { SkillsPanel } from "./skills-panel";
+import { ClientsPanel } from "./clients-panel";
 import { RuntimeUsagePanel } from "./runtime-usage";
 import { RuntimeCapabilitiesPanel } from "./runtime-capabilities";
 import { autostartEnabled, inDesktopApp, openTerminal, revealPath, setAutostart } from "./lib/core-connection";
@@ -14157,6 +14158,7 @@ export default function HomePage() {
             </section>
 
             {runtimeMode ? (
+              <>
               <RuntimeCapabilitiesPanel
                 capabilities={runtimeCapabilities}
                 agents={runtimeAgents}
@@ -14166,6 +14168,8 @@ export default function HomePage() {
                 onOpenAgents={() => openSettingsSection("agents")}
                 onOpenTerminal={desktopApp ? openTerminalFromPage : undefined}
               />
+              <ClientsPanel runtime={workspaceProvider.runtime} notify={setNotice} />
+              </>
             ) : (
             <section
               className="settings-connectors-center"

@@ -239,4 +239,37 @@ export const enPage9: Record<string, string> = {
   "删除技能 {name}": "Delete skill {name}",
   "再点一次确认删除": "Click again to delete",
   "启用技能 {name}": "Enable skill {name}",
+
+  // Other AI clients
+  "已把 Unzoo One 的终端接入 {name}。重启 {name} 后生效。": "Unzoo One's terminal is now connected to {name}. Restart {name} for it to take effect.",
+  "已从 {name} 移除 Unzoo One 的终端": "Removed Unzoo One's terminal from {name}",
+  "Unzoo 浏览器已接入这些客户端。重启客户端后生效。": "Unzoo Browser is now connected to these clients. Restart them for it to take effect.",
+  "接入其它 AI 客户端": "Other AI clients",
+  "在 Claude 桌面版、Cursor、Codex 里也能用这台电脑": "Use this computer from Claude Desktop, Cursor and Codex too",
+  "接入后，你在那些客户端里用的智能体也能操作 Unzoo One 的终端和浏览器。它第一次往终端里写东西、以及任何删除这类无法撤销的操作，都会先进这里的收件箱等你确认；Unzoo One 没打开时，这些操作会被拒绝。":
+    "Once connected, the agents you use in those clients can work in Unzoo One's terminal and browser. The first time one writes to the terminal, and for anything that can't be undone, the request comes to this inbox for you to approve; while Unzoo One isn't open, those requests are refused.",
+  "读不到客户端：{error}": "Couldn't check the clients: {error}",
+  "这台电脑上没有找到能接入的 AI 客户端。": "No AI clients that can be connected were found on this computer.",
+  "配置文件有问题，没有改动：{error}": "Its config file has a problem, so nothing was changed: {error}",
+  "终端已接入": "Terminal connected",
+  "终端未接入": "Terminal not connected",
+  "浏览器已接入": "Browser connected",
+  "浏览器未接入": "Browser not connected",
+  "断开终端": "Disconnect terminal",
+  "接入终端": "Connect terminal",
+  "缺少 Unzoo One 的终端组件，重新安装 Unzoo One 可以修复。": "Unzoo One's terminal component is missing; reinstalling Unzoo One fixes this.",
+  "浏览器由 Unzoo 自己的接入程序配置：它会接入所有它认识的客户端，并把这些客户端里其它浏览器自动化工具的配置备份后移除。":
+    "The browser is set up by Unzoo's own installer: it connects every client it knows, and backs up and removes other browser-automation tools from those clients' settings.",
+  "正在接入…": "Connecting…",
+  "接入 Unzoo 浏览器": "Connect Unzoo Browser",
+  "外部客户端": "External client",
+  "执行无法撤销的操作": "do something that can't be undone",
+  "在终端里执行": "run in the terminal",
+  "{agent} 通过 Unzoo One 的终端要做这件事，做之前需要你确认。": "{agent} wants to do this through Unzoo One's terminal and needs your approval first.",
+  "约 2 分钟内不答复就不执行": "Not done unless answered within about 2 minutes",
+  "外部客户端：写入终端前询问": "External client: asks before writing to the terminal",
+  "受管模式下，智能体的命令都经这里执行；有风险的先进收件箱，你点头才做。":
+    "In governed mode, agents run their commands here; risky ones come to your inbox and wait for your yes.",
+  "受管模式下，智能体用它打开和操作网页；上传、读取账号这类操作先进收件箱。":
+    "In governed mode, agents open and use web pages with it; uploads and access to accounts come to your inbox first.",
 };
