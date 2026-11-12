@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   activityLine,
   activitySummary,
+  computerOf,
   conversationStatus,
   decisionLabel,
   inlinePieces,
@@ -11,6 +12,7 @@ import {
   replyBlocks,
   riskTone,
   sortConversations,
+  trimScreen,
 } from "../.test-build/conversation.mjs";
 import { parseAgentRunSettings } from "../.test-build/agent-run-settings.mjs";
 
@@ -100,4 +102,17 @@ test("autonomy defaults to balanced and refuses unknown levels", () => {
   // The runtime says browser_profile; the console keeps browserProfile.
   assert.equal(parseAgentRunSettings(JSON.stringify({ agent: "claude-code", browser_profile: " default " })).browserProfile, "default");
   assert.equal(parseAgentRunSettings(null).browserProfile, "");
+});
+
+test("the agent's computer lists every terminal and tab once, in the order first used", () => {
+  assert.deepEqual(
+    computerOf([
+      { terminals: ["5"], tabs: [] },
+      { terminals: ["5", "9"], tabs: ["77"] },
+      { terminals: [], tabs: ["77", "78"] },
+      {},
+    ]),
+    { terminals: ["5", "9"], tabs: ["77", "78"] },
+  );
+  assert.deepEqual(trimScreen(["PS C:\> dir   ", "a.txt", "", "   ", ""]), ["PS C:\> dir", "a.txt"]);
 });

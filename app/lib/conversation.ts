@@ -78,6 +78,24 @@ export function pendingQuestions(turn: RuntimeTurn): RuntimeActivity[] {
   return turn.activity.filter((item) => item.request_id && !item.decided_by);
 }
 
+/** 整段对话里智能体用过的终端和标签页，按第一次用到的先后。 */
+export function computerOf(turns: Pick<RuntimeTurn, "terminals" | "tabs">[]): { terminals: string[]; tabs: string[] } {
+  const terminals: string[] = [];
+  const tabs: string[] = [];
+  for (const turn of turns) {
+    for (const id of turn.terminals ?? []) if (!terminals.includes(id)) terminals.push(id);
+    for (const id of turn.tabs ?? []) if (!tabs.includes(id)) tabs.push(id);
+  }
+  return { terminals, tabs };
+}
+
+/** 终端画面去掉末尾的空行（屏幕下半截常常是空的）。 */
+export function trimScreen(lines: string[]): string[] {
+  let end = lines.length;
+  while (end > 0 && !lines[end - 1].trim()) end--;
+  return lines.slice(0, end).map((line) => line.replace(/\s+$/, ""));
+}
+
 /** 一件事，一行字。 */
 export function activityLine(item: RuntimeActivity): string {
   const target = item.target?.trim() ?? "";

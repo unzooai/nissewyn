@@ -32,7 +32,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -368,6 +368,34 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           error: data.error,
           reserveError: data.reserve_error ?? undefined,
         };
+      },
+      async terminalScreen(sessionId): Promise<TerminalScreen> {
+        const data = await callUnterm<{ session_id: string; lines?: string[]; cols?: number | null }>(
+          "/api/console/computer/terminal",
+          { session_id: sessionId },
+        );
+        return { sessionId: data.session_id, lines: data.lines ?? [], cols: data.cols ?? undefined };
+      },
+      async focusTerminal(sessionId) {
+        await callUnterm("/api/console/computer/terminal/focus", { session_id: sessionId });
+      },
+      async tabView(tabId): Promise<TabView> {
+        const data = await callUnterm<{
+          tab_id: string;
+          url?: string | null;
+          title?: string | null;
+          format?: string | null;
+          image_base64?: string | null;
+        }>("/api/console/computer/tab", { tab_id: tabId });
+        return {
+          tabId: data.tab_id,
+          url: data.url ?? undefined,
+          title: data.title ?? undefined,
+          image: data.image_base64 ? `data:image/${data.format || "png"};base64,${data.image_base64}` : undefined,
+        };
+      },
+      async activateTab(tabId) {
+        await callUnterm("/api/console/computer/tab/activate", { tab_id: tabId });
       },
       async output({ taskId, runId, path }): Promise<RuntimeOutputContent> {
         const { output } = await callUnterm<{

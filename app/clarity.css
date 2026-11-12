@@ -26414,3 +26414,223 @@ body {
 .conversation-ready-link:hover {
   filter: brightness(1.08);
 }
+
+/* ---- The agent's computer, beside the conversation --------------------- */
+.conversation-columns {
+  position: relative;
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+}
+
+.conversation-columns.with-computer {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 46%);
+}
+
+.conversation-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.computer-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--clarity-line);
+  background: var(--clarity-panel-soft);
+}
+
+.computer-panel > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--clarity-line);
+}
+
+.computer-panel > header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.computer-panel > header em {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--clarity-green-soft);
+  color: var(--clarity-green);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.computer-panel > header button {
+  margin-left: auto;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--clarity-soft);
+  cursor: pointer;
+}
+
+.computer-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 12px 0;
+}
+
+.computer-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--clarity-line);
+  border-radius: 7px;
+  background: var(--clarity-panel);
+  color: var(--clarity-soft);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.computer-tabs button.active {
+  border-color: var(--clarity-blue);
+  background: var(--clarity-blue-soft);
+  color: var(--clarity-blue);
+}
+
+.computer-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 10px 12px 12px;
+}
+
+.computer-terminal {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #15171c;
+  color: #d9dee6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow: auto;
+  white-space: pre;
+}
+
+.computer-address {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--clarity-line);
+  border-radius: 8px;
+  background: var(--clarity-panel);
+  color: var(--clarity-soft);
+  font-size: 12.5px;
+}
+
+.computer-address span,
+.computer-address small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.computer-address span {
+  flex: none;
+  max-width: 55%;
+  color: var(--clarity-ink);
+  font-weight: 600;
+}
+
+.computer-address small {
+  min-width: 0;
+  color: var(--clarity-muted);
+}
+
+.computer-shot {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  border: 1px solid var(--clarity-line);
+  border-radius: 8px;
+  background: #fff;
+  object-fit: contain;
+  object-position: top;
+}
+
+.computer-view footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.computer-view footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid var(--clarity-blue);
+  border-radius: 7px;
+  background: var(--clarity-panel);
+  color: var(--clarity-blue);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.computer-view footer small {
+  color: var(--clarity-muted);
+  font-size: 12px;
+}
+
+.computer-empty,
+.computer-loading,
+.computer-error {
+  margin: 0;
+  padding: 16px 12px;
+  color: var(--clarity-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.computer-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.computer-error {
+  padding: 0;
+  color: var(--clarity-red);
+}
+
+@media (max-width: 1180px) {
+  .conversation-columns.with-computer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .computer-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    width: min(100%, 440px);
+    box-shadow: -12px 0 32px rgba(24, 25, 28, 0.12);
+  }
+}

@@ -12,6 +12,7 @@ import {
   FolderOpen,
   LoaderCircle,
   MessageSquarePlus,
+  Monitor,
   MoreHorizontal,
   Repeat,
   ShieldAlert,
@@ -22,11 +23,13 @@ import {
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { TaskItem, TaskSchedule, Weekday } from "./types";
 import { dateLocale, t } from "./i18n";
-import type { ApprovalDecision } from "./lib/provider";
+import type { ApprovalDecision, TabView, TerminalScreen } from "./lib/provider";
+import { ComputerPanel } from "./computer-panel";
 import type { RuntimeActivity, RuntimeThread, RuntimeTurn } from "./lib/runtime-tasks";
 import {
   activityLine,
   activitySummary,
+  computerOf,
   conversationExamples,
   conversationStatus,
   conversationStatusLabel,
@@ -61,6 +64,11 @@ export type ConversationsProps = {
   onDecide: (sessionId: string, requestId: string, decision: ApprovalDecision) => Promise<void>;
   loadThread: (taskId: string) => Promise<RuntimeThread>;
   scheduleLabel: (task: TaskItem) => string;
+  /** 智能体的电脑：它用过的终端画面、网页截图，以及去真正的窗口里接手。 */
+  loadScreen: (sessionId: string) => Promise<TerminalScreen>;
+  loadTab: (tabId: string) => Promise<TabView>;
+  onOpenTerminal: (sessionId: string) => Promise<void>;
+  onShowTab: (tabId: string) => Promise<void>;
   /** 智能体还没准备好时的提示（没装、没登录）。 */
   notice?: ReactNode;
   agentName?: string;
@@ -283,6 +291,8 @@ function ConversationThread(props: ConversationsProps & { task: TaskItem }) {
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const input = useRef<HTMLTextAreaElement>(null);
+  /** 人开关过“电脑”面板就照人的来；null 是还没动过。 */
+  const [computerOpen, setComputerOpen] = useState<boolean | null>(null);
 
   const live = thread?.turns.some(turnLive) ?? false;
   const running = live || task.status === "运行中";
@@ -345,9 +355,27 @@ function ConversationThread(props: ConversationsProps & { task: TaskItem }) {
   }
 
   const turns = thread?.turns ?? [];
+  const computer = computerOf(turns);
+  const hasComputer = computer.terminals.length + computer.tabs.length > 0;
+  // 没人动过开关时：智能体一用终端或浏览器就打开，让人看得见它在做什么；
+  // 打开了就留着，不在这一轮结束时突然收起。
+  const autoOpen = computerOpen === null && hasComputer && live;
+  useEffect(() => {
+    if (autoOpen) setComputerOpen(true);
+  }, [autoOpen]);
+  const showComputer = computerOpen ?? autoOpen;
   return (
     <div className="conversation-thread">
-      <ThreadHeader {...props} thread={thread} onBack={() => onSelect(null)} />
+      <ThreadHeader
+        {...props}
+        thread={thread}
+        onBack={() => onSelect(null)}
+        computerOpen={showComputer}
+        computerCount={computer.terminals.length + computer.tabs.length}
+        onToggleComputer={() => setComputerOpen(!showComputer)}
+      />
+      <div className={`conversation-columns${showComputer ? " with-computer" : ""}`}>
+      <div className="conversation-column">
       <div
         className="conversation-scroll"
         ref={scroller}
@@ -401,6 +429,20 @@ function ConversationThread(props: ConversationsProps & { task: TaskItem }) {
           placeholder={running ? t("它在做的时候也可以先写下一句，做完再发") : t("接着说：追问、纠正，或者让它继续")}
         />
       </div>
+      </div>
+      {showComputer && (
+        <ComputerPanel
+          terminals={computer.terminals}
+          tabs={computer.tabs}
+          live={live}
+          loadScreen={props.loadScreen}
+          loadTab={props.loadTab}
+          onOpenTerminal={props.onOpenTerminal}
+          onShowTab={props.onShowTab}
+          onClose={() => setComputerOpen(false)}
+        />
+      )}
+      </div>
     </div>
   );
 }
@@ -414,7 +456,17 @@ function ThreadHeader({
   onSchedule,
   onRevealFolder,
   scheduleLabel,
-}: ConversationsProps & { task: TaskItem; thread: RuntimeThread | null; onBack: () => void }) {
+  computerOpen,
+  computerCount,
+  onToggleComputer,
+}: ConversationsProps & {
+  task: TaskItem;
+  thread: RuntimeThread | null;
+  onBack: () => void;
+  computerOpen: boolean;
+  computerCount: number;
+  onToggleComputer: () => void;
+}) {
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState(task.title);
   const [menu, setMenu] = useState<null | "repeat" | "more">(null);
@@ -468,6 +520,16 @@ function ThreadHeader({
             <span>{t("文件夹")}</span>
           </button>
         )}
+        <button
+          type="button"
+          className={computerOpen ? "is-on" : ""}
+          aria-pressed={computerOpen}
+          onClick={onToggleComputer}
+          title={t("智能体的电脑")}
+        >
+          <Monitor size={15} aria-hidden="true" />
+          <span>{computerCount ? t("电脑 · {count}", { count: computerCount }) : t("电脑")}</span>
+        </button>
         <button
           type="button"
           className={repeating ? "is-on" : ""}

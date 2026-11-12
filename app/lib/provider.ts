@@ -343,6 +343,12 @@ export type RuntimeBrowser = {
   reserveError?: string;
 };
 
+/** 智能体的一个终端此刻的画面。 */
+export type TerminalScreen = { sessionId: string; lines: string[]; cols?: number };
+
+/** 智能体的一个标签页此刻的样子。image 是可以直接放进 <img> 的 data URL。 */
+export type TabView = { tabId: string; url?: string; title?: string; image?: string };
+
 export interface RuntimeTaskPort {
   available(): Promise<boolean>;
   list(): Promise<RuntimeTask[]>;
@@ -367,6 +373,14 @@ export interface RuntimeTaskPort {
   capabilities(): Promise<RuntimeCapabilities>;
   /** 智能体的浏览器身份。读的时候，额度有空又没指定别的，运行时会把专用身份建好。 */
   browser(): Promise<RuntimeBrowser>;
+  /** 智能体用过的终端此刻的画面（只认对话记录里出现过的）。 */
+  terminalScreen(sessionId: string): Promise<TerminalScreen>;
+  /** 把智能体的终端切到 Unzoo One 终端窗口的前台，让人接手。 */
+  focusTerminal(sessionId: string): Promise<void>;
+  /** 智能体用过的标签页此刻的样子。 */
+  tabView(tabId: string): Promise<TabView>;
+  /** 把智能体的标签页切到 Unzoo 浏览器的前台。 */
+  activateTab(tabId: string): Promise<void>;
   /** 读一次运行写下的一个文件（只能读运行记录里列出的）。 */
   output(input: { taskId: string; runId: string; path: string }): Promise<RuntimeOutputContent>;
   /** 运行时跑任务用的设置：交给哪个 agent、在哪个目录、是否受管。 */

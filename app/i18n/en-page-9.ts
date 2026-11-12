@@ -177,4 +177,30 @@ export const enPage9: Record<string, string> = {
   "Unzoo {plan} 版的 {max} 个身份已经用满，建不了智能体的专用身份。可以选一个现有身份给它用（它会用里面已登录的账号），或者升级 Unzoo。不用浏览器的事照样能做。":
     "All {max} profiles of your Unzoo {plan} plan are in use, so the agent's own profile can't be created. Choose an existing profile for it (it will use the accounts signed in there), or upgrade Unzoo. Work that doesn't need a browser still runs.",
   "选一个身份": "Choose a profile",
+
+  // The agent's computer
+  "智能体的电脑": "Agent's computer",
+  "实时": "Live",
+  "收起": "Hide",
+  "这段对话里智能体还没有用过终端或浏览器。它一用，就会出现在这里。":
+    "The agent hasn't used a terminal or browser in this conversation yet. When it does, you'll see it here.",
+  "它用过的终端和网页": "Terminals and pages it used",
+  "终端 {n}": "Terminal {n}",
+  "网页 {n}": "Page {n}",
+  "网页": "Page",
+  "读不到这个终端：{message}": "Couldn't read this terminal: {message}",
+  "正在读取": "Loading",
+  "终端画面": "Terminal screen",
+  "（屏幕是空的）": "(the screen is empty)",
+  "在终端里打开": "Open in terminal",
+  "在终端窗口里可以直接输入，接手它正在做的事。": "Type in the terminal window to take over what it's doing.",
+  "（没有标题）": "(no title)",
+  "读不到这个网页：{message}": "Couldn't read this page: {message}",
+  "智能体看到的网页": "The page the agent sees",
+  "这个网页没有截到图。": "No screenshot of this page.",
+  "在浏览器里打开": "Open in browser",
+  "要登录、过验证码或自己点几下，就在浏览器里接手。": "To sign in, solve a captcha or click around yourself, take over in the browser.",
+  "电脑 · {count}": "Computer · {count}",
+  "电脑": "Computer",
+  "先打开 Unzoo One 的终端窗口，再点一次。({message})": "Open the Unzoo One terminal window first, then click again. ({message})",
 };

@@ -69,6 +69,10 @@ export type RuntimeTurn = RuntimeRun & {
   activity: RuntimeActivity[];
   /** 追问时有：true 接上了原来的对话，false 没有可接的、开了新的。 */
   continued?: boolean | null;
+  /** 这一轮里智能体用过的终端会话（Unzoo One 终端的 id）。 */
+  terminals: string[];
+  /** 这一轮里智能体用过的 Unzoo 浏览器标签页。 */
+  tabs: string[];
 };
 
 /** 一个任务作为一段对话。 */

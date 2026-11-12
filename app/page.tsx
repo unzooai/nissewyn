@@ -9797,6 +9797,38 @@ export default function HomePage() {
     openArtifact(outputArtifactId(taskId, path));
   }
 
+  /**
+   * 在 Unzoo One 终端里接手智能体的终端。智能体开的会话住在后台服务里，
+   * 终端窗口打开时会把没人管的会话收下；窗口还没开（桌面版）就先开一扇，
+   * 再把这个会话切到前台。
+   */
+  async function openAgentTerminal(sessionId: string) {
+    try {
+      await workspaceProvider.runtime.focusTerminal(sessionId);
+      return;
+    } catch (error) {
+      if (!desktopApp) {
+        throw new Error(
+          t("先打开 Unzoo One 的终端窗口，再点一次。({message})", {
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }
+    }
+    await openTerminal();
+    let last: unknown = null;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await new Promise((resolve) => window.setTimeout(resolve, 800));
+      try {
+        await workspaceProvider.runtime.focusTerminal(sessionId);
+        return;
+      } catch (error) {
+        last = error;
+      }
+    }
+    throw last instanceof Error ? last : new Error(String(last));
+  }
+
   async function decideInConversation(sessionId: string, requestId: string, decision: ApprovalDecision) {
     await workspaceProvider.approvals.decide(agentApprovalId(sessionId, requestId), decision);
   }
@@ -11167,6 +11199,10 @@ export default function HomePage() {
             }
             onDecide={decideInConversation}
             loadThread={loadConversationThread}
+            loadScreen={(sessionId) => workspaceProvider.runtime.terminalScreen(sessionId)}
+            loadTab={(tabId) => workspaceProvider.runtime.tabView(tabId)}
+            onOpenTerminal={openAgentTerminal}
+            onShowTab={(tabId) => workspaceProvider.runtime.activateTab(tabId)}
             scheduleLabel={formatTaskSchedule}
             agentName={conversationAgent?.name}
             notice={conversationNotice}
