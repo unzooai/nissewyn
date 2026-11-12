@@ -322,6 +322,27 @@ export type RuntimeCapabilities = {
   browser: { installed: boolean; path?: string };
 };
 
+/** 智能体用的 Unzoo 浏览器：套餐、身份，以及它用哪个。 */
+export type RuntimeBrowser = {
+  installed: boolean;
+  /** Unzoo 在运行、答得上话。 */
+  reachable: boolean;
+  plan?: string;
+  maxProfiles?: number;
+  profiles: { id: string; name: string }[];
+  /** Unzoo One 给智能体预留的身份。 */
+  reservedProfile: string;
+  reserved: boolean;
+  /** 设置里指定的身份；没指定是 null。 */
+  chosen: string | null;
+  /** 指定的身份已经不在了。 */
+  chosenMissing: boolean;
+  /** 智能体现在能用浏览器。 */
+  ready: boolean;
+  error?: string;
+  reserveError?: string;
+};
+
 export interface RuntimeTaskPort {
   available(): Promise<boolean>;
   list(): Promise<RuntimeTask[]>;
@@ -344,6 +365,8 @@ export interface RuntimeTaskPort {
   stop(taskId: string): Promise<boolean>;
   /** 这台机器上有哪些能力。 */
   capabilities(): Promise<RuntimeCapabilities>;
+  /** 智能体的浏览器身份。读的时候，额度有空又没指定别的，运行时会把专用身份建好。 */
+  browser(): Promise<RuntimeBrowser>;
   /** 读一次运行写下的一个文件（只能读运行记录里列出的）。 */
   output(input: { taskId: string; runId: string; path: string }): Promise<RuntimeOutputContent>;
   /** 运行时跑任务用的设置：交给哪个 agent、在哪个目录、是否受管。 */

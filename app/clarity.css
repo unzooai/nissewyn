@@ -26373,3 +26373,44 @@ body {
     flex-wrap: wrap;
   }
 }
+
+/* Settings > agents > browser profile; the matching card on a new conversation */
+.agent-browser > span:first-child {
+  display: grid;
+  gap: 6px;
+}
+
+.agent-browser strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-browser .agent-run-select {
+  max-width: 360px;
+}
+
+.agent-browser-note {
+  color: var(--clarity-amber);
+}
+
+.agent-browser-upgrade,
+.conversation-ready-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid var(--clarity-blue);
+  border-radius: 7px;
+  background: var(--clarity-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.agent-browser-upgrade:hover,
+.conversation-ready-link:hover {
+  filter: brightness(1.08);
+}

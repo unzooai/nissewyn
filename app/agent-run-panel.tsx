@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, FolderOpen, KeyRound, Plus, RefreshCw, ShieldCheck, SquareTerminal, Trash2 } from "lucide-react";
+import { Bot, FolderOpen, Globe2, KeyRound, Plus, RefreshCw, ShieldCheck, SquareTerminal, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   agentAutonomyLevels,
@@ -10,7 +10,7 @@ import {
   type AgentAutonomy,
   type AgentRunSettings,
 } from "./lib/agent-run-settings";
-import type { AgentRule, AgentRulePort, BrainAgent, BrainPort, RuntimeTaskPort } from "./lib/provider";
+import type { AgentRule, AgentRulePort, BrainAgent, BrainPort, RuntimeBrowser, RuntimeTaskPort } from "./lib/provider";
 import { t } from "./i18n";
 
 /**
@@ -32,7 +32,7 @@ export function AgentRunPanel({
    * 有本机运行时就存在运行时里：定时任务在没有页面的时候也要知道交给谁、
    * 在哪个目录跑。没有（演示版）就存在这个浏览器里。
    */
-  runtime?: Pick<RuntimeTaskPort, "settings" | "saveSettings"> | null;
+  runtime?: Pick<RuntimeTaskPort, "settings" | "saveSettings" | "browser"> | null;
   notify: (message: string) => void;
   /** 桌面版：打开终端去登录。 */
   openTerminal?: () => void;
@@ -50,6 +50,26 @@ export function AgentRunPanel({
   const [decision, setDecision] = useState<"allow" | "deny">("deny");
   const [scoped, setScoped] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [browser, setBrowser] = useState<RuntimeBrowser | null>(null);
+  const [browserError, setBrowserError] = useState<string | null>(null);
+  const [browserChecking, setBrowserChecking] = useState(false);
+
+  const loadBrowser = useCallback(async () => {
+    if (!runtime) return;
+    setBrowserChecking(true);
+    try {
+      setBrowser(await runtime.browser());
+      setBrowserError(null);
+    } catch (error) {
+      setBrowserError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBrowserChecking(false);
+    }
+  }, [runtime]);
+
+  useEffect(() => {
+    void loadBrowser();
+  }, [loadBrowser]);
 
   // 存储只在浏览器里有，挂载后再读，免得和服务端渲染的首屏对不上。
   useEffect(() => {
@@ -338,6 +358,66 @@ export function AgentRunPanel({
         </fieldset>
       )}
 
+      {runtime && (
+        <div className="setting-row agent-browser">
+          <span>
+            <strong>
+              <Globe2 size={14} aria-hidden="true" /> {t("浏览器身份")}
+            </strong>
+            <small>{browserSummary(browser, browserError)}</small>
+            {browser?.reachable && (
+              <span className="agent-run-input agent-run-select">
+                <select
+                  aria-label={t("智能体用哪个浏览器身份")}
+                  value={settings.browserProfile}
+                  onChange={(event) => {
+                    const browserProfile = event.target.value;
+                    const name = browser.profiles.find((p) => p.id === browserProfile)?.name;
+                    save(
+                      { ...settings, browserProfile },
+                      browserProfile
+                        ? t("智能体改用浏览器身份“{name}”", { name: name ?? browserProfile })
+                        : t("智能体改用 Unzoo One 的专用身份"),
+                    );
+                    window.setTimeout(() => void loadBrowser(), 300);
+                  }}
+                >
+                  <option value="">
+                    {browser.reserved ? t("Unzoo One 专用身份") : t("Unzoo One 专用身份（还没有建）")}
+                  </option>
+                  {browser.profiles
+                    .filter((profile) => profile.id !== browser.reservedProfile)
+                    .map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  {settings.browserProfile && !browser.profiles.some((p) => p.id === settings.browserProfile) && (
+                    <option value={settings.browserProfile}>{t("{name}（已不在）", { name: settings.browserProfile })}</option>
+                  )}
+                </select>
+              </span>
+            )}
+            {settings.browserProfile && browser?.reachable && (
+              <small className="agent-browser-note">
+                {t("智能体会用这个身份里已登录的账号。它只在自己新开的标签页里操作，不碰你开着的页面。")}
+              </small>
+            )}
+          </span>
+          <span className="agent-run-signin-actions">
+            {browser?.reachable && !browser.ready && (
+              <a className="agent-browser-upgrade" href="https://unzoo.ai/#pricing" target="_blank" rel="noreferrer">
+                {t("升级 Unzoo")}
+              </a>
+            )}
+            <button type="button" onClick={() => void loadBrowser()} disabled={browserChecking}>
+              <RefreshCw size={14} aria-hidden="true" className={browserChecking ? "is-spinning" : undefined} />
+              {t("重新检查")}
+            </button>
+          </span>
+        </div>
+      )}
+
       <section className="agent-rules" aria-label={t("常设规则")}>
         <header>
           <span>
@@ -425,6 +505,25 @@ export function AgentRunPanel({
       </section>
     </div>
   );
+}
+
+/** 浏览器身份那一行的说明。 */
+function browserSummary(browser: RuntimeBrowser | null, error: string | null): string {
+  if (error) return t("读不到浏览器的情况：{error}", { error });
+  if (!browser) return t("正在读取…");
+  if (!browser.installed) return t("这台电脑没有装 Unzoo 浏览器，智能体打不开网页。");
+  if (!browser.reachable) return t("Unzoo 浏览器没有在运行。打开它后点“重新检查”。");
+  const plan =
+    browser.maxProfiles !== undefined
+      ? t("Unzoo {plan} 版，身份 {used}/{max}。", { plan: browser.plan ?? "", used: browser.profiles.length, max: browser.maxProfiles })
+      : "";
+  if (browser.chosen) {
+    return browser.chosenMissing
+      ? t("{plan}指定的身份已经不在了，换一个。", { plan })
+      : t("{plan}智能体用你指定的身份上网。", { plan });
+  }
+  if (browser.reserved) return t("{plan}智能体有自己的专用身份，和你的浏览器互不干扰。", { plan });
+  return t("{plan}身份已用满，建不了智能体的专用身份。选一个现有身份给它用，或者升级 Unzoo。", { plan });
 }
 
 function autonomyName(level: AgentAutonomy): string {

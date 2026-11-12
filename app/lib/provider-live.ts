@@ -32,7 +32,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeCapabilities, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -339,6 +339,36 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           browser: { installed: data.browser?.installed === true, path: data.browser?.path ?? undefined },
         };
       },
+      async browser(): Promise<RuntimeBrowser> {
+        const data = await getUnterm<{
+          installed?: boolean;
+          reachable?: boolean;
+          plan?: string | null;
+          max_profiles?: number | null;
+          profiles?: { id: string; name: string }[];
+          reserved_profile?: string;
+          reserved?: boolean;
+          chosen?: string | null;
+          chosen_missing?: boolean;
+          ready?: boolean;
+          error?: string;
+          reserve_error?: string | null;
+        }>("/api/console/browser");
+        return {
+          installed: data.installed === true,
+          reachable: data.reachable === true,
+          plan: data.plan ?? undefined,
+          maxProfiles: data.max_profiles ?? undefined,
+          profiles: data.profiles ?? [],
+          reservedProfile: data.reserved_profile ?? "mcp-unzoo-one-agent",
+          reserved: data.reserved === true,
+          chosen: data.chosen ?? null,
+          chosenMissing: data.chosen_missing === true,
+          ready: data.ready === true,
+          error: data.error,
+          reserveError: data.reserve_error ?? undefined,
+        };
+      },
       async output({ taskId, runId, path }): Promise<RuntimeOutputContent> {
         const { output } = await callUnterm<{
           output: { path: string; absolute_path: string; size: number; truncated: boolean; binary: boolean; text: string | null };
@@ -357,7 +387,13 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
         return parseAgentRunSettings(JSON.stringify(data.settings));
       },
       async saveSettings(settings) {
-        const data = await callUnterm<{ settings: Record<string, unknown> }>("/api/console/run-settings", settings);
+        const data = await callUnterm<{ settings: Record<string, unknown> }>("/api/console/run-settings", {
+          agent: settings.agent,
+          cwd: settings.cwd,
+          governed: settings.governed,
+          autonomy: settings.autonomy,
+          browser_profile: settings.browserProfile,
+        });
         return parseAgentRunSettings(JSON.stringify(data.settings));
       },
     },

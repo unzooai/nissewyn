@@ -150,4 +150,31 @@ export const enPage9: Record<string, string> = {
   "不再重复运行": "No longer repeats",
   "已设为{schedule}自动运行": "Set to run {schedule}",
   "打不开文件夹：{message}": "Couldn't open the folder: {message}",
+
+  // Settings › agents › browser profile, and the card on a new conversation
+  "浏览器身份": "Browser profile",
+  "智能体用哪个浏览器身份": "Which browser profile the agent uses",
+  "智能体改用浏览器身份“{name}”": "The agent now browses as “{name}”",
+  "智能体改用 Unzoo One 的专用身份": "The agent now uses its own Unzoo One profile",
+  "Unzoo One 专用身份": "Unzoo One's own profile",
+  "Unzoo One 专用身份（还没有建）": "Unzoo One's own profile (not created yet)",
+  "{name}（已不在）": "{name} (no longer exists)",
+  "智能体会用这个身份里已登录的账号。它只在自己新开的标签页里操作，不碰你开着的页面。":
+    "The agent will use the accounts signed in to this profile. It works only in tabs it opens itself and leaves yours alone.",
+  "升级 Unzoo": "Upgrade Unzoo",
+  "读不到浏览器的情况：{error}": "Couldn't check the browser: {error}",
+  "这台电脑没有装 Unzoo 浏览器，智能体打不开网页。": "Unzoo Browser isn't installed on this computer, so the agent can't open web pages.",
+  "Unzoo 浏览器没有在运行。打开它后点“重新检查”。": "Unzoo Browser isn't running. Open it, then click “Check again”.",
+  "Unzoo {plan} 版，身份 {used}/{max}。": "Unzoo {plan} plan, {used}/{max} profiles. ",
+  "{plan}指定的身份已经不在了，换一个。": "{plan}The chosen profile no longer exists; pick another.",
+  "{plan}智能体用你指定的身份上网。": "{plan}The agent browses in the profile you chose.",
+  "{plan}智能体有自己的专用身份，和你的浏览器互不干扰。": "{plan}The agent has its own profile and stays out of your browsing.",
+  "{plan}身份已用满，建不了智能体的专用身份。选一个现有身份给它用，或者升级 Unzoo。":
+    "{plan}All profiles are in use, so the agent's own can't be created. Choose an existing profile for it, or upgrade Unzoo.",
+  "智能体还没有浏览器身份": "The agent has no browser profile yet",
+  "设置里指定的浏览器身份已经不在了。换一个，智能体才能打开网页。":
+    "The browser profile chosen in Settings no longer exists. Choose another so the agent can open web pages.",
+  "Unzoo {plan} 版的 {max} 个身份已经用满，建不了智能体的专用身份。可以选一个现有身份给它用（它会用里面已登录的账号），或者升级 Unzoo。不用浏览器的事照样能做。":
+    "All {max} profiles of your Unzoo {plan} plan are in use, so the agent's own profile can't be created. Choose an existing profile for it (it will use the accounts signed in there), or upgrade Unzoo. Work that doesn't need a browser still runs.",
+  "选一个身份": "Choose a profile",
 };

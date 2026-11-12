@@ -97,4 +97,7 @@ test("autonomy defaults to balanced and refuses unknown levels", () => {
   assert.equal(parseAgentRunSettings(JSON.stringify({ agent: "claude-code", autonomy: "autonomous" })).autonomy, "autonomous");
   assert.equal(parseAgentRunSettings(JSON.stringify({ agent: "claude-code", autonomy: "yolo" })).autonomy, "balanced");
   assert.equal(parseAgentRunSettings(JSON.stringify({ agent: "agy" })).agent, "agy");
+  // The runtime says browser_profile; the console keeps browserProfile.
+  assert.equal(parseAgentRunSettings(JSON.stringify({ agent: "claude-code", browser_profile: " default " })).browserProfile, "default");
+  assert.equal(parseAgentRunSettings(null).browserProfile, "");
 });

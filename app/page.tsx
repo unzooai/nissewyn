@@ -225,7 +225,7 @@ import {
   teamRoleDetails,
   teamSeatLimit,
 } from "./data/mock";
-import type { ApprovalDecision, BrainAgent, BrainEvent, RuntimeCapabilities } from "./lib/provider";
+import type { ApprovalDecision, BrainAgent, BrainEvent, RuntimeBrowser, RuntimeCapabilities } from "./lib/provider";
 import { brainModeFor, readAgentRunSettings } from "./lib/agent-run-settings";
 import { turnOutcome } from "./lib/brain-events";
 import {
@@ -1592,6 +1592,7 @@ export default function HomePage() {
   const [runtimeCapabilities, setRuntimeCapabilities] = useState<RuntimeCapabilities | null>(null);
   const [runtimeCapabilitiesError, setRuntimeCapabilitiesError] = useState<string | null>(null);
   const [runtimeChecking, setRuntimeChecking] = useState(false);
+  const [runtimeBrowser, setRuntimeBrowser] = useState<RuntimeBrowser | null>(null);
   const runtimeUsage = useMemo(() => (runtimeSnapshot ? usageSummary(runtimeSnapshot) : null), [runtimeSnapshot]);
   // 设置的各节，按单机版说：没有团队；用量是 token；连接器是本机能力。
   const visibleSettingsSections = runtimeMode
@@ -9854,6 +9855,29 @@ export default function HomePage() {
           </button>
         </span>
       </div>
+    ) : runtimeBrowser?.reachable && !runtimeBrowser.ready ? (
+      <div className="conversation-ready" role="status">
+        <AlertTriangle size={16} aria-hidden="true" />
+        <span>
+          <strong>{t("智能体还没有浏览器身份")}</strong>
+          <small>
+            {runtimeBrowser.chosenMissing
+              ? t("设置里指定的浏览器身份已经不在了。换一个，智能体才能打开网页。")
+              : t("Unzoo {plan} 版的 {max} 个身份已经用满，建不了智能体的专用身份。可以选一个现有身份给它用（它会用里面已登录的账号），或者升级 Unzoo。不用浏览器的事照样能做。", {
+                  plan: runtimeBrowser.plan ?? "",
+                  max: runtimeBrowser.maxProfiles ?? runtimeBrowser.profiles.length,
+                })}
+          </small>
+        </span>
+        <span className="conversation-ready-actions">
+          <button type="button" onClick={() => openSettingsSection("agents")}>
+            {t("选一个身份")}
+          </button>
+          <a className="conversation-ready-link" href="https://unzoo.ai/#pricing" target="_blank" rel="noreferrer">
+            {t("升级 Unzoo")}
+          </a>
+        </span>
+      </div>
     ) : null;
 
   // 别处（收件箱、成果、通知）打开某个任务时，装好的产品里打开的是那段对话。
@@ -9937,10 +9961,12 @@ export default function HomePage() {
     void Promise.all([
       workspaceProvider.brain.agents().catch(() => [] as BrainAgent[]),
       workspaceProvider.runtime.settings().catch(() => null),
-    ]).then(([agents, runSettings]) => {
+      workspaceProvider.runtime.browser().catch(() => null),
+    ]).then(([agents, runSettings, browser]) => {
       if (!live) return;
       if (agents) setRuntimeAgents(agents.filter((agent) => agent.hosted));
       if (runSettings) setRuntimeAgentId(runSettings.agent);
+      setRuntimeBrowser(browser);
     });
     return () => {
       live = false;

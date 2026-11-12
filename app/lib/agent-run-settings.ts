@@ -25,6 +25,11 @@ export type AgentRunSettings = {
    * 删除、读取账号密钥、花钱任何一档都要人答。
    */
   autonomy: AgentAutonomy;
+  /**
+   * 智能体在 Unzoo 浏览器里用哪个身份。空串：Unzoo One 给它预留的专用身份；
+   * 也可以指定一个现有身份（比如登录了你账号的那个）。
+   */
+  browserProfile: string;
 };
 
 export type AgentAutonomy = "cautious" | "balanced" | "autonomous";
@@ -38,6 +43,7 @@ export const defaultAgentRunSettings: AgentRunSettings = {
   cwd: "",
   governed: true,
   autonomy: "balanced",
+  browserProfile: "",
 };
 
 const knownAgents: readonly string[] = ["claude-code", "codex-cli", "opencode", "agy"];
@@ -45,7 +51,8 @@ const knownAgents: readonly string[] = ["claude-code", "codex-cli", "opencode", 
 export function parseAgentRunSettings(text: string | null): AgentRunSettings {
   if (!text) return { ...defaultAgentRunSettings };
   try {
-    const raw = JSON.parse(text) as Partial<AgentRunSettings>;
+    const raw = JSON.parse(text) as Partial<AgentRunSettings> & { browser_profile?: unknown };
+    const browserProfile = raw.browserProfile ?? raw.browser_profile;
     return {
       agent:
         typeof raw.agent === "string" && knownAgents.includes(raw.agent)
@@ -56,6 +63,7 @@ export function parseAgentRunSettings(text: string | null): AgentRunSettings {
       autonomy: agentAutonomyLevels.includes(raw.autonomy as AgentAutonomy)
         ? (raw.autonomy as AgentAutonomy)
         : defaultAgentRunSettings.autonomy,
+      browserProfile: typeof browserProfile === "string" ? browserProfile.trim() : "",
     };
   } catch {
     return { ...defaultAgentRunSettings };
