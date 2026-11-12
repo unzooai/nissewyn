@@ -461,6 +461,18 @@ export function createMockProvider(): WorkspaceProvider {
       async activateTab() {
         throw new Error(t("演示版没有本机运行时"));
       },
+      async skills() {
+        return [];
+      },
+      async setSkillEnabled() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async deleteSkill() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async importSkill() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
       async settings() {
         throw new Error(t("演示版没有本机运行时"));
       },

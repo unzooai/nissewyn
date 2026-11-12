@@ -73,6 +73,12 @@ export type RuntimeTurn = RuntimeRun & {
   terminals: string[];
   /** 这一轮里智能体用过的 Unzoo 浏览器标签页。 */
   tabs: string[];
+  /** save_skill：这一轮是“把对话存为技能”。 */
+  purpose?: string | null;
+  /** 存成的技能名。 */
+  saved_skills?: string[] | null;
+  /** 没存成的原因。 */
+  skill_error?: string | null;
 };
 
 /** 一个任务作为一段对话。 */

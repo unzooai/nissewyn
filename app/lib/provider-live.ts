@@ -32,7 +32,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeSkill, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -311,13 +311,14 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       async remove(id) {
         await callUnterm("/api/console/tasks/delete", { id });
       },
-      async run({ taskId, runId, prompt, continueFrom, followUp }) {
+      async run({ taskId, runId, prompt, continueFrom, followUp, saveSkill }) {
         const data = await callUnterm<{ run: RuntimeRun }>("/api/console/tasks/run", {
           task_id: taskId,
           ...(runId ? { run_id: runId } : {}),
           ...(prompt ? { prompt } : {}),
           ...(continueFrom ? { continue_from: continueFrom } : {}),
           ...(followUp ? { follow_up: true } : {}),
+          ...(saveSkill ? { save_skill: true } : {}),
         });
         return data.run;
       },
@@ -396,6 +397,25 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       },
       async activateTab(tabId) {
         await callUnterm("/api/console/computer/tab/activate", { tab_id: tabId });
+      },
+      async skills() {
+        const data = await getUnterm<{ skills?: RuntimeSkill[] }>("/api/console/skills");
+        return data.skills ?? [];
+      },
+      async setSkillEnabled(name, enabled) {
+        const data = await callUnterm<{ skills?: RuntimeSkill[] }>("/api/console/skills/toggle", { name, enabled });
+        return data.skills ?? [];
+      },
+      async deleteSkill(name) {
+        const data = await callUnterm<{ skills?: RuntimeSkill[] }>("/api/console/skills/delete", { name });
+        return data.skills ?? [];
+      },
+      async importSkill(path, replace) {
+        const data = await callUnterm<{ imported: string; skills?: RuntimeSkill[] }>("/api/console/skills/import", {
+          path,
+          ...(replace ? { replace: true } : {}),
+        });
+        return { imported: data.imported, skills: data.skills ?? [] };
       },
       async output({ taskId, runId, path }): Promise<RuntimeOutputContent> {
         const { output } = await callUnterm<{

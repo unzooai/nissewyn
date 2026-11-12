@@ -46,7 +46,10 @@
       "payload/defaults/unterm.conf": "defaults/unterm.conf",
       "payload/assets/fonts/SymbolsNerdFontMono-Regular.ttf": "assets/fonts/SymbolsNerdFontMono-Regular.ttf",
       "payload/assets/fonts/NotoColorEmoji.ttf": "assets/fonts/NotoColorEmoji.ttf",
-      "payload/assets/fonts/JetBrainsMono-Regular.ttf": "assets/fonts/JetBrainsMono-Regular.ttf"
+      "payload/assets/fonts/JetBrainsMono-Regular.ttf": "assets/fonts/JetBrainsMono-Regular.ttf",
+      "payload/skills/unzoo-terminal/SKILL.md": "skills/unzoo-terminal/SKILL.md",
+      "payload/skills/unzoo-browser/SKILL.md": "skills/unzoo-browser/SKILL.md",
+      "payload/skills/unzoo-deliverables/SKILL.md": "skills/unzoo-deliverables/SKILL.md"
     },
     "publisher": "Unzoo",
     "shortDescription": "Unzoo One — the AI task workspace",

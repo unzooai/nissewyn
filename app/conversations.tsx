@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowUp,
+  BookOpen,
   Check,
   ChevronDown,
   ChevronRight,
@@ -69,6 +70,10 @@ export type ConversationsProps = {
   loadTab: (tabId: string) => Promise<TabView>;
   onOpenTerminal: (sessionId: string) => Promise<void>;
   onShowTab: (tabId: string) => Promise<void>;
+  /** 让智能体把这段对话做过的事写成技能。 */
+  onSaveSkill: (taskId: string) => Promise<void>;
+  /** 打开设置里的技能。 */
+  onOpenSkills: () => void;
   /** 智能体还没准备好时的提示（没装、没登录）。 */
   notice?: ReactNode;
   agentName?: string;
@@ -373,6 +378,7 @@ function ConversationThread(props: ConversationsProps & { task: TaskItem }) {
         computerOpen={showComputer}
         computerCount={computer.terminals.length + computer.tabs.length}
         onToggleComputer={() => setComputerOpen(!showComputer)}
+        canSaveSkill={!running && turns.some((turn) => turn.state === "succeeded")}
       />
       <div className={`conversation-columns${showComputer ? " with-computer" : ""}`}>
       <div className="conversation-column">
@@ -459,6 +465,8 @@ function ThreadHeader({
   computerOpen,
   computerCount,
   onToggleComputer,
+  canSaveSkill,
+  onSaveSkill,
 }: ConversationsProps & {
   task: TaskItem;
   thread: RuntimeThread | null;
@@ -466,6 +474,7 @@ function ThreadHeader({
   computerOpen: boolean;
   computerCount: number;
   onToggleComputer: () => void;
+  canSaveSkill: boolean;
 }) {
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState(task.title);
@@ -603,6 +612,19 @@ function ThreadHeader({
           <button type="button" role="menuitem" onClick={() => { setRenaming(true); setMenu(null); }}>
             {t("改名")}
           </button>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={!canSaveSkill}
+            title={canSaveSkill ? undefined : t("等这段对话做成一次、而且没有在做的时候才能存")}
+            onClick={() => {
+              setMenu(null);
+              void onSaveSkill(task.id);
+            }}
+          >
+            <BookOpen size={14} aria-hidden="true" />
+            {t("存为技能")}
+          </button>
           {confirmDelete ? (
             <button
               type="button"
@@ -648,13 +670,16 @@ function Turn({
   onDecide,
   onOpenOutput,
   onFollowUp,
+  onOpenSkills,
 }: ConversationsProps & { task: TaskItem; turn: RuntimeTurn; first: boolean }) {
   const live = turnLive(turn);
   const questions = pendingQuestions(turn);
   const [open, setOpen] = useState<boolean | null>(null);
   const expanded = open ?? (live || questions.length > 0);
   const scheduled = turn.trigger === "schedule";
-  const prompt = turn.prompt ?? (first ? task.description : "");
+  const savingSkill = turn.purpose === "save_skill";
+  // 存为技能那一轮，交给智能体的是一大段说明；对话里只说做了什么。
+  const prompt = savingSkill ? t("把这段对话存为技能") : (turn.prompt ?? (first ? task.description : ""));
   const reply = turn.reply?.trim() || (turn.state === "succeeded" ? turn.summary?.trim() : "") || "";
 
   return (
@@ -691,6 +716,22 @@ function Turn({
       ))}
 
       {reply && <Reply text={reply} />}
+
+      {savingSkill && (turn.saved_skills?.length ?? 0) > 0 && (
+        <div className="conversation-skill-saved" role="status">
+          <BookOpen size={15} aria-hidden="true" />
+          <span>{t("已存为技能：{names}。以后一句话就能让智能体照着做。", { names: turn.saved_skills!.join(", ") })}</span>
+          <button type="button" onClick={onOpenSkills}>
+            {t("查看技能")}
+          </button>
+        </div>
+      )}
+      {savingSkill && turn.skill_error && (
+        <div className="conversation-failed" role="status">
+          <AlertTriangle size={15} aria-hidden="true" />
+          <span>{t("没能存成技能：{message}", { message: turn.skill_error })}</span>
+        </div>
+      )}
 
       {live && !reply && questions.length === 0 && (
         <p className="conversation-working">

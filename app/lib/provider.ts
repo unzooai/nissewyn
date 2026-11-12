@@ -349,6 +349,15 @@ export type TerminalScreen = { sessionId: string; lines: string[]; cols?: number
 /** 智能体的一个标签页此刻的样子。image 是可以直接放进 <img> 的 data URL。 */
 export type TabView = { tabId: string; url?: string; title?: string; image?: string };
 
+/** 一个技能：自带的，或你自己的（导入的、从对话存下来的）。 */
+export type RuntimeSkill = {
+  name: string;
+  description: string;
+  source: "builtin" | "user";
+  enabled: boolean;
+  path: string;
+};
+
 export interface RuntimeTaskPort {
   available(): Promise<boolean>;
   list(): Promise<RuntimeTask[]>;
@@ -364,6 +373,8 @@ export interface RuntimeTaskPort {
     prompt?: string;
     continueFrom?: string;
     followUp?: boolean;
+    /** 让智能体把这段对话做过的事写成技能，这一轮结束后收进技能库。 */
+    saveSkill?: boolean;
   }): Promise<RuntimeRun>;
   /** 这个任务的整段对话：每一轮说了什么、做了什么、答了什么，旧的在前。 */
   thread(taskId: string): Promise<RuntimeThread>;
@@ -381,6 +392,13 @@ export interface RuntimeTaskPort {
   tabView(tabId: string): Promise<TabView>;
   /** 把智能体的标签页切到 Unzoo 浏览器的前台。 */
   activateTab(tabId: string): Promise<void>;
+  /** 技能：交给智能体时作为插件挂上（目前是 Claude Code）。 */
+  skills(): Promise<RuntimeSkill[]>;
+  setSkillEnabled(name: string, enabled: boolean): Promise<RuntimeSkill[]>;
+  /** 只能删你自己的；自带的只能关掉。 */
+  deleteSkill(name: string): Promise<RuntimeSkill[]>;
+  /** 导入一个含 SKILL.md 的文件夹。 */
+  importSkill(path: string, replace?: boolean): Promise<{ imported: string; skills: RuntimeSkill[] }>;
   /** 读一次运行写下的一个文件（只能读运行记录里列出的）。 */
   output(input: { taskId: string; runId: string; path: string }): Promise<RuntimeOutputContent>;
   /** 运行时跑任务用的设置：交给哪个 agent、在哪个目录、是否受管。 */

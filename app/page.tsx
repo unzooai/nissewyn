@@ -244,6 +244,7 @@ import {
 import { AgentRunPanel } from "./agent-run-panel";
 import { RuntimeFocusCard } from "./runtime-focus";
 import { Conversations } from "./conversations";
+import { SkillsPanel } from "./skills-panel";
 import { RuntimeUsagePanel } from "./runtime-usage";
 import { RuntimeCapabilitiesPanel } from "./runtime-capabilities";
 import { autostartEnabled, inDesktopApp, openTerminal, revealPath, setAutostart } from "./lib/core-connection";
@@ -9665,7 +9666,7 @@ export default function HomePage() {
     task: TaskItem,
     runId: string,
     continueFrom?: { sessionId: string; prompt: string },
-    options: { prompt?: string; followUp?: boolean } = {},
+    options: { prompt?: string; followUp?: boolean; saveSkill?: boolean } = {},
   ): Promise<string | null> {
     try {
       const current = tasks.find((item) => item.id === task.id) ?? task;
@@ -9677,6 +9678,7 @@ export default function HomePage() {
         prompt: continueFrom?.prompt ?? options.prompt,
         continueFrom: continueFrom?.sessionId,
         followUp: options.followUp,
+        saveSkill: options.saveSkill,
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -9802,6 +9804,30 @@ export default function HomePage() {
    * 终端窗口打开时会把没人管的会话收下；窗口还没开（桌面版）就先开一扇，
    * 再把这个会话切到前台。
    */
+  /** 让智能体把这段对话做过的事写成技能：在同一段对话里多跑一轮。 */
+  async function saveConversationAsSkill(taskId: string) {
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    const now = Date.now();
+    const runId = `run-${now}`;
+    setTasks((items) =>
+      items.map((item) =>
+        item.id === taskId
+          ? {
+              ...item,
+              status: "运行中",
+              runs: [
+                { id: runId, status: "运行中", startedAt: new Date(now).toISOString(), summary: "" },
+                ...(item.runs ?? []),
+              ],
+            }
+          : item,
+      ),
+    );
+    const failed = await runOnRuntime(task, runId, undefined, { saveSkill: true });
+    if (!failed) setNotice(t("正在把“{title}”存为技能", { title: task.title }));
+  }
+
   async function openAgentTerminal(sessionId: string) {
     try {
       await workspaceProvider.runtime.focusTerminal(sessionId);
@@ -11203,6 +11229,8 @@ export default function HomePage() {
             loadTab={(tabId) => workspaceProvider.runtime.tabView(tabId)}
             onOpenTerminal={openAgentTerminal}
             onShowTab={(tabId) => workspaceProvider.runtime.activateTab(tabId)}
+            onSaveSkill={saveConversationAsSkill}
+            onOpenSkills={() => openSettingsSection("agents")}
             scheduleLabel={formatTaskSchedule}
             agentName={conversationAgent?.name}
             notice={conversationNotice}
@@ -13924,6 +13952,8 @@ export default function HomePage() {
               notify={setNotice}
               openTerminal={desktopApp ? openTerminalFromPage : undefined}
             />
+
+            {runtimeMode && <SkillsPanel runtime={workspaceProvider.runtime} notify={setNotice} />}
 
             <section className="settings-data-center" id="settings-data">
               <header className="settings-data-heading">

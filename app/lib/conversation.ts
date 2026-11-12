@@ -128,6 +128,8 @@ export function activityLine(item: RuntimeActivity): string {
       return target ? t("上传 {target}", { target }) : t("上传了文件");
     case "plan":
       return t("更新了计划");
+    case "skill":
+      return target ? t("用了技能 {target}", { target: target.replace(/^unzoo-one:/, "") }) : t("用了一个技能");
     default:
       return target ? t("使用 {target}", { target }) : t("使用工具 {tool}", { tool: item.tool });
   }

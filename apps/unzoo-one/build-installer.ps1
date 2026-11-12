@@ -97,6 +97,14 @@ New-Item -ItemType Directory -Path $fonts -Force | Out-Null
 foreach ($font in "SymbolsNerdFontMono-Regular.ttf", "NotoColorEmoji.ttf", "JetBrainsMono-Regular.ttf") {
   Copy-Item (Join-Path $unterm "assets\fonts\$font") $fonts
 }
+# Built-in skills, beside unterm-core.exe where the runtime looks for them.
+# Each file is also listed under bundle.resources in tauri.conf.json.
+Copy-Item -Recurse (Join-Path $PSScriptRoot "skills") (Join-Path $payload "skills")
+$listed = Get-Content (Join-Path $tauri "tauri.conf.json") -Raw
+foreach ($file in Get-ChildItem (Join-Path $payload "skills") -Recurse -File) {
+  $relative = $file.FullName.Substring($payload.Length + 1).Replace('\', '/')
+  if ($listed -notmatch [regex]::Escape("payload/$relative")) { throw "skills/$($relative.Substring(7)) is not listed in tauri.conf.json bundle.resources" }
+}
 Write-Host "==> staged $((Get-ChildItem $payload -Recurse -File).Count) runtime files"
 
 $buildArgs = @("--no-install", "tauri", "build")
