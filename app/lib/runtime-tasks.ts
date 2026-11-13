@@ -79,6 +79,26 @@ export type RuntimeTurn = RuntimeRun & {
   saved_skills?: string[] | null;
   /** 没存成的原因。 */
   skill_error?: string | null;
+  /** 智能体这一轮交给别的智能体做的事，每个帮手一条。 */
+  helpers?: RuntimeHelper[] | null;
+};
+
+/**
+ * 帮手：对话里的智能体交出去一段活的另一个智能体（agent_session.delegate）。
+ * 它在同一个文件夹里、按同样的自主程度干活，要问的照样问人。
+ */
+export type RuntimeHelper = {
+  session_id: string;
+  agent: string;
+  /** 交给它的活（最近一次）。 */
+  prompt: string;
+  state: "working" | "waiting" | "done" | "failed" | "stopped";
+  waiting?: boolean;
+  reply?: string | null;
+  error?: string | null;
+  activity: RuntimeActivity[];
+  terminals: string[];
+  tabs: string[];
 };
 
 /** 一个任务作为一段对话。 */

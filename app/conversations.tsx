@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowUp,
   BookOpen,
+  Bot,
   Check,
   ChevronDown,
   ChevronRight,
@@ -26,7 +27,7 @@ import type { TaskItem, TaskSchedule, Weekday } from "./types";
 import { dateLocale, t } from "./i18n";
 import type { ApprovalDecision, TabView, TerminalScreen } from "./lib/provider";
 import { ComputerPanel } from "./computer-panel";
-import type { RuntimeActivity, RuntimeThread, RuntimeTurn } from "./lib/runtime-tasks";
+import type { RuntimeActivity, RuntimeHelper, RuntimeThread, RuntimeTurn } from "./lib/runtime-tasks";
 import {
   activityLine,
   activitySummary,
@@ -35,6 +36,9 @@ import {
   conversationStatus,
   conversationStatusLabel,
   decisionLabel,
+  helperName,
+  helperQuestions,
+  helperStateLabel,
   inlinePieces,
   intentLine,
   pendingQuestions,
@@ -715,6 +719,10 @@ function Turn({
         />
       ))}
 
+      {(turn.helpers ?? []).map((helper) => (
+        <HelperCard key={helper.session_id} turn={turn} helper={helper} onDecide={onDecide} />
+      ))}
+
       {reply && <Reply text={reply} />}
 
       {savingSkill && (turn.saved_skills?.length ?? 0) > 0 && (
@@ -768,6 +776,64 @@ function Turn({
       )}
       {turn.state === "cancelled" && <p className="conversation-quiet">{t("已停下。")}</p>}
     </div>
+  );
+}
+
+/** 智能体交出去的一段活：谁在做、做到哪、要你确认什么、它怎么回的。 */
+function HelperCard({
+  turn,
+  helper,
+  onDecide,
+}: {
+  turn: RuntimeTurn;
+  helper: RuntimeHelper;
+  onDecide: ConversationsProps["onDecide"];
+}) {
+  const questions = helperQuestions(turn, helper);
+  const [open, setOpen] = useState(false);
+  const busy = helper.state === "working" || helper.state === "waiting";
+  const name = helperName(helper.agent);
+  const task = helper.prompt.length > 240 ? `${helper.prompt.slice(0, 240)}…` : helper.prompt;
+  const reply = helper.reply?.trim() ?? "";
+  const activity = helper.activity ?? [];
+  const hasMore = activity.length > 0 || reply.length > 0;
+
+  return (
+    <section className={`conversation-helper is-${helper.state}`} aria-label={t("帮手 {name}", { name })}>
+      <header>
+        <Bot size={15} aria-hidden="true" />
+        <strong>{name}</strong>
+        <span className="conversation-helper-state">
+          {busy && <LoaderCircle size={12} className="spin" aria-hidden="true" />}
+          {helperStateLabel(helper.state)}
+        </span>
+      </header>
+      <p className="conversation-helper-task">{task}</p>
+      {hasMore && (
+        <div className={`conversation-activity${open ? " is-open" : ""}`}>
+          <button type="button" className="conversation-activity-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {open ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+            {activity.length > 0 ? activitySummary(activity) : t("它的回复")}
+          </button>
+          {open && activity.length > 0 && (
+            <ol>
+              {activity.map((item, index) => (
+                <ActivityRow key={`${item.call_id ?? item.request_id ?? ""}-${index}`} item={item} />
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
+      {open && reply && <Reply text={reply} />}
+      {questions.map((item) => (
+        <Question
+          key={item.request_id}
+          item={item}
+          onDecide={(decision) => onDecide(helper.session_id, item.request_id!, decision)}
+        />
+      ))}
+      {helper.state === "failed" && helper.error && <p className="conversation-helper-error">{helper.error}</p>}
+    </section>
   );
 }
 

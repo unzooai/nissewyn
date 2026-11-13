@@ -8,7 +8,7 @@
 
 import type { TaskItem } from "../types";
 import { t } from "../i18n";
-import type { RuntimeActivity, RuntimeTurn } from "./runtime-tasks";
+import type { RuntimeActivity, RuntimeHelper, RuntimeTurn } from "./runtime-tasks";
 
 export type ConversationStatus = "running" | "waiting" | "failed" | "done" | "scheduled" | "idle";
 
@@ -78,15 +78,53 @@ export function pendingQuestions(turn: RuntimeTurn): RuntimeActivity[] {
   return turn.activity.filter((item) => item.request_id && !item.decided_by);
 }
 
-/** 整段对话里智能体用过的终端和标签页，按第一次用到的先后。 */
-export function computerOf(turns: Pick<RuntimeTurn, "terminals" | "tabs">[]): { terminals: string[]; tabs: string[] } {
+/** 帮手还在等人答的问题，答的时候要用帮手自己的会话。 */
+export function helperQuestions(turn: RuntimeTurn, helper: RuntimeHelper): RuntimeActivity[] {
+  if (!turnLive(turn) || helper.state === "done" || helper.state === "failed" || helper.state === "stopped") return [];
+  return (helper.activity ?? []).filter((item) => item.request_id && !item.decided_by);
+}
+
+/** 整段对话里智能体（和它的帮手）用过的终端和标签页，按第一次用到的先后。 */
+export function computerOf(
+  turns: (Pick<RuntimeTurn, "terminals" | "tabs"> & { helpers?: RuntimeHelper[] | null })[],
+): { terminals: string[]; tabs: string[] } {
   const terminals: string[] = [];
   const tabs: string[] = [];
+  const add = (from: { terminals?: string[] | null; tabs?: string[] | null }) => {
+    for (const id of from.terminals ?? []) if (!terminals.includes(id)) terminals.push(id);
+    for (const id of from.tabs ?? []) if (!tabs.includes(id)) tabs.push(id);
+  };
   for (const turn of turns) {
-    for (const id of turn.terminals ?? []) if (!terminals.includes(id)) terminals.push(id);
-    for (const id of turn.tabs ?? []) if (!tabs.includes(id)) tabs.push(id);
+    add(turn);
+    for (const helper of turn.helpers ?? []) add(helper);
   }
   return { terminals, tabs };
+}
+
+/** 帮手的名字：产品名，不是命令名。 */
+export function helperName(agent: string): string {
+  const id = agent.trim().toLowerCase();
+  if (id === "codex-cli" || id === "codex") return "Codex";
+  if (id === "claude-code" || id === "claude") return "Claude Code";
+  if (id === "opencode") return "OpenCode";
+  if (id === "agy" || id === "antigravity") return "Antigravity";
+  return agent;
+}
+
+/** 帮手现在怎样。 */
+export function helperStateLabel(state: RuntimeHelper["state"]): string {
+  switch (state) {
+    case "waiting":
+      return t("等你确认");
+    case "done":
+      return t("做完了");
+    case "failed":
+      return t("出错了");
+    case "stopped":
+      return t("已停下");
+    default:
+      return t("正在做");
+  }
 }
 
 /** 终端画面去掉末尾的空行（屏幕下半截常常是空的）。 */
@@ -130,6 +168,12 @@ export function activityLine(item: RuntimeActivity): string {
       return t("更新了计划");
     case "skill":
       return target ? t("用了技能 {target}", { target: target.replace(/^unzoo-one:/, "") }) : t("用了一个技能");
+    case "delegate": {
+      // "codex: 修好测试"，接着等的时候只有会话 id。
+      const split = target.indexOf(": ");
+      if (split < 0) return t("等帮手做完");
+      return t("交给 {agent}：{task}", { agent: helperName(target.slice(0, split)), task: target.slice(split + 2) });
+    }
     default:
       return target ? t("使用 {target}", { target }) : t("使用工具 {tool}", { tool: item.tool });
   }
@@ -160,6 +204,8 @@ export function intentLine(item: RuntimeActivity): string {
     case "look":
     case "watch":
       return t("它想查看内容");
+    case "delegate":
+      return t("它想把一部分活交给别的智能体");
     default:
       return t("它想使用 {tool}", { tool: item.tool });
   }

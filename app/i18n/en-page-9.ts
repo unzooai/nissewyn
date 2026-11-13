@@ -272,4 +272,12 @@ export const enPage9: Record<string, string> = {
     "In governed mode, agents run their commands here; risky ones come to your inbox and wait for your yes.",
   "受管模式下，智能体用它打开和操作网页；上传、读取账号这类操作先进收件箱。":
     "In governed mode, agents open and use web pages with it; uploads and access to accounts come to your inbox first.",
+  // Helpers: other agents the conversation's agent hands work to
+  "等帮手做完": "Waited for a helper",
+  "交给 {agent}：{task}": "Handed to {agent}: {task}",
+  "它想把一部分活交给别的智能体": "It wants to hand part of the work to another agent",
+  "做完了": "Done",
+  "已停下": "Stopped",
+  "帮手 {name}": "Helper {name}",
+  "它的回复": "Its reply",
 };

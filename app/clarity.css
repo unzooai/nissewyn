@@ -26939,3 +26939,70 @@ body {
     flex-wrap: wrap;
   }
 }
+
+/* A helper: another agent the conversation's agent handed work to */
+.conversation-helper {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 14px 12px;
+  border: 1px solid var(--clarity-line);
+  border-left: 3px solid var(--clarity-blue, #3b6fd8);
+  border-radius: 10px;
+  background: var(--clarity-panel);
+}
+
+.conversation-helper.is-waiting {
+  border-left-color: var(--clarity-amber);
+}
+
+.conversation-helper.is-failed {
+  border-left-color: var(--clarity-red);
+}
+
+.conversation-helper.is-done,
+.conversation-helper.is-stopped {
+  border-left-color: var(--clarity-line);
+}
+
+.conversation-helper header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--clarity-ink);
+  font-size: 13px;
+}
+
+.conversation-helper-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--clarity-soft);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.conversation-helper.is-waiting .conversation-helper-state {
+  color: var(--clarity-amber);
+}
+
+.conversation-helper.is-failed .conversation-helper-state,
+.conversation-helper-error {
+  color: var(--clarity-red);
+}
+
+.conversation-helper-task {
+  margin: 0;
+  color: var(--clarity-soft);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.conversation-helper-error {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}

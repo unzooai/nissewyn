@@ -7,6 +7,8 @@ import {
   computerOf,
   conversationStatus,
   decisionLabel,
+  helperName,
+  helperQuestions,
   inlinePieces,
   pendingQuestions,
   replyBlocks,
@@ -115,4 +117,20 @@ test("the agent's computer lists every terminal and tab once, in the order first
     { terminals: ["5", "9"], tabs: ["77", "78"] },
   );
   assert.deepEqual(trimScreen(["PS C:\> dir   ", "a.txt", "", "   ", ""]), ["PS C:\> dir", "a.txt"]);
+});
+
+test("a helper's work is told by name, its questions are its own, and its computer is the conversation's", () => {
+  assert.equal(
+    activityLine({ tool: "mcp__unterm__agent_session_delegate", verb: "delegate", target: "codex-cli: fix the tests" }),
+    "Handed to Codex: fix the tests",
+  );
+  assert.equal(activityLine({ tool: "mcp__unterm__agent_session_delegate", verb: "delegate", target: "as_1" }), "Waited for a helper");
+  assert.equal(helperName("agy"), "Antigravity");
+  const asked = { tool: "shell", verb: "run", target: "cargo test", request_id: "7" };
+  const helper = { session_id: "as_2", agent: "codex-cli", prompt: "x", state: "waiting", activity: [asked], terminals: ["4"], tabs: [] };
+  const turn = { id: "r", state: "running", activity: [], terminals: ["1"], tabs: [], helpers: [helper] };
+  assert.deepEqual(helperQuestions(turn, helper), [asked]);
+  assert.deepEqual(helperQuestions({ ...turn, state: "succeeded" }, helper), [], "the turn is over: nobody is waiting");
+  assert.deepEqual(helperQuestions(turn, { ...helper, state: "stopped" }), []);
+  assert.deepEqual(computerOf([turn]), { terminals: ["1", "4"], tabs: [] });
 });
