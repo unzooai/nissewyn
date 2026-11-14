@@ -70,7 +70,8 @@ export type ConversationsProps = {
   loadThread: (taskId: string) => Promise<RuntimeThread>;
   scheduleLabel: (task: TaskItem) => string;
   /** 智能体的电脑：它用过的终端画面、网页截图，以及去真正的窗口里接手。 */
-  loadScreen: (sessionId: string) => Promise<TerminalScreen>;
+  loadScreen: (sessionId: string, fromLine?: number) => Promise<TerminalScreen>;
+  sendKeys: (sessionId: string, input: string) => Promise<void>;
   loadTab: (tabId: string) => Promise<TabView>;
   onOpenTerminal: (sessionId: string) => Promise<void>;
   onShowTab: (tabId: string) => Promise<void>;
@@ -446,6 +447,7 @@ function ConversationThread(props: ConversationsProps & { task: TaskItem }) {
           tabs={computer.tabs}
           live={live}
           loadScreen={props.loadScreen}
+          sendKeys={props.sendKeys}
           loadTab={props.loadTab}
           onOpenTerminal={props.onOpenTerminal}
           onShowTab={props.onShowTab}

@@ -394,12 +394,26 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           reserveError: data.reserve_error ?? undefined,
         };
       },
-      async terminalScreen(sessionId): Promise<TerminalScreen> {
-        const data = await callUnterm<{ session_id: string; lines?: string[]; cols?: number | null }>(
-          "/api/console/computer/terminal",
-          { session_id: sessionId },
-        );
-        return { sessionId: data.session_id, lines: data.lines ?? [], cols: data.cols ?? undefined };
+      async terminalScreen(sessionId, fromLine): Promise<TerminalScreen> {
+        const data = await callUnterm<{
+          session_id: string;
+          text?: string | null;
+          first_row?: number | null;
+          row_count?: number | null;
+          cols?: number | null;
+          rows?: number | null;
+        }>("/api/console/computer/terminal", fromLine === undefined ? { session_id: sessionId } : { session_id: sessionId, from_line: fromLine });
+        return {
+          sessionId: data.session_id,
+          text: data.text ?? "",
+          firstRow: data.first_row ?? 0,
+          rowCount: data.row_count ?? 0,
+          cols: data.cols ?? undefined,
+          rows: data.rows ?? undefined,
+        };
+      },
+      async terminalInput(sessionId, input) {
+        await callUnterm("/api/console/computer/terminal/input", { session_id: sessionId, input });
       },
       async focusTerminal(sessionId) {
         await callUnterm("/api/console/computer/terminal/focus", { session_id: sessionId });

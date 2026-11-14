@@ -452,6 +452,9 @@ export function createMockProvider(): WorkspaceProvider {
       async terminalScreen() {
         throw new Error(t("演示版没有本机运行时"));
       },
+      async terminalInput() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
       async focusTerminal() {
         throw new Error(t("演示版没有本机运行时"));
       },

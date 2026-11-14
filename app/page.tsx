@@ -11226,7 +11226,8 @@ export default function HomePage() {
             }
             onDecide={decideInConversation}
             loadThread={loadConversationThread}
-            loadScreen={(sessionId) => workspaceProvider.runtime.terminalScreen(sessionId)}
+            loadScreen={(sessionId, fromLine) => workspaceProvider.runtime.terminalScreen(sessionId, fromLine)}
+            sendKeys={(sessionId, input) => workspaceProvider.runtime.terminalInput(sessionId, input)}
             loadTab={(tabId) => workspaceProvider.runtime.tabView(tabId)}
             onOpenTerminal={openAgentTerminal}
             onShowTab={(tabId) => workspaceProvider.runtime.activateTab(tabId)}

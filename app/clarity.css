@@ -26529,6 +26529,29 @@ body {
   white-space: pre;
 }
 
+.computer-terminal-host {
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: #15171c;
+  overflow: auto;
+}
+
+.computer-terminal-host[hidden] {
+  display: none;
+}
+
+.computer-terminal-host .xterm {
+  width: max-content;
+}
+
+.computer-note {
+  margin: 0;
+  color: var(--clarity-soft);
+  font-size: 12.5px;
+}
+
 .computer-address {
   display: flex;
   align-items: center;
