@@ -251,6 +251,7 @@ import { RuntimeCapabilitiesPanel } from "./runtime-capabilities";
 import { autostartEnabled, inDesktopApp, openTerminal, revealPath, setAutostart } from "./lib/core-connection";
 import { applyDocumentLanguage, chooseLocale, dateLocale, locale, locales, t, type Locale } from "./i18n";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
+import { isMarkdown, MarkdownView } from "./markdown-view";
 import { agentApprovalId, isAgentApprovalId, reconcileAgentApprovals } from "./lib/agent-approvals";
 
 // 组件不再直接读 mock：首屏种子和出厂数据都从 provider 拿，换实现时这里不用动。
@@ -1649,6 +1650,8 @@ export default function HomePage() {
   const [artifactTitleDraft, setArtifactTitleDraft] = useState("");
   const [artifactFilenameDraft, setArtifactFilenameDraft] = useState("");
   const [artifactContentDraft, setArtifactContentDraft] = useState("");
+  /** Markdown 成果看原文而不是排好的版。 */
+  const [artifactShowSource, setArtifactShowSource] = useState(false);
   const [pendingArtifactDraftRecovery, setPendingArtifactDraftRecovery] =
     useState<ArtifactDraftRecovery | null>(null);
   const [artifactDraftAutoSavedAt, setArtifactDraftAutoSavedAt] = useState<
@@ -12917,6 +12920,26 @@ export default function HomePage() {
                   <section className="artifact-content-preview">
                     <div>
                       <span>{t("内容预览")}</span>
+                      {isMarkdown(selectedArtifact.format, selectedArtifact.filename) &&
+                        !selectedArtifact.table &&
+                        !selectedArtifact.file?.binary && (
+                          <span className="artifact-view-toggle" role="group" aria-label={t("显示方式")}>
+                            <button
+                              type="button"
+                              aria-pressed={!artifactShowSource}
+                              onClick={() => setArtifactShowSource(false)}
+                            >
+                              {t("排版")}
+                            </button>
+                            <button
+                              type="button"
+                              aria-pressed={artifactShowSource}
+                              onClick={() => setArtifactShowSource(true)}
+                            >
+                              {t("原文")}
+                            </button>
+                          </span>
+                        )}
                       <em>
                         v{selectedArtifact.version ?? 1} ·{" "}
                         {t(artifactCanBeEdited(selectedArtifact)
@@ -12958,7 +12981,11 @@ export default function HomePage() {
                       </p>
                     ) : (
                       <>
-                        <pre>{selectedArtifact.content}</pre>
+                        {isMarkdown(selectedArtifact.format, selectedArtifact.filename) && !artifactShowSource ? (
+                          <MarkdownView className="artifact-markdown" text={selectedArtifact.content} />
+                        ) : (
+                          <pre>{selectedArtifact.content}</pre>
+                        )}
                         {selectedArtifact.file?.truncated && (
                           <p className="artifact-file-note">{t("文件较大，这里只显示前 1 MB。")}</p>
                         )}

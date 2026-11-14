@@ -27102,3 +27102,180 @@ body {
   align-items: center;
   gap: 6px;
 }
+
+/* Markdown 排版：智能体回复和 .md 成果共用。 */
+.markdown-view {
+  overflow-wrap: anywhere;
+}
+
+.markdown-view > :first-child {
+  margin-top: 0;
+}
+
+.markdown-view > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-view p,
+.markdown-view ul,
+.markdown-view ol,
+.markdown-view blockquote,
+.markdown-view .markdown-table-wrap {
+  margin: 0 0 10px;
+  white-space: normal;
+}
+
+.markdown-view ul,
+.markdown-view ol {
+  padding-left: 22px;
+}
+
+.markdown-view ul {
+  list-style: disc;
+}
+
+.markdown-view ol {
+  list-style: decimal;
+}
+
+.markdown-view li + li {
+  margin-top: 3px;
+}
+
+.markdown-view li > p {
+  margin: 0;
+}
+
+.markdown-view ul.contains-task-list {
+  padding-left: 4px;
+  list-style: none;
+}
+
+.markdown-view h1,
+.markdown-view h2,
+.markdown-view h3,
+.markdown-view h4 {
+  margin: 16px 0 8px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.markdown-view h1 {
+  font-size: 1.35em;
+}
+
+.markdown-view h2 {
+  font-size: 1.2em;
+}
+
+.markdown-view h3 {
+  font-size: 1.08em;
+}
+
+.markdown-view h4 {
+  font-size: 1em;
+}
+
+.markdown-view a {
+  color: var(--clarity-blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-view blockquote {
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid #d5dce6;
+  color: #5b6779;
+}
+
+.markdown-view hr {
+  margin: 14px 0;
+  border: 0;
+  border-top: 1px solid #e2e7ee;
+}
+
+.markdown-view code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #f0f2f5;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.9em;
+}
+
+.markdown-view pre {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #1d2128;
+  color: #e7eaee;
+  font-size: 12.5px;
+  line-height: 1.55;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.markdown-view pre code {
+  padding: 0;
+  background: none;
+  color: inherit;
+}
+
+.markdown-view .markdown-table-wrap {
+  overflow-x: auto;
+}
+
+.markdown-view table {
+  border-collapse: collapse;
+  font-size: 0.92em;
+}
+
+.markdown-view th,
+.markdown-view td {
+  padding: 5px 10px;
+  border: 1px solid #e2e7ee;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-view th {
+  background: #f5f7fa;
+  font-weight: 700;
+}
+
+.markdown-view img {
+  max-width: 100%;
+}
+
+/* .md 成果在预览框里：可滚动，比原文框高一些。 */
+.artifact-content-preview .artifact-markdown {
+  max-height: 520px;
+  padding: 16px 19px;
+  overflow: auto;
+  color: #3b4758;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.artifact-view-toggle {
+  display: inline-flex;
+  margin-left: auto;
+  margin-right: 10px;
+  border: 1px solid #d5dce6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.artifact-view-toggle button {
+  padding: 3px 10px;
+  border: 0;
+  background: transparent;
+  color: #526985;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.artifact-view-toggle button[aria-pressed="true"] {
+  background: #fff;
+  color: var(--clarity-ink);
+  font-weight: 700;
+}

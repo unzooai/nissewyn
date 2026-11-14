@@ -24,11 +24,12 @@ import {
   Hand,
   X,
 } from "lucide-react";
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { TaskItem, TaskSchedule, Weekday } from "./types";
 import { dateLocale, t } from "./i18n";
 import type { ApprovalDecision, TabView, TerminalScreen } from "./lib/provider";
 import { ComputerPanel } from "./computer-panel";
+import { MarkdownView } from "./markdown-view";
 import type { RuntimeActivity, RuntimeHandover, RuntimeHelper, RuntimeThread, RuntimeTurn } from "./lib/runtime-tasks";
 import {
   activityLine,
@@ -41,10 +42,8 @@ import {
   helperName,
   helperQuestions,
   helperStateLabel,
-  inlinePieces,
   intentLine,
   pendingQuestions,
-  replyBlocks,
   riskLabel,
   riskTone,
   sortConversations,
@@ -1022,58 +1021,9 @@ function Question({ item, onDecide }: { item: RuntimeActivity; onDecide: (decisi
   );
 }
 
+/** 智能体的回复：Markdown 排好版（链接、表格、代码）。 */
 function Reply({ text }: { text: string }) {
-  const blocks = useMemo(() => replyBlocks(text), [text]);
-  return (
-    <div className="conversation-reply">
-      {blocks.map((block, index) => {
-        switch (block.kind) {
-          case "code":
-            return (
-              <pre key={index}>
-                <code>{block.text}</code>
-              </pre>
-            );
-          case "heading":
-            return (
-              <h3 key={index}>
-                <Inline text={block.text} />
-              </h3>
-            );
-          case "list": {
-            const items = block.items.map((item, at) => (
-              <li key={at}>
-                <Inline text={item} />
-              </li>
-            ));
-            return block.ordered ? <ol key={index}>{items}</ol> : <ul key={index}>{items}</ul>;
-          }
-          default:
-            return (
-              <p key={index}>
-                <Inline text={block.text} />
-              </p>
-            );
-        }
-      })}
-    </div>
-  );
-}
-
-function Inline({ text }: { text: string }) {
-  return (
-    <>
-      {inlinePieces(text).map((piece, index) =>
-        piece.kind === "code" ? (
-          <code key={index}>{piece.text}</code>
-        ) : piece.kind === "strong" ? (
-          <strong key={index}>{piece.text}</strong>
-        ) : (
-          <Fragment key={index}>{piece.text}</Fragment>
-        ),
-      )}
-    </>
-  );
+  return <MarkdownView className="conversation-reply" text={text} />;
 }
 
 function formatSize(bytes: number): string {
