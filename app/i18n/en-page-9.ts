@@ -129,6 +129,7 @@ export const enPage9: Record<string, string> = {
   "使用 {target}": "Use {target}",
   "使用工具 {tool}": "Use the {tool} tool",
   "规则拒绝": "Refused by rule",
+  "改在回复里问你": "Asked in its reply instead",
   "自动": "Auto",
   "按规则": "By rule",
   "你批准了": "You allowed",

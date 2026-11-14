@@ -215,6 +215,8 @@ export function intentLine(item: RuntimeActivity): string {
 
 /** 谁让它做的（或没让）。没问过人、也没被拦，就什么都不说。 */
 export function decisionLabel(item: RuntimeActivity): string | null {
+  // 智能体自带的“问用户”工具这里没有界面，运行时让它改成在回复里直接问。
+  if (item.tool === "AskUserQuestion" && item.decided_by === "unterm") return t("改在回复里问你");
   if (item.decision === "deny") return item.decided_by === "policy" ? t("规则拒绝") : t("已拒绝");
   if (item.decided_by === "autonomy") return t("自动");
   if (item.decided_by === "policy") return t("按规则");
