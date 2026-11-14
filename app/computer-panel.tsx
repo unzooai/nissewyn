@@ -61,7 +61,7 @@ export function ComputerPanel(props: ComputerPanelProps) {
       </header>
 
       {!current ? (
-        <p className="computer-empty">{t("这段对话里智能体还没有用过终端或浏览器。它一用，就会出现在这里。")}</p>
+        <p className="computer-empty">{t("这个任务里智能体还没有用过终端或浏览器。它一用，就会出现在这里。")}</p>
       ) : (
         <>
           <nav className="computer-tabs" aria-label={t("它用过的终端和网页")}>

@@ -19,13 +19,12 @@ export const enPage9: Record<string, string> = {
     "Looking, editing files in the work folder, running ordinary commands and using its own browser go ahead; pushing, uploading, sending requests and editing files outside the work folder are asked.",
 
   // Navigation and page title
-  "对话": "Conversations",
   "说一句话，智能体用这台电脑的终端和浏览器替你去做。":
     "Say what you need; the agent does it with this computer's terminal and browser.",
 
   // Conversation list
-  "对话列表": "Conversation list",
-  "还没有对话。": "No conversations yet.",
+  "任务列表": "Task list",
+  "还没有任务。": "No tasks yet.",
   "正在做": "Working",
   "出错了": "Failed",
   "定时": "Scheduled",
@@ -61,22 +60,21 @@ export const enPage9: Record<string, string> = {
   "接着说：追问、纠正，或者让它继续": "Reply: ask more, correct it, or tell it to continue",
 
   // Thread
-  "读不到这段对话：{message}": "Could not load this conversation: {message}",
-  "正在读取对话": "Loading the conversation",
+  "读不到这个任务：{message}": "Could not load this task: {message}",
+  "正在读取任务": "Loading the task",
   "还没有运行过。": "Hasn't run yet.",
   "正在交给智能体": "Handing it to the agent",
-  "返回对话列表": "Back to conversations",
-  "对话名称": "Conversation name",
+  "返回任务列表": "Back to tasks",
   "点击改名": "Click to rename",
   "文件夹": "Folder",
   "重复": "Repeat",
   "更多": "More",
   "重复运行": "Repeat",
-  "按时把第一句需求再交给智能体做一次，结果接在这段对话后面。":
-    "On schedule, hands the first request to the agent again; the results are added to this conversation.",
+  "按时把第一句需求再交给智能体做一次，结果接在这个任务后面。":
+    "On schedule, hands the first request to the agent again; the results are added to this task.",
   "不重复": "Don't repeat",
   "改名": "Rename",
-  "确定删除这段对话": "Yes, delete this conversation",
+  "确定删除这个任务": "Yes, delete this task",
   "定时运行": "Scheduled run",
   "上一段对话接不上了，这一句开始了新的对话。": "The earlier conversation couldn't be resumed, so this message started a new one.",
   "正在思考": "Thinking",
@@ -99,9 +97,8 @@ export const enPage9: Record<string, string> = {
   "它想上传文件": "It wants to upload a file",
   "它想查看内容": "It wants to look at something",
   "它想使用 {tool}": "It wants to use {tool}",
-  "新对话": "New conversation",
   "总是允许这条命令": "Always allow this command",
-  "在对话里拒绝": "Declined in the conversation",
+  "在任务里拒绝": "Declined in the task",
 
   // What the agent did
   "运行 {target}": "Run {target}",
@@ -145,9 +142,9 @@ export const enPage9: Record<string, string> = {
   "做了 {count} 件事": "{count} actions",
 
   // Page actions
-  "这段对话已经不在了": "This conversation no longer exists",
+  "这个任务已经不在了": "This task no longer exists",
   "没能停下：{message}": "Couldn't stop it: {message}",
-  "已删除对话“{title}”": "Deleted “{title}”",
+  "已删除任务“{title}”": "Deleted “{title}”",
   "不再重复运行": "No longer repeats",
   "已设为{schedule}自动运行": "Set to run {schedule}",
   "打不开文件夹：{message}": "Couldn't open the folder: {message}",
@@ -183,8 +180,8 @@ export const enPage9: Record<string, string> = {
   "智能体的电脑": "Agent's computer",
   "实时": "Live",
   "收起": "Hide",
-  "这段对话里智能体还没有用过终端或浏览器。它一用，就会出现在这里。":
-    "The agent hasn't used a terminal or browser in this conversation yet. When it does, you'll see it here.",
+  "这个任务里智能体还没有用过终端或浏览器。它一用，就会出现在这里。":
+    "The agent hasn't used a terminal or browser in this task yet. When it does, you'll see it here.",
   "它用过的终端和网页": "Terminals and pages it used",
   "终端 {n}": "Terminal {n}",
   "网页 {n}": "Page {n}",
@@ -218,9 +215,9 @@ export const enPage9: Record<string, string> = {
   "先打开 Unzoo One 的终端窗口，再点一次。({message})": "Open the Unzoo One terminal window first, then click again. ({message})",
 
   // Skills
-  "等这段对话做成一次、而且没有在做的时候才能存": "Available once this conversation has succeeded and isn't running",
+  "等这个任务做成一次、而且没有在做的时候才能存": "Available once this task has succeeded and isn't running",
   "存为技能": "Save as skill",
-  "把这段对话存为技能": "Save this conversation as a skill",
+  "把这个任务存为技能": "Save this task as a skill",
   "已存为技能：{names}。以后一句话就能让智能体照着做。": "Saved as skill: {names}. Next time one sentence is enough for the agent to do it again.",
   "查看技能": "View skills",
   "没能存成技能：{message}": "Couldn't save the skill: {message}",
@@ -241,8 +238,8 @@ export const enPage9: Record<string, string> = {
   "已关掉技能“{name}”": "Turned off skill “{name}”",
   "已打开技能“{name}”": "Turned on skill “{name}”",
   "你的技能": "Your skills",
-  "还没有。在一段做成了的对话里点“更多 › 存为技能”，或者在下面导入一个技能文件夹。":
-    "None yet. In a conversation that worked, choose “More › Save as skill”, or import a skill folder below.",
+  "还没有。在一个做成了的任务里点“更多 › 存为技能”，或者在下面导入一个技能文件夹。":
+    "None yet. In a task that worked, choose “More › Save as skill”, or import a skill folder below.",
   "已删除技能“{name}”": "Deleted skill “{name}”",
   "导入技能文件夹": "Import a skill folder",
   "含 SKILL.md 的文件夹，例如 C:\\skills\\weekly-report": "A folder containing SKILL.md, e.g. C:\\skills\\weekly-report",

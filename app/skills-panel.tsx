@@ -103,7 +103,7 @@ export function SkillsPanel({
           <SkillList
             title={t("你的技能")}
             skills={own}
-            empty={t("还没有。在一段做成了的对话里点“更多 › 存为技能”，或者在下面导入一个技能文件夹。")}
+            empty={t("还没有。在一个做成了的任务里点“更多 › 存为技能”，或者在下面导入一个技能文件夹。")}
             busy={busy}
             onToggle={(skill) =>
               void act(

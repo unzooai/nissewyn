@@ -93,14 +93,14 @@ export function Conversations(props: ConversationsProps) {
   const selected = tasks.find((task) => task.id === selectedId) ?? null;
 
   return (
-    <section className={`conversations${selected ? " has-selection" : ""}`} aria-label={t("对话")}>
-      <aside className="conversation-list" aria-label={t("对话列表")}>
+    <section className={`conversations${selected ? " has-selection" : ""}`} aria-label={t("任务")}>
+      <aside className="conversation-list" aria-label={t("任务列表")}>
         <button className="conversation-new" type="button" onClick={() => onSelect(null)}>
           <MessageSquarePlus size={16} aria-hidden="true" />
-          {t("新对话")}
+          {t("新任务")}
         </button>
         {sorted.length === 0 ? (
-          <p className="conversation-list-empty">{t("还没有对话。")}</p>
+          <p className="conversation-list-empty">{t("还没有任务。")}</p>
         ) : (
           <ul>
             {sorted.map((task) => {
@@ -400,12 +400,12 @@ function ConversationThread(props: ConversationsProps & { task: TaskItem }) {
       >
         {loadError && !thread && (
           <p className="conversation-error" role="alert">
-            {t("读不到这段对话：{message}", { message: loadError })}
+            {t("读不到这个任务：{message}", { message: loadError })}
           </p>
         )}
         {!thread && !loadError && (
           <p className="conversation-loading">
-            <LoaderCircle size={16} className="spin" aria-hidden="true" /> {t("正在读取对话")}
+            <LoaderCircle size={16} className="spin" aria-hidden="true" /> {t("正在读取任务")}
           </p>
         )}
         {thread && turns.length === 0 && !sending && (
@@ -506,7 +506,7 @@ function ThreadHeader({
 
   return (
     <header className="conversation-header">
-      <button className="conversation-back" type="button" onClick={onBack} aria-label={t("返回对话列表")}>
+      <button className="conversation-back" type="button" onClick={onBack} aria-label={t("返回任务列表")}>
         <ArrowLeft size={16} aria-hidden="true" />
       </button>
       {renaming ? (
@@ -515,7 +515,7 @@ function ThreadHeader({
           value={title}
           autoFocus
           maxLength={120}
-          aria-label={t("对话名称")}
+          aria-label={t("任务名称")}
           onChange={(event) => setTitle(event.target.value)}
           onBlur={saveTitle}
           onKeyDown={(event) => {
@@ -569,7 +569,7 @@ function ThreadHeader({
 
       {menu === "repeat" && (
         <div className="conversation-popover" role="dialog" aria-label={t("重复运行")}>
-          <p>{t("按时把第一句需求再交给智能体做一次，结果接在这段对话后面。")}</p>
+          <p>{t("按时把第一句需求再交给智能体做一次，结果接在这个任务后面。")}</p>
           <div className="conversation-segmented" role="radiogroup" aria-label={t("运行频率")}>
             {(["仅运行一次", "每天", "每周"] as TaskSchedule[]).map((option) => (
               <button
@@ -625,7 +625,7 @@ function ThreadHeader({
             type="button"
             role="menuitem"
             disabled={!canSaveSkill}
-            title={canSaveSkill ? undefined : t("等这段对话做成一次、而且没有在做的时候才能存")}
+            title={canSaveSkill ? undefined : t("等这个任务做成一次、而且没有在做的时候才能存")}
             onClick={() => {
               setMenu(null);
               void onSaveSkill(task.id);
@@ -645,7 +645,7 @@ function ThreadHeader({
               }}
             >
               <Trash2 size={14} aria-hidden="true" />
-              {t("确定删除这段对话")}
+              {t("确定删除这个任务")}
             </button>
           ) : (
             <button type="button" role="menuitem" className="danger" onClick={() => setConfirmDelete(true)}>
@@ -692,7 +692,7 @@ function Turn({
   const scheduled = turn.trigger === "schedule";
   const savingSkill = turn.purpose === "save_skill";
   // 存为技能那一轮，交给智能体的是一大段说明；对话里只说做了什么。
-  const prompt = savingSkill ? t("把这段对话存为技能") : (turn.prompt ?? (first ? task.description : ""));
+  const prompt = savingSkill ? t("把这个任务存为技能") : (turn.prompt ?? (first ? task.description : ""));
   const reply = turn.reply?.trim() || (turn.state === "succeeded" ? turn.summary?.trim() : "") || "";
 
   return (
@@ -1007,7 +1007,7 @@ function Question({ item, onDecide }: { item: RuntimeActivity; onDecide: (decisi
             {t("总是允许这条命令")}
           </button>
         )}
-        <button type="button" disabled={busy} onClick={() => void answer({ kind: "reject", reason: t("在对话里拒绝") })}>
+        <button type="button" disabled={busy} onClick={() => void answer({ kind: "reject", reason: t("在任务里拒绝") })}>
           <X size={14} aria-hidden="true" />
           {t("拒绝")}
         </button>

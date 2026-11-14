@@ -1068,7 +1068,7 @@ const navItems: Array<{
  * 是演示版的本地日志，这里也不要。
  */
 const runtimeNavItems: typeof navItems = [
-  { id: "home", label: t("对话"), mobileLabel: t("对话"), icon: MessagesSquare },
+  { id: "home", label: t("任务"), mobileLabel: t("任务"), icon: MessagesSquare },
   { id: "approvals", label: t("待确认的操作"), mobileLabel: t("确认"), icon: ShieldCheck },
   { id: "artifacts", label: t("成果"), mobileLabel: t("成果"), icon: Files },
   { id: "settings", label: t("设置"), mobileLabel: t("设置"), icon: Settings2 },
@@ -1879,7 +1879,7 @@ export default function HomePage() {
     activeView === "home" && runtimeMode
       ? {
           eyebrow: workspaceToday.eyebrow,
-          title: t("对话"),
+          title: t("任务"),
           description: t("说一句话，智能体用这台电脑的终端和浏览器替你去做。"),
         }
       : activeView === "home"
@@ -9738,7 +9738,7 @@ export default function HomePage() {
   /** 接着一段对话说：同一个智能体会话续接，它记得前面说过和做过的。 */
   async function sendConversationFollowUp(taskId: string, text: string) {
     const task = tasks.find((item) => item.id === taskId);
-    if (!task) throw new Error(t("这段对话已经不在了"));
+    if (!task) throw new Error(t("这个任务已经不在了"));
     const now = Date.now();
     const runId = `run-${now}`;
     setTasks((items) =>
@@ -9776,7 +9776,7 @@ export default function HomePage() {
     const task = tasks.find((item) => item.id === taskId);
     setTasks((items) => items.filter((item) => item.id !== taskId));
     setConversationId(null);
-    if (task) setNotice(t("已删除对话“{title}”", { title: task.title }));
+    if (task) setNotice(t("已删除任务“{title}”", { title: task.title }));
   }
 
   function scheduleConversation(taskId: string, schedule: TaskSchedule, time: string, day: Weekday) {
@@ -10364,7 +10364,10 @@ export default function HomePage() {
         </div>
       </aside>
 
-      <section className="clarity-main" aria-busy={!tasksReady}>
+      <section
+        className={`clarity-main${runtimeMode && activeView === "home" ? " is-task-home" : ""}`}
+        aria-busy={!tasksReady}
+      >
         <div className="clarity-mobile-topbar">
           <button
             className="clarity-mobile-brand"
@@ -10390,8 +10393,8 @@ export default function HomePage() {
           <button
             className="clarity-mobile-create"
             type="button"
-            aria-label={runtimeMode ? t("新对话") : t("新建任务")}
-            title={runtimeMode ? t("新对话") : t("新建任务")}
+            aria-label={runtimeMode ? t("新任务") : t("新建任务")}
+            title={runtimeMode ? t("新任务") : t("新建任务")}
             onClick={beginCreateTask}
           >
             <Plus size={19} />
@@ -10960,7 +10963,7 @@ export default function HomePage() {
             >
               <Plus size={17} />
 
-              {runtimeMode ? t("新对话") : t("新建任务")}
+              {runtimeMode ? t("新任务") : t("新建任务")}
             </button>
           </div>
         </header>

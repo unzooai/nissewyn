@@ -27279,3 +27279,86 @@ body {
   color: var(--clarity-ink);
   font-weight: 700;
 }
+
+/* ---- Task home: the tasks fill the window -------------------------------
+ * 装好的产品里首页就是任务。页头（日期、大标题、说明、搜索、第二个“新任务”）
+ * 在这里只占地方：左侧导航已经说了这是哪儿，待确认的数量在导航上，新任务在
+ * 列表顶上。去掉它，任务区铺满窗口，不再是页面里套着的一张卡片、整页跟着滚。 */
+.clarity-main.is-task-home {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+}
+
+.clarity-main.is-task-home > .clarity-header {
+  display: none;
+}
+
+.clarity-main.is-task-home .conversations {
+  height: 100vh;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.clarity-main.is-task-home .conversation-list {
+  width: 240px;
+}
+
+.conversations {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.conversation-list {
+  width: 260px;
+}
+
+.conversation-new {
+  margin: 12px 10px 8px;
+  padding: 8px 12px;
+}
+
+.conversation-list li button {
+  align-items: center;
+  padding: 7px 10px;
+}
+
+.conversation-list-copy {
+  gap: 0;
+}
+
+.conversation-list-copy small {
+  font-size: 11.5px;
+}
+
+.conversation-dot {
+  margin-top: 0;
+}
+
+/* 电脑面板打开时，任务列表让位，对话和面板各得一半宽；左上角的返回键回到列表。 */
+.conversations:has(.conversation-columns.with-computer) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.conversations:has(.conversation-columns.with-computer) .conversation-list {
+  display: none;
+}
+
+.conversations:has(.conversation-columns.with-computer) .conversation-back {
+  display: inline-flex;
+}
+
+.conversation-columns.with-computer {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 50%);
+}
+
+@media (max-width: 860px) {
+  .clarity-main.is-task-home .conversations {
+    height: calc(100vh - 64px);
+  }
+
+  .clarity-main.is-task-home .conversation-list,
+  .conversation-list {
+    width: auto;
+  }
+}
