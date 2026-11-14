@@ -83,11 +83,14 @@ fn start_core(program: &PathBuf) -> std::io::Result<()> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        // No console window, and not tied to this window's life: the Core
-        // keeps running schedules after the window closes.
+        // A console of its own that is never shown -- not DETACHED_PROCESS,
+        // which leaves it none: then every console program it starts (the
+        // agent CLIs, their MCP servers, git, powershell) opened a window of
+        // its own on the person's desktop. With a hidden one they share it.
+        // The window is a GUI program with no console, so the Core is not
+        // tied to this window's life either way.
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        const DETACHED_PROCESS: u32 = 0x0000_0008;
-        command.creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS);
+        command.creation_flags(CREATE_NO_WINDOW);
     }
     command.spawn().map(|_| ())
 }
