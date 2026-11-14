@@ -79,7 +79,7 @@ export function SkillsPanel({
         </button>
       </div>
       <p className="skills-intro">
-        {t("技能是一份说明（SKILL.md）加上需要的脚本，智能体遇到对应的事会自己用上。开着的技能每次交给 Claude Code 时挂上，只在 Unzoo One 里生效，不改你自己的 Claude 配置。")}
+        {t("技能是一份说明（SKILL.md）加上需要的脚本，智能体遇到对应的事会自己用上。开着的技能每次交给 Claude Code、Codex 或 OpenCode 时挂上，只在 Unzoo One 里生效，不改它们自己的配置。")}
       </p>
 
       {error ? (

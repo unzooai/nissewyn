@@ -232,8 +232,8 @@ export const enPage9: Record<string, string> = {
   "技能": "Skills",
   "智能体会的本事": "What your agents know how to do",
   "刷新技能": "Refresh skills",
-  "技能是一份说明（SKILL.md）加上需要的脚本，智能体遇到对应的事会自己用上。开着的技能每次交给 Claude Code 时挂上，只在 Unzoo One 里生效，不改你自己的 Claude 配置。":
-    "A skill is a set of instructions (SKILL.md) plus any scripts it needs; the agent uses it on its own when the work calls for it. Skills that are on are loaded every time work is handed to Claude Code, inside Unzoo One only — your own Claude setup is not changed.",
+  "技能是一份说明（SKILL.md）加上需要的脚本，智能体遇到对应的事会自己用上。开着的技能每次交给 Claude Code、Codex 或 OpenCode 时挂上，只在 Unzoo One 里生效，不改它们自己的配置。":
+    "A skill is a set of instructions (SKILL.md) plus any scripts it needs; the agent uses it on its own when the work calls for it. Skills that are on are loaded every time work is handed to Claude Code, Codex or OpenCode, inside Unzoo One only — their own settings are not changed.",
   "读不到技能：{error}": "Couldn't read skills: {error}",
   "自带": "Built in",
   "这个版本没有带自带技能。": "This version has no built-in skills.",

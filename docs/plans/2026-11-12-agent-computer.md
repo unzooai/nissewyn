@@ -252,7 +252,12 @@
   - `unzoo-deliverables`：成果写在工作文件夹、文件命名和格式、回复怎么写。
 - **你的技能**：放在 `<状态目录>/skills/<名字>/`，可以导入一个含 SKILL.md 的文件夹，或者从对话存下来。可以开关、删除（自带的只能关）。开关状态存在 `skills.json`。
 - **存为技能**：对话“更多 › 存为技能”会在同一段对话里多跑一轮，让智能体把做法写进 `.unzoo-skill/<名字>/SKILL.md`。运行时在这一轮结束时把它收进技能库、删掉这个文件夹（不算成果），对话里显示“已存为技能”。
-- **其它智能体**：Codex、agy、OpenCode 暂时不挂技能，它们装技能的方式还没验证。
+- **其它智能体**（2026-11-14）：Codex 和 OpenCode 也挂上同一套技能，同样只对这次会话、不写它们自己的配置：
+  - Codex：运行时在 app-server 握手后发 `skills/extraRoots/set`，指向组装好的技能目录（会话环境变量 `UNTERM_SKILL_ROOTS` 告诉宿主）；
+  - OpenCode：会话环境里的 `OPENCODE_CONFIG_CONTENT` 加 `skills.paths`，和用户自己的配置合并；
+  - 续接对话时重新交一次（环境变量不随旧会话保留）；帮手走同一条启动路径，也有技能；
+  - 实测：真的 Codex 列出了 unzoo-browser、unzoo-deliverables、unzoo-terminal；`opencode debug skill` 在同样的配置下列出这三个。agy 本机没装，没做。
+  - 自带的终端、浏览器技能写的是 unterm / unzoo 的 MCP 工具；Codex、OpenCode 不受管时不一定接了这些工具，它们照常用自己的。
 - **接口**：
   - `GET /api/console/skills`；
   - `POST /api/console/skills/toggle`、`/delete`、`/import`；
