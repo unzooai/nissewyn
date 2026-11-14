@@ -27029,3 +27029,76 @@ body {
   font-size: 13px;
   overflow-wrap: anywhere;
 }
+
+.conversation-handover {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--clarity-blue);
+  border-radius: 10px;
+  background: var(--clarity-panel);
+}
+
+.conversation-handover header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--clarity-blue);
+}
+
+.conversation-handover p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.conversation-handover small {
+  color: var(--clarity-soft);
+  font-size: 12.5px;
+}
+
+.conversation-handover input {
+  padding: 6px 10px;
+  border: 1px solid var(--clarity-line);
+  border-radius: 7px;
+  background: var(--clarity-panel);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.conversation-handover footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.conversation-handover footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid var(--clarity-line);
+  border-radius: 7px;
+  background: var(--clarity-panel);
+  color: inherit;
+  cursor: pointer;
+}
+
+.conversation-handover footer button.primary {
+  border-color: var(--clarity-blue);
+  background: var(--clarity-blue);
+  color: #fff;
+}
+
+.conversation-handover footer button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.conversation-handover-done {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

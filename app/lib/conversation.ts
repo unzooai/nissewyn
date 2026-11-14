@@ -168,6 +168,8 @@ export function activityLine(item: RuntimeActivity): string {
       return t("更新了计划");
     case "skill":
       return target ? t("用了技能 {target}", { target: target.replace(/^unzoo-one:/, "") }) : t("用了一个技能");
+    case "handover":
+      return t("请你接手：{what}", { what: target });
     case "delegate": {
       // "codex: 修好测试"，接着等的时候只有会话 id。
       const split = target.indexOf(": ");

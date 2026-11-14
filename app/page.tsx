@@ -11231,6 +11231,9 @@ export default function HomePage() {
             loadTab={(tabId) => workspaceProvider.runtime.tabView(tabId)}
             onOpenTerminal={openAgentTerminal}
             onShowTab={(tabId) => workspaceProvider.runtime.activateTab(tabId)}
+            onHandover={(sessionId, handoverId, done, note) =>
+              workspaceProvider.runtime.answerHandover(sessionId, handoverId, done, note)
+            }
             onSaveSkill={saveConversationAsSkill}
             onOpenSkills={() => openSettingsSection("agents")}
             scheduleLabel={formatTaskSchedule}

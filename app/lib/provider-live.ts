@@ -412,6 +412,14 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           rows: data.rows ?? undefined,
         };
       },
+      async answerHandover(sessionId, handoverId, done, note) {
+        await callUnterm("/api/console/handover", {
+          session_id: sessionId,
+          handover_id: handoverId,
+          done,
+          ...(note?.trim() ? { note: note.trim() } : {}),
+        });
+      },
       async terminalInput(sessionId, input) {
         await callUnterm("/api/console/computer/terminal/input", { session_id: sessionId, input });
       },

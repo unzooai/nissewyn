@@ -416,6 +416,8 @@ export interface RuntimeTaskPort {
   terminalScreen(sessionId: string, fromLine?: number): Promise<TerminalScreen>;
   /** Keys the person typed into it, as the bytes a terminal sends. */
   terminalInput(sessionId: string, input: string): Promise<void>;
+  /** 人做完了智能体请他做的事（或者做不了）。 */
+  answerHandover(sessionId: string, handoverId: string, done: boolean, note?: string): Promise<void>;
   /** 把智能体的终端切到 Unzoo One 终端窗口的前台，让人接手。 */
   focusTerminal(sessionId: string): Promise<void>;
   /** 智能体用过的标签页此刻的样子。 */

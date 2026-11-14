@@ -81,6 +81,18 @@ export type RuntimeTurn = RuntimeRun & {
   skill_error?: string | null;
   /** 智能体这一轮交给别的智能体做的事，每个帮手一条。 */
   helpers?: RuntimeHelper[] | null;
+  /** 智能体请人亲自做的事（登录、验证码），和人做了没有。 */
+  handovers?: RuntimeHandover[] | null;
+};
+
+/** 智能体请人接手的一件事。 */
+export type RuntimeHandover = {
+  id: string;
+  /** 给人的一句话：做什么、在哪做。 */
+  what: string;
+  tab_id?: string | null;
+  state: "waiting" | "done" | "cannot";
+  note?: string | null;
 };
 
 /**

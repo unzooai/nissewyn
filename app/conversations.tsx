@@ -20,6 +20,8 @@ import {
   ShieldAlert,
   Square,
   Trash2,
+  ExternalLink,
+  Hand,
   X,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -27,7 +29,7 @@ import type { TaskItem, TaskSchedule, Weekday } from "./types";
 import { dateLocale, t } from "./i18n";
 import type { ApprovalDecision, TabView, TerminalScreen } from "./lib/provider";
 import { ComputerPanel } from "./computer-panel";
-import type { RuntimeActivity, RuntimeHelper, RuntimeThread, RuntimeTurn } from "./lib/runtime-tasks";
+import type { RuntimeActivity, RuntimeHandover, RuntimeHelper, RuntimeThread, RuntimeTurn } from "./lib/runtime-tasks";
 import {
   activityLine,
   activitySummary,
@@ -75,6 +77,8 @@ export type ConversationsProps = {
   loadTab: (tabId: string) => Promise<TabView>;
   onOpenTerminal: (sessionId: string) => Promise<void>;
   onShowTab: (tabId: string) => Promise<void>;
+  /** 人做完了智能体请他接手的事（或者做不了）。 */
+  onHandover: (sessionId: string, handoverId: string, done: boolean, note?: string) => Promise<void>;
   /** 让智能体把这段对话做过的事写成技能。 */
   onSaveSkill: (taskId: string) => Promise<void>;
   /** 打开设置里的技能。 */
@@ -677,9 +681,13 @@ function Turn({
   onOpenOutput,
   onFollowUp,
   onOpenSkills,
+  onHandover,
+  onShowTab,
 }: ConversationsProps & { task: TaskItem; turn: RuntimeTurn; first: boolean }) {
   const live = turnLive(turn);
   const questions = pendingQuestions(turn);
+  const handovers = turn.handovers ?? [];
+  const handingOver = live && handovers.some((handover) => handover.state === "waiting");
   const [open, setOpen] = useState<boolean | null>(null);
   const expanded = open ?? (live || questions.length > 0);
   const scheduled = turn.trigger === "schedule";
@@ -721,6 +729,18 @@ function Turn({
         />
       ))}
 
+      {handovers.map((handover) => (
+        <HandoverCard
+          key={handover.id}
+          handover={handover}
+          live={live}
+          onShowTab={onShowTab}
+          onAnswer={(done, note) =>
+            turn.session_id ? onHandover(turn.session_id, handover.id, done, note) : Promise.resolve()
+          }
+        />
+      ))}
+
       {(turn.helpers ?? []).map((helper) => (
         <HelperCard key={helper.session_id} turn={turn} helper={helper} onDecide={onDecide} />
       ))}
@@ -743,7 +763,7 @@ function Turn({
         </div>
       )}
 
-      {live && !reply && questions.length === 0 && (
+      {live && !reply && questions.length === 0 && !handingOver && (
         <p className="conversation-working">
           <LoaderCircle size={15} className="spin" aria-hidden="true" />
           {turn.activity.length ? t("正在做") : t("正在思考")}
@@ -835,6 +855,94 @@ function HelperCard({
         />
       ))}
       {helper.state === "failed" && helper.error && <p className="conversation-helper-error">{helper.error}</p>}
+    </section>
+  );
+}
+
+/**
+ * 智能体请你亲自做的事：登录、验证码、手机上确认。它在等；你在真的浏览器或
+ * 终端里做完，点“好了，继续”。密码和验证码不经过对话。
+ */
+function HandoverCard({
+  handover,
+  live,
+  onShowTab,
+  onAnswer,
+}: {
+  handover: RuntimeHandover;
+  live: boolean;
+  onShowTab: ConversationsProps["onShowTab"];
+  onAnswer: (done: boolean, note?: string) => Promise<void>;
+}) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const waiting = handover.state === "waiting" && live;
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!waiting) {
+    const label =
+      handover.state === "done"
+        ? t("你接手做完了：{what}", { what: handover.what })
+        : handover.state === "cannot"
+          ? t("你说做不了：{what}", { what: handover.what })
+          : t("它请你接手过：{what}", { what: handover.what });
+    return (
+      <p className="conversation-quiet conversation-handover-done">
+        <Hand size={14} aria-hidden="true" /> {label}
+        {handover.note ? ` (${handover.note})` : ""}
+      </p>
+    );
+  }
+
+  return (
+    <section className="conversation-handover" role="group" aria-label={t("它在等你接手")}>
+      <header>
+        <Hand size={16} aria-hidden="true" />
+        <strong>{t("它在等你接手")}</strong>
+      </header>
+      <p>{handover.what}</p>
+      <small>{t("在浏览器或终端里亲自做完，再点“好了，继续”。密码和验证码不要发在对话里。")}</small>
+      <input
+        type="text"
+        value={note}
+        maxLength={500}
+        placeholder={t("想告诉它什么（可不填）")}
+        onChange={(event) => setNote(event.target.value)}
+        disabled={busy}
+      />
+      <footer>
+        {handover.tab_id && (
+          <button type="button" disabled={busy} onClick={() => void run(() => onShowTab(handover.tab_id!))}>
+            <ExternalLink size={14} aria-hidden="true" />
+            {t("在浏览器里打开")}
+          </button>
+        )}
+        <button className="primary" type="button" disabled={busy} onClick={() => void run(() => onAnswer(true, note))}>
+          <Check size={14} aria-hidden="true" />
+          {t("好了，继续")}
+        </button>
+        <button type="button" disabled={busy} onClick={() => void run(() => onAnswer(false, note))}>
+          <X size={14} aria-hidden="true" />
+          {t("做不了")}
+        </button>
+      </footer>
+      {error && (
+        <p className="conversation-error" role="alert">
+          {error}
+        </p>
+      )}
     </section>
   );
 }
