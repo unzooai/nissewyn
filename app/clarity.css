@@ -27362,3 +27362,55 @@ body {
     width: auto;
   }
 }
+
+/* Deliverables grouped by task */
+.artifact-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid #e8edf2;
+  background: #f4f7fa;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.artifact-group-head:hover {
+  background: #eaf0f6;
+}
+
+.artifact-group-head svg {
+  flex: none;
+  transition: transform 0.15s ease;
+}
+
+.artifact-group-head.open svg {
+  transform: rotate(90deg);
+}
+
+.artifact-group-head strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.artifact-group-head em {
+  flex: none;
+  font-style: normal;
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.artifact-group .artifact-list-row {
+  min-height: 76px;
+}

@@ -34,6 +34,7 @@ export const enPage5: Record<string, string> = {
   "文件名": "File name",
   "显示 {length} / {length2} 项": "Showing {length} of {length2}",
   "成果列表": "Deliverable list",
+  "其他成果": "Other deliverables",
   "取消重点标记：{title}": "Unmark as key: {title}",
   "标记为重点：{title}": "Mark as key: {title}",
   "标记为重点": "Mark as key",

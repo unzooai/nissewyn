@@ -4515,6 +4515,7 @@ export default function HomePage() {
         : artifacts,
     [artifactTaskId, artifacts],
   );
+  const [openArtifactGroups, setOpenArtifactGroups] = useState<Record<string, boolean>>({});
   const filteredArtifacts = useMemo(() => {
     const keyword = artifactListQuery.trim().toLowerCase();
     const filteredByType =
@@ -4554,6 +4555,23 @@ export default function HomePage() {
     filteredArtifacts.find((artifact) => artifact.id === selectedArtifactId) ??
     filteredArtifacts[0] ??
     null;
+  // 成果按任务分组：一个任务一组，组的先后跟着组里排在最前的那项。
+  const artifactGroups = useMemo(() => {
+    const groups: { key: string; title: string; items: ArtifactItem[] }[] = [];
+    const byKey = new Map<string, (typeof groups)[number]>();
+    for (const artifact of filteredArtifacts) {
+      const key = artifact.taskId ?? "";
+      let group = byKey.get(key);
+      if (!group) {
+        const title = tasks.find((task) => task.id === artifact.taskId)?.title ?? "";
+        group = { key, title, items: [] };
+        byKey.set(key, group);
+        groups.push(group);
+      }
+      group.items.push(artifact);
+    }
+    return groups;
+  }, [filteredArtifacts, tasks]);
   // 本机文件选中时才去读：列表里可能有几十个，不必一次全读。
   const selectedFile =
     selectedArtifact?.file && !selectedArtifact.file.loaded && !selectedArtifact.file.error
@@ -12708,7 +12726,32 @@ export default function HomePage() {
                   <em>{t("{length} 项", { length: filteredArtifacts.length })}</em>
                 </div>
                 <div className="artifact-list-items">
-                  {filteredArtifacts.map((artifact) => {
+                  {artifactGroups.map((group, groupIndex) => {
+                    const grouped = !artifactTaskId;
+                    const searching = Boolean(artifactListQuery.trim());
+                    const open =
+                      !grouped ||
+                      searching ||
+                      (openArtifactGroups[group.key] ??
+                        (groupIndex === 0 ||
+                          group.items.some((artifact) => artifact.id === selectedArtifact?.id)));
+                    return (
+                      <div className="artifact-group" key={group.key || "none"}>
+                        {grouped && (
+                          <button
+                            className={`artifact-group-head${open ? " open" : ""}`}
+                            type="button"
+                            aria-expanded={open}
+                            onClick={() =>
+                              setOpenArtifactGroups((current) => ({ ...current, [group.key]: !open }))
+                            }
+                          >
+                            <ChevronRight size={14} />
+                            <strong>{group.title || t("其他成果")}</strong>
+                            <em>{group.items.length}</em>
+                          </button>
+                        )}
+                        {open && group.items.map((artifact) => {
                     const ArtifactIcon = artifactIconMap[artifact.type];
                     return (
                       <div
@@ -12752,6 +12795,9 @@ export default function HomePage() {
                         >
                           <Star size={15} fill={artifact.starred ? "currentColor" : "none"} />
                         </button>
+                      </div>
+                    );
+                        })}
                       </div>
                     );
                   })}
