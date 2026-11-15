@@ -298,6 +298,12 @@
   - 超出的每次都问（删除、强推在任何一档都问）；“总是允许”按这次的风险等级记成授权，不再放行这个客户端之后的所有写入；
   - 实测（隔离服务，没开控制台，模拟 Claude Desktop）：`echo` 1 秒执行；`rm -rf`、`git push --force` 被拦下，提示请用户打开 Unzoo One 再试；
   - 没有设置来源时（单独用 unterm）仍是原来的规则。
+- **外部客户端也拿到用法和技能**（2026-11-15）：
+  - **连接时的说明**：桥接程序旁边有 `mcp-instructions.md` 时，`initialize` 的 `instructions` 用它，不用 unterm 自带的那段（那段讲的是“你在 Unterm 窗口里”）。Unzoo One 的版本约 300 token：终端常驻、开一个复用、短命令和长任务、交给人的输入、被拒后别换法子。文件首行 `<!-- product: Unzoo One -->` 也让服务没开时的提示变成“请用户打开 Unzoo One”。所有 MCP 客户端都适用。
+  - **技能装进客户端**：接入终端时把启用的技能复制进客户端自己读技能的文件夹，断开时取回。实测各家读的位置：Claude Code `~/.claude/skills`；Codex `~/.codex/skills`（不读 `~/.agents/skills`）；OpenCode `~/.config/opencode/skills`（也读 `~/.claude/skills`、`~/.agents/skills`）。Claude Desktop、Cursor 等没有可写的技能文件夹，只有连接时的说明。
+  - 只动自己装的：每份复制里放 `.unzoo-one-skill` 标记；同名而没有标记的文件夹是用户自己的，跳过并报告；技能开关、导入、删除后，以及服务启动时（更新可能改了自带技能）同步已接入的客户端。`unzoo-deliverables` 只在 Unzoo One 跑的任务里有意义，不装。
+  - 自带技能的措辞改成两边都对：服务器名 `unterm` / `unzoo-one`；`agent_session.handover` 只在托管任务里有，没有时在回复里请用户在那个标签页操作。
+  - 实测（隔离服务、临时家目录）：接入三个客户端后各装了 `unzoo-browser`、`unzoo-terminal`；真的 Codex（app-server `skills/list`）和 OpenCode（`debug skill`）都列出了它们；断开 Claude Code 移除了这两个，用户自己的 `my-own` 还在；桥接程序初始化带上了 Unzoo One 的说明，服务没开时提示打开 Unzoo One。
 - **限制**：
   - 要确认的操作在 Unzoo One 没打开时会被拒绝（没人能答）；
   - 判断依据是一次写入的文字，把一条命令拆成几次按键输入能绕过命令内容的判断（方法本身的风险仍在）；

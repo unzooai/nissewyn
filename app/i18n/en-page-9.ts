@@ -4,6 +4,9 @@ export const enPage9: Record<string, string> = {
   "关掉 Claude Code 自带的 Bash、PowerShell 和联网工具，命令只能经 Unzoo One 的终端执行，网页只能经 Unzoo 浏览器打开。目前只有 Claude Code 支持；其它智能体用自己的工具。哪些操作要先问你，由下面的自主程度决定。":
     "Turns off Claude Code's own Bash, PowerShell and web tools, so commands run only in the Unzoo One terminal and web pages open only in Unzoo Browser. Only Claude Code supports this for now; other agents use their own tools. What they ask you first is set by the autonomy level below.",
   "自主程度": "Autonomy",
+  "已把 Unzoo One 的终端和技能接入 {name}。重启 {name} 后生效。": "Connected Unzoo One's terminal and skills to {name}. Restart {name} to use them.",
+  "已从 {name} 移除 Unzoo One 的终端和技能": "Removed Unzoo One's terminal and skills from {name}",
+  "技能已装入": "Skills installed",
   "智能体不问你就能做多少，也包括你在 Claude Code、Cursor 等客户端里接入的终端。删除、读取账号或密钥、花钱，任何一档都会先问你；下面的常设规则优先。":
     "How much agents may do without asking, including in the terminal you connect to Claude Code, Cursor and other clients. Deleting, reading accounts or secrets, and spending money are always asked about, at every level; standing rules below take precedence.",
   "自主程度已改为“{level}”": "Autonomy set to “{level}”",
@@ -256,8 +259,8 @@ export const enPage9: Record<string, string> = {
   "Unzoo 浏览器已接入这些客户端。重启客户端后生效。": "Unzoo Browser is now connected to these clients. Restart them for it to take effect.",
   "接入其它 AI 客户端": "Other AI clients",
   "在 Claude 桌面版、Cursor、Codex 里也能用这台电脑": "Use this computer from Claude Desktop, Cursor and Codex too",
-  "接入后，你在那些客户端里用的智能体也能操作 Unzoo One 的终端和浏览器。它在终端里做的事按“智能体 › 自主程度”判断：普通命令直接执行，删除、推送这类会先进这里的收件箱等你确认；Unzoo One 没打开时，要确认的操作会被拒绝。":
-    "Once connected, the agents you use in those clients can work in Unzoo One's terminal and browser. What they do in the terminal follows Agents › Autonomy: ordinary commands run, while deleting, pushing and the like come to this inbox for you to approve; while Unzoo One isn't open, anything that needs approval is refused.",
+  "接入后，你在那些客户端里用的智能体也能操作 Unzoo One 的终端和浏览器，并拿到一段终端用法说明；Claude Code、Codex、OpenCode 还会装上你在“技能”里启用的技能，断开时一并移除。它在终端里做的事按“智能体 › 自主程度”判断：普通命令直接执行，删除、推送这类会先进这里的收件箱等你确认；Unzoo One 没打开时，要确认的操作会被拒绝。":
+    "Once connected, the agents you use in those clients can work in Unzoo One's terminal and browser, and get a short guide to the terminal; Claude Code, Codex and OpenCode also get the skills you have enabled under Skills, removed again when you disconnect. What they do in the terminal follows Agents › Autonomy: ordinary commands run, while deleting, pushing and the like come to this inbox for you to approve; while Unzoo One isn't open, anything that needs approval is refused.",
   "读不到客户端：{error}": "Couldn't check the clients: {error}",
   "这台电脑上没有找到能接入的 AI 客户端。": "No AI clients that can be connected were found on this computer.",
   "配置文件有问题，没有改动：{error}": "Its config file has a problem, so nothing was changed: {error}",

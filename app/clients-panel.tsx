@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Globe2, Plug, RefreshCw, SquareTerminal } from "lucide-react";
+import { BookOpen, Check, Globe2, Plug, RefreshCw, SquareTerminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { t } from "./i18n";
 import type { RuntimeClients, RuntimeTaskPort } from "./lib/provider";
@@ -36,14 +36,18 @@ export function ClientsPanel({
     void load();
   }, [load]);
 
-  async function toggle(id: string, name: string, connect: boolean) {
+  async function toggle(id: string, name: string, connect: boolean, skills: boolean) {
     setBusy(id);
     try {
       await runtime.connectClient(id, connect);
       notify(
         connect
-          ? t("已把 Unzoo One 的终端接入 {name}。重启 {name} 后生效。", { name })
-          : t("已从 {name} 移除 Unzoo One 的终端", { name }),
+          ? skills
+            ? t("已把 Unzoo One 的终端和技能接入 {name}。重启 {name} 后生效。", { name })
+            : t("已把 Unzoo One 的终端接入 {name}。重启 {name} 后生效。", { name })
+          : skills
+            ? t("已从 {name} 移除 Unzoo One 的终端和技能", { name })
+            : t("已从 {name} 移除 Unzoo One 的终端", { name }),
       );
       await load();
     } catch (failure) {
@@ -79,7 +83,7 @@ export function ClientsPanel({
         </button>
       </div>
       <p className="skills-intro">
-        {t("接入后，你在那些客户端里用的智能体也能操作 Unzoo One 的终端和浏览器。它在终端里做的事按“智能体 › 自主程度”判断：普通命令直接执行，删除、推送这类会先进这里的收件箱等你确认；Unzoo One 没打开时，要确认的操作会被拒绝。")}
+        {t("接入后，你在那些客户端里用的智能体也能操作 Unzoo One 的终端和浏览器，并拿到一段终端用法说明；Claude Code、Codex、OpenCode 还会装上你在“技能”里启用的技能，断开时一并移除。它在终端里做的事按“智能体 › 自主程度”判断：普通命令直接执行，删除、推送这类会先进这里的收件箱等你确认；Unzoo One 没打开时，要确认的操作会被拒绝。")}
       </p>
 
       {error ? (
@@ -105,6 +109,11 @@ export function ClientsPanel({
                     <em className={client.browser ? "is-on" : ""}>
                       <Globe2 size={12} aria-hidden="true" /> {client.browser ? t("浏览器已接入") : t("浏览器未接入")}
                     </em>
+                    {client.skills && client.terminal && (
+                      <em className="is-on">
+                        <BookOpen size={12} aria-hidden="true" /> {t("技能已装入")}
+                      </em>
+                    )}
                   </small>
                 )}
               </span>
@@ -113,7 +122,7 @@ export function ClientsPanel({
                   type="button"
                   className={client.terminal ? "" : "primary"}
                   disabled={busy !== null || !data.terminalReady}
-                  onClick={() => void toggle(client.id, client.name, !client.terminal)}
+                  onClick={() => void toggle(client.id, client.name, !client.terminal, client.skills === true)}
                 >
                   {client.terminal ? t("断开终端") : (
                     <>

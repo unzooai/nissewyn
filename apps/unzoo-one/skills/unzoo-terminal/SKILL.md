@@ -5,12 +5,12 @@ description: How to run commands on this computer through the Unzoo One terminal
 
 # Working in the Unzoo One terminal
 
-Commands on this computer run in the Unzoo One terminal, through the `unterm` MCP server. Your own shell tools may be switched off; these tools are the way in. The person can watch the same terminal live beside the conversation and take it over, so work in it the way a careful colleague would.
+Commands on this computer run in the Unzoo One terminal, through its MCP server: `unterm` in a task Unzoo One runs, `unzoo-one` in a client the person connected to it. In a Unzoo One task your own shell tools may be switched off; these tools are the way in. The person can watch the same terminal live in Unzoo One and take it over, so work in it the way a careful colleague would.
 
 ## Terminals persist — reuse them
 
 - A terminal is a session that lives in the Unzoo One background service. It survives the end of your turn, and it survives the person closing the window.
-- Open one with `session.create` (shown to you as `mcp__unterm__session_create`). Pass `cwd` set to the current working folder. Keep the `session_id` it returns.
+- Open one with `session.create` (shown with the server's prefix, such as `mcp__unterm__session_create` or `mcp__unzoo-one__session_create`). Pass `cwd` set to the current working folder. Keep the `session_id` it returns.
 - Use the same terminal for the whole task. In a follow-up turn, look at what you did earlier in the conversation: if you opened a terminal before, keep using that `session_id` instead of opening another. Open a second terminal only for something that must run alongside, like a dev server next to a test run.
 - Never close (`session.destroy`) a terminal you did not open. Close your own only if the person asks: a running server or a shell that still holds context is often why they asked you here.
 
@@ -32,7 +32,7 @@ Commands on this computer run in the Unzoo One terminal, through the `unterm` MC
 ## Interactive programs
 
 - Use `session.input` to type into a program that is waiting (a prompt, a REPL), then `screen.text` to see its answer.
-- If a program wants a password, a 2FA code or a confirmation only the person should give, do not guess or work around it. Stop and say exactly what it is waiting for: the person can type it into the same terminal from the panel beside the conversation.
+- If a program wants a password, a 2FA code or a confirmation only the person should give, do not guess or work around it. Stop and say exactly what it is waiting for: the person can type it into the same terminal in Unzoo One.
 
 ## Being asked first
 

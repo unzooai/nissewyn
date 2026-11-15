@@ -97,6 +97,8 @@ New-Item -ItemType Directory -Path $fonts -Force | Out-Null
 foreach ($font in "SymbolsNerdFontMono-Regular.ttf", "NotoColorEmoji.ttf", "JetBrainsMono-Regular.ttf") {
   Copy-Item (Join-Path $unterm "assets\fonts\$font") $fonts
 }
+# What the terminal bridge tells the agents in other clients, beside unterm-cli.exe.
+Copy-Item (Join-Path $PSScriptRoot "mcp-instructions.md") $payload
 # Built-in skills, beside unterm-core.exe where the runtime looks for them.
 # Each file is also listed under bundle.resources in tauri.conf.json.
 Copy-Item -Recurse (Join-Path $PSScriptRoot "skills") (Join-Path $payload "skills")

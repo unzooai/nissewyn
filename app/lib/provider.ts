@@ -374,6 +374,8 @@ export type RuntimeClient = {
   config: string;
   terminal: boolean;
   browser: boolean;
+  /** 这个客户端读技能文件夹：接入终端时把 Unzoo One 的技能一起装进去。 */
+  skills?: boolean;
   error?: string;
 };
 

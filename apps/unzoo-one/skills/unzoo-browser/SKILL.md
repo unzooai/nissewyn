@@ -5,7 +5,7 @@ description: How to use the web through Unzoo Browser (the unzoo MCP server) —
 
 # Using the web through Unzoo Browser
 
-Web pages open in Unzoo Browser, a real Chromium on this computer, through the `unzoo` MCP server (tools shown to you as `mcp__unzoo__…`). The person can watch your tab beside the conversation and take it over.
+Web pages open in Unzoo Browser, a real Chromium on this computer, through the `unzoo` MCP server (tools shown to you as `mcp__unzoo__…`). The person can watch your tab and take it over.
 
 ## Your tab
 
@@ -36,7 +36,7 @@ Web pages open in Unzoo Browser, a real Chromium on this computer, through the `
 ## Sign-ins, captchas and anything only the person should do
 
 - Never type a password, a 2FA code or card details yourself, and never ask the person to paste them into the chat.
-- When a page needs a sign-in, a captcha or a confirmation, hand it to the person: call the unterm tool `agent_session.handover` with one sentence saying what to do and the `tab_id`. It waits while they do it in the real browser; when it says `done`, take a fresh snapshot and carry on; when it says `waiting`, call it again with the `handover_id`. (`human_task` is not this: it runs human-like clicks and typing, which you must not use on a sign-in form.)
+- When a page needs a sign-in, a captcha or a confirmation, hand it to the person: call the unterm tool `agent_session.handover` with one sentence saying what to do and the `tab_id`. It waits while they do it in the real browser; when it says `done`, take a fresh snapshot and carry on; when it says `waiting`, call it again with the `handover_id`. (`human_task` is not this: it runs human-like clicks and typing, which you must not use on a sign-in form.) If `agent_session.handover` is not among your tools (it is there only in a task Unzoo One runs), stop instead and ask the person in your reply to do it in that tab, then carry on when they say it is done.
 - If the profile you are in is already signed in, just use it. That is why it was chosen.
 
 ## Being asked first
