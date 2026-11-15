@@ -7,6 +7,11 @@ export const enPage9: Record<string, string> = {
   "已把 Unzoo One 的终端和技能接入 {name}。重启 {name} 后生效。": "Connected Unzoo One's terminal and skills to {name}. Restart {name} to use them.",
   "已从 {name} 移除 Unzoo One 的终端和技能": "Removed Unzoo One's terminal and skills from {name}",
   "技能已装入": "Skills installed",
+  "把东西发出这台电脑": "send something off this computer",
+  "读取你的账号或密钥": "read your accounts or secrets",
+  "花钱": "spend money",
+  "想用本地模型：在 OpenCode 自己的配置里加上 Ollama 等提供方即可。智能体每一步都要读约 1.6 万 token 的工具说明，需要上下文至少 32k 的模型和较强的显卡；普通电脑上会很慢，或者放不下。":
+    "To use a local model, add a provider such as Ollama in OpenCode's own config. Every step the agent reads about 16,000 tokens of tool descriptions, so it needs a model with at least 32k context and a strong graphics card; on an ordinary computer it is very slow or does not fit.",
   "智能体不问你就能做多少，也包括你在 Claude Code、Cursor 等客户端里接入的终端。删除、读取账号或密钥、花钱，任何一档都会先问你；下面的常设规则优先。":
     "How much agents may do without asking, including in the terminal you connect to Claude Code, Cursor and other clients. Deleting, reading accounts or secrets, and spending money are always asked about, at every level; standing rules below take precedence.",
   "自主程度已改为“{level}”": "Autonomy set to “{level}”",
@@ -233,8 +238,8 @@ export const enPage9: Record<string, string> = {
   "技能": "Skills",
   "智能体会的本事": "What your agents know how to do",
   "刷新技能": "Refresh skills",
-  "技能是一份说明（SKILL.md）加上需要的脚本，智能体遇到对应的事会自己用上。开着的技能每次交给 Claude Code、Codex 或 OpenCode 时挂上，只在 Unzoo One 里生效，不改它们自己的配置。":
-    "A skill is a set of instructions (SKILL.md) plus any scripts it needs; the agent uses it on its own when the work calls for it. Skills that are on are loaded every time work is handed to Claude Code, Codex or OpenCode, inside Unzoo One only — their own settings are not changed.",
+  "技能是一份说明（SKILL.md）加上需要的脚本，智能体遇到对应的事会自己用上。开着的技能每次交给 Claude Code、Codex 或 OpenCode 时挂上，不改它们自己的配置；在“接入其它 AI 客户端”里接入了终端的客户端，也会装上一份。":
+    "A skill is a set of instructions (SKILL.md) plus any scripts it needs; the agent uses it on its own when the work calls for it. Skills that are on are loaded every time work is handed to Claude Code, Codex or OpenCode, without changing their own settings; clients you connected to the terminal under Connect other AI clients get a copy too.",
   "读不到技能：{error}": "Couldn't read skills: {error}",
   "自带": "Built in",
   "这个版本没有带自带技能。": "This version has no built-in skills.",

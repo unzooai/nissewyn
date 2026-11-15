@@ -251,6 +251,12 @@ export function AgentRunPanel({
         </span>
       </label>
 
+      {settings.agent === "opencode" && (
+        <p className="agent-run-local-models">
+          {t("想用本地模型：在 OpenCode 自己的配置里加上 Ollama 等提供方即可。智能体每一步都要读约 1.6 万 token 的工具说明，需要上下文至少 32k 的模型和较强的显卡；普通电脑上会很慢，或者放不下。")}
+        </p>
+      )}
+
       {chosen && chosen.installed && chosen.signedIn === false && (
         <div className="setting-row agent-run-signin" role="status">
           <span>

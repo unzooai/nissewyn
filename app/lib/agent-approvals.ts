@@ -79,7 +79,17 @@ export function confirmationToApprovalItem(raw: RawInputConfirmation, now: numbe
   const agent = clientLabel(raw.agent);
   const destructive = raw.risk === "destructive";
   const typing = /^(exec\.|session\.input|session\.paste)/.test(raw.method);
-  const action = destructive ? t("执行无法撤销的操作") : typing ? t("在终端里执行") : t("使用终端的 {method}", { method: raw.method });
+  const action = typing
+    ? t("在终端里执行")
+    : destructive
+      ? t("执行无法撤销的操作")
+      : raw.risk === "external_side_effect"
+        ? t("把东西发出这台电脑")
+        : raw.risk === "credential_access"
+          ? t("读取你的账号或密钥")
+          : raw.risk === "financial"
+            ? t("花钱")
+            : t("使用终端的 {method}", { method: raw.method });
   const target = raw.input_preview?.trim() || raw.method;
   return {
     id: agentApprovalId(CONFIRMATION_SESSION, String(raw.id)),
@@ -90,7 +100,7 @@ export function confirmationToApprovalItem(raw: RawInputConfirmation, now: numbe
     action,
     target,
     scope: t("仅本次调用"),
-    risk: destructive ? "高风险" : "中风险",
+    risk: destructive || raw.risk === "credential_access" || raw.risk === "financial" ? "高风险" : "中风险",
     requestedAt: relativeLabel(raw.requested_at, now),
     expiresAt: t("约 2 分钟内不答复就不执行"),
     policy: t("外部客户端：写入终端前询问"),

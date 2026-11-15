@@ -26782,6 +26782,14 @@ body {
   line-height: 1.5;
 }
 
+.agent-run-local-models {
+  margin: 0;
+  padding: 0 2px;
+  color: var(--clarity-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
 .skills-import {
   display: flex;
   align-items: flex-end;
