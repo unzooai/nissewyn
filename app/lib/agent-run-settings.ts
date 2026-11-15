@@ -87,10 +87,13 @@ export function writeAgentRunSettings(settings: AgentRunSettings): boolean {
   }
 }
 
+/** 能受管的智能体：自带 shell 关掉，终端和浏览器换成我们的。 */
+const governedAgents: readonly string[] = ["claude-code", "codex-cli", "opencode"];
+
 /**
- * 这次运行用什么模式。受管只有 Claude Code 支持（要靠它的
- * --disallowedTools 关掉自带 shell）；别的 agent 退回托管，审批照样进收件箱。
+ * 这次运行用什么模式。Claude Code、Codex、OpenCode 支持受管；别的 agent
+ * 退回托管，审批照样进收件箱。
  */
 export function brainModeFor(agent: BrainId, settings: AgentRunSettings): BrainMode {
-  return settings.governed && agent === "claude-code" ? "governed" : "hosted";
+  return settings.governed && governedAgents.includes(agent) ? "governed" : "hosted";
 }

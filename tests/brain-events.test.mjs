@@ -78,7 +78,7 @@ test("规则草稿：空串当作没给，不会生成只匹配空命令的规�
   );
 });
 
-test("运行设置：坏数据退回默认，受管只给 Claude Code", () => {
+test("运行设置：坏数据退回默认，受管给 Claude Code、Codex、OpenCode", () => {
   const fallback = { agent: "claude-code", cwd: "", governed: true, autonomy: "balanced", browserProfile: "" };
   assert.deepEqual(parseAgentRunSettings(null), fallback);
   assert.deepEqual(parseAgentRunSettings("{oops"), fallback);
@@ -92,7 +92,9 @@ test("运行设置：坏数据退回默认，受管只给 Claude Code", () => {
   assert.equal(parseAgentRunSettings('{"agent":"codex-cli"}').agent, "codex-cli");
   assert.equal(parseAgentRunSettings('{"agent":"rm -rf"}').agent, "claude-code", "不认识的 agent 退回默认");
   assert.equal(brainModeFor("claude-code", { cwd: "", governed: true }), "governed");
-  assert.equal(brainModeFor("codex-cli", { cwd: "", governed: true }), "hosted");
+  assert.equal(brainModeFor("codex-cli", { cwd: "", governed: true }), "governed");
+  assert.equal(brainModeFor("opencode", { cwd: "", governed: true }), "governed");
+  assert.equal(brainModeFor("agy", { cwd: "", governed: true }), "hosted");
   assert.equal(brainModeFor("claude-code", { cwd: "", governed: false }), "hosted");
 });
 
