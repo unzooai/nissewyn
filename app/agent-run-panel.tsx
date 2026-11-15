@@ -335,7 +335,7 @@ export function AgentRunPanel({
         <fieldset className="setting-row agent-autonomy">
           <legend>
             <strong>{t("自主程度")}</strong>
-            <small>{t("智能体不问你就能做多少。删除、读取账号或密钥、花钱，任何一档都会先问你；下面的常设规则优先。")}</small>
+            <small>{t("智能体不问你就能做多少，也包括你在 Claude Code、Cursor 等客户端里接入的终端。删除、读取账号或密钥、花钱，任何一档都会先问你；下面的常设规则优先。")}</small>
           </legend>
           <div className="agent-autonomy-options" role="radiogroup" aria-label={t("自主程度")}>
             {agentAutonomyLevels.map((level) => (
