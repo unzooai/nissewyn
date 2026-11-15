@@ -476,6 +476,18 @@ export function createMockProvider(): WorkspaceProvider {
       async connectClient() {
         throw new Error(t("演示版没有本机运行时"));
       },
+      async phone() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async pairPhone() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async unpairPhone() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async setPhoneEnabled() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
       async setupBrowserForClients() {
         throw new Error(t("演示版没有本机运行时"));
       },

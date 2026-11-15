@@ -387,6 +387,18 @@ export type RuntimeClients = {
   clients: RuntimeClient[];
 };
 
+/** 手机：同一个局域网（或 Tailscale）里的手机配对后，在手机上看对话、回答、发任务。 */
+export type RuntimePhoneAddress = { ip: string; kind: string; url?: string; qr?: string };
+export type RuntimePhoneDevice = { id: string; name: string; platform: string; scope: string; lastSeen: string; lastIp: string };
+export type RuntimePhone = {
+  enabled: boolean;
+  port: number;
+  addresses: RuntimePhoneAddress[];
+  devices: RuntimePhoneDevice[];
+  /** 正在生效的配对码：每个地址一个二维码。 */
+  pairing?: { code: string; expiresAt: number; addresses: RuntimePhoneAddress[] };
+};
+
 export interface RuntimeTaskPort {
   available(): Promise<boolean>;
   list(): Promise<RuntimeTask[]>;
@@ -437,6 +449,14 @@ export interface RuntimeTaskPort {
   clients(): Promise<RuntimeClients>;
   /** 把 Unzoo One 的终端接入（或移出）某个客户端。 */
   connectClient(id: string, connect: boolean): Promise<void>;
+  /** 手机配对的状态。 */
+  phone(): Promise<RuntimePhone>;
+  /** 生成一个 2 分钟内有效的配对码（同时打开手机连接）。 */
+  pairPhone(): Promise<RuntimePhone>;
+  /** 取消一台手机的配对，它的令牌立即失效。 */
+  unpairPhone(id: string): Promise<RuntimePhone>;
+  /** 打开或关闭手机连接。 */
+  setPhoneEnabled(enabled: boolean): Promise<RuntimePhone>;
   /** 运行 Unzoo 浏览器自己的接入程序（它会接入所有它认识的客户端）。 */
   setupBrowserForClients(): Promise<void>;
   /** 读一次运行写下的一个文件（只能读运行记录里列出的）。 */

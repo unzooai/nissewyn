@@ -12,6 +12,7 @@ mod clients;
 mod console_tasks;
 mod helpers;
 mod local_agents;
+mod mobile_one;
 mod skills;
 
 /// Whether the console has work that needs this process to stay: a task run

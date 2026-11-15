@@ -246,6 +246,7 @@ import { RuntimeFocusCard } from "./runtime-focus";
 import { Conversations } from "./conversations";
 import { SkillsPanel } from "./skills-panel";
 import { ClientsPanel } from "./clients-panel";
+import { PhonePanel } from "./phone-panel";
 import { RuntimeUsagePanel } from "./runtime-usage";
 import { RuntimeCapabilitiesPanel } from "./runtime-capabilities";
 import { autostartEnabled, inDesktopApp, openTerminal, revealPath, setAutostart } from "./lib/core-connection";
@@ -14249,6 +14250,7 @@ export default function HomePage() {
                 onOpenTerminal={desktopApp ? openTerminalFromPage : undefined}
               />
               <ClientsPanel runtime={workspaceProvider.runtime} notify={setNotice} />
+              <PhonePanel runtime={workspaceProvider.runtime} notify={setNotice} />
               </>
             ) : (
             <section

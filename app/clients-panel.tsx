@@ -83,7 +83,7 @@ export function ClientsPanel({
         </button>
       </div>
       <p className="skills-intro">
-        {t("接入后，你在那些客户端里用的智能体也能操作 Unzoo One 的终端和浏览器，并拿到一段终端用法说明；Claude Code、Codex、OpenCode 还会装上你在“技能”里启用的技能，断开时一并移除。它在终端里做的事按“智能体 › 自主程度”判断：普通命令直接执行，删除、推送这类会先进这里的收件箱等你确认；Unzoo One 没打开时，要确认的操作会被拒绝。")}
+        {t("接入后，你在那些客户端里用的智能体也能操作 Unzoo One 的终端和浏览器，并拿到一段终端用法说明；Claude Code、Codex、OpenCode 还会装上你在“技能”里启用的技能，断开时一并移除。它在终端里做的事按“智能体 › 自主程度”判断：普通命令直接执行，删除、推送这类会先进这里的收件箱等你确认；Unzoo One 没打开、手机上也没开着时，要确认的操作会被拒绝。")}
       </p>
 
       {error ? (

@@ -35,7 +35,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimeSkill, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeSkill, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -127,6 +127,36 @@ async function untermReachable(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+type RawPhoneAddress = { ip: string; kind: string; url?: string; qr_svg?: string };
+type RawPhoneStatus = {
+  enabled?: boolean;
+  port?: number;
+  addresses?: RawPhoneAddress[];
+  devices?: { device_id: string; device_name: string; platform: string; scope: string; last_seen_at: string; last_ip: string }[];
+  pairing?: { code: string; expires_at_ms: number; address_qrs?: RawPhoneAddress[] } | null;
+};
+
+/** 运行时的手机状态 → 页面用的样子。 */
+export function toRuntimePhone(raw: RawPhoneStatus): RuntimePhone {
+  const address = (a: RawPhoneAddress) => ({ ip: a.ip, kind: a.kind, url: a.url, qr: a.qr_svg });
+  return {
+    enabled: raw.enabled === true,
+    port: raw.port ?? 0,
+    addresses: (raw.addresses ?? []).map(address),
+    devices: (raw.devices ?? []).map((d) => ({
+      id: d.device_id,
+      name: d.device_name,
+      platform: d.platform,
+      scope: d.scope,
+      lastSeen: d.last_seen_at,
+      lastIp: d.last_ip,
+    })),
+    pairing: raw.pairing
+      ? { code: raw.pairing.code, expiresAt: raw.pairing.expires_at_ms, addresses: (raw.pairing.address_qrs ?? []).map(address) }
+      : undefined,
+  };
 }
 
 async function callUnterm<T>(path: string, payload: Record<string, unknown>): Promise<T> {
@@ -463,6 +493,20 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       },
       async setupBrowserForClients() {
         await callUnterm("/api/console/clients/browser", {});
+      },
+      async phone() {
+        return toRuntimePhone(await getUnterm<RawPhoneStatus>("/api/remote/status"));
+      },
+      async pairPhone() {
+        const data = await callUnterm<{ status: RawPhoneStatus }>("/api/remote/pair-code", { scope: "full" });
+        return toRuntimePhone(data.status);
+      },
+      async unpairPhone(id) {
+        const data = await callUnterm<{ status: RawPhoneStatus }>("/api/remote/revoke", { device_id: id });
+        return toRuntimePhone(data.status);
+      },
+      async setPhoneEnabled(enabled) {
+        return toRuntimePhone(await callUnterm<RawPhoneStatus>("/api/remote/enable", { enabled }));
       },
       async skills() {
         const data = await getUnterm<{ skills?: RuntimeSkill[] }>("/api/console/skills");
