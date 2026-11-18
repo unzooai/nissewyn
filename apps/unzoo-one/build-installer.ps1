@@ -97,6 +97,10 @@ New-Item -ItemType Directory -Path $fonts -Force | Out-Null
 foreach ($font in "SymbolsNerdFontMono-Regular.ttf", "NotoColorEmoji.ttf", "JetBrainsMono-Regular.ttf") {
   Copy-Item (Join-Path $unterm "assets\fonts\$font") $fonts
 }
+# Names the install for the runtime's programs nobody hands UNTERM_PRODUCT_NAME
+# to (the bridge an AI client starts): Unzoo One's state, Core and port, apart
+# from a standalone Unterm's.
+[System.IO.File]::WriteAllText((Join-Path $payload "unterm-product.txt"), "Unzoo One")
 # What the terminal bridge tells the agents in other clients, beside unterm-cli.exe.
 Copy-Item (Join-Path $PSScriptRoot "mcp-instructions.md") $payload
 # Built-in skills, beside unterm-core.exe where the runtime looks for them.

@@ -113,6 +113,7 @@ fn ensure_core() -> Result<CoreConnection, String> {
         }
     }
     let program = core_program().ok_or("The Unzoo One background service is missing. Please reinstall Unzoo One.")?;
+    adopt_shared_state();
     start_core(&program).map_err(|e| format!("The background service could not start: {e}"))?;
     let deadline = Instant::now() + Duration::from_secs(20);
     while Instant::now() < deadline {
@@ -122,6 +123,53 @@ fn ensure_core() -> Result<CoreConnection, String> {
         std::thread::sleep(Duration::from_millis(250));
     }
     Err("The background service did not become ready within 20 seconds.".into())
+}
+
+/// Unzoo One keeps its own state (`~/.unzoo-one`, its Core's record under
+/// `%LOCALAPPDATA%\Unzoo One`) so a standalone Unterm can run beside it.
+/// Earlier versions shared Unterm's `~/.unterm`; the first time there is no
+/// state of its own, it starts from a copy of that one -- conversations,
+/// settings, skills, trust -- and the original stays Unterm's.
+///
+/// Not copied: what belongs to the running processes there (window
+/// registrations, server records, grants of live sessions) and remote
+/// access, which listens on its own port here.
+fn adopt_shared_state() {
+    let (Some(own), Some(home)) = (unterm_protocol::state_dir(), dirs_home()) else { return };
+    let shared = home.join(".unterm");
+    if own.exists() || !shared.is_dir() || own == shared {
+        return;
+    }
+    const LEFT_BEHIND: &[&str] = &["instances", "server.json", "auth_token", "hosted_grants", "remote", "stall.log", "core.json"];
+    let staging = own.with_extension("adopting");
+    let _ = std::fs::remove_dir_all(&staging);
+    let copied = copy_tree(&shared, &staging, LEFT_BEHIND).and_then(|_| std::fs::rename(&staging, &own));
+    if let Err(error) = copied {
+        eprintln!("unzoo-one: starting with fresh state, the shared state could not be copied: {error}");
+        let _ = std::fs::remove_dir_all(&staging);
+    }
+}
+
+fn dirs_home() -> Option<PathBuf> {
+    std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")).map(PathBuf::from)
+}
+
+fn copy_tree(from: &std::path::Path, to: &std::path::Path, skip: &[&str]) -> std::io::Result<()> {
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if skip.iter().any(|left| name == std::ffi::OsStr::new(left)) {
+            continue;
+        }
+        let kind = entry.file_type()?;
+        if kind.is_dir() {
+            copy_tree(&entry.path(), &to.join(&name), &[])?;
+        } else if kind.is_file() {
+            std::fs::copy(entry.path(), to.join(&name))?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(windows)]
@@ -404,6 +452,11 @@ fn port_of(base: &str) -> u16 {
 }
 
 fn main() {
+    // Everything this process resolves (its Core's record, its state) and
+    // everything it starts (the Core, the terminal) is Unzoo One's, apart
+    // from a standalone Unterm's -- in a development build too, which has
+    // no product file beside it.
+    std::env::set_var("UNTERM_PRODUCT_NAME", "Unzoo One");
     // Started at sign-in: bring the background service up and leave, no window.
     if std::env::args().any(|arg| arg == "--background") {
         if let Err(error) = ensure_core() {
