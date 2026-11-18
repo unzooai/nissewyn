@@ -10,6 +10,7 @@ mod agent_run;
 mod browser;
 mod clients;
 mod console_tasks;
+mod console_watch;
 mod helpers;
 mod local_agents;
 mod mobile_one;
