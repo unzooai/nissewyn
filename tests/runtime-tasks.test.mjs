@@ -61,6 +61,33 @@ test("工作日、每隔、定时一次；有变化就运行；长期负责的�
   assert.equal(toRuntimePut(task).agent, null);
 });
 
+test("不是在页面上建的任务：按运行时的计划显示，推回去也不丢", () => {
+  const remote = {
+    id: "made-elsewhere",
+    title: "盯发票",
+    created_at: "2026-11-18T00:00:00Z",
+    updated_at: "2026-11-18T00:00:00Z",
+    prompt: "整理新发票",
+    schedule: { kind: "every", minutes: 30 },
+    watch: { kind: "folder", path: "D:\\inbox" },
+    agent: "codex-cli",
+    keep_conversation: true,
+    paused: false,
+    console: {},
+    runs: [],
+  };
+  const [made] = mergeRuntimeTasks([], [remote]);
+  assert.equal(made.schedule, "每隔");
+  assert.equal(made.scheduleEvery, 30);
+  const put = toRuntimePut(made);
+  assert.deepEqual(put.schedule, remote.schedule);
+  assert.deepEqual(put.watch, remote.watch);
+  assert.equal(put.agent, "codex-cli");
+  assert.equal(put.keep_conversation, true);
+  const weekly = mergeRuntimeTasks([], [{ ...remote, schedule: { kind: "weekly", time: "08:00", weekday: 3 } }])[0];
+  assert.deepEqual(toRuntimePut(weekly).schedule, { kind: "weekly", time: "08:00", weekday: 3 });
+});
+
 test("运行时读回来的状态和进度变了，不算要再推", () => {
   const before = putSignature(task);
   assert.equal(putSignature({ ...task, status: "运行中", progress: 40, runs: [] }), before);

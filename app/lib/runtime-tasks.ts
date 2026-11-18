@@ -193,6 +193,29 @@ export function scheduleOf(task: TaskItem): RuntimeSchedule | null {
   return null;
 }
 
+/**
+ * 运行时里的计划 → 页面上的字段。一个不是在页面上建的任务（手机、智能体、
+ * 别的客户端建的）没有页面自己那份，就按运行时说的显示；否则页面推回去时
+ * 会把它的计划、监视和负责的智能体都抹掉。
+ */
+export function planFromRuntime(
+  task: Pick<RuntimeTask, "schedule" | "watch" | "agent" | "keep_conversation">,
+): Pick<TaskItem, "schedule" | "scheduleTime" | "scheduleDay" | "scheduleEvery" | "scheduleAt" | "watch" | "helperAgent" | "keepConversation"> {
+  const plan: ReturnType<typeof planFromRuntime> = {};
+  const schedule = task.schedule;
+  if (schedule?.kind === "daily") Object.assign(plan, { schedule: "每天", scheduleTime: schedule.time });
+  if (schedule?.kind === "weekdays") Object.assign(plan, { schedule: "工作日", scheduleTime: schedule.time });
+  if (schedule?.kind === "weekly")
+    Object.assign(plan, { schedule: "每周", scheduleTime: schedule.time, scheduleDay: weekdays[schedule.weekday - 1] ?? "周一" });
+  if (schedule?.kind === "every") Object.assign(plan, { schedule: "每隔", scheduleEvery: schedule.minutes });
+  if (schedule?.kind === "once") Object.assign(plan, { schedule: "定时一次", scheduleAt: schedule.at });
+  if (task.watch?.kind === "web") plan.watch = { kind: "web", url: task.watch.url, everyMinutes: task.watch.every_minutes };
+  if (task.watch?.kind === "folder") plan.watch = { kind: "folder", path: task.watch.path };
+  if (task.agent) plan.helperAgent = task.agent;
+  if (task.keep_conversation) plan.keepConversation = true;
+  return plan;
+}
+
 export function watchOf(task: Pick<TaskItem, "watch">): RuntimeWatch | null {
   const watch: TaskWatch | undefined = task.watch;
   if (!watch) return null;
@@ -401,9 +424,10 @@ export function mergeRuntimeTasks(
             title: task.title,
             description: task.prompt ?? "",
             target: "",
-            status: "待确认",
+            status: task.paused ? "已暂停" : "待确认",
             progress: 0,
             updated: t("刚刚"),
+            ...planFromRuntime(task),
           } satisfies TaskItem);
       return [merge(base, task)];
     });
