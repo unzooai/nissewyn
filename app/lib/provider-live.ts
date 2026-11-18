@@ -384,6 +384,9 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
         const data = await callUnterm<{ stopped?: boolean }>("/api/console/tasks/stop", { task_id: taskId });
         return data.stopped === true;
       },
+      async setWatchSecret(taskId, secret, kind) {
+        await callUnterm("/api/console/tasks/watch-secret", { id: taskId, secret, kind });
+      },
       async capabilities(): Promise<RuntimeCapabilities> {
         const data = await getUnterm<{
           terminal?: { governed_ready?: boolean };

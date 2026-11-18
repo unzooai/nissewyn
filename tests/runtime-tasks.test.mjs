@@ -14,6 +14,8 @@ import {
   toRuntimePut,
   toTaskRun,
   watchOf,
+  planFromRuntime,
+  guessMailHost,
 } from "../.test-build/runtime-tasks.mjs";
 
 const task = {
@@ -86,6 +88,19 @@ test("不是在页面上建的任务：按运行时的计划显示，推回去�
   assert.equal(put.keep_conversation, true);
   const weekly = mergeRuntimeTasks([], [{ ...remote, schedule: { kind: "weekly", time: "08:00", weekday: 3 } }])[0];
   assert.deepEqual(toRuntimePut(weekly).schedule, { kind: "weekly", time: "08:00", weekday: 3 });
+});
+
+test("监视邮件和日历：密码、地址不进任务", () => {
+  const mail = { kind: "mail", address: " me@qq.com ", host: "", filter: "发票" };
+  assert.deepEqual(watchOf({ watch: mail }), { kind: "mail", address: "me@qq.com", host: "", filter: "发票" });
+  assert.equal(watchOf({ watch: { ...mail, address: "not-an-address" } }), null);
+  assert.deepEqual(watchOf({ watch: { kind: "calendar", minutesBefore: 15 } }), { kind: "calendar", minutes_before: 15 });
+  assert.equal(guessMailHost("someone@gmail.com"), "imap.gmail.com");
+  assert.equal(guessMailHost("someone@example.org"), null);
+  const put = toRuntimePut({ ...task, watch: mail, watchHasSecret: true });
+  assert.equal("watchHasSecret" in put.console, false);
+  assert.equal(JSON.stringify(put).includes("password"), false);
+  assert.deepEqual(planFromRuntime({ watch: { kind: "calendar", minutes_before: 30 } }).watch, { kind: "calendar", minutesBefore: 30 });
 });
 
 test("运行时读回来的状态和进度变了，不算要再推", () => {

@@ -20,7 +20,11 @@ export type RuntimeSchedule =
   | { kind: "once"; at: string };
 
 /** 运行时里的监视对象。 */
-export type RuntimeWatch = { kind: "web"; url: string; every_minutes: number } | { kind: "folder"; path: string };
+export type RuntimeWatch =
+  | { kind: "web"; url: string; every_minutes: number }
+  | { kind: "folder"; path: string }
+  | { kind: "mail"; address: string; host: string; port?: number; filter: string }
+  | { kind: "calendar"; minutes_before: number };
 
 /** 运行时里一次运行：引擎的 run 加上它那一步 agent_turn 的记录。 */
 export type RuntimeRun = {
@@ -145,7 +149,7 @@ export type RuntimeTask = {
   paused: boolean;
   watch?: RuntimeWatch | null;
   /** 最近一次查看监视对象的时间和出的错。 */
-  watch_status?: { checked_at?: string | null; error?: string | null } | null;
+  watch_status?: { checked_at?: string | null; error?: string | null; has_secret?: boolean } | null;
   agent?: string | null;
   keep_conversation?: boolean;
   /** 控制台自己的那份任务，运行时原样存、原样还。 */
@@ -166,7 +170,7 @@ export type RuntimeTaskPut = {
   watch: RuntimeWatch | null;
   agent: string | null;
   keep_conversation: boolean;
-  console: Omit<TaskItem, "runs" | "watchError">;
+  console: Omit<TaskItem, "runs" | "watchError" | "watchHasSecret">;
 };
 
 /** 隔多少分钟，运行时接受 5 分钟到一周。 */
@@ -211,6 +215,9 @@ export function planFromRuntime(
   if (schedule?.kind === "once") Object.assign(plan, { schedule: "定时一次", scheduleAt: schedule.at });
   if (task.watch?.kind === "web") plan.watch = { kind: "web", url: task.watch.url, everyMinutes: task.watch.every_minutes };
   if (task.watch?.kind === "folder") plan.watch = { kind: "folder", path: task.watch.path };
+  if (task.watch?.kind === "mail")
+    plan.watch = { kind: "mail", address: task.watch.address, host: task.watch.host ?? "", filter: task.watch.filter ?? "" };
+  if (task.watch?.kind === "calendar") plan.watch = { kind: "calendar", minutesBefore: task.watch.minutes_before };
   if (task.agent) plan.helperAgent = task.agent;
   if (task.keep_conversation) plan.keepConversation = true;
   return plan;
@@ -225,8 +232,41 @@ export function watchOf(task: Pick<TaskItem, "watch">): RuntimeWatch | null {
     const every = Math.min(maxEveryMinutes, Math.max(minEveryMinutes, Math.round(watch.everyMinutes || 30)));
     return { kind: "web", url, every_minutes: every };
   }
+  if (watch.kind === "mail") {
+    const address = watch.address.trim();
+    if (!/^[^@\s]+@[^@\s]+$/.test(address)) return null;
+    return { kind: "mail", address, host: watch.host.trim(), filter: watch.filter.trim() };
+  }
+  if (watch.kind === "calendar") {
+    return { kind: "calendar", minutes_before: Math.min(1440, Math.max(0, Math.round(watch.minutesBefore))) };
+  }
   const path = watch.path.trim();
   return path ? { kind: "folder", path } : null;
+}
+
+/** 常见邮箱的收信服务器，认不出来的要人填。和运行时的猜法一致。 */
+export function guessMailHost(address: string): string | null {
+  const domain = address.split("@")[1]?.trim().toLowerCase() ?? "";
+  const known: Record<string, string> = {
+    "gmail.com": "imap.gmail.com",
+    "googlemail.com": "imap.gmail.com",
+    "outlook.com": "outlook.office365.com",
+    "hotmail.com": "outlook.office365.com",
+    "live.com": "outlook.office365.com",
+    "msn.com": "outlook.office365.com",
+    "qq.com": "imap.qq.com",
+    "foxmail.com": "imap.qq.com",
+    "163.com": "imap.163.com",
+    "126.com": "imap.126.com",
+    "yeah.net": "imap.yeah.net",
+    "sina.com": "imap.sina.com",
+    "icloud.com": "imap.mail.me.com",
+    "me.com": "imap.mail.me.com",
+    "mac.com": "imap.mail.me.com",
+    "yahoo.com": "imap.mail.yahoo.com",
+    "aliyun.com": "imap.aliyun.com",
+  };
+  return known[domain] ?? null;
 }
 
 /**
@@ -259,9 +299,10 @@ export function titleFromRequest(request: string, max = 60): string {
  * 交给智能体的话是任务说明；没写说明就用标题。
  */
 export function toRuntimePut(task: TaskItem): RuntimeTaskPut {
-  const { runs: _runs, watchError: _watchError, ...rest } = task;
+  const { runs: _runs, watchError: _watchError, watchHasSecret: _watchHasSecret, ...rest } = task;
   void _runs;
   void _watchError;
+  void _watchHasSecret;
   const prompt = promptOf(task);
   return {
     id: task.id,
@@ -326,7 +367,13 @@ export function toTaskRun(run: RuntimeRun): TaskRun {
   const ended = run.ended_at ? Date.parse(run.ended_at) : NaN;
   const summary = run.summary?.trim() ?? "";
   const scheduled =
-    run.trigger === "schedule" ? `${t("按计划运行")} · ` : run.trigger === "watch" ? `${t("有变化时运行")} · ` : "";
+    run.trigger === "schedule"
+      ? `${t("按计划运行")} · `
+      : run.trigger === "watch"
+        ? `${t("有变化时运行")} · `
+        : run.trigger === "delegate"
+          ? `${t("另一个智能体交来的")} · `
+          : "";
   let text: string;
   if (status === "运行中") {
     text = run.waiting ? t("等你在收件箱确认一次工具调用") : summary ? summary.slice(-120) : t("智能体正在处理");
@@ -406,6 +453,7 @@ export function mergeRuntimeTasks(
       runs: allRuns,
       lastError: status === "失败" ? (latest ? runError(latest) : undefined) ?? base.lastError : undefined,
       watchError: from.watch && from.watch_status?.error ? from.watch_status.error : undefined,
+      watchHasSecret: from.watch_status?.has_secret,
     };
   };
 

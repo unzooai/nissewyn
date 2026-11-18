@@ -49,7 +49,13 @@ export type TaskSort = "状态优先" | "进度最高" | "名称";
 export type TaskSchedule = "仅运行一次" | "每天" | "工作日" | "每周" | "每隔" | "定时一次";
 
 /** 有变化就运行：一个网页（隔几分钟看一次），或一个文件夹（有新文件）。 */
-export type TaskWatch = { kind: "web"; url: string; everyMinutes: number } | { kind: "folder"; path: string };
+export type TaskWatch =
+  | { kind: "web"; url: string; everyMinutes: number }
+  | { kind: "folder"; path: string }
+  /** 新邮件。密码（应用专用密码/授权码）只进系统凭据库，不在这里。 */
+  | { kind: "mail"; address: string; host: string; filter: string }
+  /** 日历里的日程快开始了。日历的 iCal 地址只进系统凭据库。 */
+  | { kind: "calendar"; minutesBefore: number };
 
 export type Weekday = "周一" | "周二" | "周三" | "周四" | "周五" | "周六" | "周日";
 
@@ -396,6 +402,8 @@ export type TaskItem = {
   keepConversation?: boolean;
   /** 运行时最近一次查看监视对象时出的错（运行时写，不推回去）。 */
   watchError?: string;
+  /** 邮件、日历的密码或地址是否已存进系统凭据库（运行时写，不推回去）。 */
+  watchHasSecret?: boolean;
   requiresApproval?: boolean;
   pinned?: boolean;
   runs?: TaskRun[];

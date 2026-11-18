@@ -30,7 +30,7 @@ import { dateLocale, t } from "./i18n";
 import type { ApprovalDecision, TabView, TerminalScreen } from "./lib/provider";
 import { ComputerPanel } from "./computer-panel";
 import { MarkdownView } from "./markdown-view";
-import type { RuntimeActivity, RuntimeHandover, RuntimeHelper, RuntimeThread, RuntimeTurn } from "./lib/runtime-tasks";
+import { guessMailHost, type RuntimeActivity, type RuntimeHandover, type RuntimeHelper, type RuntimeThread, type RuntimeTurn } from "./lib/runtime-tasks";
 import {
   activityLine,
   activitySummary,
@@ -66,6 +66,8 @@ export type ConversationPlan = {
   watch: TaskWatch | null;
   helperAgent: string;
   keepConversation: boolean;
+  /** 邮件密码或日历地址，只在这次保存时交给系统凭据库。 */
+  secret?: string;
 };
 
 /** 默认的“定时一次”：一小时后的整点，本地时间。 */
@@ -537,6 +539,11 @@ function ThreadHeader({
   const [watchUrl, setWatchUrl] = useState(task.watch?.kind === "web" ? task.watch.url : "");
   const [watchEvery, setWatchEvery] = useState(task.watch?.kind === "web" ? task.watch.everyMinutes : 30);
   const [watchPath, setWatchPath] = useState(task.watch?.kind === "folder" ? task.watch.path : "");
+  const [mailAddress, setMailAddress] = useState(task.watch?.kind === "mail" ? task.watch.address : "");
+  const [mailHost, setMailHost] = useState(task.watch?.kind === "mail" ? task.watch.host : "");
+  const [mailFilter, setMailFilter] = useState(task.watch?.kind === "mail" ? task.watch.filter : "");
+  const [calendarBefore, setCalendarBefore] = useState(task.watch?.kind === "calendar" ? task.watch.minutesBefore : 15);
+  const [secret, setSecret] = useState("");
   const [helperAgent, setHelperAgent] = useState(task.helperAgent ?? "");
   const [keepConversation, setKeepConversation] = useState(task.keepConversation === true);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -547,9 +554,21 @@ function ThreadHeader({
       ? { kind: "web", url: watchUrl.trim(), everyMinutes: watchEvery }
       : watchKind === "folder"
         ? { kind: "folder", path: watchPath.trim() }
-        : null;
+        : watchKind === "mail"
+          ? { kind: "mail", address: mailAddress.trim(), host: mailHost.trim(), filter: mailFilter.trim() }
+          : watchKind === "calendar"
+            ? { kind: "calendar", minutesBefore: calendarBefore }
+            : null;
+  // 换了监视的种类，之前存的密码或地址就不算数了。
+  const secretKept = task.watchHasSecret === true && task.watch?.kind === watchKind;
+  const needsSecret = (watchKind === "mail" || watchKind === "calendar") && !secretKept && !secret.trim();
+  const guessedHost = guessMailHost(mailAddress);
   const watchInvalid =
-    (watch?.kind === "web" && !/^https?:\/\/\S+$/i.test(watch.url)) || (watch?.kind === "folder" && !watch.path);
+    (watch?.kind === "web" && !/^https?:\/\/\S+$/i.test(watch.url)) ||
+    (watch?.kind === "folder" && !watch.path) ||
+    (watch?.kind === "mail" && (!/^[^@\s]+@[^@\s]+$/.test(watch.address) || (!watch.host && !guessedHost))) ||
+    (watch?.kind === "calendar" && secret.trim() !== "" && !/^(https?|webcal):\/\//i.test(secret.trim())) ||
+    needsSecret;
   const atInvalid = schedule === "定时一次" && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at);
 
   useEffect(() => setTitle(task.title), [task.title]);
@@ -684,7 +703,18 @@ function ThreadHeader({
               <option value="">{t("不监视")}</option>
               <option value="web">{t("网页内容变了")}</option>
               <option value="folder">{t("文件夹里有新文件")}</option>
+              <option value="mail">{t("收到新邮件")}</option>
+              <option value="calendar">{t("日历里的日程快开始了")}</option>
             </select>
+            {watchKind === "calendar" && (
+              <select value={calendarBefore} aria-label={t("提前多久")} onChange={(event) => setCalendarBefore(Number(event.target.value))}>
+                {[0, 5, 10, 15, 30, 60, 120].map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {minutes === 0 ? t("开始时") : t("提前 {count} 分钟", { count: minutes })}
+                  </option>
+                ))}
+              </select>
+            )}
             {watchKind === "web" && (
               <select value={watchEvery} aria-label={t("多久看一次")} onChange={(event) => setWatchEvery(Number(event.target.value))}>
                 {(watchEveryOptions.includes(watchEvery) ? watchEveryOptions : [...watchEveryOptions, watchEvery].sort((a, b) => a - b)).map(
@@ -718,6 +748,65 @@ function ThreadHeader({
               />
             </div>
           )}
+          {watchKind === "mail" && (
+            <>
+              <div className="conversation-popover-row">
+                <input
+                  type="email"
+                  value={mailAddress}
+                  placeholder={t("邮箱地址")}
+                  aria-label={t("邮箱地址")}
+                  onChange={(event) => setMailAddress(event.target.value)}
+                />
+              </div>
+              <div className="conversation-popover-row">
+                <input
+                  type="password"
+                  value={secret}
+                  autoComplete="new-password"
+                  placeholder={secretKept ? t("已保存，不改就留空") : t("应用专用密码或授权码")}
+                  aria-label={t("应用专用密码或授权码")}
+                  onChange={(event) => setSecret(event.target.value)}
+                />
+              </div>
+              <div className="conversation-popover-row">
+                <input
+                  value={mailHost}
+                  placeholder={guessedHost ?? t("收信服务器（IMAP），例如 imap.example.com")}
+                  aria-label={t("收信服务器")}
+                  onChange={(event) => setMailHost(event.target.value)}
+                />
+              </div>
+              <div className="conversation-popover-row">
+                <input
+                  value={mailFilter}
+                  placeholder={t("只看发件人或标题含这些词的（逗号分隔，可不填）")}
+                  aria-label={t("筛选")}
+                  onChange={(event) => setMailFilter(event.target.value)}
+                />
+              </div>
+              <p className="conversation-popover-note">
+                {t("只读收件箱，不会把邮件标成已读。用邮箱的应用专用密码或授权码，不是登录密码；它只存在这台电脑的凭据库里，智能体拿不到。")}
+              </p>
+            </>
+          )}
+          {watchKind === "calendar" && (
+            <>
+              <div className="conversation-popover-row">
+                <input
+                  type="password"
+                  value={secret}
+                  autoComplete="off"
+                  placeholder={secretKept ? t("已保存，不改就留空") : t("日历的 iCal 私密地址（https:// 或 webcal://）")}
+                  aria-label={t("日历的 iCal 私密地址")}
+                  onChange={(event) => setSecret(event.target.value)}
+                />
+              </div>
+              <p className="conversation-popover-note">
+                {t("在 Google 日历的“设置和共享”里复制“iCal 格式的私密地址”，Outlook 和 iCloud 用发布或共享出来的日历链接。地址只存在这台电脑的凭据库里。")}
+              </p>
+            </>
+          )}
           {watchKind === "web" && <p className="conversation-popover-note">{t("用智能体的浏览器身份打开，要登录才能看的页面也行。")}</p>}
           {task.watchError && watchKind && (
             <p className="conversation-popover-error">{t("上次查看出错：{error}", { error: task.watchError })}</p>
@@ -750,7 +839,18 @@ function ThreadHeader({
               type="button"
               disabled={Boolean(watchInvalid) || atInvalid}
               onClick={() => {
-                onSchedule(task.id, { schedule, time, day, every, at, watch, helperAgent, keepConversation });
+                onSchedule(task.id, {
+                  schedule,
+                  time,
+                  day,
+                  every,
+                  at,
+                  watch,
+                  helperAgent,
+                  keepConversation,
+                  secret: watchKind === "mail" || watchKind === "calendar" ? secret.trim() || undefined : undefined,
+                });
+                setSecret("");
                 setMenu(null);
               }}
             >
@@ -835,6 +935,7 @@ function Turn({
   const expanded = open ?? (live || questions.length > 0);
   const scheduled = turn.trigger === "schedule";
   const watched = turn.trigger === "watch";
+  const delegated = turn.trigger === "delegate";
   const savingSkill = turn.purpose === "save_skill";
   // 存为技能那一轮，交给智能体的是一大段说明；对话里只说做了什么。
   // 有变化时那一轮，交给智能体的是需求加上变了什么（写给智能体的）；对话里只显示需求。
@@ -842,12 +943,14 @@ function Turn({
     ? t("把这个任务存为技能")
     : watched
       ? task.description || task.title
-      : (turn.prompt ?? (first ? task.description : ""));
+      : delegated
+        ? (turn.prompt ?? "").split("\n\n").slice(1).join("\n\n") || turn.prompt || ""
+        : (turn.prompt ?? (first ? task.description : ""));
   const reply = turn.reply?.trim() || (turn.state === "succeeded" ? turn.summary?.trim() : "") || "";
 
   return (
     <div className="conversation-turn">
-      {prompt && <UserMessage text={prompt} note={scheduled ? t("定时运行") : watched ? t("有变化时运行") : undefined} />}
+      {prompt && <UserMessage text={prompt} note={scheduled ? t("定时运行") : watched ? t("有变化时运行") : delegated ? t("另一个智能体交来的") : undefined} />}
       {turn.continued === false && (
         <p className="conversation-quiet">{t("上一段对话接不上了，这一句开始了新的对话。")}</p>
       )}

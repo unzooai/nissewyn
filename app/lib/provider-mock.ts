@@ -440,6 +440,7 @@ export function createMockProvider(): WorkspaceProvider {
       async stop() {
         return false;
       },
+      async setWatchSecret() {},
       async output() {
         throw new Error(t("演示版没有本机运行时"));
       },

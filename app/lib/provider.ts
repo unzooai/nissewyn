@@ -421,6 +421,8 @@ export interface RuntimeTaskPort {
   thread(taskId: string): Promise<RuntimeThread>;
   /** 停掉正在跑的那次。没有在跑的返回 false。 */
   stop(taskId: string): Promise<boolean>;
+  /** 监视邮件、日历要的密码或地址：直接存进系统凭据库，不随任务保存。 */
+  setWatchSecret(taskId: string, secret: string, kind: "mail" | "calendar"): Promise<void>;
   /** 这台机器上有哪些能力。 */
   capabilities(): Promise<RuntimeCapabilities>;
   /** 智能体的浏览器身份。读的时候，额度有空又没指定别的，运行时会把专用身份建好。 */

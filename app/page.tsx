@@ -933,6 +933,8 @@ function formatTaskTrigger(task: TaskItem) {
   if (task.schedule && task.schedule !== "仅运行一次") parts.push(formatTaskSchedule(task));
   if (task.watch?.kind === "web") parts.push(t("网页变化时"));
   if (task.watch?.kind === "folder") parts.push(t("有新文件时"));
+  if (task.watch?.kind === "mail") parts.push(t("收到新邮件时"));
+  if (task.watch?.kind === "calendar") parts.push(t("日程开始前"));
   return parts.length ? parts.join(" · ") : formatTaskSchedule(task);
 }
 
@@ -9827,8 +9829,17 @@ export default function HomePage() {
     if (task) setNotice(t("已删除任务“{title}”", { title: task.title }));
   }
 
-  function scheduleConversation(taskId: string, plan: ConversationPlan) {
-    const { schedule, time, day, every, at, watch, helperAgent, keepConversation } = plan;
+  async function scheduleConversation(taskId: string, plan: ConversationPlan) {
+    const { schedule, time, day, every, at, watch, helperAgent, keepConversation, secret } = plan;
+    // 密码、日历地址先单独存进系统凭据库，不进任务（任务会存在浏览器里）。
+    if (secret && (watch?.kind === "mail" || watch?.kind === "calendar")) {
+      try {
+        await workspaceProvider.runtime.setWatchSecret(taskId, secret, watch.kind);
+      } catch (error) {
+        setNotice(t("没能保存：{message}", { message: error instanceof Error ? error.message : String(error) }));
+        return;
+      }
+    }
     const timed = schedule === "每天" || schedule === "工作日" || schedule === "每周";
     setTasks((items) =>
       items.map((item) =>
@@ -9844,13 +9855,22 @@ export default function HomePage() {
               helperAgent: helperAgent || undefined,
               keepConversation: keepConversation || undefined,
               watchError: watch ? item.watchError : undefined,
+              watchHasSecret: secret ? true : watch?.kind === item.watch?.kind ? item.watchHasSecret : undefined,
             }
           : item,
       ),
     );
     const parts = [
       schedule === "仅运行一次" ? "" : formatSchedule(schedule, time, day, every, at),
-      watch?.kind === "web" ? t("网页变化时") : watch?.kind === "folder" ? t("有新文件时") : "",
+      watch?.kind === "web"
+        ? t("网页变化时")
+        : watch?.kind === "folder"
+          ? t("有新文件时")
+          : watch?.kind === "mail"
+            ? t("收到新邮件时")
+            : watch?.kind === "calendar"
+              ? t("日程开始前")
+              : "",
     ].filter(Boolean);
     setNotice(parts.length ? t("已设为{schedule}自动运行", { schedule: parts.join(" · ") }) : t("不再重复运行"));
   }
