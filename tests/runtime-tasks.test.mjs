@@ -13,6 +13,7 @@ import {
   statusFrom,
   toRuntimePut,
   toTaskRun,
+  watchOf,
 } from "../.test-build/runtime-tasks.mjs";
 
 const task = {
@@ -38,6 +39,26 @@ test("推给运行时的：提示词、计划、暂停；运行记录不推", ()
   assert.equal(toRuntimePut({ ...task, status: "已暂停" }).paused, true);
   assert.deepEqual(scheduleOf({ ...task, schedule: "每天", scheduleTime: undefined }), { kind: "daily", time: "09:00" });
   assert.equal(scheduleOf({ ...task, schedule: "仅运行一次" }), null);
+});
+
+test("工作日、每隔、定时一次；有变化就运行；长期负责的帮手", () => {
+  assert.deepEqual(scheduleOf({ ...task, schedule: "工作日", scheduleTime: "08:15" }), { kind: "weekdays", time: "08:15" });
+  assert.deepEqual(scheduleOf({ ...task, schedule: "每隔", scheduleEvery: 2 }), { kind: "every", minutes: 5 }, "at least five minutes");
+  assert.deepEqual(scheduleOf({ ...task, schedule: "每隔", scheduleEvery: 90 }), { kind: "every", minutes: 90 });
+  assert.deepEqual(scheduleOf({ ...task, schedule: "定时一次", scheduleAt: "2026-11-20T14:30" }), { kind: "once", at: "2026-11-20T14:30" });
+  assert.equal(scheduleOf({ ...task, schedule: "定时一次", scheduleAt: "" }), null);
+  assert.deepEqual(watchOf({ watch: { kind: "web", url: " https://example.com/a ", everyMinutes: 30 } }), {
+    kind: "web",
+    url: "https://example.com/a",
+    every_minutes: 30,
+  });
+  assert.equal(watchOf({ watch: { kind: "web", url: "example.com", everyMinutes: 30 } }), null);
+  assert.deepEqual(watchOf({ watch: { kind: "folder", path: "D:\inbox" } }), { kind: "folder", path: "D:\inbox" });
+  const put = toRuntimePut({ ...task, helperAgent: "codex-cli", keepConversation: true, watchError: "boom" });
+  assert.equal(put.agent, "codex-cli");
+  assert.equal(put.keep_conversation, true);
+  assert.equal("watchError" in put.console, false, "what the runtime reports is not pushed back");
+  assert.equal(toRuntimePut(task).agent, null);
 });
 
 test("运行时读回来的状态和进度变了，不算要再推", () => {

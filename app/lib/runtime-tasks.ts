@@ -9,12 +9,18 @@
  * 这里全是纯函数，页面和测试共用。
  */
 
-import type { ArtifactItem, ArtifactType, TaskItem, TaskRun, TaskRunStatus, TaskStatus, Weekday } from "../types";
+import type { ArtifactItem, ArtifactType, TaskItem, TaskRun, TaskRunStatus, TaskStatus, TaskWatch, Weekday } from "../types";
 import { dateLocale, t } from "../i18n";
 
 export type RuntimeSchedule =
   | { kind: "daily"; time: string }
-  | { kind: "weekly"; time: string; weekday: number };
+  | { kind: "weekdays"; time: string }
+  | { kind: "weekly"; time: string; weekday: number }
+  | { kind: "every"; minutes: number }
+  | { kind: "once"; at: string };
+
+/** 运行时里的监视对象。 */
+export type RuntimeWatch = { kind: "web"; url: string; every_minutes: number } | { kind: "folder"; path: string };
 
 /** 运行时里一次运行：引擎的 run 加上它那一步 agent_turn 的记录。 */
 export type RuntimeRun = {
@@ -137,6 +143,11 @@ export type RuntimeTask = {
   prompt?: string | null;
   schedule?: RuntimeSchedule | null;
   paused: boolean;
+  watch?: RuntimeWatch | null;
+  /** 最近一次查看监视对象的时间和出的错。 */
+  watch_status?: { checked_at?: string | null; error?: string | null } | null;
+  agent?: string | null;
+  keep_conversation?: boolean;
   /** 控制台自己的那份任务，运行时原样存、原样还。 */
   console?: unknown;
   /** 运行设置没指定目录时，这个任务自己的文件夹（第一次运行时才有）。 */
@@ -152,19 +163,47 @@ export type RuntimeTaskPut = {
   prompt?: string;
   schedule: RuntimeSchedule | null;
   paused: boolean;
-  console: Omit<TaskItem, "runs">;
+  watch: RuntimeWatch | null;
+  agent: string | null;
+  keep_conversation: boolean;
+  console: Omit<TaskItem, "runs" | "watchError">;
 };
+
+/** 隔多少分钟，运行时接受 5 分钟到一周。 */
+export const minEveryMinutes = 5;
+export const maxEveryMinutes = 7 * 24 * 60;
 
 const weekdays: readonly Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
 export function scheduleOf(task: TaskItem): RuntimeSchedule | null {
   const time = task.scheduleTime && /^\d{1,2}:\d{2}$/.test(task.scheduleTime) ? task.scheduleTime : "09:00";
   if (task.schedule === "每天") return { kind: "daily", time };
+  if (task.schedule === "工作日") return { kind: "weekdays", time };
   if (task.schedule === "每周") {
     const index = weekdays.indexOf(task.scheduleDay ?? "周一");
     return { kind: "weekly", time, weekday: (index < 0 ? 0 : index) + 1 };
   }
+  if (task.schedule === "每隔") {
+    const minutes = Math.round(task.scheduleEvery ?? 60);
+    return { kind: "every", minutes: Math.min(maxEveryMinutes, Math.max(minEveryMinutes, minutes)) };
+  }
+  if (task.schedule === "定时一次" && task.scheduleAt && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(task.scheduleAt)) {
+    return { kind: "once", at: task.scheduleAt };
+  }
   return null;
+}
+
+export function watchOf(task: Pick<TaskItem, "watch">): RuntimeWatch | null {
+  const watch: TaskWatch | undefined = task.watch;
+  if (!watch) return null;
+  if (watch.kind === "web") {
+    const url = watch.url.trim();
+    if (!/^https?:\/\//i.test(url)) return null;
+    const every = Math.min(maxEveryMinutes, Math.max(minEveryMinutes, Math.round(watch.everyMinutes || 30)));
+    return { kind: "web", url, every_minutes: every };
+  }
+  const path = watch.path.trim();
+  return path ? { kind: "folder", path } : null;
 }
 
 /**
@@ -197,8 +236,9 @@ export function titleFromRequest(request: string, max = 60): string {
  * 交给智能体的话是任务说明；没写说明就用标题。
  */
 export function toRuntimePut(task: TaskItem): RuntimeTaskPut {
-  const { runs: _runs, ...rest } = task;
+  const { runs: _runs, watchError: _watchError, ...rest } = task;
   void _runs;
+  void _watchError;
   const prompt = promptOf(task);
   return {
     id: task.id,
@@ -206,6 +246,9 @@ export function toRuntimePut(task: TaskItem): RuntimeTaskPut {
     prompt: prompt || undefined,
     schedule: scheduleOf(task),
     paused: task.status === "已暂停",
+    watch: watchOf(task),
+    agent: task.helperAgent?.trim() || null,
+    keep_conversation: task.keepConversation === true,
     console: rest,
   };
 }
@@ -259,7 +302,8 @@ export function toTaskRun(run: RuntimeRun): TaskRun {
   const started = Date.parse(run.started_at);
   const ended = run.ended_at ? Date.parse(run.ended_at) : NaN;
   const summary = run.summary?.trim() ?? "";
-  const scheduled = run.trigger === "schedule" ? `${t("按计划运行")} · ` : "";
+  const scheduled =
+    run.trigger === "schedule" ? `${t("按计划运行")} · ` : run.trigger === "watch" ? `${t("有变化时运行")} · ` : "";
   let text: string;
   if (status === "运行中") {
     text = run.waiting ? t("等你在收件箱确认一次工具调用") : summary ? summary.slice(-120) : t("智能体正在处理");
@@ -338,6 +382,7 @@ export function mergeRuntimeTasks(
       progress: status === "已完成" ? 100 : status === "运行中" ? Math.max(base.progress, 8) : base.progress,
       runs: allRuns,
       lastError: status === "失败" ? (latest ? runError(latest) : undefined) ?? base.lastError : undefined,
+      watchError: from.watch && from.watch_status?.error ? from.watch_status.error : undefined,
     };
   };
 

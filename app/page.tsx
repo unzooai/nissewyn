@@ -243,7 +243,7 @@ import {
 } from "./lib/runtime-tasks";
 import { AgentRunPanel } from "./agent-run-panel";
 import { RuntimeFocusCard } from "./runtime-focus";
-import { Conversations } from "./conversations";
+import { Conversations, type ConversationPlan } from "./conversations";
 import { SkillsPanel } from "./skills-panel";
 import { ClientsPanel } from "./clients-panel";
 import { PhonePanel } from "./phone-panel";
@@ -562,7 +562,11 @@ function isTaskItem(value: unknown): value is TaskItem {
     Number.isFinite(item.progress) &&
     typeof item.updated === "string" &&
     (item.schedule === undefined ||
-      ["仅运行一次", "每天", "每周"].includes(item.schedule)) &&
+      ["仅运行一次", "每天", "工作日", "每周", "每隔", "定时一次"].includes(item.schedule)) &&
+    (item.scheduleEvery === undefined || typeof item.scheduleEvery === "number") &&
+    (item.scheduleAt === undefined || typeof item.scheduleAt === "string") &&
+    (item.helperAgent === undefined || typeof item.helperAgent === "string") &&
+    (item.keepConversation === undefined || typeof item.keepConversation === "boolean") &&
     (item.scheduleTime === undefined || typeof item.scheduleTime === "string") &&
     (item.scheduleDay === undefined || weekdays.includes(item.scheduleDay)) &&
     (item.requiresApproval === undefined ||
@@ -906,10 +910,30 @@ function formatSchedule(
   schedule: TaskSchedule = "仅运行一次",
   time = "09:00",
   day: Weekday = "周一",
+  every?: number,
+  at?: string,
 ) {
   if (schedule === "每天") return t("每天 {time}", { time });
+  if (schedule === "工作日") return t("工作日 {time}", { time });
   if (schedule === "每周") return t("每{day} {time}", { day: t(day), time });
+  if (schedule === "每隔") return formatEvery(every ?? 60);
+  if (schedule === "定时一次" && at) return t("{at} 运行一次", { at: at.replace("T", " ") });
   return t("立即运行一次");
+}
+
+function formatEvery(minutes: number) {
+  if (minutes % 1440 === 0) return t("每 {count} 天", { count: minutes / 1440 });
+  if (minutes % 60 === 0) return minutes === 60 ? t("每小时") : t("每 {count} 小时", { count: minutes / 60 });
+  return t("每 {count} 分钟", { count: minutes });
+}
+
+/** 任务头上那颗按钮的字：什么时候运行，加上有变化时运行。 */
+function formatTaskTrigger(task: TaskItem) {
+  const parts: string[] = [];
+  if (task.schedule && task.schedule !== "仅运行一次") parts.push(formatTaskSchedule(task));
+  if (task.watch?.kind === "web") parts.push(t("网页变化时"));
+  if (task.watch?.kind === "folder") parts.push(t("有新文件时"));
+  return parts.length ? parts.join(" · ") : formatTaskSchedule(task);
 }
 
 function formatApprovalDecisionLabel(action: string) {
@@ -924,6 +948,8 @@ function formatTaskSchedule(task: TaskItem) {
     task.schedule ?? "仅运行一次",
     task.scheduleTime ?? "09:00",
     task.scheduleDay ?? "周一",
+    task.scheduleEvery,
+    task.scheduleAt,
   );
 }
 
@@ -1044,6 +1070,9 @@ function formatAuditTimestamp(createdAt: string) {
 function getNextRunLabel(task: TaskItem) {
   if (task.status === "已暂停") return t("恢复任务后重新计算");
   if (task.schedule === "每天") return t("明天 {value}", { value: task.scheduleTime ?? "09:00" });
+  if (task.schedule === "工作日") return t("下一个工作日 {value}", { value: task.scheduleTime ?? "09:00" });
+  if (task.schedule === "每隔") return formatEvery(task.scheduleEvery ?? 60);
+  if (task.schedule === "定时一次" && task.scheduleAt) return task.scheduleAt.replace("T", " ");
   if (task.schedule === "每周") {
     return t("下一个{value} {value2}", { value: t(task.scheduleDay ?? "周一"), value2: task.scheduleTime ?? "09:00" });
   }
@@ -9798,24 +9827,32 @@ export default function HomePage() {
     if (task) setNotice(t("已删除任务“{title}”", { title: task.title }));
   }
 
-  function scheduleConversation(taskId: string, schedule: TaskSchedule, time: string, day: Weekday) {
+  function scheduleConversation(taskId: string, plan: ConversationPlan) {
+    const { schedule, time, day, every, at, watch, helperAgent, keepConversation } = plan;
+    const timed = schedule === "每天" || schedule === "工作日" || schedule === "每周";
     setTasks((items) =>
       items.map((item) =>
         item.id === taskId
           ? {
               ...item,
               schedule,
-              scheduleTime: schedule === "仅运行一次" ? undefined : time,
+              scheduleTime: timed ? time : undefined,
               scheduleDay: schedule === "每周" ? day : undefined,
+              scheduleEvery: schedule === "每隔" ? every : undefined,
+              scheduleAt: schedule === "定时一次" ? at : undefined,
+              watch: watch ?? undefined,
+              helperAgent: helperAgent || undefined,
+              keepConversation: keepConversation || undefined,
+              watchError: watch ? item.watchError : undefined,
             }
           : item,
       ),
     );
-    setNotice(
-      schedule === "仅运行一次"
-        ? t("不再重复运行")
-        : t("已设为{schedule}自动运行", { schedule: formatSchedule(schedule, time, day) }),
-    );
+    const parts = [
+      schedule === "仅运行一次" ? "" : formatSchedule(schedule, time, day, every, at),
+      watch?.kind === "web" ? t("网页变化时") : watch?.kind === "folder" ? t("有新文件时") : "",
+    ].filter(Boolean);
+    setNotice(parts.length ? t("已设为{schedule}自动运行", { schedule: parts.join(" · ") }) : t("不再重复运行"));
   }
 
   function openConversationOutput(taskId: string, path: string) {
@@ -11261,8 +11298,9 @@ export default function HomePage() {
             }
             onSaveSkill={saveConversationAsSkill}
             onOpenSkills={() => openSettingsSection("agents")}
-            scheduleLabel={formatTaskSchedule}
+            scheduleLabel={formatTaskTrigger}
             agentName={conversationAgent?.name}
+            helperAgents={(runtimeAgents ?? []).filter((agent) => agent.installed).map((agent) => ({ id: agent.id, name: agent.name }))}
             notice={conversationNotice}
           />
         )}

@@ -46,7 +46,10 @@ export type TaskFilter = "全部" | TaskStatus;
 
 export type TaskSort = "状态优先" | "进度最高" | "名称";
 
-export type TaskSchedule = "仅运行一次" | "每天" | "每周";
+export type TaskSchedule = "仅运行一次" | "每天" | "工作日" | "每周" | "每隔" | "定时一次";
+
+/** 有变化就运行：一个网页（隔几分钟看一次），或一个文件夹（有新文件）。 */
+export type TaskWatch = { kind: "web"; url: string; everyMinutes: number } | { kind: "folder"; path: string };
 
 export type Weekday = "周一" | "周二" | "周三" | "周四" | "周五" | "周六" | "周日";
 
@@ -381,6 +384,18 @@ export type TaskItem = {
   schedule?: TaskSchedule;
   scheduleTime?: string;
   scheduleDay?: Weekday;
+  /** schedule 为“每隔”时，隔多少分钟。 */
+  scheduleEvery?: number;
+  /** schedule 为“定时一次”时，本地时间 YYYY-MM-DDTHH:MM。 */
+  scheduleAt?: string;
+  /** 有变化就运行。 */
+  watch?: TaskWatch;
+  /** 交给哪个智能体长期负责；不填用运行设置里的。 */
+  helperAgent?: string;
+  /** 定时和有变化时的运行接着上一次的对话，智能体记得做过什么。 */
+  keepConversation?: boolean;
+  /** 运行时最近一次查看监视对象时出的错（运行时写，不推回去）。 */
+  watchError?: string;
   requiresApproval?: boolean;
   pinned?: boolean;
   runs?: TaskRun[];

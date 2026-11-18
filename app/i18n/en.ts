@@ -8,6 +8,7 @@ import { enPage7 } from "./en-page-7";
 import { enPage8 } from "./en-page-8";
 import { enDemo } from "./en-demo";
 import { enPage9 } from "./en-page-9";
+import { enPage10 } from "./en-page-10";
 
 /**
  * English, keyed by the Chinese source text (see ./index.ts).
@@ -17,6 +18,7 @@ import { enPage9 } from "./en-page-9";
  */
 export const en: Record<string, string> = {
   // First, so a key an older catalog already translates keeps that wording.
+  ...enPage10,
   ...enPage9,
   ...enPage1,
   ...enPage2,

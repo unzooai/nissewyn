@@ -25825,6 +25825,43 @@ body {
   gap: 8px;
 }
 
+.conversation-popover.is-plan {
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 120px));
+  overflow-y: auto;
+}
+
+.conversation-popover-label {
+  margin-top: 4px;
+  color: var(--clarity-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.conversation-popover p.conversation-popover-note {
+  font-size: 12px;
+}
+
+.conversation-popover p.conversation-popover-error {
+  color: var(--clarity-red);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.conversation-popover-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--clarity-ink);
+  font-size: 13px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.conversation-popover-check input {
+  margin-top: 3px;
+}
+
 .conversation-popover-row select,
 .conversation-popover-row input {
   flex: 1;

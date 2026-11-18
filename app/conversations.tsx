@@ -25,7 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { TaskItem, TaskSchedule, Weekday } from "./types";
+import type { TaskItem, TaskSchedule, TaskWatch, Weekday } from "./types";
 import { dateLocale, t } from "./i18n";
 import type { ApprovalDecision, TabView, TerminalScreen } from "./lib/provider";
 import { ComputerPanel } from "./computer-panel";
@@ -52,6 +52,43 @@ import {
 
 const weekdays: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 const maxRequest = 8000;
+const repeatOptions: TaskSchedule[] = ["仅运行一次", "每天", "工作日", "每周", "每隔", "定时一次"];
+const everyOptions = [5, 15, 30, 60, 120, 240, 720, 1440];
+const watchEveryOptions = [5, 15, 30, 60, 240, 1440];
+
+/** 一个任务什么时候自己运行、交给谁。 */
+export type ConversationPlan = {
+  schedule: TaskSchedule;
+  time: string;
+  day: Weekday;
+  every: number;
+  at: string;
+  watch: TaskWatch | null;
+  helperAgent: string;
+  keepConversation: boolean;
+};
+
+/** 默认的“定时一次”：一小时后的整点，本地时间。 */
+function nextHour(): string {
+  const date = new Date(Date.now() + 60 * 60 * 1000);
+  date.setMinutes(0, 0, 0);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:00`;
+}
+
+function everyLabel(minutes: number): string {
+  if (minutes < 60) return t("每 {count} 分钟", { count: minutes });
+  if (minutes === 60) return t("每小时");
+  if (minutes % 1440 === 0) return t("每 {count} 天", { count: minutes / 1440 });
+  return t("每 {count} 小时", { count: minutes / 60 });
+}
+
+function lookEveryLabel(minutes: number): string {
+  if (minutes < 60) return t("每 {count} 分钟看一次", { count: minutes });
+  if (minutes === 60) return t("每小时看一次");
+  if (minutes === 1440) return t("每天看一次");
+  return t("每 {count} 小时看一次", { count: minutes / 60 });
+}
 
 export type ConversationsProps = {
   tasks: TaskItem[];
@@ -64,7 +101,9 @@ export type ConversationsProps = {
   onStop: (taskId: string) => Promise<void>;
   onRename: (taskId: string, title: string) => void;
   onDelete: (taskId: string) => void;
-  onSchedule: (taskId: string, schedule: TaskSchedule, time: string, day: Weekday) => void;
+  onSchedule: (taskId: string, plan: ConversationPlan) => void;
+  /** 能长期负责一个任务的智能体（装好了、能托管的）。 */
+  helperAgents?: { id: string; name: string }[];
   onOpenOutput: (taskId: string, path: string) => void;
   onRevealFolder?: (path: string) => void;
   onDecide: (sessionId: string, requestId: string, decision: ApprovalDecision) => Promise<void>;
@@ -476,6 +515,7 @@ function ThreadHeader({
   onToggleComputer,
   canSaveSkill,
   onSaveSkill,
+  helperAgents = [],
 }: ConversationsProps & {
   task: TaskItem;
   thread: RuntimeThread | null;
@@ -491,9 +531,26 @@ function ThreadHeader({
   const [schedule, setSchedule] = useState<TaskSchedule>(task.schedule ?? "仅运行一次");
   const [time, setTime] = useState(task.scheduleTime ?? "09:00");
   const [day, setDay] = useState<Weekday>(task.scheduleDay ?? "周一");
+  const [every, setEvery] = useState(task.scheduleEvery ?? 60);
+  const [at, setAt] = useState(task.scheduleAt ?? nextHour());
+  const [watchKind, setWatchKind] = useState<"" | TaskWatch["kind"]>(task.watch?.kind ?? "");
+  const [watchUrl, setWatchUrl] = useState(task.watch?.kind === "web" ? task.watch.url : "");
+  const [watchEvery, setWatchEvery] = useState(task.watch?.kind === "web" ? task.watch.everyMinutes : 30);
+  const [watchPath, setWatchPath] = useState(task.watch?.kind === "folder" ? task.watch.path : "");
+  const [helperAgent, setHelperAgent] = useState(task.helperAgent ?? "");
+  const [keepConversation, setKeepConversation] = useState(task.keepConversation === true);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const folder = thread?.workdir ?? thread?.turns.at(-1)?.workdir ?? null;
-  const repeating = task.schedule && task.schedule !== "仅运行一次";
+  const repeating = (task.schedule && task.schedule !== "仅运行一次") || Boolean(task.watch);
+  const watch: TaskWatch | null =
+    watchKind === "web"
+      ? { kind: "web", url: watchUrl.trim(), everyMinutes: watchEvery }
+      : watchKind === "folder"
+        ? { kind: "folder", path: watchPath.trim() }
+        : null;
+  const watchInvalid =
+    (watch?.kind === "web" && !/^https?:\/\/\S+$/i.test(watch.url)) || (watch?.kind === "folder" && !watch.path);
+  const atInvalid = schedule === "定时一次" && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at);
 
   useEffect(() => setTitle(task.title), [task.title]);
 
@@ -568,10 +625,10 @@ function ThreadHeader({
       </div>
 
       {menu === "repeat" && (
-        <div className="conversation-popover" role="dialog" aria-label={t("重复运行")}>
-          <p>{t("按时把第一句需求再交给智能体做一次，结果接在这个任务后面。")}</p>
+        <div className="conversation-popover is-plan" role="dialog" aria-label={t("重复运行")}>
+          <p>{t("按时、或者有变化时，把第一句需求再交给智能体做一次，结果接在这个任务后面。")}</p>
           <div className="conversation-segmented" role="radiogroup" aria-label={t("运行频率")}>
-            {(["仅运行一次", "每天", "每周"] as TaskSchedule[]).map((option) => (
+            {repeatOptions.map((option) => (
               <button
                 key={option}
                 type="button"
@@ -584,7 +641,7 @@ function ThreadHeader({
               </button>
             ))}
           </div>
-          {schedule !== "仅运行一次" && (
+          {(schedule === "每天" || schedule === "工作日" || schedule === "每周") && (
             <div className="conversation-popover-row">
               {schedule === "每周" && (
                 <select value={day} aria-label={t("星期")} onChange={(event) => setDay(event.target.value as Weekday)}>
@@ -598,6 +655,92 @@ function ThreadHeader({
               <input type="time" value={time} aria-label={t("时间")} onChange={(event) => setTime(event.target.value || "09:00")} />
             </div>
           )}
+          {schedule === "每隔" && (
+            <div className="conversation-popover-row">
+              <select value={every} aria-label={t("间隔")} onChange={(event) => setEvery(Number(event.target.value))}>
+                {(everyOptions.includes(every) ? everyOptions : [...everyOptions, every].sort((a, b) => a - b)).map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {everyLabel(minutes)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {schedule === "定时一次" && (
+            <div className="conversation-popover-row">
+              <input type="datetime-local" value={at} aria-label={t("运行时间")} onChange={(event) => setAt(event.target.value)} />
+            </div>
+          )}
+
+          <label className="conversation-popover-label" htmlFor={`watch-${task.id}`}>
+            {t("有变化时也运行")}
+          </label>
+          <div className="conversation-popover-row">
+            <select
+              id={`watch-${task.id}`}
+              value={watchKind}
+              onChange={(event) => setWatchKind(event.target.value as "" | TaskWatch["kind"])}
+            >
+              <option value="">{t("不监视")}</option>
+              <option value="web">{t("网页内容变了")}</option>
+              <option value="folder">{t("文件夹里有新文件")}</option>
+            </select>
+            {watchKind === "web" && (
+              <select value={watchEvery} aria-label={t("多久看一次")} onChange={(event) => setWatchEvery(Number(event.target.value))}>
+                {(watchEveryOptions.includes(watchEvery) ? watchEveryOptions : [...watchEveryOptions, watchEvery].sort((a, b) => a - b)).map(
+                  (minutes) => (
+                    <option key={minutes} value={minutes}>
+                      {lookEveryLabel(minutes)}
+                    </option>
+                  ),
+                )}
+              </select>
+            )}
+          </div>
+          {watchKind === "web" && (
+            <div className="conversation-popover-row">
+              <input
+                type="url"
+                value={watchUrl}
+                placeholder="https://"
+                aria-label={t("要看的网页")}
+                onChange={(event) => setWatchUrl(event.target.value)}
+              />
+            </div>
+          )}
+          {watchKind === "folder" && (
+            <div className="conversation-popover-row">
+              <input
+                value={watchPath}
+                placeholder={t("文件夹路径")}
+                aria-label={t("要看的文件夹")}
+                onChange={(event) => setWatchPath(event.target.value)}
+              />
+            </div>
+          )}
+          {watchKind === "web" && <p className="conversation-popover-note">{t("用智能体的浏览器身份打开，要登录才能看的页面也行。")}</p>}
+          {task.watchError && watchKind && (
+            <p className="conversation-popover-error">{t("上次查看出错：{error}", { error: task.watchError })}</p>
+          )}
+
+          <label className="conversation-popover-label" htmlFor={`helper-${task.id}`}>
+            {t("交给")}
+          </label>
+          <div className="conversation-popover-row">
+            <select id={`helper-${task.id}`} value={helperAgent} onChange={(event) => setHelperAgent(event.target.value)}>
+              <option value="">{t("默认智能体")}</option>
+              {helperAgents.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="conversation-popover-check">
+            <input type="checkbox" checked={keepConversation} onChange={(event) => setKeepConversation(event.target.checked)} />
+            <span>{t("长期负责：每次接着上一次的对话，记得之前做过什么")}</span>
+          </label>
+
           <footer>
             <button type="button" onClick={() => setMenu(null)}>
               {t("取消")}
@@ -605,8 +748,9 @@ function ThreadHeader({
             <button
               className="primary"
               type="button"
+              disabled={Boolean(watchInvalid) || atInvalid}
               onClick={() => {
-                onSchedule(task.id, schedule, time, day);
+                onSchedule(task.id, { schedule, time, day, every, at, watch, helperAgent, keepConversation });
                 setMenu(null);
               }}
             >
@@ -690,14 +834,20 @@ function Turn({
   const [open, setOpen] = useState<boolean | null>(null);
   const expanded = open ?? (live || questions.length > 0);
   const scheduled = turn.trigger === "schedule";
+  const watched = turn.trigger === "watch";
   const savingSkill = turn.purpose === "save_skill";
   // 存为技能那一轮，交给智能体的是一大段说明；对话里只说做了什么。
-  const prompt = savingSkill ? t("把这个任务存为技能") : (turn.prompt ?? (first ? task.description : ""));
+  // 有变化时那一轮，交给智能体的是需求加上变了什么（写给智能体的）；对话里只显示需求。
+  const prompt = savingSkill
+    ? t("把这个任务存为技能")
+    : watched
+      ? task.description || task.title
+      : (turn.prompt ?? (first ? task.description : ""));
   const reply = turn.reply?.trim() || (turn.state === "succeeded" ? turn.summary?.trim() : "") || "";
 
   return (
     <div className="conversation-turn">
-      {prompt && <UserMessage text={prompt} note={scheduled ? t("定时运行") : undefined} />}
+      {prompt && <UserMessage text={prompt} note={scheduled ? t("定时运行") : watched ? t("有变化时运行") : undefined} />}
       {turn.continued === false && (
         <p className="conversation-quiet">{t("上一段对话接不上了，这一句开始了新的对话。")}</p>
       )}
