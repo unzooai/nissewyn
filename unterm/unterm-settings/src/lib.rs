@@ -11,6 +11,8 @@ mod browser;
 mod clients;
 mod console_tasks;
 mod console_watch;
+mod watch_calendar;
+mod watch_mail;
 mod helpers;
 mod local_agents;
 mod mobile_one;
