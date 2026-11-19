@@ -2,6 +2,7 @@
   "name": "unzoo-one-console",
   "version": "0.1.0",
   "private": true,
+  "license": "BUSL-1.1",
   "engines": {
     "node": ">=22.13.0"
   },

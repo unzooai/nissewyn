@@ -1,5 +1,7 @@
 # 第三方源码声明
 
+Unzoo One 自己的代码采用 Business Source License 1.1（见 [LICENSE](LICENSE)）。下面列出的第三方代码不在其内，保留各自的许可证。
+
 ## Unterm（`unterm/`）
 
 `unterm/` 目录是 [zhitongblog/unterm](https://github.com/zhitongblog/unterm) 的源码，

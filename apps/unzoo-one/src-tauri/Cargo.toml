@@ -3,6 +3,7 @@ name = "unzoo-one"
 version = "0.1.0"
 description = "Unzoo One — the desktop client"
 edition = "2021"
+license = "BUSL-1.1"
 publish = false
 
 # Its own workspace: the client is not part of the runtime's (unterm/) build.
