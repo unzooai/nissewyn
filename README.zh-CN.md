@@ -85,4 +85,4 @@ Unzoo One 是**源码公开的受控自由软件**，采用 [Business Source Lic
 - **不可以**（需要商业授权）：拿去给别人做托管或代运营服务，或者放进和 Unzoo One 竞争的产品里。
 - **四年后**：每个版本发布满四年，自动改为 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)。
 
-`unterm/` 里的运行时和其它第三方代码保留各自的协议（MIT 等），见 [NOTICE.md](NOTICE.md)。要商业授权或企业版，请联系 Unzoo。
+`unterm/` 里的运行时和其它第三方代码保留各自的协议（MIT 等），见 [NOTICE.md](NOTICE.md)。要商业授权或企业版，请发邮件到 [dev@unzoo.ai](mailto:dev@unzoo.ai)。

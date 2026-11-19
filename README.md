@@ -113,4 +113,4 @@ Unzoo One is **source-available** under the
 
 The runtime in `unterm/` and other third-party code keep their own licenses
 (MIT and others); see [NOTICE.md](NOTICE.md). For a commercial or enterprise
-license, contact Unzoo.
+license, email [dev@unzoo.ai](mailto:dev@unzoo.ai).
