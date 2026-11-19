@@ -34,6 +34,8 @@ import { guessMailHost, type RuntimeActivity, type RuntimeHandover, type Runtime
 import {
   activityLine,
   activitySummary,
+  commitIntent,
+  commitLine,
   computerOf,
   conversationExamples,
   conversationStatus,
@@ -947,6 +949,9 @@ function Turn({
         ? (turn.prompt ?? "").split("\n\n").slice(1).join("\n\n") || turn.prompt || ""
         : (turn.prompt ?? (first ? task.description : ""));
   const reply = turn.reply?.trim() || (turn.state === "succeeded" ? turn.summary?.trim() : "") || "";
+  // 自己运行的那一轮觉得不用打扰你：先收起来，点开再看。
+  const [showFolded, setShowFolded] = useState(false);
+  const folded = (turn.fold === "quiet" || turn.fold === "later") && !showFolded;
 
   return (
     <div className="conversation-turn">
@@ -997,7 +1002,13 @@ function Turn({
         <HelperCard key={helper.session_id} turn={turn} helper={helper} onDecide={onDecide} />
       ))}
 
-      {reply && <Reply text={reply} />}
+      {reply && folded ? (
+        <button type="button" className="conversation-folded" onClick={() => setShowFolded(true)}>
+          {turn.fold === "quiet" ? t("这次没有要告诉你的，点开看它记了什么") : t("不急的消息，没有打扰你，点开看")}
+        </button>
+      ) : (
+        reply && <Reply text={reply} />
+      )}
 
       {savingSkill && (turn.saved_skills?.length ?? 0) > 0 && (
         <div className="conversation-skill-saved" role="status">
@@ -1246,10 +1257,15 @@ function Question({ item, onDecide }: { item: RuntimeActivity; onDecide: (decisi
     <div className={`conversation-question is-${tone}`} role="group" aria-label={t("等你确认")}>
       <header>
         <ShieldAlert size={16} aria-hidden="true" />
-        <strong>{intentLine(item)}</strong>
+        <strong>{item.commit ? commitIntent(item.commit) : intentLine(item)}</strong>
         <em>{riskLabel(item.risk)}</em>
       </header>
-      {item.target && <code>{item.target}</code>}
+      {item.commit ? <p className="conversation-commit">{commitLine(item.commit)}</p> : item.target && <code>{item.target}</code>}
+      {item.repeat && <p className="conversation-review is-warn">{t("同样的提交这次已经做过一次，可能已经发出去了。")}</p>}
+      {item.review?.state === "running" && <p className="conversation-review">{t("审核员正在核对这是不是你要它做的……")}</p>}
+      {item.review?.state === "ask" && item.review.reason && (
+        <p className="conversation-review">{t("审核员：{reason}", { reason: item.review.reason })}</p>
+      )}
       <footer>
         <button className="primary" type="button" disabled={busy} onClick={() => void answer({ kind: "approve" })}>
           <Check size={14} aria-hidden="true" />

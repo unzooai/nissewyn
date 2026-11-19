@@ -35,7 +35,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimeTellRules, RuntimeTellWish, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -551,6 +551,18 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       },
       async setTermProgram(name) {
         await callUnterm("/api/compat", { term_program: name });
+      },
+      async tellRules(): Promise<RuntimeTellRules> {
+        type Raw = { kind: string; wish: RuntimeTellWish; hours?: string | null; said?: string; at?: string; count?: number };
+        const data = await getUnterm<{ rules?: Raw[]; clues?: Raw[] }>("/api/tell-rules");
+        const rule = (raw: Raw) => ({ kind: raw.kind, wish: raw.wish, hours: raw.hours ?? null, said: raw.said ?? "", at: raw.at ?? "" });
+        return {
+          rules: (data.rules ?? []).map(rule),
+          clues: (data.clues ?? []).map((raw) => ({ ...rule(raw), count: raw.count ?? 1 })),
+        };
+      },
+      async forgetTellRule(kind) {
+        await callUnterm("/api/tell-rules/forget", { kind });
       },
       async phone() {
         return toRuntimePhone(await getUnterm<RawPhoneStatus>("/api/remote/status"));

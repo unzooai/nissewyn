@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   activityLine,
   activitySummary,
+  commitLine,
   computerOf,
   conversationStatus,
   decisionLabel,
@@ -133,4 +134,10 @@ test("a helper's work is told by name, its questions are its own, and its comput
   assert.deepEqual(helperQuestions({ ...turn, state: "succeeded" }, helper), [], "the turn is over: nobody is waiting");
   assert.deepEqual(helperQuestions(turn, { ...helper, state: "stopped" }), []);
   assert.deepEqual(computerOf([turn]), { terminals: ["1", "4"], tabs: [] });
+});
+
+test("a committing step reads as what it clicks or sends, and where", () => {
+  assert.equal(commitLine({ kind: "click", label: "发布", site: "xiaohongshu.com" }), "Click “发布” (xiaohongshu.com)");
+  assert.equal(commitLine({ kind: "enter", label: "Message", text: "10 点可以", site: "" }), "Press Enter in “Message” to send: 10 点可以");
+  assert.equal(decisionLabel({ tool: "mcp__unzoo__browser_click", verb: "click", request_id: "r1", decided_by: "reviewer", decision: "allow" }), "Allowed after review");
 });

@@ -413,6 +413,12 @@ export type RuntimeShells = {
   termProgramPresets: string[];
 };
 
+/** 怎么告诉你：从你对“自己运行的任务”发来消息的回复里学到的规则和线索。 */
+export type RuntimeTellWish = "now" | "later" | "silent";
+export type RuntimeTellRule = { kind: string; wish: RuntimeTellWish; hours: string | null; said: string; at: string };
+export type RuntimeTellClue = RuntimeTellRule & { count: number };
+export type RuntimeTellRules = { rules: RuntimeTellRule[]; clues: RuntimeTellClue[] };
+
 /** 手机：同一个局域网（或 Tailscale）里的手机配对后，在手机上看对话、回答、发任务。 */
 export type RuntimePhoneAddress = { ip: string; kind: string; url?: string; qr?: string };
 export type RuntimePhoneDevice = { id: string; name: string; platform: string; scope: string; lastSeen: string; lastIp: string };
@@ -484,6 +490,10 @@ export interface RuntimeTaskPort {
   installShell(id: string): Promise<void>;
   /** 终端里的程序看到的终端名；空字符串恢复默认。 */
   setTermProgram(name: string): Promise<void>;
+  /** 学到的提醒规则（只存在本机）。 */
+  tellRules(): Promise<RuntimeTellRules>;
+  /** 忘掉一类事的规则和线索。 */
+  forgetTellRule(kind: string): Promise<void>;
   /** 手机配对的状态。 */
   phone(): Promise<RuntimePhone>;
   /** 生成一个 2 分钟内有效的配对码（同时打开手机连接）。 */

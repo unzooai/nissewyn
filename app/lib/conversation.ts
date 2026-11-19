@@ -8,7 +8,32 @@
 
 import type { TaskItem } from "../types";
 import { t } from "../i18n";
-import type { RuntimeActivity, RuntimeHelper, RuntimeTurn } from "./runtime-tasks";
+import type { RuntimeActivity, RuntimeCommit, RuntimeHelper, RuntimeTurn } from "./runtime-tasks";
+
+/** 提交类动作说成一句话：点哪个按钮、发出什么、在哪个网站。 */
+export function commitLine(commit: RuntimeCommit): string {
+  const site = commit.site?.trim();
+  const line = (() => {
+    switch (commit.kind) {
+      case "click":
+        return t("点击「{label}」", { label: commit.label ?? "" });
+      case "enter":
+        return t("在「{field}」里按回车，发出：{text}", { field: commit.label ?? "", text: commit.text ?? "" });
+      case "form":
+        return t("填好表单并提交");
+      default:
+        return t("运行一段会点击或提交的脚本");
+    }
+  })();
+  return site ? t("{action}（{site}）", { action: line, site }) : line;
+}
+
+/** 提交类动作问你时，标题说它要做的是哪种后果。 */
+export function commitIntent(commit: RuntimeCommit): string {
+  if (commit.risk === "financial") return t("它要付款或下单");
+  if (commit.risk === "destructive") return t("它要删除东西");
+  return t("它要发出或提交内容");
+}
 
 export type ConversationStatus = "running" | "waiting" | "failed" | "done" | "scheduled" | "idle";
 
@@ -218,6 +243,7 @@ export function decisionLabel(item: RuntimeActivity): string | null {
   // 智能体自带的“问用户”工具这里没有界面，运行时让它改成在回复里直接问。
   if (item.tool === "AskUserQuestion" && item.decided_by === "unterm") return t("改在回复里问你");
   if (item.decision === "deny") return item.decided_by === "policy" ? t("规则拒绝") : t("已拒绝");
+  if (item.decided_by === "reviewer") return t("审核后放行");
   if (item.decided_by === "autonomy") return t("自动");
   if (item.decided_by === "policy") return t("按规则");
   if (item.decided_by === "person") return t("你批准了");

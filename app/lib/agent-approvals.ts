@@ -12,6 +12,8 @@
 import { t } from "../i18n";
 import { Terminal } from "lucide-react";
 import type { ApprovalItem, ApprovalRisk } from "../types";
+import { commitIntent, commitLine } from "./conversation";
+import type { RuntimeCommit } from "./runtime-tasks";
 
 /** unterm 返回的一条：approval.requested 事件原样，加 session_id 和 adapter。 */
 export type RawAgentApproval = {
@@ -23,6 +25,9 @@ export type RawAgentApproval = {
     request_id: string;
     description?: string;
     tool_call: { tool: string; arguments?: unknown };
+    commit?: RuntimeCommit | null;
+    repeat?: boolean | null;
+    review?: { state: string; reason?: string | null } | null;
   };
 };
 
@@ -207,6 +212,34 @@ export function toApprovalItem(raw: RawAgentApproval, now: number = Date.now()):
   // 执行命令和改文件都会改变本机状态；授予权限会放宽之后的所有调用，单列高风险。
   const risk: ApprovalRisk = kind === "permissions" ? "高风险" : kind === "other" ? "低风险" : "中风险";
   const target = targetOf(raw.approval.tool_call.arguments);
+  const commit = raw.approval.commit;
+  if (commit) {
+    // 发送、发布、付款、删除：说清它要点的是什么，加上审核员的理由。
+    const line = commitLine(commit);
+    const review = raw.approval.review;
+    const reason = raw.approval.repeat
+      ? t("同样的提交这次已经做过一次，可能已经发出去了。")
+      : review?.state === "ask" && review.reason
+        ? t("审核员：{reason}", { reason: review.reason })
+        : review?.state === "running"
+          ? t("审核员正在核对这是不是你要它做的……")
+          : commitIntent(commit);
+    return {
+      id: agentApprovalId(raw.session_id, raw.approval.request_id),
+      taskId: raw.task_id ?? "",
+      title: t("{agent} 请求{action}", { agent, action: line }),
+      reason,
+      impact: t("批准后会{action}", { action: line }),
+      action: line,
+      target: line,
+      scope: t("仅本次调用"),
+      risk: "高风险",
+      requestedAt: relativeLabel(raw.at, now),
+      expiresAt: t("会话关闭时自动拒绝"),
+      policy: t("托管会话：执行前询问"),
+      icon: Terminal,
+    };
+  }
   return {
     id: agentApprovalId(raw.session_id, raw.approval.request_id),
     taskId: raw.task_id ?? "",

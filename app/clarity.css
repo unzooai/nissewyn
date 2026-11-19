@@ -26065,6 +26065,39 @@ body {
   white-space: pre-wrap;
 }
 
+.conversation-folded {
+  justify-self: start;
+  padding: 4px 10px;
+  border: 1px dashed var(--clarity-line-strong);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--clarity-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.conversation-question .conversation-commit {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--clarity-ink);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.conversation-question .conversation-review {
+  margin: 0;
+  color: var(--clarity-muted, #5c6470);
+  font-size: 12.5px;
+}
+
+.conversation-question .conversation-review.is-warn {
+  color: var(--clarity-red);
+  font-weight: 600;
+}
+
 .conversation-question footer {
   display: flex;
   flex-wrap: wrap;

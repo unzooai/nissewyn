@@ -145,3 +145,22 @@ test("an external client's terminal write becomes an inbox item that can be answ
   assert.equal(clientLabel("cursor"), "Cursor");
   assert.equal(clientLabel("some-new-client"), "some-new-client");
 });
+
+test("托管审批：点发送这类提交，收件箱说清点的是什么，并带上审核员的理由", () => {
+  const send = {
+    ...claudeAsks,
+    approval: {
+      request_id: "r9",
+      tool_call: { tool: "mcp__unzoo__browser_click", arguments: { selector: "ref=9" } },
+      commit: { kind: "click", label: "Send", site: "mail.google.com", text: null, risk: "external_side_effect" },
+      review: { state: "ask", reason: "你只让它总结收件箱，没让它发信。" },
+    },
+  };
+  const item = toApprovalItem(send, Date.parse("2026-11-10T03:00:30+00:00"));
+  assert.match(item.title, /Click “Send” \(mail\.google\.com\)/);
+  assert.equal(item.reason, "Reviewer: 你只让它总结收件箱，没让它发信。");
+  assert.equal(item.risk, "高风险");
+
+  const again = { ...send, approval: { ...send.approval, review: null, repeat: true } };
+  assert.match(toApprovalItem(again).reason, /already made once/);
+});

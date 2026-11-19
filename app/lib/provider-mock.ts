@@ -489,6 +489,12 @@ export function createMockProvider(): WorkspaceProvider {
       async setTermProgram() {
         throw new Error(t("演示版没有本机运行时"));
       },
+      async tellRules() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async forgetTellRule() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
       async phone() {
         throw new Error(t("演示版没有本机运行时"));
       },

@@ -70,6 +70,22 @@ export type RuntimeActivity = {
   decision?: "allow" | "deny" | null;
   ok?: boolean | null;
   at?: string | null;
+  /** 这一步会发出、发布、付款或删除东西：点的是哪个按钮、在哪个网站、发出去的字。 */
+  commit?: RuntimeCommit | null;
+  /** 同样的提交这次会话里刚做过一次（可能已经发出去了）。 */
+  repeat?: boolean | null;
+  /** 审核员（你自己的智能体）看过：running 正在看；ask 交给你，附理由；allow 它替你放行了，附理由。 */
+  review?: { state: "running" | "ask" | "allow"; reason?: string | null } | null;
+};
+
+/** 一个提交类动作，运行时按结构给出，界面按语言拼成句子。 */
+export type RuntimeCommit = {
+  /** click 点按钮；enter 在输入框里按回车发出；form 填表并提交；script 用脚本点击或提交。 */
+  kind: "click" | "enter" | "form" | "script";
+  label?: string | null;
+  site?: string | null;
+  text?: string | null;
+  risk?: string | null;
 };
 
 /** 对话里的一轮：一次运行，加上说了什么、做了什么、答了什么。 */
@@ -85,6 +101,8 @@ export type RuntimeTurn = RuntimeRun & {
   tabs: string[];
   /** save_skill：这一轮是“把对话存为技能”。 */
   purpose?: string | null;
+  /** 自己运行的那一轮觉得不用打扰你：quiet 没什么要说的，later 不急、留着你有空看。 */
+  fold?: "quiet" | "later" | null;
   /** 存成的技能名。 */
   saved_skills?: string[] | null;
   /** 没存成的原因。 */
