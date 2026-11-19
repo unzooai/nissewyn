@@ -387,6 +387,32 @@ export type RuntimeClients = {
   clients: RuntimeClient[];
 };
 
+/** 本机的一个 shell：装没装、版本、能不能一键装。 */
+export type RuntimeShell = {
+  id: string;
+  name: string;
+  description: string;
+  installed: boolean;
+  path: string;
+  version: string | null;
+  /** 一键安装用的命令；没有就是不能一键装。 */
+  installCommand: string | null;
+  /** 装的时候要管理员权限、装完要重启（WSL），只告诉人怎么装。 */
+  installByHand: boolean;
+  recommended: boolean;
+  installing: boolean;
+  installError: string | null;
+};
+export type RuntimeShells = {
+  shells: RuntimeShell[];
+  /** 新开的终端用哪个：设置里指定的（config），或者系统默认挑的（platform）。 */
+  defaultShell: { source: string; argv: string[]; label: string; id: string | null };
+  /** 终端里的程序看到的终端名（TERM_PROGRAM）。 */
+  termProgram: string;
+  termProgramDefault: string;
+  termProgramPresets: string[];
+};
+
 /** 手机：同一个局域网（或 Tailscale）里的手机配对后，在手机上看对话、回答、发任务。 */
 export type RuntimePhoneAddress = { ip: string; kind: string; url?: string; qr?: string };
 export type RuntimePhoneDevice = { id: string; name: string; platform: string; scope: string; lastSeen: string; lastIp: string };
@@ -451,6 +477,13 @@ export interface RuntimeTaskPort {
   clients(): Promise<RuntimeClients>;
   /** 把 Unzoo One 的终端接入（或移出）某个客户端。 */
   connectClient(id: string, connect: boolean): Promise<void>;
+  /** 本机的 shell，和新开的终端用哪个。 */
+  shells(): Promise<RuntimeShells>;
+  setDefaultShell(id: string): Promise<void>;
+  /** 一键安装（winget / brew），在后台装，装好后 shells() 会显示已安装。 */
+  installShell(id: string): Promise<void>;
+  /** 终端里的程序看到的终端名；空字符串恢复默认。 */
+  setTermProgram(name: string): Promise<void>;
   /** 手机配对的状态。 */
   phone(): Promise<RuntimePhone>;
   /** 生成一个 2 分钟内有效的配对码（同时打开手机连接）。 */

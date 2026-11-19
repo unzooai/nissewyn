@@ -448,3 +448,12 @@ unterm 的终端窗口第一次启动时会自动跑 `setup-ai`，往本机所�
 - 电脑关机后任务继续跑，需要把任务、对话和登录状态放到云端代跑。这和个人版“一切在你自己的电脑上”的说法冲突，所以**个人版不做**，归企业版（企业本来就有自己的服务器和合规要求）。
 - 个人版的说法：任务、对话、邮件密码、日历地址、浏览器登录状态都只在这台电脑上；不经过我们的服务器。电脑睡着或关机时错过的定时和日程，开机后补跑（日程在开始后 10 分钟内）。
 - 手机连电脑仍走局域网或 Tailscale 直连（第 11 节），不加云端中转。
+
+## 17. 终端的 shell：按需要选、缺了再装（2026-11-19）
+
+- **系统怎么看它**：每个会话都是真的伪终端（Windows 上是 ConPTY），`TERM=xterm-256color`、`COLORTERM=truecolor`。新增 `TERM_PROGRAM`：默认是产品名去掉空格（Unzoo One 里是 `UnzooOne`，单独的 Unterm 是 `Unterm`），版本在 `TERM_PROGRAM_VERSION`。从父进程继承来的（比如 `vscode`）不往下传，调用方特意设的保留。之前设置页的“终端名”存了但从没生效。
+- **不注册成 Windows 的默认终端**：那要实现 Windows Terminal 的 COM 交接接口（`ITerminalHandoff`），工作量大，先不做。
+- **默认 shell**：有 PowerShell 7 用它，否则 Windows PowerShell；设置里可以换（写进配置的 `shell = [...]`），改完立即对新终端生效，不用重启后台服务；选“自动”删掉这一行。
+- **智能体按需要选**：智能体开始时拿到一句话——默认是哪个、本机还有哪些（带可以直接用的 argv）、缺的怎么装。要别的 shell 就用 `session.create` 的 `argv`。`session.create` 只给命令字符串时仍按原样走 `cmd /C`（上游的调用方和测试都按 cmd 语法写，改了会破坏接口），说明里写清楚，并让智能体要别的 shell 时用 `argv`。
+- **缺了再装，先问人**：网关把装卸整机程序单列出来：`winget/choco/scoop/brew/apt/dnf/pacman… install/upgrade`、`msiexec`、`wsl --install`、`Install-Module` 算对外的副作用，平衡档要问；`uninstall/remove`、`msiexec /x`、`wsl --unregister` 算破坏性，总要问。项目自己的依赖（`npm install`、虚拟环境里的 `pip install`）照旧是普通执行。WSL 要管理员和重启，只告诉人怎么装。
+- **设置 › 能力 › 终端**：默认 shell、已装的（带版本）、可以一键装的（winget/brew，后台装、不弹黑窗，页面每 5 秒看一次进度，装失败显示原因）、终端名（留空恢复默认）。Git Bash 不再把 System32 里 WSL 的 `bash.exe` 当成自己。

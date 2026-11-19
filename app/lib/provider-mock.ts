@@ -477,6 +477,18 @@ export function createMockProvider(): WorkspaceProvider {
       async connectClient() {
         throw new Error(t("演示版没有本机运行时"));
       },
+      async shells() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async setDefaultShell() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async installShell() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async setTermProgram() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
       async phone() {
         throw new Error(t("演示版没有本机运行时"));
       },

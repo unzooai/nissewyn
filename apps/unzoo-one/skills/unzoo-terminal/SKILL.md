@@ -18,7 +18,9 @@ Commands on this computer run in the Unzoo One terminal, through its MCP server:
 
 - `exec.run_wait` with `session_id` and `command` runs a command and returns its output when it exits. Use it for anything that finishes on its own: `git status`, a build, a test run, a script.
 - Set `timeout_ms` for slow commands, such as installs and full builds. The default is short.
-- This is Windows unless the prompt or `ver`/`uname` says otherwise. The shell is usually PowerShell: use PowerShell syntax (`Get-ChildItem`, `$env:NAME`, `;` between commands).
+- This is Windows unless the prompt or `ver`/`uname` says otherwise. Terminals start the default shell, usually PowerShell 7: use PowerShell syntax (`Get-ChildItem`, `$env:NAME`, `;` between commands). The prompt says which shell it is and which others are installed.
+- For a job written for another shell (a bash script, Linux tools), open a terminal for it with `session.create` and `argv`, for example `["C:/Program Files/Git/bin/bash.exe", "--login"]` or `["wsl.exe"]`. A `command` string given to `session.create` runs through `cmd /C` on Windows; to run a command in a particular shell, start that shell with `argv` and use `exec.run_wait`.
+- If the job needs a shell or tool that is not installed, install it with `winget install --id <id> -e --source winget` (or `brew install` on a Mac). Installing programs waits for the person's approval; WSL needs an administrator and a restart, so ask the person to install it.
 
 ## Long-running commands — servers, watchers, downloads
 

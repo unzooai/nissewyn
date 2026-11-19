@@ -35,7 +35,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeSkill, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -496,6 +496,61 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       },
       async setupBrowserForClients() {
         await callUnterm("/api/console/clients/browser", {});
+      },
+      async shells(): Promise<RuntimeShells> {
+        type RawShell = {
+          id: string;
+          name: string;
+          description?: string;
+          installed?: boolean;
+          path?: string;
+          version?: string | null;
+          install_command?: string | null;
+          install_by_hand?: boolean;
+          recommended?: boolean;
+          installing?: boolean;
+          install_error?: string | null;
+        };
+        const [data, compat] = await Promise.all([
+          getUnterm<{
+            shells?: RawShell[];
+            default_shell?: { source?: string; argv?: string[]; label?: string; id?: string | null };
+          }>("/api/shells"),
+          getUnterm<{ term_program?: string; default?: string; presets?: string[] }>("/api/compat"),
+        ]);
+        return {
+          shells: (data.shells ?? []).map((shell) => ({
+            id: shell.id,
+            name: shell.name,
+            description: shell.description ?? "",
+            installed: shell.installed === true,
+            path: shell.path ?? "",
+            version: shell.version ?? null,
+            installCommand: shell.install_command ?? null,
+            installByHand: shell.install_by_hand === true,
+            recommended: shell.recommended === true,
+            installing: shell.installing === true,
+            installError: shell.install_error ?? null,
+          })),
+          defaultShell: {
+            source: data.default_shell?.source ?? "platform",
+            argv: data.default_shell?.argv ?? [],
+            label: data.default_shell?.label ?? "",
+            id: data.default_shell?.id ?? null,
+          },
+          termProgram: compat.term_program ?? "",
+          termProgramDefault: compat.default ?? "",
+          termProgramPresets: compat.presets ?? [],
+        };
+      },
+      async setDefaultShell(id) {
+        await callUnterm("/api/shells/default", { id });
+      },
+      async installShell(id) {
+        await callUnterm("/api/shells/install", { id });
+      },
+      async setTermProgram(name) {
+        await callUnterm("/api/compat", { term_program: name });
       },
       async phone() {
         return toRuntimePhone(await getUnterm<RawPhoneStatus>("/api/remote/status"));

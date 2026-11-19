@@ -27551,3 +27551,46 @@ body {
   color: var(--clarity-muted);
   font-size: 12px;
 }
+
+/* 设置 › 能力 › 终端 */
+.terminal-settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.terminal-settings-row label {
+  min-width: 84px;
+  color: var(--clarity-soft);
+}
+
+.terminal-settings-row select,
+.terminal-settings-row input {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--clarity-line-strong);
+  border-radius: 7px;
+  background: var(--clarity-panel);
+  color: var(--clarity-ink);
+  font: inherit;
+}
+
+.terminal-settings-row button {
+  flex: none;
+  padding: 6px 12px;
+  border: 1px solid var(--clarity-line-strong);
+  border-radius: 7px;
+  background: var(--clarity-panel);
+  color: var(--clarity-ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.terminal-settings-row button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

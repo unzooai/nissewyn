@@ -59,4 +59,24 @@ export const enPage10: Record<string, string> = {
   "交给": "Hand to",
   "默认智能体": "Default agent",
   "长期负责：每次接着上一次的对话，记得之前做过什么": "Standing helper: each run continues the last conversation and remembers what was done",
+  // Settings › Capabilities › Terminal
+  "新开的终端用哪个 shell": "Which shell new terminals use",
+  "你开的终端和智能体开的终端都用这里选的 shell。智能体也知道本机装了哪些，需要时会换一个用；缺了要装时，会先进收件箱问你。":
+    "Terminals you open and terminals agents open both use the shell chosen here. Agents also know which shells this computer has and switch when a job needs it; installing a missing one comes to your inbox first.",
+  "读不到 shell：{error}": "Couldn't read the shells: {error}",
+  "默认 shell": "Default shell",
+  "新开的终端会用 {name}": "New terminals will use {name}",
+  "新开的终端会用系统默认的 shell": "New terminals will use the system's default shell",
+  "自动（现在是 {name}）": "Automatic (currently {name})",
+  "系统默认": "system default",
+  "没装成：{error}": "Install failed: {error}",
+  "要管理员权限，装完要重启。在管理员 PowerShell 里运行：{command}":
+    "Needs administrator rights and a restart. Run this in an administrator PowerShell: {command}",
+  "正在安装 {name}，可能会弹出系统的确认窗口": "Installing {name}; the system may ask you to confirm",
+  "正在安装…": "Installing…",
+  "安装": "Install",
+  "终端名": "Terminal name",
+  "新开的终端会用这个名字": "New terminals will use this name",
+  "终端里的程序通过 TERM_PROGRAM 看到这个名字。个别工具只认识几种终端，用不了时可以改成 WezTerm 或 xterm。留空恢复默认（{name}）。":
+    "Programs in the terminal see this name through TERM_PROGRAM. A few tools only recognize certain terminals; if one refuses to work, try WezTerm or xterm. Leave it empty to go back to the default ({name}).",
 };

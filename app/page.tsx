@@ -247,6 +247,7 @@ import { Conversations, type ConversationPlan } from "./conversations";
 import { SkillsPanel } from "./skills-panel";
 import { ClientsPanel } from "./clients-panel";
 import { PhonePanel } from "./phone-panel";
+import { TerminalPanel } from "./terminal-panel";
 import { RuntimeUsagePanel } from "./runtime-usage";
 import { RuntimeCapabilitiesPanel } from "./runtime-capabilities";
 import { autostartEnabled, inDesktopApp, openTerminal, revealPath, setAutostart } from "./lib/core-connection";
@@ -14307,6 +14308,7 @@ export default function HomePage() {
                 onOpenAgents={() => openSettingsSection("agents")}
                 onOpenTerminal={desktopApp ? openTerminalFromPage : undefined}
               />
+              <TerminalPanel runtime={workspaceProvider.runtime} notify={setNotice} />
               <ClientsPanel runtime={workspaceProvider.runtime} notify={setNotice} />
               <PhonePanel runtime={workspaceProvider.runtime} notify={setNotice} />
               </>
