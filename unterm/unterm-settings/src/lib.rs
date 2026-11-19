@@ -8,12 +8,13 @@
 
 mod agent_run;
 mod browser;
-mod clients;
+pub mod clients;
 mod console_tasks;
+pub use console_tasks::{run_settings, set_run_settings, RunSettings};
 mod console_watch;
 mod watch_calendar;
 mod watch_mail;
-mod helpers;
+pub mod helpers;
 mod local_agents;
 mod mobile_one;
 mod skills;

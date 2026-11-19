@@ -76,24 +76,18 @@ function targetForUA(
   return pageFallback;
 }
 
-export const onRequestGet: PagesFunction<Env> = (ctx) => {
+export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const url = new URL(ctx.request.url);
-  const v = url.searchParams.get("v");
+  const v = url.searchParams.get("v") || "v0.71.28";
   const mirror = url.searchParams.get("mirror");
-  const cfCountry = (ctx.request as any).cf?.country;
+  // Primary download button (/api/download?v=...) always serves GitHub Releases;
+  // only the dedicated China mirror button (?mirror=atomgit or ?cn=1) uses AtomGit.
   const useAtomgit =
-    mirror === "atomgit" ||
-    url.searchParams.get("cn") === "1" ||
-    (mirror !== "github" && cfCountry === "CN");
-  if (!v) {
-    return Response.redirect(
-      useAtomgit ? ATOMGIT_BASE : `${BASE}/latest`,
-      302
-    );
-  }
+    mirror === "atomgit" || url.searchParams.get("cn") === "1";
   const ua = ctx.request.headers.get("user-agent") || "";
   const arch = hintedArch(ctx.request);
-  const response = Response.redirect(targetForUA(ua, v, arch, useAtomgit), 302);
+  const targetUrl = targetForUA(ua, v, arch, useAtomgit);
+  const response = Response.redirect(targetUrl, 302);
   // Ask Chromium for the architecture. `Critical-CH` makes a browser that
   // did not send it retry this request once with it, before following the
   // redirect -- the only way the very first click can know it is on ARM.
@@ -102,7 +96,9 @@ export const onRequestGet: PagesFunction<Env> = (ctx) => {
   if (/Windows/i.test(ua) && arch === null) {
     headers.set("Critical-CH", "Sec-CH-UA-Arch");
   }
-  headers.set("Vary", "User-Agent, Sec-CH-UA-Arch");
+  headers.set("Vary", "User-Agent, Sec-CH-UA-Arch, Accept-Language");
   headers.set("Cache-Control", "no-store");
   return new Response(null, { status: 302, headers });
 };
+
+export const onRequestHead: PagesFunction<Env> = onRequestGet;

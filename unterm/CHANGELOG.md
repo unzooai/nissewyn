@@ -1,5 +1,64 @@
 # Changelog
 
+## v0.71.28 — 2026-11-17
+
+### Fixed
+
+- **Real-time cross-process Appearance theme switching between Web Settings (`unterm-core`) and GUI windows (`unterm-app`).**
+  - Polls `~/.unterm/theme.json` modification time (`remembered_mtime`) every 180ms in `unterm-app`'s event loop so theme changes saved by `unterm-core` (`POST /api/theme`) or `unterm-cli theme` in a separate process immediately apply to all active and parked native windows (`apply_theme` + `sync_frame` + `report_terminal_colors` + `request_redraw`).
+  - Prevents the bundled default `assets/unterm.conf` `[colors]` block (`#111315` / `#e8eaed`) from overriding light or custom themes (`Daylight`, `Notion Light`, `Midnight`, `Classic`, `Agent Inbox`) persisted in `~/.unterm/theme.json`.
+  - Synchronizes Web Settings CSS custom properties (`--unterm-bg`, `--unterm-surface`, `--unterm-ink`, `--unterm-accent`, etc.) via `syncDocumentTheme(id)` in `app.js` so the Web Settings UI itself switches between dark and light palettes immediately upon clicking a theme card.
+- **Separated primary GitHub Release download button from dedicated AtomGit mainland China mirror button on `unterm.app`.**
+  - Ensures `/api/download?v=<tag>` always redirects to GitHub Releases while only `/api/download?v=<tag>&mirror=atomgit` routes to AtomGit CDN.
+
+## v0.71.27 — 2026-11-16
+
+### Added
+
+- **Central multi-agent delegation (`agent_session.delegate`), human terminal takeover (`agent_session.handover`), live ANSI Console terminal & `mcp-trim` token optimization (#73).**
+  - Adds `agent_session.delegate` so a lead AI agent can dispatch subtasks to other configured agents (`claude`, `codex`, `agy`, `opencode`, `gemini`), wait for completion, and collect structured file artifacts while automatically closing temporary tabs and worktrees on completion or cancellation.
+  - Adds `agent_session.handover` so an agent can pause on login, 2FA, or CAPTCHA gates, notify the user in the Console/terminal, and resume automatically once the user completes the step.
+  - Streams colorized ANSI terminal output history and incremental deltas to the Console UI with direct keyboard forwarding so users can watch and operate agent terminals in real time.
+  - Adds `--mcp-trim` for governed agent sessions (`claude`, `codex`, `opencode`), exposing only the core orchestration MCP tools and saving ~30,000 prompt tokens per request.
+  - Applies risk-graded `Autonomy` (`PauseOnWrite`, `PauseOnDestructive`, `Autonomous`) per command when external MCP clients write to terminals, plus one-click error diagnosis when a terminal command exits non-zero.
+- **Refined 7-theme native UI craft, high-contrast split-pane focus rings & one-screen Quick Start.**
+  - Ships 7 curated native themes (**Obsidian**, **Carbon**, **Solarized Dark**, **Dracula**, **Nord**, **Daylight**, **Paper Light**) with full palette synchronization across the unified 36px top bar, pill tabs, split panes, command palette, and 26px bottom status bar.
+  - Enhances multi-pane split visibility with a high-contrast `2px` active focus border, glowing top accent bar, `✦ ACTIVE` pill indicator, and dimmed inactive pane backdrop.
+  - Redesigned the first-run onboarding into a concise, single-screen Quick Start card.
+
+### Fixed
+
+- **Eliminated typing stutter under multi-session load (`SessionActivity` lock contention & main-thread IPC stalls).**
+  - Moves `process_tree::snapshot` outside `unterm-core`'s global runtime mutex (`read_snapshot_concurrent`) and adds a 500ms per-PID process-tree cache (`snapshot_cached`), preventing `ps` subprocess calls from blocking `WriteInput` across active sessions.
+  - Releases `session.screen.lock()` before resolving working directories in `session_snapshots`, avoids cloning `StyledScreenSnapshot` when the viewport is already at the bottom, and skips redundant `FrameCache::bump()` when session metadata is unchanged.
+  - Adds a 650ms active-typing window (`note_user_input` / `user_typing_recently`) that pauses background process-table sweeps and status housekeeping while the user is typing, paired with 1ms fast polling in `EventHub::wake_for_input`.
+
+## v0.71.26 — 2026-11-12
+
+### Added
+
+- **Zero-stall input pipeline (`ui_client` dedicated IPC channel, condvar wakeup & memory caches).**
+  - Separates high-priority keyboard/mouse input (`write_input`, `resize_pane`, `send_mouse`) onto a dedicated persistent IPC connection (`ui_client`) in `EngineBackend`, completely isolating typing from background status, inbox, and sidebar polling on `client`.
+  - Adds a `Condvar`-backed wakeup (`EventHub::wake` / `EventHub::wait_timeout`) in `unterm-core`, lowers active event cadence from `16ms` to `6ms` (~165 Hz), and triggers an immediate `2ms` post-write echo wake so TUI agents (`agy`, `claude`, `codex`) reflect typed characters without frame stalls.
+  - Caches `pane_modes` (`bracketed_paste`, `app_cursor`, `mouse_mode`, `alt_screen`) and `mcp_state` in memory (updated via `EventHub` push events + 500ms background refresh), removing synchronous IPC round-trips from the keyboard hot path and per-frame status bar rendering.
+- **Native in-window Settings Center (`⚙` / `Cmd+,`).**
+  - Replaces the external browser redirect on clicking the title-bar `⚙` button or pressing `Cmd+,` with an instant, keyboard-driven native in-window Settings Center (`open_native_settings`), grouping Appearance, Font & Cursor, Opacity & Blur, AI Agent one-click MCP setup (`Command::SetupAiAgents`), Keybindings, and Config Reload, while keeping **Web Console & Advanced Settings** one keystroke away.
+- **Active Agent Inspection, cross-pane `Y/N` Quick Approve & Sidebar Hover Peek.**
+  - Upgrades `Ctrl+Shift+I` into an **Agent & Task Inspection (`智能体与任务巡检`)** overlay that scans all background panes across tabs/splits, attaches a live 2-line terminal tail preview to every active agent (`agy`, `claude`, `codex`, `gemini`, `opencode`, `qwen`, `kimi`), and highlights panes waiting for `[y/n]` confirmation with amber badges.
+  - Supports pressing `Y` or `N` directly inside the inspection overlay to send `y\r` / `n\r` to a background agent pane without switching tabs, and adds hover preview cards (`append_sidebar_peek`) when hovering background tabs in the left sidebar.
+  - Adds a bespoke 4-point sparkle vector icon (`✦`) for Antigravity (`agy`) in the sidebar and status bar, and refines tab, status-bar, and inspection-card geometry against Windows Terminal Fluent 2 and macOS HIG specifications.
+- **Risk-graded autonomy, multi-turn Console task threads, dedicated managed browser, local agent sign-in & skill plugins (#68–#72).**
+  - Adds risk-graded `Autonomy` (`PauseOnWrite`, `PauseOnDestructive`, `Autonomous`) with unified `tool_risk` and shell `command_risk` classification across hosted sessions and Console tasks (#68).
+  - Adds multi-turn conversation threads (`follow_up`), structured outputs (`extract_outputs`), and explicit stop endpoints for Console tasks (#69).
+  - Launches a dedicated managed browser profile (`~/.unterm/browser-profile`) for Unterm tasks so users can log in once without CDP conflicts with their daily browser (#70).
+  - Supports starting local CLI sign-in flows (`claude`, `codex`, `gemini`, `agy`) directly from Web Settings (`POST /api/agents/<id>/sign-in`) and installing curated skill plugins (`~/.unterm/skills/<id>/SKILL.md`) into agent prompts (#71).
+  - Keeps `unterm-core` alive while hosted sessions, Console task runs, or task schedules are active even after the last GUI window closes (#72).
+
+### Fixed
+
+- **Windows Git checkpoint test (`core.autocrlf`) in `unterm-settings`.**
+  - Forces `core.autocrlf = false` in `hidden_git_checkpoint_creates_lists_diffs_and_restores_without_touching_branch` so Windows CI restores LF fixtures byte-for-byte identically.
+
 ## v0.71.25 — 2026-11-11
 
 ### Added
