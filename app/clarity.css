@@ -27749,3 +27749,4 @@ body {
   .plugins-list { border-right: none; padding-right: 0; border-bottom: 1px solid var(--clarity-line); padding-bottom: 12px; }
   .plugins-role { grid-template-columns: 1fr; }
 }
+.plugins-hint { color: var(--clarity-soft); font-size: 12px; }

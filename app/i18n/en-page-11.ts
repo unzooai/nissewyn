@@ -38,4 +38,8 @@ export const enPage11: Record<string, string> = {
   "还没有输出": "No output yet",
   "重启": "Restart",
   "默认强度": "Default effort",
+  "正在列出它的模型…": "Listing its models…",
+  "其他（自己填）": "Other (type it)",
+  "列不出模型，自己填（留空用默认）": "Could not list models; type one (blank for default)",
+  "默认强度（{effort}）": "Default effort ({effort})",
 };

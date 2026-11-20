@@ -444,6 +444,7 @@ export type RuntimePlugin = {
   roles: RuntimePluginRole[];
   domains: string[];
 };
+export type RuntimeAgentModel = { id: string; label: string; efforts: string[]; defaultEffort: string | null; isDefault: boolean };
 export type RuntimePlugins = { plugins: RuntimePlugin[]; browserProfiles: { id: string; name: string }[] };
 
 /** 手机：同一个局域网（或 Tailscale）里的手机配对后，在手机上看对话、回答、发任务。 */
@@ -528,6 +529,7 @@ export interface RuntimeTaskPort {
   removePlugin(id: string): Promise<void>;
   bindPluginRole(id: string, role: string, value: Record<string, string> | null): Promise<void>;
   pluginLog(id: string): Promise<string>;
+  agentModels(agent: string, refresh?: boolean): Promise<{ models: RuntimeAgentModel[]; error: string | null }>;
   /** 手机配对的状态。 */
   phone(): Promise<RuntimePhone>;
   /** 生成一个 2 分钟内有效的配对码（同时打开手机连接）。 */

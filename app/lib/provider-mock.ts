@@ -516,6 +516,9 @@ export function createMockProvider(): WorkspaceProvider {
       async pluginLog() {
         return "";
       },
+      async agentModels() {
+        return { models: [], error: null };
+      },
       async phone() {
         throw new Error(t("演示版没有本机运行时"));
       },

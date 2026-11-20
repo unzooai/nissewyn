@@ -3,11 +3,11 @@
 import { FolderPlus, Puzzle, RefreshCw, RotateCcw, ScrollText, Settings2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { t } from "./i18n";
-import type { RuntimePlugin, RuntimePluginRole, RuntimePlugins, RuntimeTaskPort } from "./lib/provider";
+import type { RuntimeAgentModel, RuntimePlugin, RuntimePluginRole, RuntimePlugins, RuntimeTaskPort } from "./lib/provider";
 
 type Port = Pick<
   RuntimeTaskPort,
-  "plugins" | "addPlugin" | "enablePlugin" | "restartPlugin" | "removePlugin" | "bindPluginRole" | "pluginLog"
+  "plugins" | "addPlugin" | "enablePlugin" | "restartPlugin" | "removePlugin" | "bindPluginRole" | "pluginLog" | "agentModels"
 >;
 
 const AGENTS: { id: string; label: string }[] = [
@@ -16,7 +16,8 @@ const AGENTS: { id: string; label: string }[] = [
   { id: "agy", label: "Antigravity CLI" },
   { id: "opencode", label: "OpenCode" },
 ];
-const EFFORTS = ["", "low", "medium", "high", "xhigh", "max"];
+/** 自己填模型名时选的那一项。 */
+const OTHER = "__other__";
 
 function statusLabel(plugin: RuntimePlugin): string {
   if (!plugin.enabled) return t("已关闭");
@@ -368,7 +369,64 @@ function RoleRow({
   const [agent, setAgent] = useState(current.agent ?? "");
   const [model, setModel] = useState(current.model ?? "");
   const [effort, setEffort] = useState(current.effort ?? "");
+  const [models, setModels] = useState<RuntimeAgentModel[]>([]);
+  const [listing, setListing] = useState<"idle" | "loading" | "done">("idle");
+  const [listError, setListError] = useState<string | null>(null);
+  const [custom, setCustom] = useState(false);
   const saved = t("{role} 已保存", { role: role.label });
+
+  // 每个智能体有自己的模型：换了智能体就列它的。
+  useEffect(() => {
+    if (role.kind !== "agent" || !agent) {
+      setModels([]);
+      return;
+    }
+    let alive = true;
+    setListing("loading");
+    setListError(null);
+    runtime
+      .agentModels(agent)
+      .then(({ models: list, error }) => {
+        if (!alive) return;
+        setModels(list);
+        setListError(error);
+        setListing("done");
+        setCustom(Boolean(model) && list.length > 0 && !list.some((m) => m.id === model));
+      })
+      .catch((failure) => {
+        if (!alive) return;
+        setModels([]);
+        setListError(errorText(failure));
+        setListing("done");
+      });
+    return () => {
+      alive = false;
+    };
+    // model 只在列表回来时比对一次，不随输入重新列。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agent, role.kind, runtime]);
+
+  const chosen = models.find((m) => m.id === model) ?? null;
+  const efforts = chosen?.efforts ?? [];
+
+  function pickAgent(next: string) {
+    setAgent(next);
+    // 上一个智能体的模型对新的没意义：清空，列表回来后用它的默认模型。
+    setModel("");
+    setEffort("");
+    setCustom(false);
+  }
+
+  useEffect(() => {
+    if (listing === "done" && !model && !custom && models.length > 0) {
+      const preferred = models.find((m) => m.isDefault) ?? models[0];
+      setModel(preferred.id);
+    }
+  }, [listing, models, model, custom]);
+
+  useEffect(() => {
+    if (effort && !efforts.includes(effort)) setEffort("");
+  }, [efforts, effort]);
 
   if (role.kind === "browser") {
     const value = role.binding?.profile ?? "";
@@ -409,7 +467,7 @@ function RoleRow({
       }}
     >
       <span>{role.label}</span>
-      <select value={agent} onChange={(event) => setAgent(event.target.value)} aria-label={t("智能体")}>
+      <select value={agent} onChange={(event) => pickAgent(event.target.value)} aria-label={t("智能体")}>
         <option value="">{t("还没指定")}</option>
         {AGENTS.map((a) => (
           <option key={a.id} value={a.id}>
@@ -417,15 +475,50 @@ function RoleRow({
           </option>
         ))}
       </select>
-      <input value={model} onChange={(event) => setModel(event.target.value)} placeholder={t("模型（留空用默认）")} aria-label={t("模型")} />
-      <select value={effort} onChange={(event) => setEffort(event.target.value)} aria-label={t("推理强度")}>
-        {EFFORTS.map((e) => (
-          <option key={e} value={e}>
-            {e || t("默认强度")}
+      {agent && listing === "loading" ? (
+        <span className="plugins-hint">{t("正在列出它的模型…")}</span>
+      ) : agent && models.length > 0 && !custom ? (
+        <select
+          value={model}
+          onChange={(event) => {
+            if (event.target.value === OTHER) {
+              setCustom(true);
+              setModel("");
+            } else {
+              setModel(event.target.value);
+            }
+          }}
+          aria-label={t("模型")}
+        >
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label === m.id ? m.id : `${m.label} (${m.id})`}
+            </option>
+          ))}
+          <option value={OTHER}>{t("其他（自己填）")}</option>
+        </select>
+      ) : agent ? (
+        <input
+          value={model}
+          onChange={(event) => setModel(event.target.value)}
+          placeholder={listError ? t("列不出模型，自己填（留空用默认）") : t("模型（留空用默认）")}
+          aria-label={t("模型")}
+          title={listError ?? undefined}
+        />
+      ) : null}
+      {efforts.length > 0 ? (
+        <select value={effort} onChange={(event) => setEffort(event.target.value)} aria-label={t("推理强度")}>
+          <option value="">
+            {chosen?.defaultEffort ? t("默认强度（{effort}）", { effort: chosen.defaultEffort }) : t("默认强度")}
           </option>
-        ))}
-      </select>
-      <button type="submit" disabled={busy}>
+          {efforts.map((e) => (
+            <option key={e} value={e}>
+              {e}
+            </option>
+          ))}
+        </select>
+      ) : null}
+      <button type="submit" disabled={busy || listing === "loading"}>
         {t("保存")}
       </button>
     </form>

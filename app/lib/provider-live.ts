@@ -35,7 +35,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimePluginStatus, RuntimePlugins, RuntimeTellRules, RuntimeTellWish, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimeAgentModel, RuntimePluginStatus, RuntimePlugins, RuntimeTellRules, RuntimeTellWish, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -613,6 +613,20 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       },
       async bindPluginRole(id, role, value) {
         await callUnterm("/api/plugins/bind", { id, role, value });
+      },
+      async agentModels(agent, refresh) {
+        type Raw = { id: string; label?: string; efforts?: string[]; default_effort?: string | null; default?: boolean };
+        const data = await getUnterm<{ models?: Raw[]; error?: string | null }>(
+          `/api/agents/models?agent=${encodeURIComponent(agent)}${refresh ? "&refresh=1" : ""}`,
+        );
+        const models: RuntimeAgentModel[] = (data.models ?? []).map((m) => ({
+          id: m.id,
+          label: m.label ?? m.id,
+          efforts: m.efforts ?? [],
+          defaultEffort: m.default_effort ?? null,
+          isDefault: Boolean(m.default),
+        }));
+        return { models, error: data.error ?? null };
       },
       async pluginLog(id) {
         const data = await getUnterm<{ log?: string }>(`/api/plugins/log?id=${encodeURIComponent(id)}`);
