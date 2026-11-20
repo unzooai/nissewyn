@@ -1,13 +1,29 @@
 "use client";
 
 import { FolderPlus, Puzzle, RefreshCw, RotateCcw, ScrollText, Settings2, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { t } from "./i18n";
-import type { RuntimeAgentModel, RuntimePlugin, RuntimePluginRole, RuntimePlugins, RuntimeTaskPort } from "./lib/provider";
+import type {
+  RuntimeAgentModel,
+  RuntimePlugin,
+  RuntimePluginRole,
+  RuntimePluginSetting,
+  RuntimePluginSettingValue,
+  RuntimePlugins,
+  RuntimeTaskPort,
+} from "./lib/provider";
 
 type Port = Pick<
   RuntimeTaskPort,
-  "plugins" | "addPlugin" | "enablePlugin" | "restartPlugin" | "removePlugin" | "bindPluginRole" | "pluginLog" | "agentModels"
+  | "plugins"
+  | "addPlugin"
+  | "enablePlugin"
+  | "restartPlugin"
+  | "removePlugin"
+  | "bindPluginRole"
+  | "setPluginSettings"
+  | "pluginLog"
+  | "agentModels"
 >;
 
 const AGENTS: { id: string; label: string }[] = [
@@ -238,7 +254,7 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
               ) : null}
               <button type="button" className={effectiveTab === "settings" ? "is-active" : ""} onClick={() => setTab("settings")}>
                 <Settings2 size={14} aria-hidden="true" />
-                {t("账号与模型")}
+                {t("设置")}
               </button>
               <button type="button" className={effectiveTab === "log" ? "is-active" : ""} onClick={() => setTab("log")}>
                 <ScrollText size={14} aria-hidden="true" />
@@ -301,6 +317,10 @@ function PluginSettings({
             <RoleRow key={role.name} plugin={plugin} role={role} profiles={profiles} busy={busy} act={act} runtime={runtime} />
           ))}
         </section>
+      ) : null}
+
+      {plugin.settings.length > 0 ? (
+        <SettingsForm key={`${plugin.id}:${JSON.stringify(plugin.settings.map((s) => s.value))}`} plugin={plugin} busy={busy} act={act} runtime={runtime} />
       ) : null}
 
       {plugin.tools.length > 0 || plugin.mcpServer ? (
@@ -522,5 +542,169 @@ function RoleRow({
         {t("保存")}
       </button>
     </form>
+  );
+}
+
+type Draft = Record<string, RuntimePluginSettingValue>;
+const NEWLINE = "\n";
+
+function same(a: RuntimePluginSettingValue, b: RuntimePluginSettingValue): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** 插件声明的设置，按组列出。关着也能改；开着时保存会让它重启来读取。 */
+function SettingsForm({
+  plugin,
+  busy,
+  act,
+  runtime,
+}: {
+  plugin: RuntimePlugin;
+  busy: boolean;
+  act: (what: () => Promise<unknown>, done?: string) => Promise<void>;
+  runtime: Port;
+}) {
+  const saved = useMemo(() => Object.fromEntries(plugin.settings.map((s) => [s.key, s.value])) as Draft, [plugin.settings]);
+  // 保存后父组件换 key 重建这个表单，草稿从新存的值开始。
+  const [draft, setDraft] = useState<Draft>(saved);
+
+  const groups = useMemo(() => {
+    const out: { name: string; items: RuntimePluginSetting[] }[] = [];
+    for (const s of plugin.settings) {
+      const group = out.find((g) => g.name === s.group) ?? out[out.push({ name: s.group, items: [] }) - 1];
+      group.items.push(s);
+    }
+    return out;
+  }, [plugin.settings]);
+
+  const edits = plugin.settings.filter((s) => !same(draft[s.key], saved[s.key]));
+  const set = (key: string, value: RuntimePluginSettingValue) => setDraft((d) => ({ ...d, [key]: value }));
+
+  function save() {
+    const values: Record<string, RuntimePluginSettingValue> = {};
+    for (const s of edits) values[s.key] = draft[s.key];
+    void act(
+      () => runtime.setPluginSettings(plugin.id, values),
+      plugin.status === "running" ? t("设置已保存，{name} 已重启来读取", { name: plugin.name }) : t("设置已保存"),
+    );
+  }
+
+  return (
+    <form
+      className="plugins-config"
+      onSubmit={(event) => {
+        event.preventDefault();
+        save();
+      }}
+    >
+      {groups.map((group) => (
+        <section key={group.name || "_"}>
+          {group.name ? <h3>{group.name}</h3> : null}
+          {group.items.map((s) => (
+            <SettingRow key={s.key} setting={s} value={draft[s.key]} onChange={(v) => set(s.key, v)} />
+          ))}
+        </section>
+      ))}
+      <div className="plugins-config-actions">
+        <button type="submit" disabled={busy || edits.length === 0}>
+          {edits.length > 0 ? t("保存 {count} 项改动", { count: edits.length }) : t("保存")}
+        </button>
+        {edits.length > 0 ? (
+          <button type="button" onClick={() => setDraft(saved)} disabled={busy}>
+            {t("撤销改动")}
+          </button>
+        ) : null}
+        {plugin.settings.some((s) => s.changed) ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              if (window.confirm(t("把 {name} 的设置全部恢复成默认？", { name: plugin.name }))) {
+                const values: Record<string, null> = {};
+                for (const s of plugin.settings) if (s.changed) values[s.key] = null;
+                void act(() => runtime.setPluginSettings(plugin.id, values), t("已恢复默认"));
+              }
+            }}
+          >
+            {t("全部恢复默认")}
+          </button>
+        ) : null}
+      </div>
+    </form>
+  );
+}
+
+function SettingRow({
+  setting,
+  value,
+  onChange,
+}: {
+  setting: RuntimePluginSetting;
+  value: RuntimePluginSettingValue;
+  onChange: (value: RuntimePluginSettingValue) => void;
+}) {
+  const bounds = { min: setting.min ?? undefined, max: setting.max ?? undefined };
+  let control: ReactNode;
+  switch (setting.type) {
+    case "bool":
+      control = <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
+      break;
+    case "number":
+      control = (
+        <input
+          type="number"
+          {...bounds}
+          value={typeof value === "number" ? value : ""}
+          onChange={(e) => onChange(e.target.value === "" ? setting.default : Number(e.target.value))}
+        />
+      );
+      break;
+    case "choice":
+      control = (
+        <select value={String(value)} onChange={(e) => onChange(e.target.value)}>
+          {setting.choices.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+      );
+      break;
+    case "range": {
+      const pair = Array.isArray(value) && value.length === 2 ? (value as [number, number]) : [0, 0];
+      control = (
+        <span className="plugins-range">
+          <input type="number" {...bounds} value={pair[0]} onChange={(e) => onChange([Number(e.target.value), pair[1]])} />
+          <span>–</span>
+          <input type="number" {...bounds} value={pair[1]} onChange={(e) => onChange([pair[0], Number(e.target.value)])} />
+        </span>
+      );
+      break;
+    }
+    case "list":
+      control = (
+        <textarea
+          rows={Math.min(8, Math.max(2, (Array.isArray(value) ? value.length : 0) + 1))}
+          value={Array.isArray(value) ? value.join(NEWLINE) : ""}
+          onChange={(e) => onChange(e.target.value.split(NEWLINE))}
+          placeholder={t("每行一项")}
+        />
+      );
+      break;
+    case "textarea":
+      control = <textarea rows={4} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
+      break;
+    default:
+      control = <input value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
+  }
+  return (
+    <label className={`plugins-setting is-${setting.type}`}>
+      <span className="plugins-setting-label">
+        {setting.label}
+        {setting.changed ? <small>{t("已改")}</small> : null}
+      </span>
+      {control}
+      {setting.help ? <span className="plugins-hint">{setting.help}</span> : null}
+    </label>
   );
 }

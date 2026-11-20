@@ -513,6 +513,9 @@ export function createMockProvider(): WorkspaceProvider {
       async bindPluginRole() {
         throw new Error(t("演示版没有本机运行时"));
       },
+      async setPluginSettings() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
       async pluginLog() {
         return "";
       },

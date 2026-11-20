@@ -27750,3 +27750,46 @@ body {
   .plugins-role { grid-template-columns: 1fr; }
 }
 .plugins-hint { color: var(--clarity-soft); font-size: 12px; }
+.plugins-config { display: flex; flex-direction: column; gap: 18px; }
+.plugins-config section { display: flex; flex-direction: column; gap: 10px; }
+.plugins-setting {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 3px;
+  align-items: center;
+  font-size: 13px;
+}
+.plugins-setting .plugins-hint { grid-column: 2; }
+.plugins-setting.is-list, .plugins-setting.is-textarea { align-items: start; }
+.plugins-setting-label small { margin-left: 6px; color: var(--clarity-blue); font-size: 11px; }
+.plugins-setting input:not([type="checkbox"]), .plugins-setting select, .plugins-setting textarea {
+  padding: 6px 8px;
+  border: 1px solid var(--clarity-line-strong);
+  border-radius: 6px;
+  background: var(--clarity-panel);
+  color: var(--clarity-ink);
+  font: inherit;
+  font-size: 13px;
+  min-width: 0;
+  max-width: 420px;
+}
+.plugins-setting input[type="number"] { max-width: 120px; }
+.plugins-setting input[type="checkbox"] { justify-self: start; }
+.plugins-setting textarea { resize: vertical; width: 100%; }
+.plugins-range { display: inline-flex; align-items: center; gap: 6px; }
+.plugins-config-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.plugins-config-actions button {
+  padding: 6px 12px;
+  border: 1px solid var(--clarity-line-strong);
+  border-radius: 6px;
+  background: var(--clarity-panel);
+  color: var(--clarity-ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+.plugins-config-actions button[type="submit"]:not(:disabled) { background: var(--clarity-blue); border-color: var(--clarity-blue); color: #fff; }
+@media (max-width: 760px) {
+  .plugins-setting { grid-template-columns: 1fr; }
+  .plugins-setting .plugins-hint { grid-column: 1; }
+}

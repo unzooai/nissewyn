@@ -35,7 +35,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimeAgentModel, RuntimePluginStatus, RuntimePlugins, RuntimeTellRules, RuntimeTellWish, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimeAgentModel, RuntimePluginSetting, RuntimePluginStatus, RuntimePlugins, RuntimeTellRules, RuntimeTellWish, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -569,6 +569,7 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           id: string; name?: string; version?: string; description?: string; dir?: string; enabled?: boolean;
           status?: RuntimePluginStatus; error?: string | null; page_url?: string | null; has_page?: boolean;
           mcp_server?: string | null; tools?: { name: string; does: string }[]; domains?: string[];
+          settings?: RuntimePluginSetting[];
           roles?: { name: string; kind: "browser" | "agent"; label?: string; default?: Record<string, string> | null; binding?: Record<string, string> | null }[];
         };
         const data = await getUnterm<{ plugins?: Raw[]; browser_profiles?: { id: string; name?: string }[] }>("/api/plugins");
@@ -593,6 +594,7 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
               default: role.default ?? null,
               binding: role.binding ?? null,
             })),
+            settings: (raw.settings ?? []).map((s) => ({ ...s, help: s.help ?? "", choices: s.choices ?? [], min: s.min ?? null, max: s.max ?? null })),
             domains: raw.domains ?? [],
           })),
           browserProfiles: (data.browser_profiles ?? []).map((p) => ({ id: p.id, name: p.name ?? p.id })),
@@ -613,6 +615,9 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       },
       async bindPluginRole(id, role, value) {
         await callUnterm("/api/plugins/bind", { id, role, value });
+      },
+      async setPluginSettings(id, values) {
+        await callUnterm("/api/plugins/settings", { id, values });
       },
       async agentModels(agent, refresh) {
         type Raw = { id: string; label?: string; efforts?: string[]; default_effort?: string | null; default?: boolean };

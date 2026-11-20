@@ -442,7 +442,23 @@ export type RuntimePlugin = {
   mcpServer: string | null;
   tools: { name: string; does: string }[];
   roles: RuntimePluginRole[];
+  settings: RuntimePluginSetting[];
   domains: string[];
+};
+export type RuntimePluginSettingValue = boolean | number | string | string[] | [number, number];
+/** 插件声明的一项设置（节奏、上限、时段……），关着的时候也能改。 */
+export type RuntimePluginSetting = {
+  key: string;
+  group: string;
+  label: string;
+  type: "bool" | "number" | "text" | "textarea" | "choice" | "list" | "range";
+  default: RuntimePluginSettingValue;
+  value: RuntimePluginSettingValue;
+  changed: boolean;
+  help: string;
+  choices: { value: string; label: string }[];
+  min: number | null;
+  max: number | null;
 };
 export type RuntimeAgentModel = { id: string; label: string; efforts: string[]; defaultEffort: string | null; isDefault: boolean };
 export type RuntimePlugins = { plugins: RuntimePlugin[]; browserProfiles: { id: string; name: string }[] };
@@ -528,6 +544,8 @@ export interface RuntimeTaskPort {
   restartPlugin(id: string): Promise<void>;
   removePlugin(id: string): Promise<void>;
   bindPluginRole(id: string, role: string, value: Record<string, string> | null): Promise<void>;
+  /** 改插件的设置；值为 null 表示恢复默认。 */
+  setPluginSettings(id: string, values: Record<string, RuntimePluginSettingValue | null>): Promise<void>;
   pluginLog(id: string): Promise<string>;
   agentModels(agent: string, refresh?: boolean): Promise<{ models: RuntimeAgentModel[]; error: string | null }>;
   /** 手机配对的状态。 */

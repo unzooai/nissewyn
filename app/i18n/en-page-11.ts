@@ -1,4 +1,13 @@
 export const enPage11: Record<string, string> = {
+  "设置已保存，{name} 已重启来读取": "Settings saved; {name} restarted to pick them up",
+  "设置已保存": "Settings saved",
+  "保存 {count} 项改动": "Save {count} changes",
+  "撤销改动": "Undo changes",
+  "全部恢复默认": "Reset all to defaults",
+  "把 {name} 的设置全部恢复成默认？": "Reset all of {name}'s settings to their defaults?",
+  "已恢复默认": "Back to defaults",
+  "每行一项": "One per line",
+  "已改": "changed",
   "{name} 已关闭": "{name} is off",
   "{name} 已打开": "{name} is on",
   "{name} 已移除": "{name} removed",
