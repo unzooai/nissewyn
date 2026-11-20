@@ -35,7 +35,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimeTellRules, RuntimeTellWish, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimePluginStatus, RuntimePlugins, RuntimeTellRules, RuntimeTellWish, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -563,6 +563,60 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       },
       async forgetTellRule(kind) {
         await callUnterm("/api/tell-rules/forget", { kind });
+      },
+      async plugins(): Promise<RuntimePlugins> {
+        type Raw = {
+          id: string; name?: string; version?: string; description?: string; dir?: string; enabled?: boolean;
+          status?: RuntimePluginStatus; error?: string | null; page_url?: string | null; has_page?: boolean;
+          mcp_server?: string | null; tools?: { name: string; does: string }[]; domains?: string[];
+          roles?: { name: string; kind: "browser" | "agent"; label?: string; default?: Record<string, string> | null; binding?: Record<string, string> | null }[];
+        };
+        const data = await getUnterm<{ plugins?: Raw[]; browser_profiles?: { id: string; name?: string }[] }>("/api/plugins");
+        return {
+          plugins: (data.plugins ?? []).map((raw) => ({
+            id: raw.id,
+            name: raw.name ?? raw.id,
+            version: raw.version ?? "",
+            description: raw.description ?? "",
+            dir: raw.dir ?? "",
+            enabled: Boolean(raw.enabled),
+            status: raw.status ?? "stopped",
+            error: raw.error ?? null,
+            pageUrl: raw.page_url ?? null,
+            hasPage: Boolean(raw.has_page),
+            mcpServer: raw.mcp_server ?? null,
+            tools: raw.tools ?? [],
+            roles: (raw.roles ?? []).map((role) => ({
+              name: role.name,
+              kind: role.kind,
+              label: role.label ?? role.name,
+              default: role.default ?? null,
+              binding: role.binding ?? null,
+            })),
+            domains: raw.domains ?? [],
+          })),
+          browserProfiles: (data.browser_profiles ?? []).map((p) => ({ id: p.id, name: p.name ?? p.id })),
+        };
+      },
+      async addPlugin(dir) {
+        const data = await callUnterm<{ id: string }>("/api/plugins/add", { dir });
+        return data.id;
+      },
+      async enablePlugin(id, enabled) {
+        await callUnterm("/api/plugins/enable", { id, enabled });
+      },
+      async restartPlugin(id) {
+        await callUnterm("/api/plugins/restart", { id });
+      },
+      async removePlugin(id) {
+        await callUnterm("/api/plugins/remove", { id });
+      },
+      async bindPluginRole(id, role, value) {
+        await callUnterm("/api/plugins/bind", { id, role, value });
+      },
+      async pluginLog(id) {
+        const data = await getUnterm<{ log?: string }>(`/api/plugins/log?id=${encodeURIComponent(id)}`);
+        return data.log ?? "";
       },
       async phone() {
         return toRuntimePhone(await getUnterm<RawPhoneStatus>("/api/remote/status"));

@@ -34,6 +34,7 @@ import {
   ListChecks,
   Link2,
   MessagesSquare,
+  Puzzle,
   LoaderCircle,
   Mail,
   Pause,
@@ -249,6 +250,7 @@ import { ClientsPanel } from "./clients-panel";
 import { PhonePanel } from "./phone-panel";
 import { TerminalPanel } from "./terminal-panel";
 import { TellRulesPanel } from "./tell-rules-panel";
+import { PluginsView } from "./plugins-view";
 import { RuntimeUsagePanel } from "./runtime-usage";
 import { RuntimeCapabilitiesPanel } from "./runtime-capabilities";
 import { autostartEnabled, inDesktopApp, openTerminal, revealPath, setAutostart } from "./lib/core-connection";
@@ -1105,6 +1107,7 @@ const runtimeNavItems: typeof navItems = [
   { id: "home", label: t("任务"), mobileLabel: t("任务"), icon: MessagesSquare },
   { id: "approvals", label: t("待确认的操作"), mobileLabel: t("确认"), icon: ShieldCheck },
   { id: "artifacts", label: t("成果"), mobileLabel: t("成果"), icon: Files },
+  { id: "plugins", label: t("插件"), mobileLabel: t("插件"), icon: Puzzle },
   { id: "settings", label: t("设置"), mobileLabel: t("设置"), icon: Settings2 },
 ];
 
@@ -1173,7 +1176,7 @@ function readWorkspaceRoute(): WorkspaceRoute {
   const requestedView = url.searchParams.get("view");
   const view =
     requestedView &&
-    navItems.some((item) => item.id === requestedView)
+    [...navItems, ...runtimeNavItems].some((item) => item.id === requestedView)
       ? (requestedView as ViewId)
       : "home";
   const taskId = url.searchParams.get("task")?.trim() || null;
@@ -1457,6 +1460,11 @@ const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: 
     eyebrow: t("运行记录"),
     title: t("系统刚刚做了什么"),
     description: t("每一步都有时间、结果和证据，可以随时回看。"),
+  },
+  plugins: {
+    eyebrow: t("插件"),
+    title: t("在旁边运行的程序"),
+    description: t("有自己的控制页面和状态，也给智能体提供工具；每个角色可以单独指定账号和模型。"),
   },
   settings: {
     eyebrow: t("设置"),
@@ -13452,6 +13460,10 @@ export default function HomePage() {
               )}
             </div>
           </section>
+        )}
+
+        {activeView === "plugins" && runtimeMode && (
+          <PluginsView runtime={workspaceProvider.runtime} notify={setNotice} />
         )}
 
         {activeView === "settings" && (

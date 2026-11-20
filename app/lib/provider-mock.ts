@@ -495,6 +495,27 @@ export function createMockProvider(): WorkspaceProvider {
       async forgetTellRule() {
         throw new Error(t("演示版没有本机运行时"));
       },
+      async plugins() {
+        return { plugins: [], browserProfiles: [] };
+      },
+      async addPlugin(): Promise<string> {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async enablePlugin() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async restartPlugin() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async removePlugin() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async bindPluginRole() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async pluginLog() {
+        return "";
+      },
       async phone() {
         throw new Error(t("演示版没有本机运行时"));
       },

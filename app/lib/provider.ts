@@ -419,6 +419,33 @@ export type RuntimeTellRule = { kind: string; wish: RuntimeTellWish; hours: stri
 export type RuntimeTellClue = RuntimeTellRule & { count: number };
 export type RuntimeTellRules = { rules: RuntimeTellRule[]; clues: RuntimeTellClue[] };
 
+/** 插件：在 Unzoo One 旁边运行的程序，有自己的控制页面、状态和给智能体的工具。 */
+export type RuntimePluginStatus = "running" | "starting" | "not_answering" | "failed" | "stopped" | "tools_only" | "broken";
+export type RuntimePluginRole = {
+  name: string;
+  kind: "browser" | "agent";
+  label: string;
+  default: Record<string, string> | null;
+  binding: Record<string, string> | null;
+};
+export type RuntimePlugin = {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  dir: string;
+  enabled: boolean;
+  status: RuntimePluginStatus;
+  error: string | null;
+  pageUrl: string | null;
+  hasPage: boolean;
+  mcpServer: string | null;
+  tools: { name: string; does: string }[];
+  roles: RuntimePluginRole[];
+  domains: string[];
+};
+export type RuntimePlugins = { plugins: RuntimePlugin[]; browserProfiles: { id: string; name: string }[] };
+
 /** 手机：同一个局域网（或 Tailscale）里的手机配对后，在手机上看对话、回答、发任务。 */
 export type RuntimePhoneAddress = { ip: string; kind: string; url?: string; qr?: string };
 export type RuntimePhoneDevice = { id: string; name: string; platform: string; scope: string; lastSeen: string; lastIp: string };
@@ -494,6 +521,13 @@ export interface RuntimeTaskPort {
   tellRules(): Promise<RuntimeTellRules>;
   /** 忘掉一类事的规则和线索。 */
   forgetTellRule(kind: string): Promise<void>;
+  plugins(): Promise<RuntimePlugins>;
+  addPlugin(dir: string): Promise<string>;
+  enablePlugin(id: string, enabled: boolean): Promise<void>;
+  restartPlugin(id: string): Promise<void>;
+  removePlugin(id: string): Promise<void>;
+  bindPluginRole(id: string, role: string, value: Record<string, string> | null): Promise<void>;
+  pluginLog(id: string): Promise<string>;
   /** 手机配对的状态。 */
   phone(): Promise<RuntimePhone>;
   /** 生成一个 2 分钟内有效的配对码（同时打开手机连接）。 */

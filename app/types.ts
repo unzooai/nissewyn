@@ -6,6 +6,7 @@ export type ViewId =
   | "approvals"
   | "artifacts"
   | "activity"
+  | "plugins"
   | "settings";
 
 export type SettingsSectionId =
