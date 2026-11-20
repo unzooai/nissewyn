@@ -53,8 +53,12 @@ function Run([string]$what, [scriptblock]$block) {
 
 if (-not $SkipRuntimeBuild) {
   Push-Location $unterm
+  # The programs' file details (Task Manager, Properties) name Unzoo One, the
+  # product they are installed as; antivirus reputation is per product and
+  # publisher, and a mismatch reads as something bundled in.
+  $env:UNTERM_BRAND_PRODUCT = "Unzoo One"
   try { Run "runtime and terminal (release)" { cargo build --release -p unterm-app -p unterm-cli -p unterm-core } }
-  finally { Pop-Location }
+  finally { Pop-Location; Remove-Item Env:UNTERM_BRAND_PRODUCT -ErrorAction SilentlyContinue }
 }
 
 if (-not $SkipInterfaceBuild) {

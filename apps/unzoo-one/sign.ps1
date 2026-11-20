@@ -15,6 +15,13 @@ Which certificate, from the environment:
                           token or in a cloud HSM with a KSP.
   UNZOO_SIGN_PFX          Path to a .pfx file, with
   UNZOO_SIGN_PFX_PASSWORD its password.
+  UNZOO_SIGN_TRUSTED      Azure Trusted Signing: path to its metadata.json
+                          ({"Endpoint", "CodeSigningAccountName",
+                          "CertificateProfileName"}), with
+  UNZOO_SIGN_TRUSTED_DLIB the path to Azure.CodeSigning.Dlib.dll from the
+                          Microsoft.Trusted.Signing.Client package. Signs in
+                          with the Azure login on this machine (az login) or
+                          AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_CLIENT_SECRET.
   UNZOO_SIGN_TIMESTAMP    RFC 3161 timestamp server
                           (default http://timestamp.digicert.com). A timestamp
                           keeps the signature valid after the certificate
@@ -36,7 +43,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 function Configured {
-  return [bool]($env:UNZOO_SIGN_THUMBPRINT -or $env:UNZOO_SIGN_PFX)
+  return [bool]($env:UNZOO_SIGN_THUMBPRINT -or $env:UNZOO_SIGN_PFX -or $env:UNZOO_SIGN_TRUSTED)
 }
 
 if ($Check) {
@@ -45,7 +52,7 @@ if ($Check) {
 if (-not $File) { throw "usage: sign.ps1 <file>" }
 if (-not (Test-Path -LiteralPath $File)) { throw "no such file: $File" }
 if (-not (Configured)) {
-  Write-Host "    (unsigned: set UNZOO_SIGN_THUMBPRINT or UNZOO_SIGN_PFX to sign) $File"
+  Write-Host "    (unsigned: set UNZOO_SIGN_TRUSTED, UNZOO_SIGN_THUMBPRINT or UNZOO_SIGN_PFX to sign) $File"
   exit 0
 }
 
@@ -71,9 +78,16 @@ function Find-SignTool {
 }
 
 $signtool = Find-SignTool
-$timestamp = if ($env:UNZOO_SIGN_TIMESTAMP) { $env:UNZOO_SIGN_TIMESTAMP } else { "http://timestamp.digicert.com" }
+$timestamp = if ($env:UNZOO_SIGN_TIMESTAMP) { $env:UNZOO_SIGN_TIMESTAMP }
+  elseif ($env:UNZOO_SIGN_TRUSTED) { "http://timestamp.acs.microsoft.com" }
+  else { "http://timestamp.digicert.com" }
 $arguments = @("sign", "/fd", "sha256", "/tr", $timestamp, "/td", "sha256", "/d", "Unzoo One")
-if ($env:UNZOO_SIGN_PFX) {
+if ($env:UNZOO_SIGN_TRUSTED) {
+  if (-not $env:UNZOO_SIGN_TRUSTED_DLIB -or -not (Test-Path -LiteralPath $env:UNZOO_SIGN_TRUSTED_DLIB)) {
+    throw "UNZOO_SIGN_TRUSTED needs UNZOO_SIGN_TRUSTED_DLIB: the path to Azure.CodeSigning.Dlib.dll"
+  }
+  $arguments += @("/dlib", $env:UNZOO_SIGN_TRUSTED_DLIB, "/dmdf", $env:UNZOO_SIGN_TRUSTED)
+} elseif ($env:UNZOO_SIGN_PFX) {
   $arguments += @("/f", $env:UNZOO_SIGN_PFX)
   if ($env:UNZOO_SIGN_PFX_PASSWORD) { $arguments += @("/p", $env:UNZOO_SIGN_PFX_PASSWORD) }
 } else {

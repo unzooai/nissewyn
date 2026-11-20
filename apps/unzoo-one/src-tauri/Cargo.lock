@@ -732,7 +732,7 @@ dependencies = [
  "rustc_version",
  "toml 1.2.1+spec-1.1.0",
  "vswhom",
- "winreg",
+ "winreg 0.56.0",
 ]
 
 [[package]]
@@ -3742,10 +3742,11 @@ checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
 
 [[package]]
 name = "unterm-protocol"
-version = "0.71.25"
+version = "0.71.28"
 dependencies = [
  "dirs-next",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3757,6 +3758,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "unterm-protocol",
+ "winreg 0.10.1",
 ]
 
 [[package]]
@@ -4324,6 +4326,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3b93199df0ab874cdf0c6a94f0a0dc3423fe41f1cafb62b8bd7b1deb277aef"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "winreg"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80d0f4e272c85def139476380b12f9ac60926689dd2e01d4923222f40580869d"
+dependencies = [
+ "winapi",
 ]
 
 [[package]]

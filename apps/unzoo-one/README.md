@@ -42,7 +42,10 @@ powershell -File apps\unzoo-one\build-installer.ps1
 $env:UNZOO_SIGN_THUMBPRINT = "<证书 SHA-1 指纹>"
 # 或者是 .pfx 文件
 $env:UNZOO_SIGN_PFX = "C:\path\to\codesign.pfx"; $env:UNZOO_SIGN_PFX_PASSWORD = "..."
-# 可选：时间戳服务器，默认 http://timestamp.digicert.com
+# 或者用 Azure Trusted Signing（微软的签名服务）
+$env:UNZOO_SIGN_TRUSTED = "C:\path\to\metadata.json"      # Endpoint、CodeSigningAccountName、CertificateProfileName
+$env:UNZOO_SIGN_TRUSTED_DLIB = "C:\path\to\Azure.CodeSigning.Dlib.dll"
+# 可选：时间戳服务器，默认 http://timestamp.digicert.com（Trusted Signing 默认用微软的）
 $env:UNZOO_SIGN_TIMESTAMP = "http://timestamp.digicert.com"
 
 powershell -File apps\unzoo-one\build-installer.ps1 -RequireSignature
@@ -54,8 +57,15 @@ powershell -File apps\unzoo-one\build-installer.ps1 -RequireSignature
   `conpty.dll`）原样保留。
 - 没配证书时照样能打包，脚本开头会说明这是未签名的包；`-RequireSignature` 下没证书直接失败，
   打完还会检查两个 MSI 确实带了签名。
-- 买证书：面向欧美用户建议 EV 代码签名证书，SmartScreen 立即信任；普通（OV）证书要积累下载量后
-  才不再提示。
+- 选哪种签名：2024 年起 EV 证书也不再让 SmartScreen 立即放行，信任都要靠同一个发布者的签名积累下载量。
+  首选 Azure Trusted Signing（按月付费，证书由微软托管、自动续期，不用 USB 令牌）；它对申请者所在地有
+  限制，申请不了时再买 OV/EV 证书。无论哪种，签名的发布者名都要和安装包里的“Unzoo”一致，且一直用同一个。
+- 不签名之外，最容易被杀毒软件误报的是程序“看起来像恶意软件”的行为。下面这些已经改掉，以后也别再加：
+  隐藏窗口里跑 `reg.exe` 写开机启动项（改用注册表 API）、`powershell -EncodedCommand` /
+  `-ExecutionPolicy Bypass` / 在 PowerShell 里 `Add-Type` 调 user32（截图改用 GDI 直接调）、
+  后台下载安装包再用隐藏的 PowerShell 装（Unterm 自带的自动更新在 Unzoo One 里不再启用）。
+- 新版本发布后如果仍被 Defender 报毒，到 https://www.microsoft.com/wdsi/filesubmission 以软件开发者身份
+  提交误报，通常几天内处理。
 
 ## 开机后台运行
 

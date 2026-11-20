@@ -254,15 +254,22 @@ fn reveal_path(path: String) -> Result<(), String> {
 
 /// Where Windows keeps what starts at sign-in, for this user only.
 #[cfg(windows)]
-const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 #[cfg(windows)]
 const RUN_VALUE: &str = "Unzoo One";
 
+/// The user's Run key, through the registry API. Not `reg.exe` in a hidden
+/// console: a program that quietly runs `reg add ...\Run` is how malware
+/// makes itself persistent, and antivirus engines score it that way.
 #[cfg(windows)]
-fn reg(args: &[&str]) -> std::io::Result<std::process::Output> {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    Command::new("reg.exe").args(args).creation_flags(CREATE_NO_WINDOW).output()
+fn run_key(write: bool) -> std::io::Result<winreg::RegKey> {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
+    let user = winreg::RegKey::predef(HKEY_CURRENT_USER);
+    if write {
+        user.create_subkey_with_flags(RUN_KEY, KEY_READ | KEY_WRITE).map(|(key, _)| key)
+    } else {
+        user.open_subkey_with_flags(RUN_KEY, KEY_READ)
+    }
 }
 
 /// Whether Unzoo One starts its background service when the user signs in.
@@ -270,8 +277,7 @@ fn reg(args: &[&str]) -> std::io::Result<std::process::Output> {
 fn autostart_get() -> Result<bool, String> {
     #[cfg(windows)]
     {
-        let out = reg(&["query", RUN_KEY, "/v", RUN_VALUE]).map_err(|e| e.to_string())?;
-        Ok(out.status.success())
+        Ok(run_key(false).and_then(|key| key.get_value::<String, _>(RUN_VALUE)).is_ok())
     }
     #[cfg(not(windows))]
     {
@@ -290,17 +296,16 @@ fn autostart_get() -> Result<bool, String> {
 fn autostart_set(enabled: bool) -> Result<bool, String> {
     #[cfg(windows)]
     {
-        let out = if enabled {
+        let key = run_key(true).map_err(|e| e.to_string())?;
+        if enabled {
             let exe = std::env::current_exe().map_err(|e| e.to_string())?;
             let command = format!("\"{}\" --background", exe.display());
-            reg(&["add", RUN_KEY, "/v", RUN_VALUE, "/t", "REG_SZ", "/d", &command, "/f"])
-        } else {
-            reg(&["delete", RUN_KEY, "/v", RUN_VALUE, "/f"])
-        }
-        .map_err(|e| e.to_string())?;
-        // Deleting a value that is not there is already the wanted state.
-        if !out.status.success() && enabled {
-            return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+            key.set_value(RUN_VALUE, &command).map_err(|e| e.to_string())?;
+        } else if let Err(error) = key.delete_value(RUN_VALUE) {
+            // Deleting a value that is not there is already the wanted state.
+            if error.kind() != std::io::ErrorKind::NotFound {
+                return Err(error.to_string());
+            }
         }
         autostart_get()
     }

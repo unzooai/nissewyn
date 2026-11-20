@@ -23,3 +23,7 @@ unterm-protocol = { path = "../../../unterm/unterm-protocol" }
 [profile.release]
 strip = true
 lto = true
+
+[target."cfg(windows)".dependencies]
+# The Run key for start-at-sign-in, through the registry API.
+winreg = "0.10"
