@@ -1,5 +1,7 @@
 # 内容自动化插件设计（提案）
 
+技能和插件怎么分、插件怎么带控制页面和自己的浏览器身份/模型、第一个外部插件 Xdoaipm 怎么接入：见 [xdoaipm-integration.md](xdoaipm-integration.md)。
+
 这些是设计文档，没有实现代码。判断标准：
 
 - **技能（SKILL.md）**：智能体用现有的终端（unterm）和 Unzoo Browser 工具就能做完，只缺"怎么做、什么时候停"的知识。见 `apps/unzoo-one/skills/`。
