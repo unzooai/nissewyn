@@ -1,0 +1,451 @@
+{
+  "id": "xtools",
+  "name": "Xtools",
+  "version": "2.0.0",
+  "description": "你的 X 账号运营助理:学你的说话方式,按读者作息发原创,在同行新帖下前排回复,接住读者,每周按效果调整打法。任何领域都能用。",
+  "run": {
+    "command": [
+      "python",
+      "{dir}/server.py"
+    ],
+    "health": "/api/ping"
+  },
+  "page": "/",
+  "mcp": {
+    "command": [
+      "python",
+      "{dir}/mcp_server.py"
+    ],
+    "tools": {
+      "status": "read",
+      "playbook": "read",
+      "queue": "read",
+      "write_post": "change",
+      "run": "change",
+      "schedule_post": "send",
+      "approve": "send",
+      "session": "send"
+    }
+  },
+  "roles": {
+    "account": {
+      "kind": "browser",
+      "label": "X 账号(登录在哪个浏览器身份)"
+    },
+    "writer": {
+      "kind": "agent",
+      "label": "写稿",
+      "default": {
+        "agent": "claude-code",
+        "model": "sonnet"
+      }
+    }
+  },
+  "settings": [
+    {
+      "key": "paused",
+      "group": "自动化",
+      "label": "全部暂停",
+      "type": "bool",
+      "default": false,
+      "help": "打开后什么都不做(不发、不互动);数据和草稿照常保留。"
+    },
+    {
+      "key": "auto.posts",
+      "group": "自动化",
+      "label": "发自己的原创",
+      "type": "choice",
+      "default": "auto",
+      "choices": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "approve",
+          "先给我批准"
+        ],
+        [
+          "off",
+          "不做"
+        ]
+      ]
+    },
+    {
+      "key": "auto.mentions",
+      "group": "自动化",
+      "label": "回复读者(通知里的提问和讨论)",
+      "type": "choice",
+      "default": "auto",
+      "choices": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "approve",
+          "先给我批准"
+        ],
+        [
+          "off",
+          "不做"
+        ]
+      ]
+    },
+    {
+      "key": "auto.replies",
+      "group": "自动化",
+      "label": "在同行的新帖下前排回复",
+      "type": "choice",
+      "default": "auto",
+      "help": "X 的自动化规则不允许按关键字或批量自动回复、关注、点赞;选「自动」时账号被限流或封禁的风险由你承担。",
+      "choices": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "approve",
+          "先给我批准"
+        ],
+        [
+          "off",
+          "不做"
+        ]
+      ]
+    },
+    {
+      "key": "auto.quotes",
+      "group": "自动化",
+      "label": "引用转发高流量帖",
+      "type": "choice",
+      "default": "auto",
+      "choices": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "approve",
+          "先给我批准"
+        ],
+        [
+          "off",
+          "不做"
+        ]
+      ]
+    },
+    {
+      "key": "auto.likes",
+      "group": "自动化",
+      "label": "点赞",
+      "type": "choice",
+      "default": "auto",
+      "choices": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "approve",
+          "先给我批准"
+        ],
+        [
+          "off",
+          "不做"
+        ]
+      ]
+    },
+    {
+      "key": "auto.follows",
+      "group": "自动化",
+      "label": "关注同领域的人",
+      "type": "choice",
+      "default": "auto",
+      "choices": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "approve",
+          "先给我批准"
+        ],
+        [
+          "off",
+          "不做"
+        ]
+      ]
+    },
+    {
+      "key": "audience.timezones",
+      "group": "读者",
+      "label": "读者所在时区",
+      "type": "list",
+      "default": [
+        "UTC+8"
+      ],
+      "help": "每行一个,如 UTC+8、UTC-5。第一个是主时区(“今天”按它算)。"
+    },
+    {
+      "key": "audience.active_hours",
+      "group": "读者",
+      "label": "读者活跃时段(当地几点到几点)",
+      "type": "range",
+      "default": [
+        8,
+        23
+      ],
+      "min": 0,
+      "max": 24
+    },
+    {
+      "key": "posts.per_day",
+      "group": "原创",
+      "label": "每天发几条",
+      "type": "number",
+      "default": 2,
+      "min": 0,
+      "max": 20
+    },
+    {
+      "key": "posts.formats",
+      "group": "原创",
+      "label": "用哪些格式",
+      "type": "list",
+      "default": [
+        "short",
+        "thread"
+      ],
+      "help": "每行一个:short(单帖)、thread(串)、long(长文,需要 X Premium)。"
+    },
+    {
+      "key": "posts.language",
+      "group": "原创",
+      "label": "语言",
+      "type": "choice",
+      "default": "auto",
+      "choices": [
+        [
+          "auto",
+          "按账号习惯"
+        ],
+        [
+          "zh",
+          "中文"
+        ],
+        [
+          "en",
+          "English"
+        ],
+        [
+          "both",
+          "都可以"
+        ]
+      ]
+    },
+    {
+      "key": "posts.link",
+      "group": "原创",
+      "label": "要推广的链接",
+      "type": "text",
+      "default": "",
+      "help": "网站、产品或频道;留空就不带。外链会被 X 降权,所以只偶尔带。"
+    },
+    {
+      "key": "posts.link_every",
+      "group": "原创",
+      "label": "每几条原创带一次链接",
+      "type": "number",
+      "default": 5,
+      "min": 1,
+      "max": 50
+    },
+    {
+      "key": "sessions.per_day",
+      "group": "互动",
+      "label": "每天几场互动会话",
+      "type": "number",
+      "default": 3,
+      "help": "每场像人刷一会儿 X:先看通知,再做排好的回复、点赞、关注。",
+      "min": 0,
+      "max": 12
+    },
+    {
+      "key": "sessions.replies",
+      "group": "互动",
+      "label": "每场回复几条",
+      "type": "range",
+      "default": [
+        2,
+        4
+      ],
+      "min": 0,
+      "max": 30
+    },
+    {
+      "key": "sessions.likes",
+      "group": "互动",
+      "label": "每场点赞几个",
+      "type": "range",
+      "default": [
+        4,
+        8
+      ],
+      "min": 0,
+      "max": 60
+    },
+    {
+      "key": "sessions.follows",
+      "group": "互动",
+      "label": "每场关注几个",
+      "type": "range",
+      "default": [
+        0,
+        2
+      ],
+      "min": 0,
+      "max": 20
+    },
+    {
+      "key": "frontrow.max_age_hours",
+      "group": "互动",
+      "label": "前排回复:只回几小时内的新帖",
+      "type": "number",
+      "default": 3,
+      "min": 1,
+      "max": 48
+    },
+    {
+      "key": "frontrow.max_replies_on_post",
+      "group": "互动",
+      "label": "前排回复:对方帖已有多少回复就不回了",
+      "type": "number",
+      "default": 150,
+      "min": 0,
+      "max": 5000
+    },
+    {
+      "key": "mentions.max_per_run",
+      "group": "互动",
+      "label": "每次看通知最多回几个人",
+      "type": "number",
+      "default": 5,
+      "min": 0,
+      "max": 50
+    },
+    {
+      "key": "caps.post",
+      "group": "上限与节奏",
+      "label": "每天最多发原创",
+      "type": "number",
+      "default": 6,
+      "min": 0,
+      "max": 50
+    },
+    {
+      "key": "caps.reply",
+      "group": "上限与节奏",
+      "label": "每天最多回复",
+      "type": "number",
+      "default": 30,
+      "min": 0,
+      "max": 300
+    },
+    {
+      "key": "caps.quote",
+      "group": "上限与节奏",
+      "label": "每天最多引用",
+      "type": "number",
+      "default": 3,
+      "min": 0,
+      "max": 30
+    },
+    {
+      "key": "caps.like",
+      "group": "上限与节奏",
+      "label": "每天最多点赞",
+      "type": "number",
+      "default": 80,
+      "min": 0,
+      "max": 500
+    },
+    {
+      "key": "caps.follow",
+      "group": "上限与节奏",
+      "label": "每天最多关注",
+      "type": "number",
+      "default": 20,
+      "min": 0,
+      "max": 200
+    },
+    {
+      "key": "caps.per_hour",
+      "group": "上限与节奏",
+      "label": "每小时最多动作",
+      "type": "number",
+      "default": 15,
+      "min": 1,
+      "max": 120
+    },
+    {
+      "key": "warmup.days",
+      "group": "上限与节奏",
+      "label": "养号期(天)",
+      "type": "number",
+      "default": 14,
+      "help": "刚开始用的这些天,所有上限按下面的比例打折,逐天恢复。",
+      "min": 0,
+      "max": 90
+    },
+    {
+      "key": "warmup.ratio",
+      "group": "上限与节奏",
+      "label": "养号期第一天的比例",
+      "type": "number",
+      "default": 0.4,
+      "min": 0,
+      "max": 1
+    },
+    {
+      "key": "pace.gap_seconds",
+      "group": "上限与节奏",
+      "label": "两个动作之间隔几秒",
+      "type": "range",
+      "default": [
+        25,
+        90
+      ],
+      "min": 5,
+      "max": 1800
+    },
+    {
+      "key": "redlines",
+      "group": "内容红线",
+      "label": "不碰的话题",
+      "type": "list",
+      "default": [
+        "政治、时政、地缘冲突",
+        "宗教",
+        "色情",
+        "投资建议、炒币",
+        "人身攻击"
+      ],
+      "help": "每行一个。写稿时会避开;别人的帖碰到这些也不回。"
+    },
+    {
+      "key": "learn.weekly",
+      "group": "学习",
+      "label": "每周按效果自动调整打法",
+      "type": "bool",
+      "default": true,
+      "help": "哪个内容支柱带来更多互动就多写;改动写进周报,可以在打法页改回去。"
+    }
+  ],
+  "permissions": {
+    "domains": [
+      "x.com",
+      "twitter.com"
+    ]
+  }
+}

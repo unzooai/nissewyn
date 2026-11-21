@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Xtools</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#14171a;--soft:#536471;--muted:#8b98a5;--line:#e6e9ec;--blue:#1d9bf0;--green:#00a36c;--amber:#c77700;--red:#e0245e;--radius:12px}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1419;--panel:#16202a;--ink:#e7e9ea;--soft:#a5b1bd;--muted:#71808f;--line:#2a3640}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+button{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--soft)}
+button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+button.danger{color:var(--red)}
+button:disabled{opacity:.5;cursor:default}
+input,textarea,select{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 9px;width:100%}
+textarea{resize:vertical;min-height:70px}
+.wrap{max-width:1080px;margin:0 auto;padding:18px 18px 60px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+header h1{font-size:20px;margin:0}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;background:var(--line);color:var(--soft)}
+.pill.ok{background:rgba(0,163,108,.12);color:var(--green)}
+.pill.warn{background:rgba(199,119,0,.14);color:var(--amber)}
+.pill.bad{background:rgba(224,36,94,.12);color:var(--red)}
+.grow{flex:1}
+nav.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
+nav.tabs a{padding:9px 14px;color:var(--soft);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav.tabs a.on{color:var(--ink);border-bottom-color:var(--blue);font-weight:600}
+nav.tabs a .n{background:var(--blue);color:#fff;border-radius:999px;padding:0 6px;font-size:11px;margin-left:4px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>*{flex:1;min-width:180px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.kpi b{font-size:22px;display:block}
+.kpi span{color:var(--soft);font-size:12px}
+.muted{color:var(--muted)}
+.soft{color:var(--soft)}
+.item{border-top:1px solid var(--line);padding:12px 0;display:flex;gap:12px}
+.item:first-child{border-top:none}
+.item .when{width:92px;flex:none;color:var(--soft);font-size:12px}
+.item .body{flex:1;min-width:0}
+.item .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.text{white-space:pre-wrap;word-break:break-word}
+.part{border-left:3px solid var(--line);padding-left:10px;margin:6px 0}
+.target{background:var(--bg);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--soft);margin-bottom:6px;white-space:pre-wrap;word-break:break-word;max-height:120px;overflow:auto}
+.item.sel{background:rgba(29,155,240,.06)}
+.tag{font-size:12px;color:var(--soft)}
+.log div{font-size:12px;padding:3px 0;border-top:1px dashed var(--line)}
+.log .warn{color:var(--amber)}
+.spark{width:100%;height:60px}
+.pillar{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px}
+.hint{font-size:12px;color:var(--soft);margin:4px 0 0}
+.toast{position:fixed;right:18px;bottom:18px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;display:none;max-width:420px}
+.notice{border:1px solid rgba(199,119,0,.4);background:rgba(199,119,0,.07);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px}
+kbd{border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px}
+a.link{color:var(--blue);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="muted">加载中…</p></div>
+<div class="toast" id="toast"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(p,b){const r=await fetch(p,b===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});return r.json()}
+function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast._t);toast._t=setTimeout(()=>e.style.display='none',4000)}
+const fmt=ts=>{if(!ts)return '';const d=new Date(ts*1000);const p=n=>String(n).padStart(2,'0');return `${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`};
+const num=n=>n==null?'—':(n>=1e4?(n/1e4).toFixed(1)+'万':String(n));
+const KIND={reply:'回复',quote:'引用',like:'点赞',follow:'关注'};
+const MODE={auto:'自动',approve:'先批准',off:'不做'};
+let S=null, TAB=localStorage.getItem('xt_tab')||'today', SEL=0;
+
+async function load(){S=await api('/api/state');render()}
+function setTab(t){TAB=t;try{localStorage.setItem('xt_tab',t)}catch(e){};render()}
+
+function header(){
+  let st;
+  if(S.halted) st=`<span class="pill bad">已停下:${esc(S.halted)}</span> <button onclick="resume()">恢复</button>`;
+  else if(S.running.job) st=`<span class="pill warn">正在:${esc(S.running.job)}</span>`;
+  else st=`<span class="pill ok">${S.awake?'读者醒着,按计划运行':'读者在睡觉,只按时发原创'}</span>`;
+  return `<header><h1>Xtools</h1><span class="soft">${S.handle?'@'+esc(S.handle):''}</span>${st}<span class="grow"></span>
+    ${S.browser?'':'<span class="pill bad">Unzoo 浏览器没连上</span>'}
+    <button onclick="load()">刷新</button></header>`;
+}
+
+function render(){
+  if(!S)return;
+  const app=$('#app');
+  if(!S.setup){app.innerHTML=header()+onboarding();return}
+  const tabs=[['today','今天'],['queue','队列'],['posts','原创'],['radar','雷达'],['book','打法'],['report','周报'],['log','记录']];
+  app.innerHTML=header()+`<nav class="tabs">${tabs.map(([k,l])=>`<a class="${TAB===k?'on':''}" onclick="setTab('${k}')">${l}${k==='queue'&&S.queue.pending?`<span class="n">${S.queue.pending}</span>`:''}</a>`).join('')}</nav><div id="view"></div>`;
+  ({today:vToday,queue:vQueue,posts:vPosts,radar:vRadar,book:vBook,report:vReport,log:vLog})[TAB]();
+}
+
+// ---- first run
+function onboarding(){
+  const bound=S.profile_bound;
+  return `<div class="card"><h2>开始:告诉 Xtools 你是谁</h2>
+   <p class="soft">它会先读你的 X 主页和最近的帖,学你的说话方式、看哪类内容表现好,再给出一套打法(内容支柱、关键词、要盯的同行)。之后每天按读者作息发原创、在同行新帖下前排回复、接住读者,每周按效果调整。</p>
+   ${bound?'':`<div class="notice">还没指定用哪个浏览器身份:到 Unzoo One › 插件 › Xtools › 设置 › 账号与模型,选登录了你 X 账号的那个。</div>`}
+   <label>我是谁、做什么</label><textarea id="ob_who" placeholder="例:独立开发者,做给设计师用的效率工具;或:健身教练,专做上班族的减脂"></textarea>
+   <div class="row" style="margin-top:10px"><div><label>想吸引的人</label><input id="ob_aud" placeholder="例:海外的独立开发者和小团队"></div>
+   <div><label>目标</label><input id="ob_goal" placeholder="例:涨粉;给我的网站引流;建立专业影响力"></div></div>
+   <div class="notice" style="margin-top:14px">默认是<b>全自动</b>:发原创、回读者、前排回复、引用、点赞、关注都会直接做。X 的自动化规则不允许按关键字或批量自动回复、关注、点赞,账号被限流或封禁的风险由你承担。每一类都可以在设置里改成「先给我批准」或「不做」;现在:${Object.entries(S.automation).map(([k,v])=>`${({posts:'原创',mentions:'回读者',replies:'前排回复',quotes:'引用',likes:'点赞',follows:'关注'})[k]} ${MODE[v]}`).join(' · ')}。</div>
+   <button class="primary" ${bound?'':'disabled'} onclick="startSetup()">读我的账号,生成打法</button>
+   ${S.running.job?`<p class="hint">正在:${esc(S.running.job)}…(大约一两分钟)</p>`:''}
+   </div>${logCard(8)}`;
+}
+async function startSetup(){
+  const r=await api('/api/setup',{who:$('#ob_who').value,audience:$('#ob_aud').value,goal:$('#ob_goal').value});
+  toast(r.ok?'开始读账号…':'没开始:'+(r.error||''));poll();
+}
+function poll(){clearTimeout(poll._t);poll._t=setTimeout(async()=>{await load();if(S.running.job)poll()},3000)}
+
+// ---- today
+function spark(snaps){
+  if(!snaps||snaps.length<2)return '<p class="muted">粉丝趋势:记录两天以上后显示</p>';
+  const v=snaps.map(s=>s.followers),lo=Math.min(...v),hi=Math.max(...v)||1,w=300,h=60;
+  const pts=v.map((y,i)=>`${(i/(v.length-1)*w).toFixed(1)},${(h-4-(y-lo)/((hi-lo)||1)*(h-8)).toFixed(1)}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline fill="none" stroke="var(--blue)" stroke-width="2" points="${pts}"/></svg>`;
+}
+function vToday(){
+  const t=S.today,f=S.followers,last=f.length?f[f.length-1].followers:null,first=f.length?f[0].followers:null;
+  const post=p=>`<div class="item"><div class="when">${p.status==='published'?'已发 '+fmt(p.published_at).slice(6):(p.due||'草稿')}<br><span class="tag">${esc(p.pillar||'')}</span></div>
+    <div class="body">${p.parts.map(x=>`<div class="part text">${esc(x)}</div>`).join('')}
+    <div class="acts">${p.status==='published'?(p.url?`<a class="link" href="${esc(p.url)}" target="_blank">在 X 上看</a> <span class="tag">${num(p.views)} 浏览 · ${num(p.likes)} 赞 · ${num(p.replies)} 回复</span>`:''):
+      `<span class="pill ${p.status==='scheduled'?'ok':p.status==='failed'?'bad':''}">${({scheduled:'已排程',draft:'草稿,等你批准',failed:'没发出:'+esc(p.error||'')})[p.status]||p.status}</span>
+       ${p.status!=='scheduled'?`<button onclick="schedule(${p.id})">批准并排程</button>`:`<button onclick="unschedule(${p.id})">撤回</button>`}
+       <button onclick="publishNow(${p.id})">立刻发</button><button onclick="editPost(${p.id})">改</button><button class="danger" onclick="delPost(${p.id})">删</button>`}</div></div></div>`;
+  $('#view').innerHTML=`<div class="kpis">
+    <div class="kpi"><b>${num(last)}</b><span>粉丝${first!=null&&last!=null?` · 近期 ${last-first>=0?'+':''}${last-first}`:''}</span></div>
+    <div class="kpi"><b>${t.posts.filter(p=>p.status==='published').length} / ${t.posts.length}</b><span>今天原创:已发 / 计划</span></div>
+    <div class="kpi"><b>${t.done.reply}</b><span>今天回复 · 还能 ${t.left.reply}</span></div>
+    <div class="kpi"><b>${t.done.like} · ${t.done.follow}</b><span>点赞 · 关注</span></div>
+    <div class="kpi"><b>${S.queue.pending}</b><span>等你批准</span></div></div>
+   <div class="row"><div class="card" style="flex:2"><h2>今天的原创</h2>${t.posts.length?t.posts.map(post).join(''):'<p class="muted">今天还没有。到时间会自动写,也可以现在写一条。</p>'}
+     <div class="acts" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button onclick="writeOne()">写一条</button><button onclick="run('plan')">按计划补齐今天</button></div></div>
+   <div style="flex:1;min-width:260px"><div class="card"><h2>粉丝</h2>${spark(f)}</div>
+     <div class="card"><h2>今天的互动会话</h2>${t.sessions.length?t.sessions.map(s=>`<div>${s.done?'✓':'·'} ${esc(s.at)}</div>`).join(''):'<p class="muted">还没排</p>'}
+     <div class="acts" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button onclick="run('session')">现在跑一场</button><button onclick="run('radar')">看一圈领域</button><button onclick="run('mentions')">看通知</button></div></div>
+     <div class="card"><h2>自动化</h2>${Object.entries(S.automation).map(([k,v])=>`<div class="soft">${({posts:'原创',mentions:'回读者',replies:'前排回复',quotes:'引用',likes:'点赞',follows:'关注'})[k]}:${MODE[v]}</div>`).join('')}<p class="hint">在 Unzoo One › 插件 › Xtools › 设置 里改</p></div></div></div>
+   ${logCard(10)}`;
+}
+async function run(job){const r=await api('/api/run',{job});toast(r.ok?'开始了:'+r.started:'没开始:'+(r.error||''));poll()}
+async function writeOne(){const r=await api('/api/posts/write',{});toast(r.ok?'在写…':'没开始');poll()}
+async function schedule(id){await api('/api/posts/schedule',{id});load()}
+async function unschedule(id){await api('/api/posts/unschedule',{id});load()}
+async function publishNow(id){if(!confirm('现在就发到 X?'))return;await api('/api/posts/schedule',{id,due_at:Date.now()/1000});await api('/api/run',{job:'publish'});toast('在发…');poll()}
+async function delPost(id){if(!confirm('删掉这条?'))return;await api('/api/posts/delete',{id});load()}
+async function editPost(id){
+  const p=[...S.today.posts].find(x=>x.id===id)||(await api('/api/posts')).items.find(x=>x.id===id);
+  const t=prompt('改这条(多条 thread 用单独一行 --- 隔开)',p.parts.join('\n---\n'));
+  if(t==null)return;await api('/api/posts/save',{id,parts:t.split(/\n\s*---\s*\n/).map(s=>s.trim()).filter(Boolean)});load();
+}
+
+// ---- queue
+let QUEUE=[];
+async function vQueue(){
+  const [p,q]=await Promise.all([api('/api/actions?status=pending'),api('/api/actions?status=queued')]);
+  QUEUE=p.items;SEL=Math.min(SEL,Math.max(0,QUEUE.length-1));
+  const row=(a,i,pending)=>`<div class="item ${pending&&i===SEL?'sel':''}" id="qa_${a.id}"><div class="when">${KIND[a.kind]}<br><span class="tag">${esc(a.reason||'')}</span></div>
+    <div class="body">${a.target_text?`<div class="target">@${esc(a.target_handle)}:${esc(a.target_text)}</div>`:`<div class="target">@${esc(a.target_handle||'')}</div>`}
+    ${a.text?`<div class="text">${esc(a.text)}</div>`:''}
+    <div class="acts">${pending?`<button class="primary" onclick="approve([${a.id}])">批准</button><button onclick="reject([${a.id}])">不要</button>`:`<button onclick="reject([${a.id}])">取消</button>`}
+    ${a.text?`<button onclick="editAction(${a.id})">改</button>`:''}${a.target_url?`<a class="link" href="${esc(a.target_url)}" target="_blank">原帖</a>`:''}</div></div></div>`;
+  $('#view').innerHTML=`<div class="card"><h2>等你批准 (${QUEUE.length})</h2>
+    <p class="hint">键盘:<kbd>j</kbd>/<kbd>k</kbd> 上下,<kbd>a</kbd> 批准,<kbd>x</kbd> 不要。批准后按节奏在下一场会话里做。</p>
+    ${QUEUE.length?`<div class="acts" style="display:flex;gap:6px;margin:8px 0"><button class="primary" onclick="approve(QUEUE.map(a=>a.id))">全部批准</button></div>`+QUEUE.map((a,i)=>row(a,i,true)).join(''):'<p class="muted">没有。默认全自动时这里是空的;在设置里把某类改成「先给我批准」,它们会出现在这里。</p>'}</div>
+   <div class="card"><h2>排队中,下一场会话做 (${q.items.length})</h2>${q.items.length?q.items.map((a,i)=>row(a,i,false)).join(''):'<p class="muted">没有</p>'}
+    <div class="acts" style="display:flex;gap:6px;margin-top:8px"><button onclick="run('frontrow')">起草前排回复</button><button onclick="run('quotes')">起草引用</button><button onclick="run('follows')">找要关注的人</button><button onclick="run('session')">现在跑一场</button></div></div>`;
+}
+async function approve(ids){await api('/api/actions/approve',{ids});await load()}
+async function reject(ids){await api('/api/actions/reject',{ids});await load()}
+async function editAction(id){const a=[...QUEUE].find(x=>x.id===id)||(await api('/api/actions?status=queued')).items.find(x=>x.id===id);const t=prompt('改这条',a.text);if(t==null)return;await api('/api/actions/edit',{id,text:t});load()}
+document.addEventListener('keydown',e=>{
+  if(TAB!=='queue'||/INPUT|TEXTAREA/.test(document.activeElement.tagName)||!QUEUE.length)return;
+  if(e.key==='j'){SEL=Math.min(SEL+1,QUEUE.length-1);vQueue()}
+  else if(e.key==='k'){SEL=Math.max(SEL-1,0);vQueue()}
+  else if(e.key==='a')approve([QUEUE[SEL].id]);
+  else if(e.key==='x')reject([QUEUE[SEL].id]);
+});
+
+// ---- posts
+async function vPosts(){
+  const r=await api('/api/posts');
+  $('#view').innerHTML=`<div class="card"><h2>原创</h2>${r.items.length?r.items.map(p=>`<div class="item"><div class="when">${p.status==='published'?fmt(p.published_at):(p.due||'草稿')}<br><span class="tag">${esc(p.pillar||'')} · ${esc(p.format||'')}</span></div>
+     <div class="body">${p.parts.map(x=>`<div class="part text">${esc(x)}</div>`).join('')}
+     <div class="acts">${p.status==='published'?`${p.url?`<a class="link" href="${esc(p.url)}" target="_blank">在 X 上看</a>`:''} <span class="tag">${num(p.views)} 浏览 · ${num(p.likes)} 赞 · ${num(p.replies)} 回复 · ${num(p.reposts)} 转</span>`:`<span class="pill">${esc(p.status)}</span>`}</div></div></div>`).join(''):'<p class="muted">还没有</p>'}</div>`;
+}
+
+// ---- radar
+async function vRadar(){
+  const r=await api('/api/seen');
+  $('#view').innerHTML=`<div class="card"><h2>领域雷达:最近看到的</h2><p class="hint">来自你盯的账号和关键词。原创会拿它们当素材和时效参考,前排回复从这里挑。</p>
+   ${r.items.length?r.items.map(p=>`<div class="item"><div class="when">${fmt(p.at)}<br><span class="tag">${esc(p.source)}</span></div><div class="body"><div class="soft">@${esc(p.handle)} · ${num(p.views)} 浏览 · ${num(p.likes)} 赞 · ${num(p.replies)} 回复 ${p.used?`· <span class="tag">${esc(p.used)}</span>`:''}</div><div class="text">${esc(p.text.slice(0,500))}</div><a class="link" href="${esc(p.url)}" target="_blank">原帖</a></div></div>`).join(''):'<p class="muted">还没看。点下面开始。</p>'}
+   <button onclick="run('radar')">现在看一圈</button></div>`;
+}
+
+// ---- playbook
+let BOOK=null;
+async function vBook(){
+  BOOK=await api('/api/playbook');const L=BOOK.learned||{};
+  $('#view').innerHTML=`<div class="card"><h2>从你的账号学到的</h2><div class="soft">@${esc(L.handle)} · ${num((L.profile||{}).followers)} 粉丝 · 平均 ${num(L.avg_views)} 浏览/帖 · 读了 ${L.posts||0} 条</div>
+    ${(L.top||[]).slice(0,3).map(t=>`<div class="part text soft">${esc(t.text.slice(0,200))}</div>`).join('')}</div>
+   <div class="card"><h2>定位与声音</h2><label>这个号给读者什么</label><input id="b_pos" value="${esc(BOOK.positioning)}">
+    <label style="margin-top:8px;display:block">说话方式(写稿时照这个)</label><textarea id="b_voice">${esc(BOOK.voice)}</textarea></div>
+   <div class="card"><h2>内容支柱</h2><p class="hint">权重越高写得越多;每周按效果自动调整。</p><div id="b_pillars">${(BOOK.pillars||[]).map((p,i)=>pillarRow(p,i)).join('')}</div>
+    <button onclick="BOOK.pillars.push({name:'',what:'',examples:[],weight:1});vBookRefresh()">加一个</button></div>
+   <div class="row"><div class="card"><h2>关键词</h2><p class="hint">每行一个,在 X 上搜这个领域正在聊什么。</p><textarea id="b_kw" rows="8">${esc((BOOK.keywords||[]).join('\n'))}</textarea></div>
+    <div class="card"><h2>盯的同行和大号</h2><p class="hint">每行一个 handle。他们的新帖是前排回复的机会。</p><textarea id="b_watch" rows="8">${esc((BOOK.watch||[]).map(w=>w.handle).join('\n'))}</textarea></div></div>
+   <button class="primary" onclick="saveBook()">保存打法</button> <button onclick="if(confirm('重新读账号并生成打法?现在的会被替换。'))redo()">重新生成</button>`;
+}
+function pillarRow(p,i){return `<div class="pillar"><div class="row"><div style="flex:2"><input placeholder="名字" value="${esc(p.name)}" oninput="BOOK.pillars[${i}].name=this.value"></div><div style="flex:0 0 110px;min-width:110px"><input type="number" step="0.1" min="0" value="${p.weight??1}" oninput="BOOK.pillars[${i}].weight=+this.value" title="权重"></div><div style="flex:0 0 auto;min-width:0"><button class="danger" onclick="BOOK.pillars.splice(${i},1);vBookRefresh()">删</button></div></div>
+  <textarea style="margin-top:6px" placeholder="写什么、为什么读者在乎" oninput="BOOK.pillars[${i}].what=this.value">${esc(p.what)}</textarea>
+  <input style="margin-top:6px" placeholder="选题例子,用 ; 隔开" value="${esc((p.examples||[]).join('; '))}" oninput="BOOK.pillars[${i}].examples=this.value.split(/[;；]/).map(s=>s.trim()).filter(Boolean)"></div>`}
+function vBookRefresh(){$('#b_pillars').innerHTML=BOOK.pillars.map((p,i)=>pillarRow(p,i)).join('')}
+async function saveBook(){
+  const lines=s=>s.split('\n').map(x=>x.trim().replace(/^@/,'')).filter(Boolean);
+  const old=Object.fromEntries((BOOK.watch||[]).map(w=>[w.handle,w]));
+  await api('/api/playbook',{positioning:$('#b_pos').value,voice:$('#b_voice').value,pillars:BOOK.pillars.filter(p=>p.name),
+    keywords:lines($('#b_kw').value),watch:lines($('#b_watch').value).map(h=>old[h]||{handle:h,why:'added',score:0})});
+  toast('打法已保存');
+}
+async function redo(){const a=BOOK.about||{};await api('/api/setup',a);toast('重新读账号…');poll()}
+
+// ---- report
+async function vReport(){
+  const b=await api('/api/playbook');const h=(b.history||[]).slice().reverse();
+  $('#view').innerHTML=`<div class="card"><h2>周报</h2>${h.length?h.map(r=>`<div class="item"><div class="when">${fmt(r.at)}</div><div class="body">
+    <div>粉丝 ${r.followers?`${num(r.followers[0])} → ${num(r.followers[1])}`:'—'} · 原创 ${r.posts} 条 · 回复 ${r.actions.reply} · 引用 ${r.actions.quote} · 点赞 ${r.actions.like} · 关注 ${r.actions.follow}</div>
+    <div class="soft">${Object.entries(r.pillars||{}).map(([k,v])=>`${esc(k)} 平均互动 ${Math.round(v)}`).join(' · ')}</div>
+    ${(r.changes||[]).length?`<div style="margin-top:6px">调整:<br>${r.changes.map(esc).join('<br>')}</div>`:'<div class="muted">没有调整</div>'}</div></div>`).join(''):'<p class="muted">用满一周后出第一份。</p>'}
+    <button onclick="run('measure')">现在记录数据</button> <button onclick="run('learn')">现在出一份</button></div>`;
+}
+
+// ---- log
+function logCard(n){return `<div class="card"><h2>最近</h2><div class="log">${(S.log||[]).slice(0,n).map(l=>`<div class="${l.level}">${fmt(l.at)} ${esc(l.what)}</div>`).join('')||'<div class="muted">还没有</div>'}</div></div>`}
+async function vLog(){const r=await api('/api/log');$('#view').innerHTML=`<div class="card"><h2>记录</h2><div class="log">${r.items.map(l=>`<div class="${l.level}">${fmt(l.at)} ${esc(l.what)}</div>`).join('')}</div></div>`}
+async function resume(){await api('/api/resume',{});load()}
+
+load();setInterval(()=>{if(!/INPUT|TEXTAREA/.test(document.activeElement.tagName)&&TAB==='today')load()},20000);
+</script>
+</body>
+</html>
