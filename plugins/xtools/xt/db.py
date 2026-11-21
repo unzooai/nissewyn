@@ -50,6 +50,11 @@ def conn():
             _CONN = sqlite3.connect(os.path.join(env.data_dir(), 'xtools.db'), check_same_thread=False)
             _CONN.row_factory = sqlite3.Row
             _CONN.executescript(SCHEMA)
+            have = {r[1] for r in _CONN.execute('PRAGMA table_info(actions)')}
+            for col in ('views', 'likes', 'replies', 'measured_at'):      # added in 2.1: how our replies did
+                if col not in have:
+                    _CONN.execute('ALTER TABLE actions ADD COLUMN %s %s' % (col, 'REAL' if col == 'measured_at' else 'INTEGER'))
+            _CONN.commit()
         return _CONN
 
 

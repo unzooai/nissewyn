@@ -20,9 +20,23 @@ textarea{resize:vertical;min-height:70px}
 .wrap{max-width:1080px;margin:0 auto;padding:18px 18px 60px}
 header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 header h1{font-size:20px;margin:0}
+.chart{width:100%;height:140px;display:block}
+.axis{display:flex;justify-content:space-between;font-size:12px;color:var(--soft);margin-top:4px;gap:8px}
+.bars{display:flex;align-items:flex-end;gap:2px;height:120px}.bar{flex:1;height:100%;display:flex;align-items:flex-end;min-width:0}
+.stack{width:100%;height:100%;display:flex;flex-direction:column-reverse}.stack div{width:100%;min-height:1px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--soft);margin-bottom:8px}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}.tbl th{text-align:left;color:var(--soft);font-weight:500}.tbl td,.tbl th{padding:6px 4px;border-bottom:1px solid var(--line)}
+.meter{display:inline-block;width:60px;height:6px;background:var(--line);border-radius:3px;margin-right:6px;vertical-align:middle;overflow:hidden}.meter i{display:block;height:100%;background:var(--blue)}
+.range{display:flex;gap:6px;align-items:center;margin-bottom:12px}.range button.on{border-color:var(--blue);color:var(--blue)}
+.bad{color:var(--red)}
 .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;background:var(--line);color:var(--soft)}
 .pill.ok{background:rgba(0,163,108,.12);color:var(--green)}
 .pill.warn{background:rgba(199,119,0,.14);color:var(--amber)}
+.status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:-4px 0 14px}
+.status b{font-size:15px}.status .dot{display:inline-block}
+.status.ok{border-color:rgba(0,163,108,.4);background:rgba(0,163,108,.06)}.status.ok .dot{color:var(--green)}
+.status.bad{border-color:rgba(224,36,94,.4);background:rgba(224,36,94,.06)}.status.bad .dot{color:var(--red)}
+.status.live .dot{animation:blink 1.2s infinite}@keyframes blink{50%{opacity:.25}}
 .pill.bad{background:rgba(224,36,94,.12);color:var(--red)}
 .grow{flex:1}
 nav.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
@@ -78,22 +92,31 @@ async function load(){S=await api('/api/state');render()}
 function setTab(t){TAB=t;try{localStorage.setItem('xt_tab',t)}catch(e){};render()}
 
 function header(){
-  let st;
-  if(S.halted) st=`<span class="pill bad">已停下:${esc(S.halted)}</span> <button onclick="resume()">恢复</button>`;
-  else if(S.running.job) st=`<span class="pill warn">正在:${esc(S.running.job)}</span>`;
-  else st=`<span class="pill ok">${S.awake?'读者醒着,按计划运行':'读者在睡觉,只按时发原创'}</span>`;
-  return `<header><h1>Xtools</h1><span class="soft">${S.handle?'@'+esc(S.handle):''}</span>${st}<span class="grow"></span>
+  const t=S.status||{},icon={on:'●',working:'●',off:'○',problem:'▲'}[t.state]||'○';
+  const cls={on:'ok',working:'ok',off:'',problem:'bad'}[t.state]||'';
+  const beat=t.beat?`最近检查 ${ago(t.beat)}`:'';
+  return `<div id="hdr"><header><h1>Xtools</h1><span class="soft">${S.handle?'@'+esc(S.handle):''}</span><span class="grow"></span>
     ${S.browser?'':'<span class="pill bad">Unzoo 浏览器没连上</span>'}
-    <button onclick="load()">刷新</button></header>`;
+    <button onclick="load()">刷新</button></header>
+    <div class="status ${cls} ${t.state==='working'?'live':''}"><b><span class="dot">${icon}</span> ${esc(t.text||'')}</b>
+      ${S.warmup?`<span class="pill warn">养号期 · ${esc(S.warmup.name)}</span>`:''}
+      <span class="soft">${esc(t.detail||'')}</span><span class="grow"></span>
+      ${t.next&&t.state!=='off'?`<span class="soft">下一件:${esc(t.next)}</span>`:''}
+      <span class="muted">${beat}</span>
+      ${S.halted?'<button onclick="resume()">恢复</button>':''}</div></div>`;
 }
+function ago(ts){const s=Math.max(0,Math.round(Date.now()/1000-ts));return s<60?s+' 秒前':Math.round(s/60)+' 分钟前'}
+// The status line stays live: every 10 seconds, only the header is redrawn (nothing you are editing moves).
+setInterval(async()=>{try{S=await api('/api/state');const h=$('#hdr');if(h)h.outerHTML=header()}catch(e){
+  const h=$('#hdr');if(h)h.innerHTML='<div class="status bad"><b><span class="dot">▲</span> Xtools 没有响应</b><span class="soft">插件可能已关掉;到 Unzoo One › 插件 里打开它</span></div>'}},10000);
 
 function render(){
   if(!S)return;
   const app=$('#app');
   if(!S.setup){app.innerHTML=header()+onboarding();return}
-  const tabs=[['today','今天'],['queue','队列'],['posts','原创'],['radar','雷达'],['book','打法'],['report','周报'],['log','记录']];
+  const tabs=[['today','今天'],['stats','数据'],['queue','队列'],['posts','原创'],['radar','雷达'],['book','打法'],['report','周报'],['log','记录']];
   app.innerHTML=header()+`<nav class="tabs">${tabs.map(([k,l])=>`<a class="${TAB===k?'on':''}" onclick="setTab('${k}')">${l}${k==='queue'&&S.queue.pending?`<span class="n">${S.queue.pending}</span>`:''}</a>`).join('')}</nav><div id="view"></div>`;
-  ({today:vToday,queue:vQueue,posts:vPosts,radar:vRadar,book:vBook,report:vReport,log:vLog})[TAB]();
+  ({today:vToday,stats:vStats,queue:vQueue,posts:vPosts,radar:vRadar,book:vBook,report:vReport,log:vLog})[TAB]();
 }
 
 // ---- first run
@@ -137,6 +160,7 @@ function vToday(){
     <div class="kpi"><b>${t.done.reply}</b><span>今天回复 · 还能 ${t.left.reply}</span></div>
     <div class="kpi"><b>${t.done.like} · ${t.done.follow}</b><span>点赞 · 关注</span></div>
     <div class="kpi"><b>${S.queue.pending}</b><span>等你批准</span></div></div>
+   ${warmCard()}
    <div class="row"><div class="card" style="flex:2"><h2>今天的原创</h2>${t.posts.length?t.posts.map(post).join(''):'<p class="muted">今天还没有。到时间会自动写,也可以现在写一条。</p>'}
      <div class="acts" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button onclick="writeOne()">写一条</button><button onclick="run('plan')">按计划补齐今天</button></div></div>
    <div style="flex:1;min-width:260px"><div class="card"><h2>粉丝</h2>${spark(f)}</div>
@@ -149,7 +173,15 @@ async function run(job){const r=await api('/api/run',{job});toast(r.ok?'开始�
 async function writeOne(){const r=await api('/api/posts/write',{});toast(r.ok?'在写…':'没开始');poll()}
 async function schedule(id){await api('/api/posts/schedule',{id});load()}
 async function unschedule(id){await api('/api/posts/unschedule',{id});load()}
-async function publishNow(id){if(!confirm('现在就发到 X?'))return;await api('/api/posts/schedule',{id,due_at:Date.now()/1000});await api('/api/run',{job:'publish'});toast('在发…');poll()}
+async function publishNow(id){if(!confirm('现在就发到 X?'))return;await api('/api/posts/publish',{id});toast('在发…');poll()}
+async function warmup(action){if(!confirm(action==='end'?'结束养号期?之后按设定的上限全力运行。':'养号期从今天重新算?'))return;await api('/api/warmup',{action});load()}
+function warmCard(){const w=S.warmup;if(!w)return '';
+  const steps=[1,2,3].map(i=>`<span class="pill ${i===w.stage?'warn':i<w.stage?'ok':''}">${i<w.stage?'✓ ':''}${['','只逛','开口','起步'][i]}</span>`).join(' → ');
+  return `<div class="card"><h2>养号期 · 第 ${w.day} / ${w.days} 天</h2><div style="margin:6px 0">${steps}</div>
+    <p>现在是「${esc(w.name)}」:${esc(w.what)}。${w.stage<3?`${esc(w.next)} 进入下一阶段,`:''}${esc(w.end)} 结束。</p>
+    ${w.todo.length?`<p class="hint">趁这几天把主页补齐(X 对空主页的新号更警惕):${w.todo.map(esc).join(';')}。</p>`:''}
+    <p class="hint">${w.mode==='on'?'设置里选了「总是养号」。':'因为这是新号或小号(粉丝不到 500 或注册不到半年)。'}在设置 › 上限与节奏 里可以改天数或关掉。</p>
+    <div class="acts" style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="warmup('end')">提前结束</button><button onclick="warmup('restart')">从今天重新算</button></div></div>`}
 async function delPost(id){if(!confirm('删掉这条?'))return;await api('/api/posts/delete',{id});load()}
 async function editPost(id){
   const p=[...S.today.posts].find(x=>x.id===id)||(await api('/api/posts')).items.find(x=>x.id===id);
@@ -236,6 +268,54 @@ async function vReport(){
     ${(r.changes||[]).length?`<div style="margin-top:6px">调整:<br>${r.changes.map(esc).join('<br>')}</div>`:'<div class="muted">没有调整</div>'}</div></div>`).join(''):'<p class="muted">用满一周后出第一份。</p>'}
     <button onclick="run('measure')">现在记录数据</button> <button onclick="run('learn')">现在出一份</button></div>`;
 }
+
+// ---- numbers
+let DAYS=30;try{DAYS=+localStorage.getItem('xt_days')||30}catch(e){}
+function lineChart(pts,key){
+  if(pts.length<2)return '<p class="muted">记录两天以上后显示趋势(每天自动记一次,也可以点「现在记录数据」)</p>';
+  const v=pts.map(p=>p[key]),lo=Math.min(...v),hi=Math.max(...v),w=600,h=140,pad=4;
+  const xy=v.map((y,i)=>[(i/(v.length-1)*w),(h-pad-(y-lo)/((hi-lo)||1)*(h-2*pad))]);
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="粉丝从 ${lo} 到 ${hi}">
+    <polyline fill="none" stroke="var(--blue)" stroke-width="2" vector-effect="non-scaling-stroke" points="${xy.map(p=>p.map(n=>n.toFixed(1)).join(',')).join(' ')}"/></svg>
+    <div class="axis"><span>${esc(pts[0].day)} · ${num(v[0])}</span><span>最高 ${num(hi)} · 最低 ${num(lo)}</span><span>${esc(pts[pts.length-1].day)} · ${num(v[v.length-1])}</span></div>`;
+}
+const SERIES=[['post','原创','var(--blue)'],['reply','回复','var(--green)'],['quote','引用','var(--amber)'],['like','点赞','#9aa4b2'],['follow','关注','#b08cd9']];
+function bars(act){
+  const max=Math.max(1,...act.map(a=>SERIES.reduce((s,[k])=>s+a[k],0)));
+  return `<div class="legend">${SERIES.map(([k,l,c])=>`<span><i style="background:${c}"></i>${l}</span>`).join('')}</div>
+   <div class="bars">${act.map(a=>`<div class="bar" title="${esc(a.day)}:${SERIES.map(([k,l])=>l+' '+a[k]).join(' · ')}">
+     <div class="stack">${SERIES.map(([k,,c])=>a[k]?`<div style="height:${a[k]/max*100}%;background:${c}"></div>`:'').join('')}</div></div>`).join('')}</div>
+   <div class="axis"><span>${esc(act[0].day)}</span><span>${esc(act[act.length-1].day)}</span></div>`;
+}
+function table(rows,first,empty){
+  if(!rows.length)return `<p class="muted">${empty}</p>`;
+  const best=Math.max(1,...rows.map(r=>r.views));
+  return `<table class="tbl"><tr><th>${first}</th><th>条数</th><th>平均浏览</th><th>平均赞</th><th>互动分</th></tr>${rows.map(r=>`<tr><td>${esc(String(r.name))}</td><td>${r.n}</td>
+    <td><span class="meter"><i style="width:${r.views/best*100}%"></i></span>${num(r.views)}</td><td>${num(r.likes)}</td><td>${r.score}</td></tr>`).join('')}</table>`;
+}
+const signed=n=>n==null?'—':(n>=0?'+':'')+num(n);
+async function vStats(){
+  const d=await api('/api/stats?days='+DAYS),f=d.followers,last=f.length?f[f.length-1]:null;
+  $('#view').innerHTML=`<div class="range">${[7,30,90].map(n=>`<button class="${n===DAYS?'on':''}" onclick="setDays(${n})">${n} 天</button>`).join('')}
+     <span class="grow"></span><button onclick="run('measure')">现在记录数据</button></div>
+   <div class="kpis">
+    <div class="kpi"><b>${last?num(last.followers):'—'}</b><span>粉丝 · 今天 ${signed(d.gain.d1)}</span></div>
+    <div class="kpi"><b>${signed(d.gain.d7)}</b><span>近 7 天涨粉</span></div>
+    <div class="kpi"><b>${signed(d.gain.d30)}</b><span>近 30 天涨粉</span></div>
+    <div class="kpi"><b>${num(d.posts.views)}</b><span>原创平均浏览(${d.posts.n} 条)</span></div>
+    <div class="kpi"><b>${num(d.replies.views)}</b><span>回复平均浏览(${d.replies.n} 条)</span></div></div>
+   <div class="card"><h2>粉丝</h2>${lineChart(f,'followers')}</div>
+   <div class="card"><h2>每天做了什么</h2>${bars(d.activity)}
+     <p class="soft">${d.days} 天合计:原创 ${d.totals.post} · 回复 ${d.totals.reply} · 引用 ${d.totals.quote} · 点赞 ${d.totals.like} · 关注 ${d.totals.follow}${d.failed?` · <span class="bad">失败 ${d.failed}</span>`:''}</p></div>
+   <div class="row"><div class="card" style="flex:1;min-width:280px"><h2>哪类内容表现好</h2>${table(d.by_pillar,'内容支柱','还没有量过数据的原创')}</div>
+     <div class="card" style="flex:1;min-width:280px"><h2>格式</h2>${table(d.by_format,'格式','—')}</div></div>
+   <div class="row"><div class="card" style="flex:1;min-width:280px"><h2>几点发效果好</h2><p class="hint">按主时区 ${d.tz>=0?'UTC+'+d.tz:'UTC'+d.tz} 的发帖时间</p>${table(d.by_hour.map(r=>({...r,name:r.name+' 点'})),'时间','—')}</div>
+     <div class="card" style="flex:1;min-width:280px"><h2>回复在谁的帖下最有效</h2><p class="hint">我们的回复各自带来的浏览</p>${table(d.replies.by_target,'帖子作者','还没有量过数据的回复')}</div></div>
+   <div class="card"><h2>表现最好的原创</h2>${d.top.length?d.top.map(p=>`<div class="item"><div class="when">${esc(p.at)}<br><span class="tag">${esc(p.pillar||'')}</span></div>
+     <div class="body"><div class="text">${esc(p.text)}</div><div class="soft">${num(p.views)} 浏览 · ${num(p.likes)} 赞 · ${num(p.replies)} 回复 · ${num(p.reposts)} 转发 ${p.url?`· <a class="link" href="${esc(p.url)}" target="_blank">在 X 上看</a>`:''}</div></div></div>`).join(''):'<p class="muted">还没有</p>'}</div>
+   <p class="hint">数据每天记录一次(粉丝数,以及最近 40 条帖和回复的浏览、赞、回复),只存在这台电脑上。</p>`;
+}
+function setDays(n){DAYS=n;try{localStorage.setItem('xt_days',n)}catch(e){};vStats()}
 
 // ---- log
 function logCard(n){return `<div class="card"><h2>最近</h2><div class="log">${(S.log||[]).slice(0,n).map(l=>`<div class="${l.level}">${fmt(l.at)} ${esc(l.what)}</div>`).join('')||'<div class="muted">还没有</div>'}</div></div>`}

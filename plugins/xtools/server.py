@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from xt import browser, clock, db, engine, env, playbook, scheduler  # noqa: E402
+from xt import browser, clock, db, engine, env, playbook, scheduler, stats  # noqa: E402
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
 
@@ -66,7 +66,60 @@ def state():
         'followers': snaps,
         'log': db.q('SELECT at, level, what FROM log ORDER BY at DESC LIMIT 40'),
         'timezones': env.setting('audience.timezones'),
+        'warmup': _warmup_view(book),
+        'status': _status(book, sessions),
     }
+
+
+def _status(book, sessions):
+    """Is it running, in one line: state (on / working / waiting / off / problem), what, next."""
+    now, beat, job = time.time(), scheduler.heartbeat(), scheduler.running()
+    nxt = []
+    p = db.one("SELECT due_at FROM posts WHERE status='scheduled' ORDER BY due_at LIMIT 1")
+    if p:
+        nxt.append((p['due_at'], '发原创'))
+    nxt += [(t, '互动会话') for t in sessions.get('at', []) if t > now and t not in sessions.get('done', [])]
+    nxt.sort()
+    nxt = '%s %s' % (clock.fmt(nxt[0][0]), nxt[0][1]) if nxt else ''
+    def out(state, text, detail=''):
+        return {'state': state, 'text': text, 'detail': detail, 'next': nxt,
+                'beat': beat['at'], 'job': job['job'], 'since': job['since']}
+    if os.environ.get('XTOOLS_NO_SCHEDULER'):
+        return out('off', '没有在运行', '自动调度被关掉了(XTOOLS_NO_SCHEDULER),只能手动操作')
+    if job['job']:
+        return out('working', '运行中 · 正在' + job['job'], '已经 %d 秒' % (now - job['since']))
+    if not book.get('pillars'):
+        return out('off', '还没开始', '先在下面完成设置,完成后自动开始')
+    if env.setting('paused'):
+        return out('off', '已暂停', '在 Unzoo One › 插件 › Xtools › 设置 里关掉「全部暂停」就继续')
+    h = engine.halted()
+    if h:
+        return out('problem', '已停下', h)
+    if not beat['at'] or now - beat['at'] > 180:
+        return out('problem', '调度没有在跑', '超过 3 分钟没有动静;到 Unzoo One 里把 Xtools 关掉再打开')
+    if beat['idle'] == 'no_browser':
+        return out('problem', '等浏览器', 'Unzoo 浏览器没有响应,连上后自动继续')
+    if beat['idle'] == 'error':
+        return out('problem', '运行中 · 上一轮出错', '看下面「最近」里的记录')
+    if beat['idle'] == 'asleep':
+        return out('on', '运行中 · 读者在睡觉', '这段时间只按时发原创,不互动')
+    return out('on', '运行中 · 等下一件事', '每分钟检查一次')
+
+
+def _warmup_view(book):
+    w = engine.warmup()
+    if not w:
+        return None
+    prof = (book.get('learned') or {}).get('profile') or {}
+    todo = []
+    if prof.get('default_avatar'):
+        todo.append('换一张真实的头像')
+    if prof.get('banner') is False:
+        todo.append('加一张横幅图')
+    if not (prof.get('bio') or '').strip():
+        todo.append('写一句简介:你是谁、关注你能看到什么')
+    return {**w, 'next': clock.fmt(w['next_at']), 'end': clock.fmt(w['end_at']), 'todo': todo,
+            'mode': env.setting('warmup.mode'), 'new_account': engine.is_new_account(book)}
 
 
 def handle_get(path, qs):
@@ -77,6 +130,8 @@ def handle_get(path, qs):
         return state()
     if path == '/api/playbook':
         return db.playbook()
+    if path == '/api/stats':
+        return stats.stats(max(1, min(90, int(one('days', 30)))))
     if path == '/api/posts':
         st = one('status')
         rows = db.q('SELECT * FROM posts WHERE status=? ORDER BY id DESC LIMIT 100', (st,)) if st else \
@@ -108,6 +163,17 @@ def handle_post(path, body):
         if not job:
             return {'ok': False, 'error': 'unknown job'}
         return background(*job)
+    if path == '/api/posts/publish':
+        return background('发一条原创', engine.publish_due, int(body['id']))
+    if path == '/api/warmup':
+        if body.get('action') == 'end':
+            db.kv_set('warmup_ended', True)
+            db.log('养号期提前结束')
+        elif body.get('action') == 'restart':
+            db.kv_set('warmup_ended', None)
+            db.kv_set('warmup_start', time.time())
+            db.log('养号期从今天重新开始')
+        return {'ok': True}
     if path == '/api/resume':
         db.kv_set('halt', None)
         db.log('已恢复自动运行')

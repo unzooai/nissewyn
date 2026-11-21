@@ -22,7 +22,7 @@ DEFAULTS = {
     'mentions.max_per_run': 5,
     'caps.post': 6, 'caps.reply': 30, 'caps.quote': 3, 'caps.like': 80, 'caps.follow': 20,
     'caps.per_hour': 15,
-    'warmup.days': 14, 'warmup.ratio': 0.4,
+    'warmup.mode': 'auto', 'warmup.days': 14, 'warmup.ratio': 40,
     'pace.gap_seconds': [25, 90],
     'redlines': ['政治、时政、地缘冲突', '宗教', '色情', '投资建议、炒币', '人身攻击'],
     'learn.weekly': True,

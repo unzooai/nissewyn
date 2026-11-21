@@ -6,11 +6,16 @@ import traceback
 from . import browser, clock, db, engine, env, x
 
 _RUNNING = {'job': None, 'since': None}
+_BEAT = {'at': None, 'idle': None}    # the clock's last tick, and why it did nothing (or None)
 _LOCK = threading.Lock()
 
 
 def running():
     return dict(_RUNNING)
+
+
+def heartbeat():
+    return dict(_BEAT)
 
 
 def run_job(name, fn, *args):
@@ -50,10 +55,13 @@ def _daily(key):
 
 
 def tick():
+    """Run what is due. Returns why it did nothing, or None when it went through."""
     if not db.playbook().get('pillars'):
-        return                                   # not set up yet
-    if engine.halted() or not browser.reachable():
-        return
+        return 'not_setup'
+    if engine.halted():
+        return 'halted'
+    if not browser.reachable():
+        return 'no_browser'
     awake = clock.audience_awake()
     if _daily('plan'):
         run_job('写今天的原创', engine.plan_day)
@@ -63,7 +71,7 @@ def tick():
         run_job('周报', engine.weekly_learn)
     run_job('到点发原创', engine.publish_due)
     if not awake:
-        return
+        return 'asleep'
     if _every('mentions', 30 * 60):
         run_job('看读者通知', engine.mentions)
     if _every('radar', 90 * 60):
@@ -85,10 +93,13 @@ def loop():
     if db.kv_get('first_run_at') is None:
         db.kv_set('first_run_at', time.time())
     while True:
+        _BEAT['at'] = time.time()
         try:
-            tick()
+            _BEAT['idle'] = tick()
         except Exception:
+            _BEAT['idle'] = 'error'
             traceback.print_exc()
+        _BEAT['at'] = time.time()
         time.sleep(60)
 
 

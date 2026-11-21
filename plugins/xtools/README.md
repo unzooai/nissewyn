@@ -8,6 +8,9 @@ An Unzoo One plugin that runs one X account for growth, for any niche.
 - **Front row.** When a watched account posts, it replies early with something concrete.
 - **Readers first.** Answers questions in mentions and likes thanks.
 - **Sessions.** Acts in bursts the way a person checks X, at a person's pace, within daily caps. New accounts warm up gradually.
+- **Warms up new accounts.** An account under 500 followers or half a year old starts the way a person new to X does: first it only reads and likes a little, then it starts talking (one post a day, a few replies and follows), then the daily limits rise to full. 14 days by default.
+- **Shows the numbers.** Followers over time, what it did each day, and which pillars, formats, posting hours and reply targets earn views.
+- **Says whether it is running.** The top of its page always shows one of: running, working on something, waiting for the browser, paused, stopped and why. It also shows what comes next.
 - **Learns weekly.** Pillars that earn more engagement get written more. Every change appears in the weekly report.
 
 Design and reasoning: [docs/research/plugins/x-growth.md](../../docs/research/plugins/x-growth.md).

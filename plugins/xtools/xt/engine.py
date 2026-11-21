@@ -34,19 +34,79 @@ def on_unhealthy(state):
     halt(why, minutes)
 
 
-def _warmup_factor():
-    first = db.kv_get('first_run_at') or time.time()
-    days = (time.time() - first) / 86400
-    total = env.setting('warmup.days') or 0
-    if days >= total:
-        return 1.0
-    lo = env.setting('warmup.ratio') or 0.4
-    return lo + (1 - lo) * days / total
+# ---- warm-up (养号期) ------------------------------------------------------------
+# A new or small account that suddenly posts, replies and follows every day looks like a
+# bot to X. So it starts the way a person new to X does, in three stages:
+#   1 只逛  look around: read the timeline and the niche, like a few posts, answer anyone
+#           who talks to it; no originals, no replies to strangers, no follows, no quotes
+#   2 开口  start talking: one original a day, a few replies under peers' posts, a few follows
+#   3 起步  everything, the daily caps rising day by day to the full amount
+# Stage 1 takes the first fifth of the period, stage 2 runs to half of it.
+
+STAGES = {
+    1: ('只逛', '只看时间线和领域里的帖、少量点赞、回应找你的人;不发原创、不在别人帖下回复、不关注、不引用'),
+    2: ('开口', '每天最多 1 条原创,少量前排回复和关注;不引用'),
+    3: ('起步', '什么都做,每天的上限逐天放开到设定值'),
+}
+NEW_FOLLOWERS, NEW_DAYS = 500, 180
+
+
+def is_new_account(book=None):
+    """Fewer than 500 followers, or joined X under half a year ago (unknown counts as new)."""
+    prof = ((book or db.playbook()).get('learned') or {}).get('profile') or {}
+    followers, joined = prof.get('followers'), prof.get('joined_at')
+    return followers is None or followers < NEW_FOLLOWERS or bool(joined and time.time() - joined < NEW_DAYS * 86400)
+
+
+def warmup():
+    """Where the account is in its warm-up, or None when it is not in one."""
+    book = db.playbook()
+    mode, total = env.setting('warmup.mode') or 'auto', env.setting('warmup.days') or 0
+    if not book.get('pillars') or mode == 'off' or total <= 0 or db.kv_get('warmup_ended'):
+        return None
+    if mode == 'auto' and not is_new_account(book):
+        return None
+    start = db.kv_get('warmup_start')
+    if start is None:
+        start = time.time()
+        db.kv_set('warmup_start', start)
+    day = (time.time() - start) / 86400
+    if day >= total:
+        return None
+    s1 = max(1, round(total * 0.2))
+    s2 = max(s1 + 1, round(total * 0.5))
+    stage = 1 if day < s1 else 2 if day < s2 else 3
+    ends = {1: s1, 2: min(s2, total), 3: total}[stage]
+    return {'stage': stage, 'name': STAGES[stage][0], 'what': STAGES[stage][1], 'day': int(day) + 1, 'days': total,
+            'next_at': start + ends * 86400, 'end_at': start + total * 86400,
+            'progress': 0 if stage < 3 else (day - s2) / max(1, total - s2)}
+
+
+def stage():
+    w = warmup()
+    return w['stage'] if w else None
+
+
+def _warm_cap(kind, cap):
+    w = warmup()
+    if not w:
+        return cap
+    r = env.setting('warmup.ratio')
+    r = 0.4 if r is None else (r / 100 if r > 1 else r)    # a percentage; old values were 0-1
+    if w['stage'] == 1:
+        f = {'post': 0, 'reply': r * 0.25, 'quote': 0, 'like': r * 0.5, 'follow': 0}[kind]
+    elif w['stage'] == 2:
+        if kind == 'post':
+            return min(1, cap)
+        f = {'reply': r, 'quote': 0, 'like': r, 'follow': r * 0.5}[kind]
+    else:
+        f = r + (1 - r) * w['progress']
+    return int(cap * f + (0.5 if f else 0)) if cap else 0
 
 
 def cap_left(kind):
     """How many more of this kind today, after warm-up, today's count and the hourly limit."""
-    cap = int((env.setting('caps.' + kind) or 0) * _warmup_factor())
+    cap = _warm_cap(kind, env.setting('caps.' + kind) or 0)
     if kind == 'post':
         done = db.count_today('posts', 'kind', 'post', done=('published',))
     else:
@@ -149,7 +209,7 @@ def plan_day():
     now = time.time()
     planned = db.one("SELECT COUNT(*) n FROM posts WHERE due_at>=? AND due_at<? AND status IN ('scheduled','draft','published')",
                      (start, end))['n']
-    want = max(0, (env.setting('posts.per_day') or 0) - planned)
+    want = max(0, min(env.setting('posts.per_day') or 0, _warm_cap('post', 99)) - planned)
     times = [t for t in clock.spread_over_awake(want + 2, max(start, now + 600), end)][:want]
     for t in times:
         try:
@@ -243,6 +303,8 @@ def _lang_of(text):
 
 def frontrow(max_drafts=4):
     """Fresh posts from watched accounts, still early (few replies): be one of the first good replies."""
+    if stage() == 1:
+        return 0                     # warm-up: not talking to strangers yet
     book = _book()
     age = (env.setting('frontrow.max_age_hours') or 3) * 3600
     crowd = env.setting('frontrow.max_replies_on_post') or 150
@@ -355,6 +417,8 @@ def mentions():
 
 def discover_follows(n=3):
     """Watched accounts we do not follow yet, and authors of strong posts in the niche."""
+    if cap_left('follow') <= 0:
+        return 0                     # warm-up stage 1, or today's follows used up
     book = _book()
     done = {r['target_handle'].lower() for r in db.q("SELECT target_handle FROM actions WHERE kind='follow'") if r['target_handle']}
     me = (book.get('learned') or {}).get('handle', '').lower()
@@ -375,12 +439,17 @@ def discover_follows(n=3):
 
 # ---- doing -------------------------------------------------------------------
 
-def publish_due():
+def publish_due(post_id=None):
+    """The next scheduled post that is due, within today's cap and the warm-up. With
+    post_id, that post now: the person pressed "post now", so caps and warm-up yield."""
     if halted():
         return 0
-    rows = db.q("SELECT * FROM posts WHERE status='scheduled' AND due_at<=? ORDER BY due_at LIMIT 1", (time.time(),))
+    if post_id:
+        rows = db.q("SELECT * FROM posts WHERE id=? AND status!='published'", (post_id,))
+    else:
+        rows = db.q("SELECT * FROM posts WHERE status='scheduled' AND due_at<=? ORDER BY due_at LIMIT 1", (time.time(),))
     for r in rows:
-        if cap_left('post') <= 0:
+        if not post_id and cap_left('post') <= 0:
             return 0
         handle = (db.playbook().get('learned') or {}).get('handle')
         try:
@@ -414,12 +483,15 @@ def do_action(a):
 def run_actions(limits):
     """Carry out queued actions, up to `limits` per kind, a person's pace apart."""
     done = {k: 0 for k in KINDS}
+    first_stage = stage() == 1
     rows = db.q("SELECT * FROM actions WHERE status='queued' AND due_at<=? ORDER BY "
                 "CASE reason WHEN '回读者' THEN 0 ELSE 1 END, due_at LIMIT 40", (time.time(),))
     for a in rows:
         k = a['kind']
         if halted() or done[k] >= limits.get(k, 0) or cap_left(k) <= 0:
             continue
+        if first_stage and k == 'reply' and a['reason'] != '回读者':
+            continue                 # warm-up stage 1: only answering people who talked to us
         try:
             res = do_action(a)
         except x.Unhealthy as e:
@@ -445,13 +517,42 @@ def session():
     if halted():
         return None
     r = lambda key: random.randint(*(env.setting(key) or [0, 0]))
+    warm = stage()
     try:
         x.mentions(want=5)       # look at notifications first, as a person would
         browser.scroll()
+        if warm or random.random() < 0.5:
+            browse(likes=random.randint(2, 5) if warm == 1 else 0)
     except x.Unhealthy as e:
         on_unhealthy(e.state)
         return None
     return run_actions({'reply': r('sessions.replies'), 'quote': 1, 'like': r('sessions.likes'), 'follow': r('sessions.follows')})
+
+
+def browse(likes=0):
+    """Read like a person: scroll the home timeline, open a post now and then, look in on
+    one account in the niche. With `likes`, like a few of the niche posts it read (in
+    warm-up stage 1 this is what the account mostly does)."""
+    _remember(x.home(want=random.randint(8, 20)), 'home')
+    book = db.playbook()
+    watch = [w['handle'] for w in book.get('watch') or []]
+    if watch:
+        h = random.choice(watch)
+        _remember(x.posts_of(h, want=5), 'watch:' + h)
+        browser.pause(4, 12)
+    if likes <= 0:
+        return 0
+    rows = db.q("SELECT * FROM seen WHERE (source LIKE 'watch:%' OR source LIKE 'kw:%') AND captured_at>? "
+                "ORDER BY likes DESC LIMIT 40", (time.time() - 48 * 3600,))
+    made = 0
+    for row in rows:
+        if made >= likes:
+            break
+        if _already(row['url'], 'like') or _redline_hit(row['text']):
+            continue
+        if _queue('like', row, reason='养号:读到的同领域好帖', soon=False):
+            made += 1
+    return made
 
 
 # ---- measuring and learning ---------------------------------------------------------
@@ -464,9 +565,15 @@ def measure():
     prof = x.profile(handle)
     if prof.get('followers') is not None:
         db.run('INSERT INTO snapshots(at, followers, following) VALUES(?,?,?)', (time.time(), prof['followers'], prof.get('following')))
-    for p in x.posts_of(handle, want=30):
-        db.run('UPDATE posts SET views=?, likes=?, replies=?, reposts=?, bookmarks=?, measured_at=? WHERE url=?',
-               (p['views'], p['likes'], p['replies'], p['reposts'], p['bookmarks'], time.time(), p['url']))
+        book['learned']['profile'] = {**(book['learned'].get('profile') or {}), **prof}
+        db.save_playbook(book)
+    for p in x.posts_of(handle, want=40, include_replies=True):
+        # our replies and quotes too: how they did, for the numbers page
+        db.run("UPDATE actions SET views=?, likes=?, replies=?, measured_at=? WHERE result_url=? AND kind IN ('reply','quote')",
+               (p['views'], p['likes'], p['replies'], time.time(), p['url']))
+        if not p['is_reply']:
+            db.run('UPDATE posts SET views=?, likes=?, replies=?, reposts=?, bookmarks=?, measured_at=? WHERE url=?',
+                   (p['views'], p['likes'], p['replies'], p['reposts'], p['bookmarks'], time.time(), p['url']))
     db.log('记录数据:粉丝 %s' % prof.get('followers'))
 
 

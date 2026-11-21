@@ -117,11 +117,39 @@ def profile(handle):
       if (!f && !g) return null;
       const n = el => { if (!el) return null; const m = el.innerText.replace(/,/g, '').match(/([\d.]+)\s*([KkMm万]?)/);
         if (!m) return null; const mul = {k: 1e3, K: 1e3, m: 1e6, M: 1e6, '万': 1e4}[m[2]] || 1; return Math.round(parseFloat(m[1]) * mul); };
+      const av = document.querySelector('a[href$="/photo"] img');
       return {followers: n(f), following: n(g),
               name: ((document.querySelector('[data-testid="UserName"]') || {}).innerText || '').split('\n')[0],
-              bio: (document.querySelector('[data-testid="UserDescription"]') || {}).innerText || ''};
+              bio: (document.querySelector('[data-testid="UserDescription"]') || {}).innerText || '',
+              joined: (document.querySelector('[data-testid="UserJoinDate"]') || {}).innerText || '',
+              default_avatar: !av || /default_profile/.test(av.getAttribute('src') || ''),
+              banner: !!document.querySelector('a[href$="/header_photo"]')};
     })()""", 15)
-    return got or {}
+    got = got or {}
+    if got.get('joined'):
+        got['joined_at'] = _joined_at(got['joined'])
+    return got
+
+
+_MONTHS = {m: i for i, m in enumerate(['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], 1)}
+
+
+def _joined_at(text):
+    """'Joined March 2024' / '2024年3月 加入' -> the first of that month, as a timestamp."""
+    m = re.search(r'(\d{4})\s*年\s*(\d{1,2})\s*月', text)
+    if m:
+        y, mo = int(m.group(1)), int(m.group(2))
+    else:
+        m = re.search(r'([A-Za-z]{3})[a-z]*\.?\s+(\d{4})', text)
+        if not m or m.group(1).lower() not in _MONTHS:
+            return None
+        y, mo = int(m.group(2)), _MONTHS[m.group(1).lower()]
+    return time.mktime((y, mo, 1, 0, 0, 0, 0, 0, -1))
+
+
+def home(want=15):
+    """The home timeline, read the way a person scrolls it."""
+    return _collect(X + '/home', want, max_scrolls=max(3, want // 4))
 
 
 def posts_of(handle, want=40, include_replies=False):
