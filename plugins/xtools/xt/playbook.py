@@ -23,7 +23,7 @@ def learn_account():
     """Read the account: profile, its recent posts and what they earned."""
     handle = x.me()
     if not handle:
-        raise RuntimeError('这个浏览器身份里 X 没有登录')
+        raise RuntimeError(browser.signed_out_text())
     prof = x.profile(handle)
     posts = x.posts_of(handle, want=60)
     own = {p['url'] for p in posts}

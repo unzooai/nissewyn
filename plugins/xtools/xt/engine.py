@@ -17,20 +17,20 @@ def halted():
     if env.setting('paused'):
         return '已在设置里暂停'
     h = db.kv_get('halt')
-    if h and h.get('until', 0) > time.time():
+    if h and h.get('until', 0) > time.time() and h.get('profile', env.browser_profile()) == env.browser_profile():
         return h.get('why')
     return None
 
 
 def halt(why, minutes):
-    db.kv_set('halt', {'why': why, 'until': time.time() + minutes * 60, 'at': time.time()})
+    db.kv_set('halt', {'why': why, 'until': time.time() + minutes * 60, 'at': time.time(), 'profile': env.browser_profile()})
     db.log('停下 %d 分钟:%s' % (minutes, why), 'warn')
 
 
 def on_unhealthy(state):
     minutes = {'limited': 180, 'locked': 60 * 24 * 7, 'signed_out': 60 * 24, 'error': 30}.get(state, 60)
     why = {'limited': 'X 提示操作太频繁(限流)', 'locked': 'X 账号被锁或需要验证,请到浏览器里处理',
-           'signed_out': '这个浏览器身份里 X 没有登录', 'error': 'X 页面出错'}.get(state, state)
+           'signed_out': browser.signed_out_text(), 'error': 'X 页面出错'}.get(state, state)
     halt(why, minutes)
 
 

@@ -46,6 +46,17 @@ def profiles():
     return [{'id': p.get('profile_id'), 'name': p.get('name')} for p in items or []]
 
 
+def signed_out_text():
+    """Says which browser identity was checked, so a wrong binding is obvious."""
+    pid = env.browser_profile()
+    try:
+        name = next((p['name'] for p in profiles() if p['id'] == pid), None) or pid
+    except BrowserError:
+        name = pid
+    return ('浏览器身份「%s」里 X 没有登录。如果你的 X 登录在别的身份里,到 设置 › X 账号 选那个;'
+            '否则在这个身份里登录 X。' % name)
+
+
 def _alive(tab):
     try:
         return _call('/api/v1/evaluate', {'tab_id': tab, 'expression': '1'}, timeout=10).get('result') == 1
