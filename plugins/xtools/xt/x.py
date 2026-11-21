@@ -85,8 +85,15 @@ def _check():
 def me():
     """The signed-in handle (without @), or None if X is not signed in."""
     b.go(X + '/home')
-    h = b.wait_for('(() => { const a = document.querySelector(\'a[data-testid="AppTabBar_Profile_Link"]\');'
-                   ' return a && a.getAttribute("href"); })()', 15)
+    # X has moved the "Profile" tab out of the side nav; the account button bottom-left
+    # ("name\n@handle") is there either way, the old tab is the fallback.
+    h = b.wait_for(r'''(() => {
+      const s = document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]');
+      const m = s && s.innerText.match(/@([A-Za-z0-9_]{1,15})/);
+      if (m) return m[1];
+      const a = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]');
+      return a && a.getAttribute("href");
+    })()''', 15)
     return h.strip('/') if h else None
 
 

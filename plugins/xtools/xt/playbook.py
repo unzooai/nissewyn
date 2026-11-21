@@ -149,7 +149,7 @@ def draft_about(source, url=''):
     else:
         db.log('读 X 账号:主页和最近的帖')
         learned = learn_account()
-        db.kv_set('learned_draft', {'at': time.time(), 'learned': learned})
+        db.kv_set('learned_draft', {'at': time.time(), 'learned': learned, 'profile': env.browser_profile()})
         prof = learned.get('profile') or {}
         line = lambda t: '  · ' + re.sub(r'\s+', ' ', t)[:240]
         material = '他的 X 账号 @%s,名字 %s,简介:%s\n粉丝 %s。表现最好的帖:\n%s\n最近的帖:\n%s' % (
@@ -171,7 +171,8 @@ def setup(about):
     """First run: learn the account, propose a playbook, save it."""
     db.log('开始读账号:主页、最近的帖和它们的数据')
     fresh = db.kv_get('learned_draft') or {}
-    learned = fresh['learned'] if fresh.get('at', 0) > time.time() - 6 * 3600 else learn_account()
+    learned = (fresh['learned'] if fresh.get('at', 0) > time.time() - 6 * 3600 and fresh.get('profile') == env.browser_profile()
+               else learn_account())
     db.log('读完 @%s:%d 条帖;让写稿的智能体给出打法' % (learned['handle'], learned['posts']))
     plan = propose(about, learned)
     book = {'about': about, 'learned': learned, **plan, 'created_at': time.time(), 'history': []}
