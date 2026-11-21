@@ -117,6 +117,15 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
     return () => window.clearTimeout(timer);
   }, [settling, data, load]);
 
+  // And keep looking while this page is open: a plugin can stop, crash or restart on
+  // its own, and its status and page address must follow.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
   const loadLog = useCallback(async () => {
     if (!plugin) return;
     try {
