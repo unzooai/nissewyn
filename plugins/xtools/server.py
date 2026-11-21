@@ -89,7 +89,9 @@ def _status(book, sessions):
     if job['job']:
         return out('working', '运行中 · 正在' + job['job'], '已经 %d 秒' % (now - job['since']))
     if not book.get('pillars'):
-        return out('off', '还没开始', '先在下面完成设置,完成后自动开始')
+        if not env.browser_profile():
+            return out('problem', '已启动 · 还没指定 X 账号', '到 Unzoo One › 插件 › Xtools › 设置,选登录了你 X 的浏览器身份')
+        return out('waiting', '已启动 · 等你完成下面的「开始」', '填好你是谁、想吸引谁、目标,它读完账号后自动开始运营')
     if env.setting('paused'):
         return out('off', '已暂停', '在 Unzoo One › 插件 › Xtools › 设置 里关掉「全部暂停」就继续')
     h = engine.halted()

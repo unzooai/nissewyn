@@ -35,6 +35,7 @@ header h1{font-size:20px;margin:0}
 .status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:-4px 0 14px}
 .status b{font-size:15px}.status .dot{display:inline-block}
 .status.ok{border-color:rgba(0,163,108,.4);background:rgba(0,163,108,.06)}.status.ok .dot{color:var(--green)}
+.status.wait{border-color:rgba(199,119,0,.4);background:rgba(199,119,0,.06)}.status.wait .dot{color:var(--amber)}
 .status.bad{border-color:rgba(224,36,94,.4);background:rgba(224,36,94,.06)}.status.bad .dot{color:var(--red)}
 .status.live .dot{animation:blink 1.2s infinite}@keyframes blink{50%{opacity:.25}}
 .pill.bad{background:rgba(224,36,94,.12);color:var(--red)}
@@ -92,8 +93,8 @@ async function load(){S=await api('/api/state');render()}
 function setTab(t){TAB=t;try{localStorage.setItem('xt_tab',t)}catch(e){};render()}
 
 function header(){
-  const t=S.status||{},icon={on:'●',working:'●',off:'○',problem:'▲'}[t.state]||'○';
-  const cls={on:'ok',working:'ok',off:'',problem:'bad'}[t.state]||'';
+  const t=S.status||{},icon={on:'●',working:'●',waiting:'●',off:'○',problem:'▲'}[t.state]||'○';
+  const cls={on:'ok',working:'ok',waiting:'wait',off:'',problem:'bad'}[t.state]||'';
   const beat=t.beat?`最近检查 ${ago(t.beat)}`:'';
   return `<div id="hdr"><header><h1>Xtools</h1><span class="soft">${S.handle?'@'+esc(S.handle):''}</span><span class="grow"></span>
     ${S.browser?'':'<span class="pill bad">Unzoo 浏览器没连上</span>'}
