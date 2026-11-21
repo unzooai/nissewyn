@@ -47,6 +47,7 @@ def state():
     sessions = db.kv_get('sessions') or {}
     return {
         'setup': bool(book.get('pillars')),
+        'about_draft': db.kv_get('about_draft') or {},
         'handle': (book.get('learned') or {}).get('handle'),
         'profile_bound': bool(env.browser_profile()),
         'in_unzoo_one': env.in_unzoo_one(),
@@ -150,8 +151,22 @@ def handle_get(path, qs):
 
 
 def handle_post(path, body):
+    if path == '/api/about/save':
+        d = db.kv_get('about_draft') or {}
+        d.update({k: (body.get(k) or '') for k in ('who', 'audience', 'goal', 'site') if k in body})
+        db.kv_set('about_draft', d)
+        return {'ok': True}
+    if path == '/api/about/draft':
+        src = 'site' if body.get('source') == 'site' else 'account'
+        url = (body.get('url') or '').strip()
+        if src == 'site' and not url:
+            return {'ok': False, 'error': '先填网站地址'}
+        return background('读网站、填写基本信息' if src == 'site' else '读 X 账号、填写基本信息', playbook.draft_about, src, url)
     if path == '/api/setup':
-        about = {k: (body.get(k) or '').strip() for k in ('who', 'audience', 'goal')}
+        about = {k: (body.get(k) or '').strip() for k in ('who', 'audience', 'goal', 'site')}
+        d = db.kv_get('about_draft') or {}
+        d.update(about)
+        db.kv_set('about_draft', d)
         return background('读账号、生成打法', playbook.setup, about)
     if path == '/api/playbook':
         book = db.playbook()
