@@ -70,13 +70,16 @@ def _command(w, out_file):
         exe = _which('agy')
         if not exe:
             raise WriterError('没找到 Antigravity CLI')
-        argv = [exe, '-p']
+        argv = [exe, '--disable-slash-commands']
         if model:
             argv += ['--model', model]
         if effort:
             argv += ['--effort', effort]
-        return argv
+        return argv + ['-p', PROMPT_ARG]   # agy takes the prompt as -p's value, not from stdin
     raise WriterError('不支持的智能体:%s' % name)
+
+
+PROMPT_ARG = object()   # where the prompt goes when the CLI wants it as an argument
 
 
 RULES = """写作要求(每次都遵守):
@@ -98,8 +101,12 @@ def write(prompt, redlines=None):
         os.close(fd)
         try:
             argv = _command(w, out_file)
+            stdin = rules + '\n\n' + prompt
+            if PROMPT_ARG in argv:
+                argv = [stdin if a is PROMPT_ARG else a for a in argv]
+                stdin = ''
             try:
-                p = subprocess.run(argv, input=rules + '\n\n' + prompt, capture_output=True, text=True,
+                p = subprocess.run(argv, input=stdin, capture_output=True, text=True,
                                    encoding='utf-8', errors='replace', cwd=_workdir(), timeout=_TIMEOUT,
                                    creationflags=_NO_WINDOW)
             except subprocess.TimeoutExpired:
