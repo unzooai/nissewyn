@@ -23,6 +23,8 @@ export const enPage11: Record<string, string> = {
   "启动了但没有响应": "Started but not answering",
   "在旁边运行的程序": "Programs that run alongside",
   "它还没准备好，页面稍后出现。": "It is not ready yet; the page will appear shortly.",
+  "正在打开页面…": "Opening the page…",
+  "它正在重启，页面回来后自动打开。": "It is restarting; the page opens again as soon as it is back.",
   "打开": "On",
   "打开后，对话里的智能体可以直接用这些工具。按它声明的用途判断：只读的直接做，发到外部、删除的照常问你；没声明的都当作发到外部。": "When it is on, agents in your conversations can use these tools. Each is judged by what it says it does: reading just runs; sending outside or deleting asks you as usual; anything undeclared counts as sending outside.",
   "打开它之后，控制页面在这里。": "Turn it on and its control page appears here.",

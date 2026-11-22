@@ -82,6 +82,54 @@ function errorText(failure: unknown): string {
  * 技能只是给智能体看的做法；需要控制页面、常驻状态或自己代码的，是插件。插件的每个角色可以
  * 单独指定浏览器身份（哪个账号）和智能体、模型（谁来写）。
  */
+// Can the page be reached? A refused connection rejects; anything that answers resolves.
+async function reachable(url: string): Promise<boolean> {
+  try {
+    await fetch(url, { mode: "no-cors", cache: "no-store", signal: AbortSignal.timeout(3000) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// The plugin's own page. A plugin restarts whenever its settings or bindings change, and an
+// iframe that loads in that gap shows the browser's "connection refused" page and stays on it.
+// So: load it only once the plugin answers, keep checking, and load it again after it comes back.
+function PluginFrame({ url, title }: { url: string; title: string }) {
+  const [up, setUp] = useState<boolean | null>(null);
+  const [generation, setGeneration] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    let was: boolean | null = null;
+    let misses = 0;
+    const check = async () => {
+      const ok = await reachable(url);
+      if (!live) return;
+      misses = ok ? 0 : misses + 1;
+      // One slow answer must not throw away a page someone is typing in: down means twice in a row
+      // (or never up yet).
+      if (!ok && was && misses < 2) return;
+      if (ok && was === false) setGeneration((g) => g + 1);
+      was = ok;
+      setUp(ok);
+    };
+    void check();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void check();
+    }, 2000);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [url]);
+
+  if (!up) {
+    return <p className="plugins-empty">{up === null ? t("正在打开页面…") : t("它正在重启，页面回来后自动打开。")}</p>;
+  }
+  return <iframe key={`${url}#${generation}`} className="plugins-frame" src={url} title={title} />;
+}
+
 export function PluginsView({ runtime, notify }: { runtime: Port; notify: (message: string) => void }) {
   const [data, setData] = useState<RuntimePlugins | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -273,7 +321,7 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
 
             {effectiveTab === "page" ? (
               plugin.pageUrl ? (
-                <iframe className="plugins-frame" src={plugin.pageUrl} title={plugin.name} />
+                <PluginFrame url={plugin.pageUrl} title={plugin.name} />
               ) : (
                 <p className="plugins-empty">
                   {plugin.enabled ? t("它还没准备好，页面稍后出现。") : t("打开它之后，控制页面在这里。")}
