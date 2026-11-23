@@ -522,7 +522,8 @@ export interface RuntimeTaskPort {
   /** 人做完了智能体请他做的事（或者做不了）。 */
   answerHandover(sessionId: string, handoverId: string, done: boolean, note?: string): Promise<void>;
   /** 把智能体的终端切到 Nissewyn 终端窗口的前台，让人接手。 */
-  focusTerminal(sessionId: string): Promise<void>;
+  /** 是否真有一扇终端窗口把它切到了前台（没开窗口时为 false）。 */
+  focusTerminal(sessionId: string): Promise<boolean>;
   /** 开着的终端（「终端」页列出的那些）。 */
   terminals(): Promise<RuntimeTerminal[]>;
   /** 给人开一个新终端，默认在用户目录。返回它的 id。 */

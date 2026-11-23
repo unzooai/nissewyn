@@ -9941,30 +9941,22 @@ export default function HomePage() {
 
   /** 同一个终端放进独立窗口（大型全屏程序更顺滑）。 */
   async function openTerminalWindow(sessionId: string) {
-    try {
-      await workspaceProvider.runtime.focusTerminal(sessionId);
-      return;
-    } catch (error) {
-      if (!desktopApp) {
-        throw new Error(
-          t("先打开 Nissewyn 的终端窗口，再点一次。({message})", {
-            message: error instanceof Error ? error.message : String(error),
-          }),
-        );
-      }
-    }
-    await openTerminal();
     let last: unknown = null;
-    for (let attempt = 0; attempt < 10; attempt++) {
-      await new Promise((resolve) => window.setTimeout(resolve, 800));
-      try {
-        await workspaceProvider.runtime.focusTerminal(sessionId);
-        return;
-      } catch (error) {
+    const shown = () =>
+      workspaceProvider.runtime.focusTerminal(sessionId).catch((error: unknown) => {
         last = error;
-      }
+        return false;
+      });
+    // A terminal window already open takes it to the front.
+    if (await shown()) return;
+    if (!desktopApp) throw new Error(t("先打开 Nissewyn 的终端窗口，再点一次。"));
+    // None is: start one, and wait for it to pick this terminal up.
+    await openTerminal();
+    for (let attempt = 0; attempt < 15; attempt++) {
+      await new Promise((resolve) => window.setTimeout(resolve, 800));
+      if (await shown()) return;
     }
-    throw last instanceof Error ? last : new Error(String(last));
+    throw last instanceof Error ? last : new Error(t("终端窗口开了，但没能切到这个终端"));
   }
 
   async function decideInConversation(sessionId: string, requestId: string, decision: ApprovalDecision) {

@@ -457,7 +457,12 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
         await callUnterm("/api/console/computer/terminal/input", { session_id: sessionId, input });
       },
       async focusTerminal(sessionId) {
-        await callUnterm("/api/console/computer/terminal/focus", { session_id: sessionId });
+        const data = await callUnterm<{ shown?: boolean; window_id?: unknown }>("/api/console/computer/terminal/focus", {
+          session_id: sessionId,
+        });
+        // ok comes back with no window open to show it; `shown` says whether one does
+        // (an older runtime only names a window it had to raise).
+        return data.shown ?? (data.window_id !== undefined && data.window_id !== null);
       },
       async terminals(): Promise<RuntimeTerminal[]> {
         const data = await getUnterm<{

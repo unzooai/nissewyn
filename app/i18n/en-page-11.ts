@@ -81,4 +81,6 @@ export const enPage11: Record<string, string> = {
   "智能体正在用": "An agent is using it",
   "选中文字后 Ctrl+C 复制": "Select text, then Ctrl+C to copy",
   "在这里开一个终端，直接在 Nissewyn 里输入命令。智能体正在用的终端也会出现在上面。": "Open a terminal here and type commands right in Nissewyn. Terminals agents are using show up above too.",
+  "先打开 Nissewyn 的终端窗口，再点一次。": "Open the Nissewyn terminal window first, then click again.",
+  "终端窗口开了，但没能切到这个终端": "The terminal window opened, but could not switch to this terminal",
 };
