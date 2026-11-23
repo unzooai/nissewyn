@@ -1,5 +1,49 @@
 # Changelog
 
+## v0.71.31 — 2026-11-20
+
+### Added
+
+- **MCP Protocol & CLI Expansion for Worktree Studio, Agent Telemetry, Command Blocks, and Unzoo Synergy (165 MCP methods / 38 CLI commands).**
+  - Added 9 new MCP tools (`worktree.list`, `worktree.create`, `worktree.merge`, `worktree.remove`, `telemetry.status`, `screen.last_command`, `unzoo.status`, `unzoo.preview`, `unzoo.bridge_errors`) with full gateway risk-band classification in `unterm-gateway`.
+  - Added `unterm-cli worktree {list, create, merge, remove}`, `unterm-cli telemetry status`, and `unterm-cli unzoo {status, preview, bridge-errors}`.
+- **`OSC 133` Command Block Actions & Elapsed Duration Micro-Pills (`command_block.rs`, `window.rs`).**
+  - Extracts the most recent executed command and its clean stdout/stderr output between shell prompts (POSIX / Zsh / Starship / PowerShell) for 1-click **Copy Last Command Clean Output** and **Send Last Command & Output to Active AI Agent Pane**.
+  - Upgraded the corner failure diagnosis micro-pill to display command execution duration alongside exit status (`● AI 诊断 · exit 1 · 4.2s`).
+- **Unterm × Unzoo Full-Stack Self-Healing Workflow (`unzoo_hub.rs`, `window.rs`).**
+  - Live dev-server URL auto-sniffer surfaces a floating corner micro-pill (`🦁 Unzoo 预览 :5173`) whenever a pane starts a localhost server (`localhost`, `127.0.0.1`, `0.0.0.0`), opening the Unzoo Browser Synergy Hub on click.
+  - Added 1-click **Bridge Unzoo Browser Errors to Terminal AI Agent (Self-Heal)** to feed frontend console/network errors directly into the active terminal AI coding agent pane.
+
+## v0.71.30 — 2026-11-19
+
+### Fixed
+
+- **Eliminated repeated background console/terminal window popups (`worktree.rs`, `git.rs`, `review.rs`, `window.rs`, `links.rs`, `remote.rs`, `server.rs`, `agent_run.rs`, `updater.rs`, `verification.rs`, `records.rs`, `gcloud.rs`, `runtime.rs`).**
+  - Replaced the sidebar's 3-second background `git diff --numstat` / `git ls-files` polling thread (`worktree::cached_diff_stat`) with a zero-process read from `git::cached_dirty_count`, and gated `git::branch_hint`'s `request_repaint()` on actual status changes so idle windows never enter a self-perpetuating repaint-and-spawn loop.
+  - Fixed a debounce gap in `cockpit::review::record_auto_checkpoint` where unchanged working trees (`sha == latest.sha`) returned early without updating the debounce timestamp, causing `statsbar` to spawn 6 `git` processes per second after the first 60 seconds.
+  - Added `CREATE_NO_WINDOW` (`0x0800_0000`), `Stdio::null()`, `GIT_TERMINAL_PROMPT=0`, `GCM_INTERACTIVE=never`, `GIT_OPTIONAL_LOCKS=0`, and `--no-pager --no-ext-diff --no-textconv` across all background subprocess invocations on Windows.
+
+## v0.71.29 — 2026-11-19
+
+### Added
+
+- **Native Git Worktree Parallel Studio (`worktree.rs`).**
+  - Create isolated Git worktrees (`<repo>.worktrees/<slug>` on branch `wt/<slug>`) in one click from the `+ New Session ▾` menu, Command Palette, or `⚡` Agent Inbox (`W`), optionally auto-launching `claude`, `agy`, `codex`, or `gemini`.
+  - Non-blocking background `git diff --numstat` sampling displays live `+added -deleted` change badges next to branch names in the left sidebar (` branch +42 -12`).
+  - Supports 1-click Squash-Merge back into the main repository worktree with automatic worktree cleanup.
+- **Interactive Inline Git Diff Review & Single-File Actions (`git.rs`).**
+  - Upgrades the right-docked Git panel (`Cmd+Shift+G`) with color-coded status glyphs (`M`, `A`, `??`, `D`), hover highlights, and click-to-inspect unified diff hunks (also reachable via `D` in the `⚡` Agent Inbox).
+  - Supports 1-click **Send File Diff to Active AI Agent**, **Revert Single File to HEAD** (with an automatic pre-revert safety checkpoint), and **Open File in Editor at First Changed Line**.
+- **AI Agent Telemetry, Context Pressure & Cost HUD (`telemetry.rs`).**
+  - Extracts live context-window occupancy (`ctx %` and `% context left`), token counts, and session cost (`$X.XX`) from active CLI agent screens (`T` in the `⚡` Agent Inbox), grading pressure (`Normal`, `Elevated 70%+`, `Critical 85%+`) and offering 1-click `/compact` or Cross-Agent Handoff.
+- **SSH Remote Agent Roaming & Same-Directory Session Clone (`ssh_roam.rs`).**
+  - Detects active `ssh [-p PORT] user@host` sessions and remote prompt titles (`user@host: ~/path`), displaying `🌐 host · ~/remote/path` in the sidebar and offering 1-click remote session cloning into the same remote working directory (`S` in the `⚡` Agent Inbox).
+- **Unzoo Browser Synergy Hub & Guided Onboarding (`unzoo_hub.rs`).**
+  - Sniffs live local dev-server URLs (`http://localhost:3000`, `http://localhost:5173`, etc.) from terminal panes for 1-click managed preview in **Unzoo Browser** (`U` in the `⚡` Agent Inbox or top-right `▾` menu).
+  - Surfaces live local MCP binding and capability lease controls (Bind, Pause/Resume Leases, Unbind & Revoke), plus a guided download and onboarding flow (`https://unzoo.com`) when Unzoo Browser is not yet installed.
+- **Refined Window Chrome Hierarchy & 110ms GPU Micro-Animations (`chrome.rs`, `topbar.rs`, `sidebar.rs`, `ui_tokens.rs`, `window.rs`).**
+  - Unified top-bar right action capsule (removing the duplicate `⚙` gear in quiet mode), centered title pill container, high-contrast active sidebar cards with `3pt × 16pt` selection pills, first-party accent coloring for all AI agent icons (`✦`, `✻`, `󰋘`, `◇`), expanded sidebar footer breathing room, and 110ms `ease_out_cubic` flyout entrance & selection pill glide animations.
+
 ## v0.71.28 — 2026-11-17
 
 ### Fixed

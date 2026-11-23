@@ -17,6 +17,7 @@ mod chrome;
 mod chrome_font;
 mod clipboard;
 mod cockpit;
+mod command_block;
 mod composer;
 mod confirm;
 mod copy_mode;
@@ -63,6 +64,10 @@ mod window;
 mod win_chrome;
 mod window_buttons;
 mod workspaces;
+mod worktree;
+mod telemetry;
+mod ssh_roam;
+mod unzoo_hub;
 mod updates;
 mod crash_report;
 
