@@ -75,4 +75,10 @@ export const enPage11: Record<string, string> = {
   "在独立窗口打开": "Open in a separate window",
   "在这里开一个终端，直接在 Nissewyn 里输入命令。智能体用过的终端也会出现在左边。": "Open a terminal here and type commands right in Nissewyn. Terminals agents used show up on the left too.",
   "正在连接终端": "Connecting to the terminal",
+  "命令提示符": "Command Prompt",
+  "开着的终端": "Open terminals",
+  "智能体正在用的终端：点进去就能直接输入，接手它的工作。": "A terminal an agent is using: click in and type to take over its work.",
+  "智能体正在用": "An agent is using it",
+  "选中文字后 Ctrl+C 复制": "Select text, then Ctrl+C to copy",
+  "在这里开一个终端，直接在 Nissewyn 里输入命令。智能体正在用的终端也会出现在上面。": "Open a terminal here and type commands right in Nissewyn. Terminals agents are using show up above too.",
 };

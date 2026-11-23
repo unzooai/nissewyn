@@ -359,6 +359,8 @@ export type RuntimeTerminal = {
   sessionId: string;
   title?: string;
   shell?: string;
+  /** 它在哪个文件夹。 */
+  cwd?: string;
   /** 智能体用过它。 */
   agent: boolean;
 };

@@ -31,6 +31,7 @@ export function TerminalPage({ runtime, notify, focus, newRequest, openWindow }:
   const [creating, setCreating] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const handledNew = useRef<number | undefined>(undefined);
+  const [size, setSize] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -90,76 +91,96 @@ export function TerminalPage({ runtime, notify, focus, newRequest, openWindow }:
     }
   }
 
-  const name = (item: RuntimeTerminal, index: number) =>
-    item.title?.trim() || item.shell?.split(/[\\/]/).pop() || t("终端 {n}", { n: index + 1 });
+  const shellName = (shell?: string) => {
+    const base = shell?.split(/[\\/]/).pop()?.replace(/\.exe$/i, "") ?? "";
+    return /^pwsh$|^powershell$/i.test(base) ? "PowerShell" : /^cmd$/i.test(base) ? t("命令提示符") : base;
+  };
+  const name = (item: RuntimeTerminal, index: number) => {
+    const place = (item.cwd || item.title)?.trim().split(/[\\/]/).filter(Boolean).pop();
+    const shell = shellName(item.shell);
+    return [place, shell].filter(Boolean).join(" · ") || t("终端 {n}", { n: index + 1 });
+  };
 
   return (
     <section className="terminal-page" aria-label={t("终端")}>
-      <aside className="terminal-page-list">
-        <div className="terminal-page-list-head">
-          <strong>{t("终端")}</strong>
+      <div className="terminal-page-tabs" role="tablist" aria-label={t("开着的终端")}>
+        {terminals.map((item, index) => (
+          <div key={item.sessionId} className={`terminal-page-tab${item.sessionId === current ? " active" : ""}`}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={item.sessionId === current}
+              onClick={() => setSelected(item.sessionId)}
+              title={item.agent ? t("智能体正在用的终端：点进去就能直接输入，接手它的工作。") : item.title ?? undefined}
+            >
+              {item.agent ? <Bot size={14} aria-hidden="true" className="is-agent" /> : <SquareTerminal size={14} aria-hidden="true" />}
+              <span>{name(item, index)}</span>
+            </button>
+            {!item.agent && (
+              <button
+                type="button"
+                className="terminal-page-close"
+                onClick={() => void close(item.sessionId)}
+                aria-label={t("关掉这个终端")}
+                title={t("关掉这个终端")}
+              >
+                <X size={13} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        ))}
+        <button
+          type="button"
+          className="terminal-page-add"
+          onClick={() => void create()}
+          disabled={creating}
+          aria-label={t("新终端")}
+          title={t("新终端")}
+        >
+          {creating ? <LoaderCircle size={15} className="spin" aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}
+        </button>
+        <span className="terminal-page-tabs-gap" />
+        {current && openWindow && (
+          <button
+            type="button"
+            className="terminal-page-window"
+            onClick={() => openWindow(current).catch((failure) => notify(t("没能打开独立窗口：{error}", { error: errorText(failure) })))}
+            title={t("大型全屏程序（vim、htop 这类）在独立窗口里更顺滑")}
+          >
+            <ExternalLink size={13} aria-hidden="true" />
+            {t("在独立窗口打开")}
+          </button>
+        )}
+      </div>
+
+      {loadError && <p className="terminal-page-error">{t("读不到终端列表：{error}", { error: loadError })}</p>}
+
+      {current ? (
+        <>
+          <LiveTerminal key={current} id={current} runtime={runtime} onSize={setSize} />
+          <footer className="terminal-page-status">
+            {currentInfo?.agent ? (
+              <span className="is-agent">
+                <Bot size={12} aria-hidden="true" /> {t("智能体正在用")}
+              </span>
+            ) : null}
+            <span>{shellName(currentInfo?.shell) || t("终端")}</span>
+            {size && <span>{size}</span>}
+            <span className="terminal-page-status-gap" />
+            <span>{t("选中文字后 Ctrl+C 复制")}</span>
+          </footer>
+        </>
+      ) : (
+        <div className="terminal-page-empty">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/nissewyn-mark.png" alt="" width={56} height={56} />
+          <p>{t("在这里开一个终端，直接在 Nissewyn 里输入命令。智能体正在用的终端也会出现在上面。")}</p>
           <button type="button" className="terminal-page-new" onClick={() => void create()} disabled={creating}>
-            {creating ? <LoaderCircle size={14} className="spin" aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
+            <Plus size={14} aria-hidden="true" />
             {t("新终端")}
           </button>
         </div>
-        {loadError && <p className="terminal-page-error">{t("读不到终端列表：{error}", { error: loadError })}</p>}
-        <ul>
-          {terminals.map((item, index) => (
-            <li key={item.sessionId} className={item.sessionId === current ? "active" : ""}>
-              <button type="button" onClick={() => setSelected(item.sessionId)} title={item.shell ?? undefined}>
-                {item.agent ? <Bot size={15} aria-hidden="true" /> : <SquareTerminal size={15} aria-hidden="true" />}
-                <span>{name(item, index)}</span>
-                {item.agent && <em>{t("智能体")}</em>}
-              </button>
-              {!item.agent && (
-                <button
-                  type="button"
-                  className="terminal-page-close"
-                  onClick={() => void close(item.sessionId)}
-                  aria-label={t("关掉这个终端")}
-                  title={t("关掉这个终端")}
-                >
-                  <X size={13} aria-hidden="true" />
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-        {list && terminals.length === 0 && <p className="terminal-page-hint">{t("还没有开着的终端。")}</p>}
-      </aside>
-
-      <div className="terminal-page-main">
-        {current ? (
-          <>
-            <header className="terminal-page-bar">
-              <span>
-                {currentInfo?.agent ? t("智能体用过的终端：点进去就能直接输入，接手它的工作。") : t("你的终端")}
-              </span>
-              {openWindow && (
-                <button
-                  type="button"
-                  onClick={() => openWindow(current).catch((failure) => notify(t("没能打开独立窗口：{error}", { error: errorText(failure) })))}
-                  title={t("大型全屏程序（vim、htop 这类）在独立窗口里更顺滑")}
-                >
-                  <ExternalLink size={13} aria-hidden="true" />
-                  {t("在独立窗口打开")}
-                </button>
-              )}
-            </header>
-            <LiveTerminal key={current} id={current} runtime={runtime} />
-          </>
-        ) : (
-          <div className="terminal-page-empty">
-            <SquareTerminal size={28} aria-hidden="true" />
-            <p>{t("在这里开一个终端，直接在 Nissewyn 里输入命令。智能体用过的终端也会出现在左边。")}</p>
-            <button type="button" className="terminal-page-new" onClick={() => void create()} disabled={creating}>
-              <Plus size={14} aria-hidden="true" />
-              {t("新终端")}
-            </button>
-          </div>
-        )}
-      </div>
+      )}
     </section>
   );
 }
@@ -197,7 +218,7 @@ const THEME = {
  * One terminal, drawn in the page and sized to it: what the runtime holds,
  * read as it changes, with the person's keys sent straight in.
  */
-function LiveTerminal({ id, runtime }: { id: string; runtime: Runtime }) {
+function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; onSize?: (size: string) => void }) {
   const host = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "closed" | "failed">("loading");
   const [error, setError] = useState<string | null>(null);
@@ -258,6 +279,7 @@ function LiveTerminal({ id, runtime }: { id: string; runtime: Runtime }) {
         return;
       }
       const size = `${term.cols}x${term.rows}`;
+      onSize?.(`${term.cols} × ${term.rows}`);
       if (size === sentSize) return;
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(() => {
@@ -353,6 +375,8 @@ function LiveTerminal({ id, runtime }: { id: string; runtime: Runtime }) {
       observer?.disconnect();
       term?.dispose();
     };
+  // onSize is a state setter: stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, runtime]);
 
   return (

@@ -130,6 +130,8 @@ Copy-Item (Join-Path $root "NOTICE.md") $licences
 Copy-Item (Join-Path $root "LICENSE") (Join-Path $licences "LICENSE.txt")
 Copy-Item (Join-Path $unterm "LICENSE.md") (Join-Path $licences "UNTERM-LICENSE.md")
 Copy-Item (Join-Path $unterm "assets/fonts/LICENSE_OFL.txt") $licences
+# Nissewyn's logo, for the runtime's own pages (the terminal's settings page).
+Copy-Item (Join-Path $root "brand/nissewyn/nissewyn-mark.svg") (Join-Path $payload "brand-logo.svg")
 # What the terminal bridge tells the agents in other clients, beside nissewyn-cli.exe.
 Copy-Item (Join-Path $PSScriptRoot "mcp-instructions.md") $payload
 # Built-in skills, beside nissewyn-service.exe where the runtime looks for them.

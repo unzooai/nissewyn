@@ -461,12 +461,15 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       },
       async terminals(): Promise<RuntimeTerminal[]> {
         const data = await getUnterm<{
-          sessions?: Array<{ session_id: string; title?: string | null; shell?: string | null; agent?: boolean }>;
+          sessions?: Array<{ session_id: string; title?: unknown; shell?: unknown; cwd?: unknown; agent?: boolean }>;
         }>("/api/console/terminals");
+        // Older runtimes sent the whole shell record: keep only text.
+        const text = (value: unknown) => (typeof value === "string" ? value : undefined);
         return (data.sessions ?? []).map((s) => ({
           sessionId: String(s.session_id),
-          title: s.title ?? undefined,
-          shell: s.shell ?? undefined,
+          title: text(s.title),
+          shell: text(s.shell),
+          cwd: text(s.cwd),
           agent: s.agent === true,
         }));
       },
