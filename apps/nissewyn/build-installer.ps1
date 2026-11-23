@@ -60,7 +60,7 @@ if (-not $SkipRuntimeBuild) {
   # And they look like it: the file icon, and the window and tray icon.
   $env:UNTERM_BRAND_ICON = Join-Path $tauri "icons\icon.ico"
   $env:UNTERM_BRAND_ICON_PNG = Join-Path $root "brand\nissewyn\nissewyn-mark-256.png"
-  try { Run "runtime and terminal (release)" { cargo build --release -p unterm-app -p unterm-cli -p unterm-core } }
+  try { Run "runtime: service and CLI (release)" { cargo build --release -p unterm-cli -p unterm-core } }
   finally {
     Pop-Location
     Remove-Item Env:UNTERM_BRAND_PRODUCT, Env:UNTERM_BRAND_ICON, Env:UNTERM_BRAND_ICON_PNG -ErrorAction SilentlyContinue
