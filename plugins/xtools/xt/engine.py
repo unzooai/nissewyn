@@ -451,6 +451,12 @@ def publish_due(post_id=None):
     for r in rows:
         if not post_id and cap_left('post') <= 0:
             return 0
+        try:
+            if not same_account():
+                return 0
+        except x.Unhealthy as e:
+            on_unhealthy(e.state)
+            return 0
         handle = (db.playbook().get('learned') or {}).get('handle')
         try:
             res = x.post(json.loads(r['parts']), handle=handle)
@@ -465,6 +471,23 @@ def publish_due(post_id=None):
             db.log('原创 #%d 没发出去:%s' % (r['id'], res.get('error')), 'warn')
         return 1
     return 0
+
+
+def same_account():
+    """Is the X account signed in to the bound browser identity still the one the playbook was
+    made for? Checked before anything is sent, so a changed binding or another X account signed
+    in to that identity never posts, replies, likes or follows as someone else."""
+    want = ((db.playbook().get('learned') or {}).get('handle') or '').lower()
+    profile = env.browser_profile()
+    got = (x.me() or '').lower()
+    if not got:
+        on_unhealthy('signed_out')
+        return False
+    if want and got != want:
+        halt('浏览器身份「%s」里登录的是 @%s,不是打法对应的 @%s;什么都没做。请到 设置 › X 账号 选对身份,'
+             '或在这个身份里换回 @%s' % (profile, got, want, want), 60)
+        return False
+    return True
 
 
 def do_action(a):
@@ -486,6 +509,13 @@ def run_actions(limits):
     first_stage = stage() == 1
     rows = db.q("SELECT * FROM actions WHERE status='queued' AND due_at<=? ORDER BY "
                 "CASE reason WHEN '回读者' THEN 0 ELSE 1 END, due_at LIMIT 40", (time.time(),))
+    if rows:
+        try:
+            if not same_account():
+                return done
+        except x.Unhealthy as e:
+            on_unhealthy(e.state)
+            return done
     for a in rows:
         k = a['kind']
         if halted() or done[k] >= limits.get(k, 0) or cap_left(k) <= 0:
