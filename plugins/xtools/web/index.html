@@ -110,7 +110,7 @@ function header(){
 function ago(ts){const s=Math.max(0,Math.round(Date.now()/1000-ts));return s<60?s+' 秒前':Math.round(s/60)+' 分钟前'}
 // The status line stays live: every 10 seconds, only the header is redrawn (nothing you are editing moves).
 setInterval(async()=>{try{S=await api('/api/state');const h=$('#hdr');if(h)h.outerHTML=header()}catch(e){
-  const h=$('#hdr');if(h)h.innerHTML='<div class="status bad"><b><span class="dot">▲</span> Xtools 没有响应</b><span class="soft">插件可能已关掉;到 Unzoo One › 插件 里打开它</span></div>'}},10000);
+  const h=$('#hdr');if(h)h.innerHTML='<div class="status bad"><b><span class="dot">▲</span> Xtools 没有响应</b><span class="soft">插件可能已关掉;到 Nissewyn › 插件 里打开它</span></div>'}},10000);
 
 function render(){
   if(!S)return;
@@ -126,7 +126,7 @@ function onboarding(){
   const bound=S.profile_bound,d=S.about_draft||{},busy=!!S.running.job;
   return `<div class="card"><h2>开始:告诉 Xtools 你是谁</h2>
    <p class="soft">它会先读你的 X 主页和最近的帖,学你的说话方式、看哪类内容表现好,再给出一套打法(内容支柱、关键词、要盯的同行)。之后每天按读者作息发原创、在同行新帖下前排回复、接住读者,每周按效果调整。</p>
-   ${bound?'':`<div class="notice">还没指定用哪个浏览器身份:到 Unzoo One › 插件 › Xtools › 设置 › 账号与模型,选登录了你 X 账号的那个。</div>`}
+   ${bound?'':`<div class="notice">还没指定用哪个浏览器身份:到 Nissewyn › 插件 › Xtools › 设置 › 账号与模型,选登录了你 X 账号的那个。</div>`}
    <div class="autofill"><b>自动填写</b><span class="soft">读完后填进下面三项,你再改</span>
      <div class="row" style="margin-top:8px;align-items:flex-end">
        <div style="flex:0 0 auto"><button ${bound&&!busy?'':'disabled'} onclick="autofill('account')">读我的 X 账号</button></div>
@@ -199,7 +199,7 @@ function vToday(){
    <div style="flex:1;min-width:260px"><div class="card"><h2>粉丝</h2>${spark(f)}</div>
      <div class="card"><h2>今天的互动会话</h2>${t.sessions.length?t.sessions.map(s=>`<div>${s.done?'✓':'·'} ${esc(s.at)}</div>`).join(''):'<p class="muted">还没排</p>'}
      <div class="acts" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button onclick="run('session')">现在跑一场</button><button onclick="run('radar')">看一圈领域</button><button onclick="run('mentions')">看通知</button></div></div>
-     <div class="card"><h2>自动化</h2>${Object.entries(S.automation).map(([k,v])=>`<div class="soft">${({posts:'原创',mentions:'回读者',replies:'前排回复',quotes:'引用',likes:'点赞',follows:'关注'})[k]}:${MODE[v]}</div>`).join('')}<p class="hint">在 Unzoo One › 插件 › Xtools › 设置 里改</p></div></div></div>
+     <div class="card"><h2>自动化</h2>${Object.entries(S.automation).map(([k,v])=>`<div class="soft">${({posts:'原创',mentions:'回读者',replies:'前排回复',quotes:'引用',likes:'点赞',follows:'关注'})[k]}:${MODE[v]}</div>`).join('')}<p class="hint">在 Nissewyn › 插件 › Xtools › 设置 里改</p></div></div></div>
    ${logCard(10)}`;
 }
 async function run(job){const r=await api('/api/run',{job});toast(r.ok?'开始了:'+r.started:'没开始:'+(r.error||''));poll()}

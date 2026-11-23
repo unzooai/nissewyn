@@ -90,7 +90,7 @@ export const enPage7: Record<string, string> = {
   "编辑配置": "Edit setup",
   "任务配置": "Task setup",
   "更新任务设置": "Update task settings",
-  "交给 Unzoo One 一项工作": "Give Unzoo One a job",
+  "交给 Nissewyn 一项工作": "Give Nissewyn a job",
   "修改会立即保存，正在运行的任务会使用新配置。": "Changes save right away; a running task picks up the new setup.",
   "描述结果，选择节奏，然后让 AI 持续执行。": "Describe the outcome, pick a schedule, and let the AI keep at it.",
   "当前处于离线状态": "You're offline",

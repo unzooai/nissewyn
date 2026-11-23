@@ -1,14 +1,14 @@
-# Unzoo One 产品架构与 Unterm / Unzoo 能力审计
+# Nissewyn 产品架构与 Unterm / Unzoo 能力审计
 
 > 状态：产品架构草案
 > 日期：2026-07-26
 > 范围：Unterm、Unzoo Browser、Codex / Claude / Gemini 等 Agent Runtime
 
-> 产品名：**Unzoo One — Your Personal AI Operating System**
+> 产品名：**Nissewyn — Your Personal AI Operating System**
 
 > **归属修订 2026-08-06**：本文档 §1、§4、§6、§8、§10 原将 Unterm 定位为「个人助理控制平面」。
-> 该定位已纠正——**Unzoo One 自身是唯一控制平面**，Unterm 与 Unzoo 是同级 Provider。
-> 详见 `unzooai/unzoo-one#2`（One Epic）、`zhitongblog/unterm#20`（Unterm 收窄为 Terminal Provider）、
+> 该定位已纠正——**Nissewyn 自身是唯一控制平面**，Unterm 与 Unzoo 是同级 Provider。
+> 详见 `unzooai/nissewyn#2`（One Epic）、`zhitongblog/unterm#20`（Unterm 收窄为 Terminal Provider）、
 > `unzooai/unzoo#73`（Unzoo Provider Epic）。§3 的能力审计为当时事实记录，保留不改。
 
 ## 1. 执行摘要
@@ -19,7 +19,7 @@
 
 推荐的核心分工：
 
-- **Unzoo One**：唯一控制平面。自有常驻运行时 `one-core`，负责 Workspace、任务、大脑路由、权限、审批、记忆、调度、Provider 编排、审计与产物。
+- **Nissewyn**：唯一控制平面。自有常驻运行时 `one-core`，负责 Workspace、任务、大脑路由、权限、审批、记忆、调度、Provider 编排、审计与产物。
 - **Unterm**：Terminal Provider。负责 PTY、Session、Screen、Scrollback、终端内 Agent 会话，以及自身的本地执行闸门。同时是一个独立的 AI 原生终端产品。
 - **Unzoo**：Browser / Computer Provider。负责观察页面与桌面、执行动作、管理浏览器身份，并提供动作证据。
 - **Codex / Claude / Gemini / OpenCode 等**：可插拔 Brain Provider，负责推理、规划和生成下一步行动。
@@ -262,7 +262,7 @@ REST Audit、Workflow Evidence、Human Action Report 和 OpLogger 各自存在�
 └─────────────────────────────┬───────────────────────────────┘
                               │
 ┌─────────────────────────────▼───────────────────────────────┐
-│                    Unzoo One Core (one-core)                 │
+│                    Nissewyn Core (one-core)                 │
 │                                                             │
 │ Workspace          Task Engine        Brain Router          │
 │ Scheduler          Policy Engine      Artifact Registry     │
@@ -400,21 +400,21 @@ provider.events
 3. **授权两层，纵深防御。** One 决定「该不该做」，Provider 决定「能不能在我这里做」。
 4. **边界对象由 `contracts/v0` 统一定义**，三仓库共同冻结，任何一方不单独定义。
 
-### 6.2 Unzoo One 自身实现（P0）
+### 6.2 Nissewyn 自身实现（P0）
 
 | 能力 | Issue |
 |---|---|
-| `contracts/v0` 跨仓库对象与错误 schema 冻结 | `unzoo-one#3` |
-| One Core 自有常驻运行时 | `unzoo-one#4` |
-| Durable Task Engine | `unzoo-one#5` |
-| Policy、Approval、Grant 与 Inbox | `unzoo-one#6` |
-| Provider Registry：发现、协商、租约与编排 | `unzoo-one#7` |
-| Artifact Registry 与跨 Provider 证据链 | `unzoo-one#8` |
-| Workspace Context & Isolation | `unzoo-one#9` |
-| Brain Router：多脑路由、成本配额与 handoff | `unzoo-one#10` |
-| Tool Routing：强制意图路由 | `unzoo-one#11` |
-| Distribution & Runtime Supervisor | `unzoo-one#12` |
-| 平台能力（记忆/触发器/连接器/模型路由/移动审批，P1） | `unzoo-one#13` |
+| `contracts/v0` 跨仓库对象与错误 schema 冻结 | `nissewyn#3` |
+| One Core 自有常驻运行时 | `nissewyn#4` |
+| Durable Task Engine | `nissewyn#5` |
+| Policy、Approval、Grant 与 Inbox | `nissewyn#6` |
+| Provider Registry：发现、协商、租约与编排 | `nissewyn#7` |
+| Artifact Registry 与跨 Provider 证据链 | `nissewyn#8` |
+| Workspace Context & Isolation | `nissewyn#9` |
+| Brain Router：多脑路由、成本配额与 handoff | `nissewyn#10` |
+| Tool Routing：强制意图路由 | `nissewyn#11` |
+| Distribution & Runtime Supervisor | `nissewyn#12` |
+| 平台能力（记忆/触发器/连接器/模型路由/移动审批，P1） | `nissewyn#13` |
 
 ### 6.3 Unterm 作为 Terminal Provider
 
@@ -438,7 +438,7 @@ Artifact Registry、Memory/Scheduler/Connector/Model Router 与三进程 Supervi
 
 ### 6.4 同一能力的三方分层
 
-| 能力 | Unzoo One | Unterm | Unzoo |
+| 能力 | Nissewyn | Unterm | Unzoo |
 |---|---|---|---|
 | 任务 | 全局 Task/Run/Step（#5） | 局部会话记录（#12） | Provider durable state（`unzoo#101`） |
 | 授权 | Grant/Approval/Inbox（#6） | 本地执行闸门（#15） | Control Surface Enforcement（`unzoo#82`/`#97`） |
@@ -663,7 +663,7 @@ evidence_policy
 
 在目标架构中：
 
-- **Unzoo One 是数字同事本身——操作系统与控制中心。**
+- **Nissewyn 是数字同事本身——操作系统与控制中心。**
 - **Unzoo 是它操作网页和电脑的眼睛与手。**
 - **Unterm 是它操作终端的手，同时也是一个可独立存在的终端产品。**
 - **Codex、Claude 等是可以按任务切换的大脑。**

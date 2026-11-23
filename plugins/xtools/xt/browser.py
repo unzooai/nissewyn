@@ -69,7 +69,7 @@ def tab():
     with _LOCK:
         profile = env.browser_profile()
         if not profile:
-            raise BrowserError('还没指定 X 账号用哪个浏览器身份(Unzoo One › 插件 › Xtools › 设置 › 账号与模型)')
+            raise BrowserError('还没指定 X 账号用哪个浏览器身份(Nissewyn › 插件 › Xtools › 设置 › 账号与模型)')
         if _TAB['id'] and _TAB.get('profile') == profile and _alive(_TAB['id']):
             return _TAB['id']
         d = _call('/api/v1/tabs/create', {'profile_id': profile, 'url': 'about:blank'})

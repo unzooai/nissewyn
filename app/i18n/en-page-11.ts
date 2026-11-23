@@ -13,7 +13,7 @@ export const enPage11: Record<string, string> = {
   "{name} 已移除": "{name} removed",
   "{name} 已重启": "{name} restarted",
   "{role} 已保存": "{role} saved",
-  "从 Unzoo One 移除 {name}？它的文件夹和数据都不会删除。": "Remove {name} from Unzoo One? Its folder and data are not deleted.",
+  "从 Nissewyn 移除 {name}？它的文件夹和数据都不会删除。": "Remove {name} from Nissewyn? Its folder and data are not deleted.",
   "会访问的网站": "Websites it uses",
   "位置": "Location",
   "刷新": "Refresh",

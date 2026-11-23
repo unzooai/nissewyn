@@ -16,30 +16,30 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Unzoo One | The AI task workspace",
+  title: "Nissewyn | Your AI helper, on your own computer",
   description:
-    "Run, approve and track long-running AI tasks, with evidence, limits and a clear result for every step.",
+    "The little helper that lives in your computer: your AI gets a terminal, a browser and a place to work. It works while you sleep, and nothing leaves home.",
   openGraph: {
-    title: "Unzoo One | The AI task workspace",
-    description: "See every step, approval and piece of evidence of your long-running AI tasks.",
+    title: "Nissewyn | Your AI helper, on your own computer",
+    description: "The little helper that lives in your computer. It works while you sleep, and nothing leaves home.",
     images: [
       {
-        url: "https://unzoo-one-console.matiancheng528.chatgpt.site/og.png",
-        width: 1740,
-        height: 909,
-        alt: "Unzoo One, the AI task workspace",
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Nissewyn, the little helper that lives in your computer",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Unzoo One | The AI task workspace",
-    description: "See every step, approval and piece of evidence of your long-running AI tasks.",
-    images: ["https://unzoo-one-console.matiancheng528.chatgpt.site/og.png"],
+    title: "Nissewyn | Your AI helper, on your own computer",
+    description: "The little helper that lives in your computer. It works while you sleep, and nothing leaves home.",
+    images: ["/og.png"],
   },
   icons: {
-    icon: "/unzoo-favicon-v6.png",
-    shortcut: "/unzoo-favicon-v6.png",
+    icon: "/nissewyn-favicon.png",
+    shortcut: "/nissewyn-favicon.png",
   },
 };
 

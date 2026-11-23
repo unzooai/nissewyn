@@ -1,11 +1,11 @@
-# Unzoo One 超级工作台：Context、角色与执行治理
+# Nissewyn 超级工作台：Context、角色与执行治理
 
 > 状态：Current product direction
 > 日期：2026-07-27
 
 ## 1. 产品定义
 
-Unzoo One 是 AI 驱动的超级工作台，不是一个附带工具的聊天机器人。
+Nissewyn 是 AI 驱动的超级工作台，不是一个附带工具的聊天机器人。
 
 工作台的一级对象是：
 
@@ -39,11 +39,11 @@ Workspace
 
 ```json
 {
-  "workspace_id": "workspace_unzoo_one",
-  "name": "unzoo-one",
-  "filesystem_roots": ["D:\\code\\unzoo-one"],
+  "workspace_id": "workspace_nissewyn",
+  "name": "nissewyn",
+  "filesystem_roots": ["D:\\code\\nissewyn"],
   "browser_profile_refs": ["profile_work"],
-  "memory_namespace": "workspace_unzoo_one",
+  "memory_namespace": "workspace_nissewyn",
   "trust": "trusted",
   "owner_id": "user_alex",
   "default_work_role": "build",
@@ -59,7 +59,7 @@ Workspace
 - 新目录默认为 Restricted，用户确认后才进入 Trusted。
 - Artifact 的来源 Workspace 不可丢失。
 
-VS Code 的 Workspace Trust 证明了“打开目录”和“允许执行代码”必须分离；Unzoo One 应把相同原则扩展到 AI、终端和浏览器 Provider。
+VS Code 的 Workspace Trust 证明了“打开目录”和“允许执行代码”必须分离；Nissewyn 应把相同原则扩展到 AI、终端和浏览器 Provider。
 
 ## 3. 两套角色，严格分离
 

@@ -1,4 +1,4 @@
-# Unzoo One MVP 产品规格
+# Nissewyn MVP 产品规格
 
 > 状态：Draft
 > 日期：2026-07-26
@@ -8,15 +8,15 @@
 
 ## 1. 产品定义
 
-Unzoo One 是面向个人用户的本地 AI 工作台。用户只需要描述目标，系统即可选择合适的大脑，调用终端和浏览器完成任务，并在需要授权、登录或人工判断时把控制权交还给用户。
+Nissewyn 是面向个人用户的本地 AI 工作台。用户只需要描述目标，系统即可选择合适的大脑，调用终端和浏览器完成任务，并在需要授权、登录或人工判断时把控制权交还给用户。
 
 首版产品承诺：
 
 > 一个任务入口，一套权限体系，一条可恢复的执行链，一份用户可以直接打开、分享或继续使用的最终成品。
 
-Unzoo One 不是新的通用 Agent 框架，也不复制 Unterm 和 Unzoo 已有能力：
+Nissewyn 不是新的通用 Agent 框架，也不复制 Unterm 和 Unzoo 已有能力：
 
-- **Unzoo One** 是唯一控制平面：产品体验、`one-core` 运行时、全局任务、大脑路由、权限、审批、审计、产物、安装绑定与版本契约。
+- **Nissewyn** 是唯一控制平面：产品体验、`one-core` 运行时、全局任务、大脑路由、权限、审批、审计、产物、安装绑定与版本契约。
 - **Unterm** 是 Terminal Provider：PTY、会话、终端内 Agent 与本地执行闸门（可选组件，纯浏览器任务不需要）。
 - **Unzoo** 负责浏览器观察、执行、Profile 和动作证据。
 - **Brain Provider** 负责推理和规划，不持有最终权限。
@@ -242,7 +242,7 @@ Private Alpha 暂不承诺：
 
 1. 检测或安装 Unterm Core。
 2. 检测或安装 Unzoo。
-3. 创建 Unzoo One Client Identity。
+3. 创建 Nissewyn Client Identity。
 4. 绑定至少一个 Brain。
 5. 运行本地自检。
 6. 执行一个只读示例任务并生成真实 Artifact。

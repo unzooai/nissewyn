@@ -418,7 +418,7 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           plan: data.plan ?? undefined,
           maxProfiles: data.max_profiles ?? undefined,
           profiles: data.profiles ?? [],
-          reservedProfile: data.reserved_profile ?? "mcp-unzoo-one-agent",
+          reservedProfile: data.reserved_profile ?? "mcp-nissewyn-agent",
           reserved: data.reserved === true,
           chosen: data.chosen ?? null,
           chosenMissing: data.chosen_missing === true,
@@ -769,14 +769,14 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
         try {
           const data = await callUnzoo<Record<string, unknown>>("lease_request", {
             capability: mapped,
-            holder: "unzoo-one-console",
+            holder: "nissewyn-console",
             scope,
             ttl_secs: ttlSeconds,
           });
           return {
             id: String(data.id ?? ""),
             capability: mapped,
-            holder: "unzoo-one-console",
+            holder: "nissewyn-console",
             scope,
             expiresAt: String(data.expires_at ?? ""),
             status: (data.status as CapabilityLease["status"]) ?? "pending",

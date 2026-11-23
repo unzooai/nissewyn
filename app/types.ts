@@ -36,7 +36,7 @@ export type WorkspaceRoute = {
 };
 
 export type WorkspaceHistoryState = {
-  unzooOne: true;
+  nissewyn: true;
   route: WorkspaceRoute;
   canPop: boolean;
 };
@@ -179,7 +179,7 @@ export type ApprovalRejectSnapshot = {
 
 export type WorkspaceBackup = {
   version: 1;
-  product: "Unzoo One";
+  product: "Nissewyn";
   exportedAt: string;
   profile?: WorkspaceProfile;
   tasks: TaskItem[];

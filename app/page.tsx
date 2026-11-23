@@ -160,26 +160,26 @@ const settingsDraftDiscardCopy: Record<
 };
 const weekdays: Weekday[] = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 const taskSchedules: TaskSchedule[] = ["仅运行一次", "每天", "每周"];
-const taskDraftRecoveryKey = "unzoo-one-task-draft-recovery";
+const taskDraftRecoveryKey = "nissewyn-task-draft-recovery";
 /** 直接输入需求时一段话的上限；演示版的“结果要求”仍是 500。 */
 const requestMaxLength = 4000;
-const artifactDraftRecoveryKey = "unzoo-one-artifact-draft-recovery";
-const workspaceSyncKey = "unzoo-one-workspace-sync";
-const workspaceLastBackupKey = "unzoo-one-last-backup-at";
-const onboardingPreferenceKey = "unzoo-one-onboarding-dismissed";
+const artifactDraftRecoveryKey = "nissewyn-artifact-draft-recovery";
+const workspaceSyncKey = "nissewyn-workspace-sync";
+const workspaceLastBackupKey = "nissewyn-last-backup-at";
+const onboardingPreferenceKey = "nissewyn-onboarding-dismissed";
 const legacyWorkspaceStorageKeys = [
-  "unzoo-one-tasks",
-  "unzoo-one-settings",
-  "unzoo-one-usage",
-  "unzoo-one-connectors",
-  "unzoo-one-team",
-  "unzoo-one-pending-approvals",
-  "unzoo-one-activity",
-  "unzoo-one-artifacts",
+  "nissewyn-tasks",
+  "nissewyn-settings",
+  "nissewyn-usage",
+  "nissewyn-connectors",
+  "nissewyn-team",
+  "nissewyn-pending-approvals",
+  "nissewyn-activity",
+  "nissewyn-artifacts",
 ] as const;
 const workspacePreferenceStorageKeys = [
-  "unzoo-one-recent-searches",
-  "unzoo-one-read-notifications",
+  "nissewyn-recent-searches",
+  "nissewyn-read-notifications",
   workspaceLastBackupKey,
   onboardingPreferenceKey,
 ] as const;
@@ -826,7 +826,7 @@ function parseWorkspaceBackup(value: unknown): WorkspaceBackup {
   const backup = value as Partial<WorkspaceBackup>;
   if (
     backup.version !== 1 ||
-    backup.product !== "Unzoo One" ||
+    backup.product !== "Nissewyn" ||
     typeof backup.exportedAt !== "string" ||
     Number.isNaN(Date.parse(backup.exportedAt)) ||
     (backup.profile !== undefined && !isWorkspaceProfile(backup.profile)) ||
@@ -1335,7 +1335,7 @@ function writeWorkspaceRoute(
     | WorkspaceHistoryState
     | null;
   const nextState: WorkspaceHistoryState = {
-    unzooOne: true,
+    nissewyn: true,
     route,
     canPop: shouldPush
       ? true
@@ -1352,7 +1352,7 @@ function writeWorkspaceRoute(
 
 function canReturnToWorkspaceParent() {
   const state = window.history.state as WorkspaceHistoryState | null;
-  return Boolean(state?.unzooOne && state.canPop);
+  return Boolean(state?.nissewyn && state.canPop);
 }
 
 const taskFilters: TaskFilter[] = [
@@ -1449,7 +1449,7 @@ const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: 
   approvals: {
     eyebrow: t("待确认"),
     title: t("需要你决定的操作"),
-    description: t("Unzoo One 不会在你确认前执行外部发送或敏感访问。"),
+    description: t("Nissewyn 不会在你确认前执行外部发送或敏感访问。"),
   },
   artifacts: {
     eyebrow: t("成果"),
@@ -1669,7 +1669,7 @@ export default function HomePage() {
     setAutostart(next)
       .then((enabled) => {
         setAutostartState(enabled);
-        setNotice(enabled ? t("登录系统后，Unzoo One 会在后台启动") : t("登录系统后不再自动启动"));
+        setNotice(enabled ? t("登录系统后，Nissewyn 会在后台启动") : t("登录系统后不再自动启动"));
       })
       .catch((error: unknown) =>
         setNotice(t("没能修改开机启动：{error}", { error: error instanceof Error ? error.message : String(error) })),
@@ -3106,39 +3106,39 @@ export default function HomePage() {
         }
         const saved = syncedWorkspace
           ? JSON.stringify(syncedWorkspace.tasks)
-          : window.localStorage.getItem("unzoo-one-tasks");
+          : window.localStorage.getItem("nissewyn-tasks");
         const savedSettings = syncedWorkspace
           ? JSON.stringify(syncedWorkspace.settings)
-          : window.localStorage.getItem("unzoo-one-settings");
+          : window.localStorage.getItem("nissewyn-settings");
         const savedUsage = syncedWorkspace
           ? JSON.stringify(syncedWorkspace.usage)
-          : window.localStorage.getItem("unzoo-one-usage");
+          : window.localStorage.getItem("nissewyn-usage");
         const savedConnectors = syncedWorkspace
           ? JSON.stringify(syncedWorkspace.connectors)
-          : window.localStorage.getItem("unzoo-one-connectors");
+          : window.localStorage.getItem("nissewyn-connectors");
         const savedTeam = syncedWorkspace
           ? JSON.stringify(syncedWorkspace.members)
-          : window.localStorage.getItem("unzoo-one-team");
+          : window.localStorage.getItem("nissewyn-team");
         const savedApprovalIds = syncedWorkspace
           ? JSON.stringify(syncedWorkspace.approvalIds)
-          : window.localStorage.getItem("unzoo-one-pending-approvals");
+          : window.localStorage.getItem("nissewyn-pending-approvals");
         const savedActivity = syncedWorkspace
           ? JSON.stringify(syncedWorkspace.activity)
-          : window.localStorage.getItem("unzoo-one-activity");
+          : window.localStorage.getItem("nissewyn-activity");
         const savedArtifacts = syncedWorkspace
           ? JSON.stringify(syncedWorkspace.artifacts)
-          : window.localStorage.getItem("unzoo-one-artifacts");
+          : window.localStorage.getItem("nissewyn-artifacts");
         const savedRecentSearches = window.localStorage.getItem(
-          "unzoo-one-recent-searches",
+          "nissewyn-recent-searches",
         );
         const savedReadNotifications = window.localStorage.getItem(
-          "unzoo-one-read-notifications",
+          "nissewyn-read-notifications",
         );
         const savedLastWorkspaceBackupAt = window.localStorage.getItem(
           workspaceLastBackupKey,
         );
         const schemaVersion = Number(
-          window.localStorage.getItem("unzoo-one-schema-version") ?? "1",
+          window.localStorage.getItem("nissewyn-schema-version") ?? "1",
         );
         if (saved) {
           const parsed = JSON.parse(saved);
@@ -3200,7 +3200,7 @@ export default function HomePage() {
           if (isUsageSettings(parsedUsage)) {
             setUsageSettings(parsedUsage);
           } else {
-            window.localStorage.removeItem("unzoo-one-usage");
+            window.localStorage.removeItem("nissewyn-usage");
           }
         }
         if (savedConnectors) {
@@ -3208,7 +3208,7 @@ export default function HomePage() {
           if (isConnectorState(parsedConnectors)) {
             setConnectorStates(parsedConnectors);
           } else {
-            window.localStorage.removeItem("unzoo-one-connectors");
+            window.localStorage.removeItem("nissewyn-connectors");
           }
         }
         if (savedTeam) {
@@ -3220,7 +3220,7 @@ export default function HomePage() {
           ) {
             setTeamMembers(parsedTeam);
           } else {
-            window.localStorage.removeItem("unzoo-one-team");
+            window.localStorage.removeItem("nissewyn-team");
           }
         }
         if (savedApprovalIds) {
@@ -3294,7 +3294,7 @@ export default function HomePage() {
             setLastWorkspaceBackupAt(savedLastWorkspaceBackupAt);
           }
         }
-        window.localStorage.setItem("unzoo-one-schema-version", "11");
+        window.localStorage.setItem("nissewyn-schema-version", "11");
       } catch (error) {
         lastWorkspaceSyncSignatureRef.current = "";
         if (error instanceof SyntaxError) {
@@ -3585,7 +3585,7 @@ export default function HomePage() {
       writeWorkspaceRoute(
         resolvedRoute,
         "replace",
-        Boolean(currentHistoryState?.unzooOne && currentHistoryState.canPop),
+        Boolean(currentHistoryState?.nissewyn && currentHistoryState.canPop),
       );
       if (resolvedRoute.view === "settings") {
         scrollSettingsSectionIntoView(nextSettingsSection, "auto");
@@ -3819,11 +3819,11 @@ export default function HomePage() {
           lastWorkspaceSyncSignatureRef.current = signature;
         }
         window.localStorage.setItem(
-          "unzoo-one-recent-searches",
+          "nissewyn-recent-searches",
           JSON.stringify(recentSearchKeys.slice(0, 4)),
         );
         window.localStorage.setItem(
-          "unzoo-one-read-notifications",
+          "nissewyn-read-notifications",
           JSON.stringify(readNotificationIds.slice(0, 30)),
         );
         removeLocalStorageItems(legacyWorkspaceStorageKeys);
@@ -5176,8 +5176,8 @@ export default function HomePage() {
     try {
       const desktopNotification = new window.Notification(newItem.title, {
         body: newItem.detail,
-        icon: "/unzoo-one-mark-v6.png",
-        tag: `unzoo-one-${newItem.id}`,
+        icon: "/nissewyn-mark.png",
+        tag: `nissewyn-${newItem.id}`,
       });
       desktopNotification.onclick = () => {
         window.focus();
@@ -5237,7 +5237,7 @@ export default function HomePage() {
 
   function exportActivity() {
     const payload = {
-      product: "Unzoo One",
+      product: "Nissewyn",
       exportedAt: new Date().toISOString(),
       recordCount: activityLog.length,
       records: activityLog,
@@ -5248,7 +5248,7 @@ export default function HomePage() {
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `unzoo-one-audit-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.download = `nissewyn-audit-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -5265,7 +5265,7 @@ export default function HomePage() {
 
   function exportActivityItem(item: ActivityItem) {
     const payload = {
-      product: "Unzoo One",
+      product: "Nissewyn",
       exportedAt: new Date().toISOString(),
       record: item,
     };
@@ -5329,7 +5329,7 @@ export default function HomePage() {
     const exportedAt = new Date().toISOString();
     const payload: WorkspaceBackup = {
       version: 1,
-      product: "Unzoo One",
+      product: "Nissewyn",
       exportedAt,
       profile: workspaceProfile,
       tasks,
@@ -5348,7 +5348,7 @@ export default function HomePage() {
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `unzoo-one-workspace-${new Date()
+    anchor.download = `nissewyn-workspace-${new Date()
       .toISOString()
       .slice(0, 10)}.json`;
     document.body.appendChild(anchor);
@@ -5678,7 +5678,7 @@ export default function HomePage() {
       filename: editingArtifact.filename,
       content: editingArtifact.content,
       createdAt: editingArtifact.editedAt ?? editingArtifact.createdAt,
-      editor: editingArtifact.editedBy ?? "Unzoo One AI",
+      editor: editingArtifact.editedBy ?? "Nissewyn AI",
     };
     const nextRevisions = [
       ...(editingArtifact.revisions ?? []),
@@ -5808,7 +5808,7 @@ export default function HomePage() {
         fileSize: file.size,
       });
     } catch {
-      setNotice(t("导入失败，请选择由 Unzoo One 导出的工作区备份"));
+      setNotice(t("导入失败，请选择由 Nissewyn 导出的工作区备份"));
     } finally {
       input.value = "";
     }
@@ -7901,7 +7901,7 @@ export default function HomePage() {
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `unzoo-one-usage-${new Date()
+    anchor.download = `nissewyn-usage-${new Date()
       .toISOString()
       .slice(0, 7)}.csv`;
     document.body.appendChild(anchor);
@@ -7997,10 +7997,10 @@ export default function HomePage() {
       setNotice(t("桌面提醒已开启"));
 
       try {
-        const confirmation = new window.Notification(t("Unzoo One 提醒已开启"), {
+        const confirmation = new window.Notification(t("Nissewyn 提醒已开启"), {
           body: t("后续需要你决定的任务会在这里提醒。"),
-          icon: "/unzoo-one-mark-v6.png",
-          tag: "unzoo-one-notifications-enabled",
+          icon: "/nissewyn-mark.png",
+          tag: "nissewyn-notifications-enabled",
         });
         window.setTimeout(() => confirmation.close(), 5000);
       } catch {
@@ -9043,7 +9043,7 @@ export default function HomePage() {
 
   function downloadTaskRun(task: TaskItem, run: TaskRun) {
     const payload = {
-      product: "Unzoo One",
+      product: "Nissewyn",
       exportedAt: new Date().toISOString(),
       task: {
         id: task.id,
@@ -9079,7 +9079,7 @@ export default function HomePage() {
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `unzoo-one-run-${run.id.replace(/[^a-z0-9-]/gi, "-")}.json`;
+    anchor.download = `nissewyn-run-${run.id.replace(/[^a-z0-9-]/gi, "-")}.json`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -9326,7 +9326,7 @@ export default function HomePage() {
       }
 
       const response = await window.fetch(
-        `/unzoo-one-mark-v6.png?network-check=${Date.now()}`,
+        `/nissewyn-mark.png?network-check=${Date.now()}`,
         { cache: "no-store" },
       );
       if (!response.ok) {
@@ -9890,7 +9890,7 @@ export default function HomePage() {
   }
 
   /**
-   * 在 Unzoo One 终端里接手智能体的终端。智能体开的会话住在后台服务里，
+   * 在 Nissewyn 终端里接手智能体的终端。智能体开的会话住在后台服务里，
    * 终端窗口打开时会把没人管的会话收下；窗口还没开（桌面版）就先开一扇，
    * 再把这个会话切到前台。
    */
@@ -9925,7 +9925,7 @@ export default function HomePage() {
     } catch (error) {
       if (!desktopApp) {
         throw new Error(
-          t("先打开 Unzoo One 的终端窗口，再点一次。({message})", {
+          t("先打开 Nissewyn 的终端窗口，再点一次。({message})", {
             message: error instanceof Error ? error.message : String(error),
           }),
         );
@@ -9966,7 +9966,7 @@ export default function HomePage() {
         <AlertTriangle size={16} aria-hidden="true" />
         <span>
           <strong>{t("这台电脑上还没有可用的智能体")}</strong>
-          <small>{t("Unzoo One 让智能体替你干活，需要先装一个，比如 Claude Code 或 Codex。装好后点“重新检查”。")}</small>
+          <small>{t("Nissewyn 让智能体替你干活，需要先装一个，比如 Claude Code 或 Codex。装好后点“重新检查”。")}</small>
         </span>
         <span className="conversation-ready-actions">
           <button type="button" onClick={() => openSettingsSection("agents")}>
@@ -10398,14 +10398,13 @@ export default function HomePage() {
         >
           <span className="clarity-brand-mark">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/unzoo-one-mark-v6.png" alt="Unzoo One" />
+            <img src="/nissewyn-mark.png" alt="Nissewyn" />
           </span>
           <div className="clarity-brand-copy">
             <strong>
-              <span className="clarity-wordmark-name">Unzoo</span>
-              <span className="clarity-wordmark-one">One</span>
+              <span className="clarity-wordmark-name">Nissewyn</span>
             </strong>
-            <small>{t("可信 AI 执行")}</small>
+            <small>{t("你的 AI 小帮手")}</small>
           </div>
         </button>
 
@@ -10463,12 +10462,11 @@ export default function HomePage() {
           >
             <span className="clarity-mobile-brand-mark">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/unzoo-one-mark-v6.png" alt="" />
+              <img src="/nissewyn-mark.png" alt="" />
             </span>
             <span className="clarity-mobile-brand-copy">
               <strong>
-                <span className="clarity-wordmark-name">Unzoo</span>
-                <span className="clarity-wordmark-one">One</span>
+                <span className="clarity-wordmark-name">Nissewyn</span>
               </strong>
               <small>
                 <i className={systemStatusTone} />
@@ -11786,7 +11784,7 @@ export default function HomePage() {
               <div className="section-title-row">
                 <div>
                   <span>{t("最近任务")}</span>
-                  <h2>{t("你交给 Unzoo One 的工作")}</h2>
+                  <h2>{t("你交给 Nissewyn 的工作")}</h2>
                 </div>
                 <button type="button" onClick={() => openView("tasks")}>
                   
@@ -14026,8 +14024,8 @@ export default function HomePage() {
                     <strong>{t("登录系统后在后台运行")}</strong>
                     <small>
                       {tasks.some((task) => task.schedule === "每天" || task.schedule === "每周") && !autostart
-                        ? t("你有定时任务。不打开这项，电脑重启后要等你打开 Unzoo One，定时任务才会接着跑。")
-                        : t("定时任务需要后台服务一直在。打开后，重启电脑不用手动打开 Unzoo One。")}
+                        ? t("你有定时任务。不打开这项，电脑重启后要等你打开 Nissewyn，定时任务才会接着跑。")
+                        : t("定时任务需要后台服务一直在。打开后，重启电脑不用手动打开 Nissewyn。")}
                     </small>
                   </span>
                   <button
@@ -14189,7 +14187,7 @@ export default function HomePage() {
                   <span>
                     <small>{t("恢复文件校验")}</small>
                     <strong>{t("已启用")}</strong>
-                    <em>{t("仅接受 Unzoo One JSON v1")}</em>
+                    <em>{t("仅接受 Nissewyn JSON v1")}</em>
                   </span>
                 </span>
               </div>
@@ -16430,7 +16428,7 @@ export default function HomePage() {
                     ? t("更新任务设置")
                     : runtimeMode
                       ? t("交给智能体一项工作")
-                      : t("交给 Unzoo One 一项工作")}
+                      : t("交给 Nissewyn 一项工作")}
                 </h2>
                 <p>
                   {editingTaskId
@@ -17136,7 +17134,7 @@ export default function HomePage() {
                     </div>
                     <div>
                       <dt>{t("最近编辑")}</dt>
-                      <dd>{editingArtifact.editedBy ?? "Unzoo One AI"}</dd>
+                      <dd>{editingArtifact.editedBy ?? "Nissewyn AI"}</dd>
                     </div>
                   </dl>
                 </div>

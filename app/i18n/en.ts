@@ -58,14 +58,14 @@ export const en: Record<string, string> = {
   "{agent}（清单里没有）": "{agent} (not in the list)",
   "（未安装）": " (not installed)",
   "工作目录": "Working directory",
-  "任务交给智能体后，它在这个目录里读写文件、执行命令。留空则每个任务用自己的文件夹：文档 › Unzoo One › 任务名。":
-    "The agent reads and writes files and runs commands in this folder. Leave it empty and each task gets its own folder: Documents › Unzoo One › task name.",
+  "任务交给智能体后，它在这个目录里读写文件、执行命令。留空则每个任务用自己的文件夹：文档 › Nissewyn › 任务名。":
+    "The agent reads and writes files and runs commands in this folder. Leave it empty and each task gets its own folder: Documents › Nissewyn › task name.",
   "例如 C:\\code\\my-project": "e.g. C:\\code\\my-project",
   "智能体的工作目录": "Agent working directory",
   "保存": "Save",
   "受管模式": "Governed mode",
-  "关掉 Claude Code 自带的 Bash、PowerShell 和联网工具，命令只能经 Unzoo One 执行，每一步都先进收件箱。目前只有 Claude Code 支持；其它智能体以托管模式运行：用自己的工具，但同样逐条等你批准。":
-    "Turns off Claude Code's own Bash, PowerShell and web tools so commands can only run through Unzoo One, and every step comes to your inbox first. Only Claude Code supports this today; other agents run hosted: they use their own tools, but still wait for your approval on each call.",
+  "关掉 Claude Code 自带的 Bash、PowerShell 和联网工具，命令只能经 Nissewyn 执行，每一步都先进收件箱。目前只有 Claude Code 支持；其它智能体以托管模式运行：用自己的工具，但同样逐条等你批准。":
+    "Turns off Claude Code's own Bash, PowerShell and web tools so commands can only run through Nissewyn, and every step comes to your inbox first. Only Claude Code supports this today; other agents run hosted: they use their own tools, but still wait for your approval on each call.",
   "已改为托管模式": "Switched to hosted mode",
   "已改为受管模式": "Switched to governed mode",
   "常设规则": "Standing rules",
@@ -167,7 +167,7 @@ export const en: Record<string, string> = {
   "仅本次调用": "This call only",
   "会话关闭时自动拒绝": "Denied automatically when the session closes",
   "托管会话：执行前询问": "Hosted session: asks before running",
-  "Unzoo One 的后台服务还没有就绪": "The Unzoo One background service isn't ready yet",
+  "Nissewyn 的后台服务还没有就绪": "The Nissewyn background service isn't ready yet",
   "bootstrap.json 返回 {status}": "bootstrap.json returned {status}",
   "bootstrap.json 里没有 auth_token": "bootstrap.json has no auth_token",
   "{error}（{detail}）": "{error} ({detail})",
@@ -192,7 +192,7 @@ export const en: Record<string, string> = {
   "界面语言": "Language",
   "切换后页面会重新载入。": "The page reloads when you change it.",
   "待确认的操作": "Approvals",
-  "终端只能在 Unzoo One 桌面版里打开": "The terminal can only be opened in the Unzoo One desktop app",
+  "终端只能在 Nissewyn 桌面版里打开": "The terminal can only be opened in the Nissewyn desktop app",
   "没能打开终端：{error}": "Couldn't open the terminal: {error}",
   "打开终端": "Open terminal",
   "我的工作区": "My workspace",
@@ -204,5 +204,5 @@ export const en: Record<string, string> = {
   "十分钟没有任何进展，已停止": "Stopped after ten minutes without any progress",
   "智能体的会话意外中断了": "The agent's session ended unexpectedly",
   "这次运行还没结束，后台服务就停止了": "The background service stopped before this run finished",
-  "Unzoo One | AI 任务工作台": "Unzoo One | The AI task workspace",
+  "Nissewyn | AI 任务工作台": "Nissewyn | The AI task workspace",
 };

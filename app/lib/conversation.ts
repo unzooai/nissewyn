@@ -192,7 +192,7 @@ export function activityLine(item: RuntimeActivity): string {
     case "plan":
       return t("更新了计划");
     case "skill":
-      return target ? t("用了技能 {target}", { target: target.replace(/^unzoo-one:/, "") }) : t("用了一个技能");
+      return target ? t("用了技能 {target}", { target: target.replace(/^nissewyn:/, "") }) : t("用了一个技能");
     case "handover":
       return t("请你接手：{what}", { what: target });
     case "delegate": {

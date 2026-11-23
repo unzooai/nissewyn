@@ -162,7 +162,7 @@ export function PhonePanel({
           )}
 
           <p className="skills-empty">
-            {t("第一次配对时，Windows 可能会问是否允许 Unzoo One 访问网络：选“专用网络”并允许，手机才连得上。")}
+            {t("第一次配对时，Windows 可能会问是否允许 Nissewyn 访问网络：选“专用网络”并允许，手机才连得上。")}
           </p>
         </>
       )}

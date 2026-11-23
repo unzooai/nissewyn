@@ -1,12 +1,12 @@
-# Unzoo One 交付路线图与开发 Backlog
+# Nissewyn 交付路线图与开发 Backlog
 
 > 状态：Draft
 > 日期：2026-07-26
 > 规划方式：以验收门槛推进，不以日期掩盖未完成能力
 
 > **归属修订 2026-08-06**：原划分把控制平面能力全部指派给 Unterm。已纠正为
-> 「Unzoo One 是唯一控制平面，Unterm 与 Unzoo 是同级 Provider」。
-> 见 `unzoo-one#2`、`unterm#20`、`unzoo#73`。
+> 「Nissewyn 是唯一控制平面，Unterm 与 Unzoo 是同级 Provider」。
+> 见 `nissewyn#2`、`unterm#20`、`unzoo#73`。
 
 > **归属修订 2026-11-09（取代上一条的实现部分）**：Unterm 源码已并入本仓库 `unterm/`，
 > 采用 `unterm#30` 的**路线 A**——运行时以 unterm 的 Rust 实现为准，`contracts/v0`
@@ -15,14 +15,14 @@
 
 ## 1. 仓库职责
 
-### `unzooai/unzoo-one`
+### `unzooai/nissewyn`
 
 负责（**唯一控制平面**）：
 
 - 产品规格和跨仓库 Architecture Decision，以及 `contracts/v0` 契约的定义与冻结。
 - `one-core` 自有常驻运行时。
 - Task Engine、Policy/Approval/Grant/Inbox、Provider Registry、Workspace、Artifact Registry、Brain Router、Scheduler、Memory。
-- Unzoo One Desktop / Web 产品体验。
+- Nissewyn Desktop / Web 产品体验。
 - 一体化安装、Supervisor、绑定和版本兼容矩阵。
 - 端到端测试与发布清单。
 
@@ -32,7 +32,7 @@
 - 在 UI 层直接启动 Brain CLI 绕过 one-core。
 - 替 Provider 做它自己那一层的执行闸门（纵深防御的另一层由 Provider 各自实现）。
 
-对应 Issue：`unzoo-one#2`（Epic）、`#3`–`#13`、
+对应 Issue：`nissewyn#2`（Epic）、`#3`–`#13`、
 [#14 timestamp pattern 放宽](https://github.com/unzooai/unzoo-one/issues/14)（`contracts/v0` 冻结前处理）。
 
 ### `zhitongblog/unterm`
@@ -67,8 +67,8 @@ Memory/Scheduler/Connector/Model Router、三进程 Supervisor。
   拿 schema 逐条对照 0.71.0 代码之后剩下的差异；第 0 项是控制平面归属，阻塞其余）
 - [#20 总 Epic](https://github.com/zhitongblog/unterm/issues/20)
 
-已迁往本仓库并关闭：#14 → `unzoo-one#5`、#17 → `unzoo-one#7`、
-#19 → `unzoo-one#13`、#21 → `unzoo-one#9`、#23 → `unzoo-one#12`。
+已迁往本仓库并关闭：#14 → `nissewyn#5`、#17 → `nissewyn#7`、
+#19 → `nissewyn#13`、#21 → `nissewyn#9`、#23 → `nissewyn#12`。
 
 ### `unzooai/unzoo`
 
@@ -157,7 +157,7 @@ Memory/Scheduler/Connector/Model Router、三进程 Supervisor。
 - [ ] Cancel 能停止 Workflow/CUA。
 - [ ] 使用登录 Profile 前会请求审批。
 
-## M3：Unzoo One Private Alpha
+## M3：Nissewyn Private Alpha
 
 目标：
 
@@ -237,36 +237,36 @@ Memory/Scheduler/Connector/Model Router、三进程 Supervisor。
 
 | ID | 优先级 | 仓库 | 工作项 | 依赖 | 验收产物 |
 |---|---|---|---|---|---|
-| ONE-C001 | P0-Blocker | unzoo-one | 冻结跨仓库对象和错误 schema（`unzoo-one#3`） | 无 | `contracts/v0` |
+| ONE-C001 | P0-Blocker | nissewyn | 冻结跨仓库对象和错误 schema（`nissewyn#3`） | 无 | `contracts/v0` |
 | ONE-C002 | P0-Blocker | unterm | 修复 PTY 授权旁路（`unterm#16`） | 无 | 已完成 |
-| ONE-C003 | P0 | unzoo-one | **one-core 常驻运行时**（`unzoo-one#4`） | C001 | 骨架已完成：`one-core/`，`npm run cli demo` |
-| ONE-C004 | P0 | unzoo-one | SQLite Task Engine（`unzoo-one#5`） | C001,C003 | 重启恢复测试 |
-| ONE-C005 | P0 | unzoo-one | Brain Router + Codex Adapter（`unzoo-one#10`） | C001,C003 | Brain event demo |
-| ONE-C006 | P0 | unzoo-one | Claude Adapter（`unzoo-one#10`） | C001,C003 | Brain event demo |
-| ONE-C007 | P0 | unzoo-one | Policy/Approval v0（`unzoo-one#6`） | C001,C004 | 决策解释测试 |
+| ONE-C003 | P0 | nissewyn | **one-core 常驻运行时**（`nissewyn#4`） | C001 | 骨架已完成：`one-core/`，`npm run cli demo` |
+| ONE-C004 | P0 | nissewyn | SQLite Task Engine（`nissewyn#5`） | C001,C003 | 重启恢复测试 |
+| ONE-C005 | P0 | nissewyn | Brain Router + Codex Adapter（`nissewyn#10`） | C001,C003 | Brain event demo |
+| ONE-C006 | P0 | nissewyn | Claude Adapter（`nissewyn#10`） | C001,C003 | Brain event demo |
+| ONE-C007 | P0 | nissewyn | Policy/Approval v0（`nissewyn#6`） | C001,C004 | 决策解释测试 |
 | ONE-C008 | P0 | unzoo | Structured Risk Metadata | C001 | Tool manifest |
 | ONE-C009 | P0 | unzoo | Local Client Identity/Lease | C001 | 认证测试 |
-| ONE-C010 | P0 | unzoo-one | Provider Registry v0（`unzoo-one#7`） | C001,C004 | Provider demo |
+| ONE-C010 | P0 | nissewyn | Provider Registry v0（`nissewyn#7`） | C001,C004 | Provider demo |
 | ONE-C011 | P0 | unzoo | Orchestrator Binding（绑定对象改为 One） | C009,C010 | 绑定自检 |
-| ONE-C012 | P0 | unzoo-one | Artifact Registry 与证据链 v0（`unzoo-one#8`） | C004,C007 | 证据包 |
+| ONE-C012 | P0 | nissewyn | Artifact Registry 与证据链 v0（`nissewyn#8`） | C004,C007 | 证据包 |
 | ONE-C023 | P0 | unterm | 0.60 终端 parity gate（`unterm#24` 阶段 A） | 无 | parity 台账 |
 | ONE-C024 | P0 | unterm | Terminal Provider 化（`unterm#15`/`#26`/`#27`） | C001,C023 | Provider Contract Suite |
-| ONE-C025 | P0 | unzoo-one | Workspace Context & Isolation（`unzoo-one#9`） | C004,C007 | 隔离与穿越测试 |
-| ONE-C026 | P0 | unzoo-one | Tool Routing 决策（`unzoo-one#11`） | C007,C010 | 旁路测试 |
-| ONE-C027 | P0 | unzoo-one | Supervisor 与一体化安装（`unzoo-one#12`） | C003,C010 | 安装/升级/回滚 E2E |
-| ONE-C013 | P0 | unzoo-one | First-run onboarding | C003,C011 | 5 分钟首个 Artifact |
-| ONE-C014 | P0 | unzoo-one | Task Composer/Detail | C004,C005 | 四条主链路 |
-| ONE-C015 | P0 | unzoo-one | Approval Inbox | C007 | 审批测试 |
-| ONE-C016 | P0 | unzoo-one | Artifact Center | C012 | 打开/导出测试 |
-| ONE-C017 | P0 | unzoo-one | Diagnostics | C003,C011 | 诊断包 |
-| ONE-C018 | P0 | unzoo-one | 端到端测试套件 | C013-C017 | Alpha Gate |
-| ONE-C019 | P0 | unzoo-one | Automation 与 Attention Routing v0 | C004,C007 | 场景 D |
-| ONE-C020 | P0 | unzoo-one | MCP Connector 导入与 Gallery | C010 | Connector demo |
-| ONE-C021 | P0 | unzoo-one | GitHub + 邮件/日历 + 双向消息验证 | C020 | Connector E2E |
-| ONE-C022 | P0 | unzoo-one | Ask/Work/Code/Automate 入口预设 | C014,C019 | 四入口 UX |
+| ONE-C025 | P0 | nissewyn | Workspace Context & Isolation（`nissewyn#9`） | C004,C007 | 隔离与穿越测试 |
+| ONE-C026 | P0 | nissewyn | Tool Routing 决策（`nissewyn#11`） | C007,C010 | 旁路测试 |
+| ONE-C027 | P0 | nissewyn | Supervisor 与一体化安装（`nissewyn#12`） | C003,C010 | 安装/升级/回滚 E2E |
+| ONE-C013 | P0 | nissewyn | First-run onboarding | C003,C011 | 5 分钟首个 Artifact |
+| ONE-C014 | P0 | nissewyn | Task Composer/Detail | C004,C005 | 四条主链路 |
+| ONE-C015 | P0 | nissewyn | Approval Inbox | C007 | 审批测试 |
+| ONE-C016 | P0 | nissewyn | Artifact Center | C012 | 打开/导出测试 |
+| ONE-C017 | P0 | nissewyn | Diagnostics | C003,C011 | 诊断包 |
+| ONE-C018 | P0 | nissewyn | 端到端测试套件 | C013-C017 | Alpha Gate |
+| ONE-C019 | P0 | nissewyn | Automation 与 Attention Routing v0 | C004,C007 | 场景 D |
+| ONE-C020 | P0 | nissewyn | MCP Connector 导入与 Gallery | C010 | Connector demo |
+| ONE-C021 | P0 | nissewyn | GitHub + 邮件/日历 + 双向消息验证 | C020 | Connector E2E |
+| ONE-C022 | P0 | nissewyn | Ask/Work/Code/Automate 入口预设 | C014,C019 | 四入口 UX |
 | ONE-C101 | P1 | unzoo | Desktop Observation | M3 | #66 |
 | ONE-C102 | P1 | unzoo | Secure Desktop Input | C101 | #67 |
-| ONE-C103 | P1 | unzoo-one | Memory/Trigger/Connector/Model Router（`unzoo-one#13`） | M3 | 平台能力验收 |
+| ONE-C103 | P1 | nissewyn | Memory/Trigger/Connector/Model Router（`nissewyn#13`） | M3 | 平台能力验收 |
 
 ## 4. 跨仓库契约清单
 
@@ -364,12 +364,12 @@ contracts/v0/
 
 按顺序执行：
 
-1. ~~在本仓库增加 `contracts/v0`（`unzoo-one#3`，P0-Blocker）。~~ 2026-09-03 完成。
+1. ~~在本仓库增加 `contracts/v0`（`nissewyn#3`，P0-Blocker）。~~ 2026-09-03 完成。
 2. ~~完成 Task、Brain、Provider、Risk、Workspace scope、Error 六组 schema~~ 已完成；
    **三仓库共同评审冻结待办**——这是 M0 剩下的唯一一件事。
 3. ~~用静态 mock 写一个完整任务事件样例。~~ 见
    `contracts/v0/examples/task-event-stream.json`（22 条事件，从创建到产物）。
-4. ~~建立 `one-core` 骨架（`unzoo-one#4`）：认证 IPC、single-instance、SQLite、事件 cursor。~~
+4. ~~建立 `one-core` 骨架（`nissewyn#4`）：认证 IPC、single-instance、SQLite、事件 cursor。~~
    2026-09-05 完成，见 [`one-core/README.md`](../one-core/README.md)。四件事都落地了，
    `npm run cli demo` 是 ONE-C003 的验收物；Brain、Provider、Policy 还没接。
 5. 先接 Unzoo Browser Provider 跑通场景 A（不依赖终端），验证边界成立。

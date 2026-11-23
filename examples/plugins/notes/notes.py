@@ -1,5 +1,5 @@
 """The notes both the page and the tools work on: one JSON file in the
-folder Unzoo One gives the plugin (UNZOO_PLUGIN_DATA)."""
+folder Nissewyn gives the plugin (UNZOO_PLUGIN_DATA)."""
 import json, os, time
 
 DATA = os.environ.get("UNZOO_PLUGIN_DATA") or os.path.join(os.path.dirname(__file__), "_data")

@@ -1,11 +1,11 @@
-"""Where Xtools runs: what Unzoo One passed in (port, data folder, roles, settings)."""
+"""Where Xtools runs: what Nissewyn passed in (port, data folder, roles, settings)."""
 import json
 import os
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# What a setting is when Unzoo One did not pass one (running on its own, or an
-# older Unzoo One). Same keys and defaults as unzoo-plugin.json.
+# What a setting is when Nissewyn did not pass one (running on its own, or an
+# older Nissewyn). Same keys and defaults as unzoo-plugin.json.
 DEFAULTS = {
     'auto.posts': 'auto', 'auto.mentions': 'auto', 'auto.replies': 'auto', 'auto.quotes': 'auto',
     'auto.likes': 'auto', 'auto.follows': 'auto',
@@ -39,7 +39,7 @@ def port():
     return int(os.environ.get('UNZOO_PLUGIN_PORT') or os.environ.get('PORT') or 8792)
 
 
-def in_unzoo_one():
+def in_nissewyn():
     return bool(os.environ.get('UNZOO_PLUGIN_ID'))
 
 

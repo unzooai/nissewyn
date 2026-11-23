@@ -43,7 +43,7 @@ export const enPage3: Record<string, string> = {
   "后续任务需要确认或安全停止时，浏览器会主动发送桌面提醒。":
     "You'll get a desktop alert when a task needs approval or stops safely.",
   "桌面提醒已开启": "Desktop alerts on",
-  "Unzoo One 提醒已开启": "Unzoo One alerts are on",
+  "Nissewyn 提醒已开启": "Nissewyn alerts are on",
   "后续需要你决定的任务会在这里提醒。": "Tasks that need your decision will alert you here.",
   "无法开启桌面通知，页面内通知仍可正常使用": "Couldn't turn on desktop notifications; in-app notifications work as usual",
   "本机持久保存已开启": "Saving on this device turned on",
@@ -191,7 +191,7 @@ export const enPage3: Record<string, string> = {
   "首页主任务停止执行，已保存当前进度。": "The home task stopped; its progress is saved.",
   "主导航": "Main navigation",
   "返回首页": "Back to Home",
-  "可信 AI 执行": "Trusted AI execution",
+  "你的 AI 小帮手": "Your AI helper",
   "全局搜索": "Search everything",
   "搜索任务、成果、页面和操作": "Search tasks, deliverables, pages and actions",
   "清除搜索": "Clear search",

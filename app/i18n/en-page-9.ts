@@ -1,11 +1,11 @@
 /** English for the conversation page and the autonomy setting. Keys: see ./index.ts. */
 export const enPage9: Record<string, string> = {
   // Settings › agents › autonomy
-  "关掉 Claude Code 自带的 Bash、PowerShell 和联网工具，命令只能经 Unzoo One 的终端执行，网页只能经 Unzoo 浏览器打开。目前只有 Claude Code 支持；其它智能体用自己的工具。哪些操作要先问你，由下面的自主程度决定。":
-    "Turns off Claude Code's own Bash, PowerShell and web tools, so commands run only in the Unzoo One terminal and web pages open only in Unzoo Browser. Only Claude Code supports this for now; other agents use their own tools. What they ask you first is set by the autonomy level below.",
+  "关掉 Claude Code 自带的 Bash、PowerShell 和联网工具，命令只能经 Nissewyn 的终端执行，网页只能经 Unzoo 浏览器打开。目前只有 Claude Code 支持；其它智能体用自己的工具。哪些操作要先问你，由下面的自主程度决定。":
+    "Turns off Claude Code's own Bash, PowerShell and web tools, so commands run only in the Nissewyn terminal and web pages open only in Unzoo Browser. Only Claude Code supports this for now; other agents use their own tools. What they ask you first is set by the autonomy level below.",
   "自主程度": "Autonomy",
-  "已把 Unzoo One 的终端和技能接入 {name}。重启 {name} 后生效。": "Connected Unzoo One's terminal and skills to {name}. Restart {name} to use them.",
-  "已从 {name} 移除 Unzoo One 的终端和技能": "Removed Unzoo One's terminal and skills from {name}",
+  "已把 Nissewyn 的终端和技能接入 {name}。重启 {name} 后生效。": "Connected Nissewyn's terminal and skills to {name}. Restart {name} to use them.",
+  "已从 {name} 移除 Nissewyn 的终端和技能": "Removed Nissewyn's terminal and skills from {name}",
   "技能已装入": "Skills installed",
   "把东西发出这台电脑": "send something off this computer",
   "读取你的账号或密钥": "read your accounts or secrets",
@@ -56,8 +56,8 @@ export const enPage9: Record<string, string> = {
   "每天早上 9 点看一下这几个竞品网站的更新，有变化就告诉我":
     "Every morning at 9, check these competitors' websites and tell me what changed",
   "这台电脑上还没有可用的智能体": "No agent is ready on this computer",
-  "Unzoo One 让智能体替你干活，需要先装一个，比如 Claude Code 或 Codex。装好后点“重新检查”。":
-    "Unzoo One has an agent do the work, so install one first — Claude Code or Codex, for example. Then click “Check again”.",
+  "Nissewyn 让智能体替你干活，需要先装一个，比如 Claude Code 或 Codex。装好后点“重新检查”。":
+    "Nissewyn has an agent do the work, so install one first — Claude Code or Codex, for example. Then click “Check again”.",
   "查看智能体": "View agents",
 
   // Composer
@@ -161,9 +161,9 @@ export const enPage9: Record<string, string> = {
   "浏览器身份": "Browser profile",
   "智能体用哪个浏览器身份": "Which browser profile the agent uses",
   "智能体改用浏览器身份“{name}”": "The agent now browses as “{name}”",
-  "智能体改用 Unzoo One 的专用身份": "The agent now uses its own Unzoo One profile",
-  "Unzoo One 专用身份": "Unzoo One's own profile",
-  "Unzoo One 专用身份（还没有建）": "Unzoo One's own profile (not created yet)",
+  "智能体改用 Nissewyn 的专用身份": "The agent now uses its own Nissewyn profile",
+  "Nissewyn 专用身份": "Nissewyn's own profile",
+  "Nissewyn 专用身份（还没有建）": "Nissewyn's own profile (not created yet)",
   "{name}（已不在）": "{name} (no longer exists)",
   "智能体会用这个身份里已登录的账号。它只在自己新开的标签页里操作，不碰你开着的页面。":
     "The agent will use the accounts signed in to this profile. It works only in tabs it opens itself and leaves yours alone.",
@@ -220,7 +220,7 @@ export const enPage9: Record<string, string> = {
   "要登录、过验证码或自己点几下，就在浏览器里接手。": "To sign in, solve a captcha or click around yourself, take over in the browser.",
   "电脑 · {count}": "Computer · {count}",
   "电脑": "Computer",
-  "先打开 Unzoo One 的终端窗口，再点一次。({message})": "Open the Unzoo One terminal window first, then click again. ({message})",
+  "先打开 Nissewyn 的终端窗口，再点一次。({message})": "Open the Nissewyn terminal window first, then click again. ({message})",
 
   // Skills
   "等这个任务做成一次、而且没有在做的时候才能存": "Available once this task has succeeded and isn't running",
@@ -259,13 +259,13 @@ export const enPage9: Record<string, string> = {
   "启用技能 {name}": "Enable skill {name}",
 
   // Other AI clients
-  "已把 Unzoo One 的终端接入 {name}。重启 {name} 后生效。": "Unzoo One's terminal is now connected to {name}. Restart {name} for it to take effect.",
-  "已从 {name} 移除 Unzoo One 的终端": "Removed Unzoo One's terminal from {name}",
+  "已把 Nissewyn 的终端接入 {name}。重启 {name} 后生效。": "Nissewyn's terminal is now connected to {name}. Restart {name} for it to take effect.",
+  "已从 {name} 移除 Nissewyn 的终端": "Removed Nissewyn's terminal from {name}",
   "Unzoo 浏览器已接入这些客户端。重启客户端后生效。": "Unzoo Browser is now connected to these clients. Restart them for it to take effect.",
   "接入其它 AI 客户端": "Other AI clients",
   "在 Claude 桌面版、Cursor、Codex 里也能用这台电脑": "Use this computer from Claude Desktop, Cursor and Codex too",
-  "接入后，你在那些客户端里用的智能体也能操作 Unzoo One 的终端和浏览器，并拿到一段终端用法说明；Claude Code、Codex、OpenCode 还会装上你在“技能”里启用的技能，断开时一并移除。它在终端里做的事按“智能体 › 自主程度”判断：普通命令直接执行，删除、推送这类会先进这里的收件箱等你确认；Unzoo One 没打开、手机上也没开着时，要确认的操作会被拒绝。":
-    "Once connected, the agents you use in those clients can work in Unzoo One's terminal and browser, and get a short guide to the terminal; Claude Code, Codex and OpenCode also get the skills you have enabled under Skills, removed again when you disconnect. What they do in the terminal follows Agents › Autonomy: ordinary commands run, while deleting, pushing and the like come to this inbox for you to approve; while neither Unzoo One nor your phone has it open, anything that needs approval is refused.",
+  "接入后，你在那些客户端里用的智能体也能操作 Nissewyn 的终端和浏览器，并拿到一段终端用法说明；Claude Code、Codex、OpenCode 还会装上你在“技能”里启用的技能，断开时一并移除。它在终端里做的事按“智能体 › 自主程度”判断：普通命令直接执行，删除、推送这类会先进这里的收件箱等你确认；Nissewyn 没打开、手机上也没开着时，要确认的操作会被拒绝。":
+    "Once connected, the agents you use in those clients can work in Nissewyn's terminal and browser, and get a short guide to the terminal; Claude Code, Codex and OpenCode also get the skills you have enabled under Skills, removed again when you disconnect. What they do in the terminal follows Agents › Autonomy: ordinary commands run, while deleting, pushing and the like come to this inbox for you to approve; while neither Nissewyn nor your phone has it open, anything that needs approval is refused.",
   "读不到客户端：{error}": "Couldn't check the clients: {error}",
   "这台电脑上没有找到能接入的 AI 客户端。": "No AI clients that can be connected were found on this computer.",
   "配置文件有问题，没有改动：{error}": "Its config file has a problem, so nothing was changed: {error}",
@@ -275,7 +275,7 @@ export const enPage9: Record<string, string> = {
   "浏览器未接入": "Browser not connected",
   "断开终端": "Disconnect terminal",
   "接入终端": "Connect terminal",
-  "缺少 Unzoo One 的终端组件，重新安装 Unzoo One 可以修复。": "Unzoo One's terminal component is missing; reinstalling Unzoo One fixes this.",
+  "缺少 Nissewyn 的终端组件，重新安装 Nissewyn 可以修复。": "Nissewyn's terminal component is missing; reinstalling Nissewyn fixes this.",
   "浏览器由 Unzoo 自己的接入程序配置：它会接入所有它认识的客户端，并把这些客户端里其它浏览器自动化工具的配置备份后移除。":
     "The browser is set up by Unzoo's own installer: it connects every client it knows, and backs up and removes other browser-automation tools from those clients' settings.",
   "正在接入…": "Connecting…",
@@ -283,7 +283,7 @@ export const enPage9: Record<string, string> = {
   "外部客户端": "External client",
   "执行无法撤销的操作": "do something that can't be undone",
   "在终端里执行": "run in the terminal",
-  "{agent} 通过 Unzoo One 的终端要做这件事，做之前需要你确认。": "{agent} wants to do this through Unzoo One's terminal and needs your approval first.",
+  "{agent} 通过 Nissewyn 的终端要做这件事，做之前需要你确认。": "{agent} wants to do this through Nissewyn's terminal and needs your approval first.",
   "约 2 分钟内不答复就不执行": "Not done unless answered within about 2 minutes",
   "外部客户端：写入终端前询问": "External client: asks before writing to the terminal",
   "受管模式下，智能体的命令都经这里执行；有风险的先进收件箱，你点头才做。":
@@ -317,5 +317,5 @@ export const enPage9: Record<string, string> = {
   "只能看": "watch only",
   "已取消 {name} 的配对": "{name} is no longer paired",
   "取消配对": "Unpair",
-  "第一次配对时，Windows 可能会问是否允许 Unzoo One 访问网络：选“专用网络”并允许，手机才连得上。": "The first time, Windows may ask whether Unzoo One may use the network: allow it on private networks, or the phone can't connect.",
+  "第一次配对时，Windows 可能会问是否允许 Nissewyn 访问网络：选“专用网络”并允许，手机才连得上。": "The first time, Windows may ask whether Nissewyn may use the network: allow it on private networks, or the phone can't connect.",
 };

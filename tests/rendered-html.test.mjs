@@ -25,7 +25,7 @@ async function render() {
   );
 }
 
-test("server-renders the Unzoo One task console", async () => {
+test("server-renders the Nissewyn task console", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -34,13 +34,13 @@ test("server-renders the Unzoo One task console", async () => {
   // Server rendering has no system language: it is English, the default
   // for the European and US market. Chinese is chosen in the browser.
   assert.match(html, /<html lang="en">/);
-  assert.match(html, /<title>Unzoo One \| The AI task workspace<\/title>/);
+  assert.match(html, /<title>Nissewyn \| Your AI helper, on your own computer<\/title>/);
   assert.match(html, /(Working late|Good morning|Good afternoon|Good evening) — 4 thing\(s\) need you today/);
   assert.match(html, /Track competitor releases/);
   assert.match(html, /Needs you/);
-  assert.match(html, /Work you(&#x27;|')ve handed to Unzoo One/);
+  assert.match(html, /Work you(&#x27;|')ve handed to Nissewyn/);
   assert.match(html, /ai-core-premium\.webp/);
-  assert.match(html, /unzoo-one-mark-v6\.png/);
+  assert.match(html, /nissewyn-mark\.png/);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/);
 });
 
@@ -55,14 +55,13 @@ test("keeps commercial task interactions and accessibility in source", async () 
       readFile(new URL("../app/clarity.css", import.meta.url), "utf8"),
       readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
       readFile(new URL("../package.json", import.meta.url), "utf8"),
-      readFile(new URL("../public/unzoo-one-mark-v6.svg", import.meta.url), "utf8"),
-      readFile(new URL("../public/unzoo-one-mark-v6.png", import.meta.url)),
-      readFile(new URL("../public/unzoo-favicon-v6.png", import.meta.url)),
+      readFile(new URL("../public/nissewyn-mark.svg", import.meta.url), "utf8"),
+      readFile(new URL("../public/nissewyn-mark.png", import.meta.url)),
+      readFile(new URL("../public/nissewyn-favicon.png", import.meta.url)),
     ]);
   const page = [pageEntry, pageTypes, pageMock].join("\n");
 
   assert.match(page, /clarity-wordmark-name/);
-  assert.match(page, /clarity-wordmark-one/);
   assert.match(page, /clarity-mobile-brand-mark/);
   assert.match(page, /className="clarity-brand"[\s\S]*aria-label=\{t\("返回首页"\)\}/);
   assert.match(page, /const onboardingPreferenceKey =/);
@@ -75,14 +74,13 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /name: "",[\s\S]*target: "",[\s\S]*description: ""/);
   assert.match(page, /targetHint: t\("粘贴要监控的网页地址"\)/);
   assert.match(page, /activeTaskTemplate\?\.targetHint/);
-  assert.match(brandSvg, /viewBox="12 12 104 104"/);
-  assert.match(brandSvg, /#356dff/);
-  assert.match(brandSvg, /#16b889/);
+  assert.match(brandSvg, /viewBox="0 0 1024 1024"/);
+  assert.match(brandSvg, /#E5483B/);
   assert.equal(brandMark.subarray(1, 4).toString("ascii"), "PNG");
   assert.ok(brandMark.length > 10_000);
   assert.equal(brandFavicon.subarray(1, 4).toString("ascii"), "PNG");
   assert.ok(brandFavicon.length > 1_000);
-  assert.match(layout, /unzoo-favicon-v6\.png/);
+  assert.match(layout, /nissewyn-favicon\.png/);
   assert.match(css, /Brand identity v6/);
   assert.match(css, /\.workspace-onboarding/);
   assert.match(css, /\.workspace-onboarding-progress/);
@@ -96,7 +94,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /function exportEmergencyWorkspaceBackup/);
   assert.match(page, /className={`workspace-storage-banner/);
   assert.match(page, /type WorkspaceSyncSnapshot =/);
-  assert.match(page, /const workspaceSyncKey = "unzoo-one-workspace-sync"/);
+  assert.match(page, /const workspaceSyncKey = "nissewyn-workspace-sync"/);
   assert.match(page, /function parseWorkspaceSyncSnapshot/);
   assert.match(page, /function applyWorkspaceSyncSnapshot/);
   assert.match(page, /window\.addEventListener\("storage"/);
@@ -197,16 +195,16 @@ test("keeps commercial task interactions and accessibility in source", async () 
   assert.match(page, /className="notification-backdrop"/);
   assert.match(page, /function closeNotifications/);
   assert.match(page, /keepFocusInNotificationPanel/);
-  assert.match(page, /"unzoo-one-connectors"/);
-  assert.match(page, /"unzoo-one-team"/);
-  assert.match(page, /"unzoo-one-usage"/);
-  assert.match(page, /"unzoo-one-schema-version", "11"/);
+  assert.match(page, /"nissewyn-connectors"/);
+  assert.match(page, /"nissewyn-team"/);
+  assert.match(page, /"nissewyn-usage"/);
+  assert.match(page, /"nissewyn-schema-version", "11"/);
   assert.match(
     page,
     /window\.localStorage\.setItem\(\s*workspaceSyncKey,\s*JSON\.stringify\(snapshot\)/,
   );
   assert.match(page, /removeLocalStorageItems\(legacyWorkspaceStorageKeys\)/);
-  assert.match(page, /"unzoo-one-pending-approvals"/);
+  assert.match(page, /"nissewyn-pending-approvals"/);
   assert.match(page, /function createTask/);
   assert.match(page, /function beginEditTask/);
   assert.match(page, /function duplicateTask/);
@@ -733,7 +731,7 @@ test("keeps commercial task interactions and accessibility in source", async () 
     (match) => Number(match[1]),
   );
   assert.ok(Math.min(...pixelFontSizes) >= 11);
-  assert.match(layout, /The AI task workspace/);
+  assert.match(layout, /Your AI helper, on your own computer/);
   assert.match(packageJson, /"test": "npm run test:contracts && npm run build && node --test/);
 
   await assert.rejects(access(new URL("app/_sites-preview", templateRoot)));

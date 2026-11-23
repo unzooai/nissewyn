@@ -13,7 +13,7 @@ export const enPage6: Record<string, string> = {
   "{length} 个任务 · {length2} 项成果": "{length} task(s) · {length2} deliverable(s)",
   "恢复文件校验": "Restore file check",
   "已启用": "On",
-  "仅接受 Unzoo One JSON v1": "Only Unzoo One JSON v1 is accepted",
+  "仅接受 Nissewyn JSON v1": "Only Nissewyn JSON v1 is accepted",
   "恢复准备度 · {workspaceRecoveryLayerCount} / 3": "Recovery readiness · {workspaceRecoveryLayerCount} / 3",
   "数据保护层": "Protection layers",
   "第一层": "Layer 1",

@@ -22,7 +22,7 @@ export const locales: { id: Locale; label: string }[] = [
   { id: "zh-CN", label: "简体中文" },
 ];
 
-const STORAGE_KEY = "unzoo-one.locale";
+const STORAGE_KEY = "nissewyn.locale";
 
 const catalogs: Record<Exclude<Locale, "zh-CN">, Record<string, string>> = { en };
 
@@ -99,5 +99,5 @@ export function applyDocumentLanguage(): void {
   document.documentElement.lang = current;
   // The page metadata is English (server rendering); the title follows the
   // language actually shown.
-  document.title = t("Unzoo One | AI 任务工作台");
+  document.title = t("Nissewyn | AI 任务工作台");
 }

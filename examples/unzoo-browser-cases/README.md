@@ -1,10 +1,10 @@
 # Unzoo Browser cases: content production and publishing
 
-Worked browser workflows for the content skills in `apps/unzoo-one/skills/` (`social-publish`, `blog-to-platforms`, `content-repurpose`, `subtitle-and-clip`, `newsletter-digest`). Each case lists the exact sequence of Unzoo MCP tool calls, where the person takes over, and what to do when a step fails.
+Worked browser workflows for the content skills in `apps/nissewyn/skills/` (`social-publish`, `blog-to-platforms`, `content-repurpose`, `subtitle-and-clip`, `newsletter-digest`). Each case lists the exact sequence of Unzoo MCP tool calls, where the person takes over, and what to do when a step fails.
 
 Conventions used in every case:
 
-- Calls are written `tool(arg=value)`; in a client they appear as `mcp__unzoo__<tool>`. `agent_session.handover` is the Unzoo One terminal (unterm) tool.
+- Calls are written `tool(arg=value)`; in a client they appear as `mcp__unzoo__<tool>`. `agent_session.handover` is the Nissewyn terminal (unterm) tool.
 - `T` is the `tab_id` returned by the first `tab_create`; pass it on every later call.
 - `ref=N` values come from the **latest** `browser_a11y_snapshot`. Element names in the steps ("Select files", "发布") are what to look for in the snapshot, not hard-coded selectors; these pages change often.
 - Files are absolute paths in the task's working folder.

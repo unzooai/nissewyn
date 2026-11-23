@@ -1,12 +1,12 @@
-# Unzoo One
+# Nissewyn
 
-**The agent's computer.**
+**The little helper that lives in your computer.** It works while you sleep, and nothing leaves home.
 
 [中文](README.zh-CN.md)
 
-Unzoo One is not another chat app. It is the computer your AI agents work on.
+Nissewyn is not another chat app. It is the computer your AI agents work on.
 The thinking comes from the agents you already pay for: Claude Code, Codex,
-Antigravity CLI (agy) and OpenCode, on your own subscriptions. Unzoo One gives
+Antigravity CLI (agy) and OpenCode, on your own subscriptions. Nissewyn gives
 them what they can't get inside their own apps:
 
 - **A terminal that stays.** Sessions live in a background service, so they
@@ -74,7 +74,7 @@ Next for the personal edition:
 |---|---|
 | `unterm/` | The runtime: background service, terminal, agent sessions, scheduling, gateway (Rust). Third-party, MIT; see [NOTICE.md](NOTICE.md). |
 | `app/` | The interface (Next.js 16 + React 19 on [vinext](https://github.com/cloudflare/vinext)), built as static files and bundled into the desktop client. |
-| `apps/unzoo-one/` | The desktop client (Tauri 2) and installer. See [its README](apps/unzoo-one/README.md). |
+| `apps/nissewyn/` | The desktop client (Tauri 2) and installer. See [its README](apps/nissewyn/README.md). |
 | `contracts/` | Cross-repository JSON Schemas. |
 | `docs/` | Product and design documents. The current plan is [docs/plans/2026-11-12-agent-computer.md](docs/plans/2026-11-12-agent-computer.md). |
 | `one-core/` | Earlier runtime prototype, now frozen. |
@@ -88,9 +88,9 @@ npm test                      # interface tests
 cd unterm && cargo build -p unterm-core -p unterm-app    # runtime and terminal
 ```
 
-Windows installer: `powershell -File apps\unzoo-one\build-installer.ps1`.
+Windows installer: `powershell -File apps\nissewyn\build-installer.ps1`.
 Details, signing and autostart are covered in
-[apps/unzoo-one/README.md](apps/unzoo-one/README.md). The interface's
+[apps/nissewyn/README.md](apps/nissewyn/README.md). The interface's
 development setup is in [docs/web-console-setup.md](docs/web-console-setup.md).
 
 Agents working in this repository must follow [AGENTS.md](AGENTS.md). In
@@ -99,14 +99,14 @@ Puppeteer and similar tools are not allowed.
 
 ## License
 
-Unzoo One is **source-available** under the
+Nissewyn is **source-available** under the
 [Business Source License 1.1](LICENSE). It is free software with controls:
 
 - **Allowed:** reading, changing and building the code; using it yourself; and
   using it inside your company, including in production.
 - **Not allowed** without a commercial license: offering it to others as a
   hosted or managed service, or shipping it inside a product that competes
-  with Unzoo One.
+  with Nissewyn.
 - **After four years:** each version becomes
   [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) four years
   after it is first released.

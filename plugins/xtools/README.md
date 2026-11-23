@@ -1,6 +1,6 @@
 # Xtools
 
-An Unzoo One plugin that runs one X account for growth, for any niche.
+An Nissewyn plugin that runs one X account for growth, for any niche.
 
 - **Learns the account.** Reads the profile and recent posts: voice, what performed, when.
 - **Proposes a playbook.** Content pillars, keywords, accounts to watch. You can edit all of it.
@@ -15,7 +15,7 @@ An Unzoo One plugin that runs one X account for growth, for any niche.
 
 Design and reasoning: [docs/research/plugins/x-growth.md](../../docs/research/plugins/x-growth.md).
 
-## Use it in Unzoo One
+## Use it in Nissewyn
 
 1. **Add the plugin.** Go to **Plugins › Add** and enter this folder.
 2. **Set it up.** In **Settings**:

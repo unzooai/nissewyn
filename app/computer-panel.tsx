@@ -16,7 +16,7 @@ export type ComputerPanelProps = {
   /** Keys the person typed into it. */
   sendKeys: (sessionId: string, input: string) => Promise<void>;
   loadTab: (tabId: string) => Promise<TabView>;
-  /** 在 Unzoo One 终端里打开这个会话，人来接手。 */
+  /** 在 Nissewyn 终端里打开这个会话，人来接手。 */
   onOpenTerminal: (sessionId: string) => Promise<void>;
   /** 把标签页切到 Unzoo 浏览器前台。 */
   onShowTab: (tabId: string) => Promise<void>;

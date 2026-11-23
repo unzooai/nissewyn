@@ -1,10 +1,10 @@
-# Unzoo One
+# Nissewyn
 
-**智能体的电脑。**
+**住在你电脑里的 AI 小帮手。** 你睡觉时它干活，数据不出门。
 
 [English](README.md)
 
-Unzoo One 不是另一个聊天客户端，而是给 AI 智能体干活用的电脑。思考交给你已经在用的智能体：Claude Code、Codex、Antigravity CLI（agy）、OpenCode，用的是你自己的订阅。Unzoo One 提供它们在自家客户端里拿不到的东西：
+Nissewyn 不是另一个聊天客户端，而是给 AI 智能体干活用的电脑。思考交给你已经在用的智能体：Claude Code、Codex、Antigravity CLI（agy）、OpenCode，用的是你自己的订阅。Nissewyn 提供它们在自家客户端里拿不到的东西：
 
 - **不会断的终端**：会话在后台服务里，窗口关了照样跑；长时间跑的程序下次还在，你可以在同一个终端里看着、随时接手。
 - **带真实登录的浏览器**：真 Chromium、你自己的账号，每个智能体有隔离的身份；能下载媒体、处理验证码，要登录时交给你，它等着。
@@ -56,7 +56,7 @@ Unzoo One 不是另一个聊天客户端，而是给 AI 智能体干活用的电
 |---|---|
 | `unterm/` | 运行时：后台服务、终端、智能体会话、调度、网关（Rust）。第三方代码，MIT 协议，见 [NOTICE.md](NOTICE.md) |
 | `app/` | 界面（Next.js 16 + React 19，基于 [vinext](https://github.com/cloudflare/vinext)），静态构建后打进桌面客户端 |
-| `apps/unzoo-one/` | 桌面客户端（Tauri 2）和安装包，见[它的说明](apps/unzoo-one/README.md) |
+| `apps/nissewyn/` | 桌面客户端（Tauri 2）和安装包，见[它的说明](apps/nissewyn/README.md) |
 | `contracts/` | 跨仓库 JSON Schema |
 | `docs/` | 产品和设计文档。当前计划见 [docs/plans/2026-11-12-agent-computer.md](docs/plans/2026-11-12-agent-computer.md) |
 | `one-core/` | 早期的运行时原型，已冻结 |
@@ -70,19 +70,19 @@ npm test                      # 界面测试
 cd unterm && cargo build -p unterm-core -p unterm-app    # 运行时和终端
 ```
 
-Windows 安装包：`powershell -File apps\unzoo-one\build-installer.ps1`。
+Windows 安装包：`powershell -File apps\nissewyn\build-installer.ps1`。
 
-- 安装包、签名和开机后台运行：见 [apps/unzoo-one/README.md](apps/unzoo-one/README.md)。
+- 安装包、签名和开机后台运行：见 [apps/nissewyn/README.md](apps/nissewyn/README.md)。
 - 界面开发：见 [docs/web-console-setup.md](docs/web-console-setup.md)。
 
 在本仓库里工作的智能体必须遵守 [AGENTS.md](AGENTS.md)：浏览器自动化一律走 Unzoo Browser，不许用 Playwright、Puppeteer 这类工具。
 
 ## 协议
 
-Unzoo One 是**源码公开的受控自由软件**，采用 [Business Source License 1.1](LICENSE)：
+Nissewyn 是**源码公开的受控自由软件**，采用 [Business Source License 1.1](LICENSE)：
 
 - **可以**：看、改、构建代码；自己用；在公司内部用，包括生产环境。
-- **不可以**（需要商业授权）：拿去给别人做托管或代运营服务，或者放进和 Unzoo One 竞争的产品里。
+- **不可以**（需要商业授权）：拿去给别人做托管或代运营服务，或者放进和 Nissewyn 竞争的产品里。
 - **四年后**：每个版本发布满四年，自动改为 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)。
 
 `unterm/` 里的运行时和其它第三方代码保留各自的协议（MIT 等），见 [NOTICE.md](NOTICE.md)。要商业授权或企业版，请发邮件到 [dev@unzoo.ai](mailto:dev@unzoo.ai)。

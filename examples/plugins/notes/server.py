@@ -1,4 +1,4 @@
-"""The plugin's program: its page and a small JSON API, on the port Unzoo One
+"""The plugin's program: its page and a small JSON API, on the port Nissewyn
 gives it (UNZOO_PLUGIN_PORT). Standard library only."""
 import html, json, os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,7 +13,7 @@ li{{margin:6px 0}} small{{color:#888}} code{{font-size:12px}}
 <h1>Notes</h1>
 <form method="post" action="/add"><input name="text" placeholder="A note" style="width:60%"> <button>Add</button></form>
 <ul>{items}</ul>
-<h3>Roles Unzoo One gave this plugin</h3><pre><code>{roles}</code></pre>
+<h3>Roles Nissewyn gave this plugin</h3><pre><code>{roles}</code></pre>
 </body></html>"""
 
 

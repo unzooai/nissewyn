@@ -1,4 +1,4 @@
-# OpenWorker 参考分析与 Unzoo One 产品覆盖策略
+# OpenWorker 参考分析与 Nissewyn 产品覆盖策略
 
 > 状态：Draft
 > 日期：2026-07-26
@@ -7,7 +7,7 @@
 
 ## 1. 参考原则
 
-Unzoo One 将 OpenWorker 视为首要产品参考基线。
+Nissewyn 将 OpenWorker 视为首要产品参考基线。
 
 “完全学习”不等于复制 UI 或源代码，而是：
 
@@ -17,9 +17,9 @@ Unzoo One 将 OpenWorker 视为首要产品参考基线。
 4. 用 Unterm 和 Unzoo 扩展执行范围、可靠性和可控性。
 5. 对采用的 MIT 源代码保持许可证和归属合规。
 
-Unzoo One 的目标不是“功能列表更多”，而是：
+Nissewyn 的目标不是“功能列表更多”，而是：
 
-> OpenWorker 能完成的日常知识工作，Unzoo One 应当更稳定地完成；OpenWorker 当前不能覆盖的终端、真实浏览器、多账号、桌面应用和长期任务，Unzoo One 继续完成。
+> OpenWorker 能完成的日常知识工作，Nissewyn 应当更稳定地完成；OpenWorker 当前不能覆盖的终端、真实浏览器、多账号、桌面应用和长期任务，Nissewyn 继续完成。
 
 ## 2. OpenWorker 的产品公式
 
@@ -44,7 +44,7 @@ Outcome-oriented UX
 - 已更新的日历。
 - 已整理的 Inbox。
 
-这是 Unzoo One 必须继承的第一原则：**任务完成标准是可用结果，而不是 Agent 停止输出。**
+这是 Nissewyn 必须继承的第一原则：**任务完成标准是可用结果，而不是 Agent 停止输出。**
 
 ## 3. 已验证的 OpenWorker 能力
 
@@ -62,7 +62,7 @@ OpenWorker 提供三种内置 Agent：
 - 安装前展示权限和风险。
 - 新 Persona 默认禁用，等待用户同意。
 
-### Unzoo One 学习方式
+### Nissewyn 学习方式
 
 保留三种清晰心智，但避免把它们做成三个割裂产品：
 
@@ -85,9 +85,9 @@ OpenWorker 的上手流程是：
 
 Provider Gallery 与 Settings 复用同一组件，避免状态漂移。
 
-### Unzoo One 学习方式
+### Nissewyn 学习方式
 
-Unzoo One 首次启动控制在三步：
+Nissewyn 首次启动控制在三步：
 
 1. **Choose a brain**：自动检测 Codex/Claude 登录态，也支持 API Key/Ollama。
 2. **Connect your tools**：自动绑定 Unterm 与 Unzoo，展示可选 Connector。
@@ -128,7 +128,7 @@ OpenWorker 的工具风险分为：
 - Connector 的长期授权绑定到精确工具和目标。
 - “Allow every time” 对 Automation 持久化，但可撤销。
 
-### Unzoo One 的增强
+### Nissewyn 的增强
 
 在相同心智上扩展为：
 
@@ -151,7 +151,7 @@ destructive
 - Approval 与 Grant 的持久关联。
 - 未声明风险默认 fail-closed。
 
-OpenWorker 对无法识别且没有 `requires_approval` 元数据的工具可能回落为 read；Unzoo One 不采用这一回退策略。
+OpenWorker 对无法识别且没有 `requires_approval` 元数据的工具可能回落为 read；Nissewyn 不采用这一回退策略。
 
 ## 3.4 Unattended 与 Inbox
 
@@ -168,7 +168,7 @@ OpenWorker 最值得学习的设计之一：
 - 重启后可恢复等待中的工具调用。
 - 删除 Session 会关闭孤立审批。
 
-### Unzoo One 学习方式
+### Nissewyn 学习方式
 
 直接采用“注意力路由”和“自治等级”分离的产品概念：
 
@@ -188,7 +188,7 @@ OpenWorker：
 - Stop 能中断 stream、tool、approval 和 question。
 - 部分输出和 interruption notice 会保留。
 
-### Unzoo One 的增强
+### Nissewyn 的增强
 
 在 Session 之外增加完整 Task 层：
 
@@ -214,7 +214,7 @@ OpenWorker：
 - 创建 Automation 本身需要审批。
 - Standing Grant 绑定到精确工具和目标。
 
-### Unzoo One 学习方式
+### Nissewyn 学习方式
 
 完整覆盖以上能力，并增加：
 
@@ -249,7 +249,7 @@ Hunter, PagerDuty
 - Approval owner。
 - 发送文件与互动按钮。
 
-### Unzoo One 覆盖策略
+### Nissewyn 覆盖策略
 
 不应逐个手写 39 套孤立逻辑。分三层覆盖：
 
@@ -284,7 +284,7 @@ OpenWorker：
 - 自定义模型允许使用，但给出降级风险。
 - 会话中可以切换模型。
 
-### Unzoo One 学习方式
+### Nissewyn 学习方式
 
 保持 Curated Matrix，并增加两种接入：
 
@@ -314,7 +314,7 @@ OpenWorker 使用 SQLite Memory Store，支持：
 - Keyed memory。
 - 增、删、改、查。
 
-### Unzoo One 增强
+### Nissewyn 增强
 
 - Working / Episodic / Semantic 分层。
 - 用户可视化管理。
@@ -335,7 +335,7 @@ OpenWorker 的 Cowork Prompt 强制：
 
 这不是 Prompt 小技巧，而是产品协议。
 
-### Unzoo One 学习方式
+### Nissewyn 学习方式
 
 将其提升为运行时要求：
 
@@ -356,9 +356,9 @@ OpenWorker：
 - Rust STT Sidecar。
 - Hermetic E2E 与真实 Server E2E 分开。
 
-### Unzoo One 学习方式
+### Nissewyn 学习方式
 
-- Unzoo One Desktop 是薄客户端。
+- Nissewyn Desktop 是薄客户端。
 - **One Core 是唯一控制平面**（归属修订 2026-08-06，原写作 Unterm Core）。
 - Unzoo daemon 是 Browser/Computer Provider。
 - Unterm 是 Terminal Provider，且为可选组件。
@@ -367,7 +367,7 @@ OpenWorker：
 
 ## 4. 能力覆盖矩阵
 
-| 能力 | OpenWorker | Unzoo One 目标 |
+| 能力 | OpenWorker | Nissewyn 目标 |
 |---|---|---|
 | 成品交付 | 已有 | 完全覆盖；Artifact Registry 强化 |
 | Chat/Cowork/Code | 已有 | Ask/Work/Code/Automate 统一入口 |
@@ -393,7 +393,7 @@ OpenWorker：
 | 手机接管 | 路线中 | 审批、通知、接管、紧急停止 |
 | 中国本地生态 | 少 | 飞书、企业微信、钉钉、微信方向 |
 
-## 5. Unzoo One 必须优先补齐的差距
+## 5. Nissewyn 必须优先补齐的差距
 
 当前规划相对 OpenWorker 仍有四个产品差距，必须调整：
 
@@ -425,7 +425,7 @@ V1 加入 Ollama；首次 Alpha 可先允许用户使用已登录的 Codex/Claud
 
 ### 5.4 Persona/Skill 必须有安装许可
 
-Unzoo One 的 Skill/Persona 不能安装后自动获得工具权限。安装页必须展示：
+Nissewyn 的 Skill/Persona 不能安装后自动获得工具权限。安装页必须展示：
 
 - 它是谁。
 - 能读取什么。
@@ -448,7 +448,7 @@ Unzoo One 的 Skill/Persona 不能安装后自动获得工具权限。安装页�
 
 ## 7. 更广范围的产品边界
 
-Unzoo One 的执行范围按层扩展：
+Nissewyn 的执行范围按层扩展：
 
 ```text
 Ask
@@ -485,11 +485,11 @@ OpenWorker 已经证明了桌面数字同事的正确产品形态：
 - 重要动作先问用户。
 - 无人值守仍不越权。
 
-Unzoo One 不应偏离这些原则。我们的差异化建立在更强的底座之上：
+Nissewyn 不应偏离这些原则。我们的差异化建立在更强的底座之上：
 
 - Unterm 提供真实终端、Headless Core、多 Agent 和可恢复任务。
 - Unzoo 提供真实浏览器、多 Profile、Human Mode 和未来桌面操作。
-- Unzoo One 提供比 OpenWorker 更统一的任务、授权、证据和跨设备体验。
+- Nissewyn 提供比 OpenWorker 更统一的任务、授权、证据和跨设备体验。
 
 产品验收口径不是“比 OpenWorker 多几个工具”，而是：
 

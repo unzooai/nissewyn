@@ -209,7 +209,7 @@ export function createMockProvider(): WorkspaceProvider {
       const lease: CapabilityLease = {
         id: nextId("lease"),
         capability,
-        holder: "unzoo-one-console",
+        holder: "nissewyn-console",
         scope,
         expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
         status: "active",

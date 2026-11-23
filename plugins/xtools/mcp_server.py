@@ -1,5 +1,5 @@
-"""Xtools' tools for agents in Unzoo One conversations: a small MCP server over stdio that
-talks to the running Xtools (its port comes from Unzoo One)."""
+"""Xtools' tools for agents in Nissewyn conversations: a small MCP server over stdio that
+talks to the running Xtools (its port comes from Nissewyn)."""
 import json
 import os
 import sys
@@ -37,7 +37,7 @@ ROUTES = {
 
 def call(name, args):
     if not PORT:
-        raise RuntimeError('Xtools 没在运行:在 Unzoo One 的插件页打开它')
+        raise RuntimeError('Xtools 没在运行:在 Nissewyn 的插件页打开它')
     method, path, body = ROUTES[name]
     data = json.dumps(body(args)).encode() if body else None
     req = urllib.request.Request('http://127.0.0.1:%s%s' % (PORT, path(args)), data=data, method=method,

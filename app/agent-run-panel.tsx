@@ -294,7 +294,7 @@ export function AgentRunPanel({
       >
         <span>
           <strong>{t("工作目录")}</strong>
-          <small>{t("任务交给智能体后，它在这个目录里读写文件、执行命令。留空则每个任务用自己的文件夹：文档 › Unzoo One › 任务名。")}</small>
+          <small>{t("任务交给智能体后，它在这个目录里读写文件、执行命令。留空则每个任务用自己的文件夹：文档 › Nissewyn › 任务名。")}</small>
           <span className="agent-run-input">
             <FolderOpen size={14} aria-hidden="true" />
             <input
@@ -317,7 +317,7 @@ export function AgentRunPanel({
         <span>
           <strong>{t("受管模式")}</strong>
           <small>
-            {t("关掉 Claude Code 自带的 Bash、PowerShell 和联网工具，命令只能经 Unzoo One 的终端执行，网页只能经 Unzoo 浏览器打开。目前只有 Claude Code 支持；其它智能体用自己的工具。哪些操作要先问你，由下面的自主程度决定。")}
+            {t("关掉 Claude Code 自带的 Bash、PowerShell 和联网工具，命令只能经 Nissewyn 的终端执行，网页只能经 Unzoo 浏览器打开。目前只有 Claude Code 支持；其它智能体用自己的工具。哪些操作要先问你，由下面的自主程度决定。")}
           </small>
         </span>
         <button
@@ -383,13 +383,13 @@ export function AgentRunPanel({
                       { ...settings, browserProfile },
                       browserProfile
                         ? t("智能体改用浏览器身份“{name}”", { name: name ?? browserProfile })
-                        : t("智能体改用 Unzoo One 的专用身份"),
+                        : t("智能体改用 Nissewyn 的专用身份"),
                     );
                     window.setTimeout(() => void loadBrowser(), 300);
                   }}
                 >
                   <option value="">
-                    {browser.reserved ? t("Unzoo One 专用身份") : t("Unzoo One 专用身份（还没有建）")}
+                    {browser.reserved ? t("Nissewyn 专用身份") : t("Nissewyn 专用身份（还没有建）")}
                   </option>
                   {browser.profiles
                     .filter((profile) => profile.id !== browser.reservedProfile)

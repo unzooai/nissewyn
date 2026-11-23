@@ -8,9 +8,9 @@ import type { RuntimeClients, RuntimeTaskPort } from "./lib/provider";
 /**
  * 设置 › 能力 › 接入其它 AI 客户端。
  *
- * 喜欢在 Claude 桌面版、Cursor、Codex 里干活的人，也能用上 Unzoo One 的终端
+ * 喜欢在 Claude 桌面版、Cursor、Codex 里干活的人，也能用上 Nissewyn 的终端
  * 和浏览器：终端由这里写进客户端的 MCP 配置；浏览器由 Unzoo 自己的接入程序
- * 管。外部客户端往终端里写东西之前，问题进 Unzoo One 的收件箱。
+ * 管。外部客户端往终端里写东西之前，问题进 Nissewyn 的收件箱。
  */
 export function ClientsPanel({
   runtime,
@@ -43,11 +43,11 @@ export function ClientsPanel({
       notify(
         connect
           ? skills
-            ? t("已把 Unzoo One 的终端和技能接入 {name}。重启 {name} 后生效。", { name })
-            : t("已把 Unzoo One 的终端接入 {name}。重启 {name} 后生效。", { name })
+            ? t("已把 Nissewyn 的终端和技能接入 {name}。重启 {name} 后生效。", { name })
+            : t("已把 Nissewyn 的终端接入 {name}。重启 {name} 后生效。", { name })
           : skills
-            ? t("已从 {name} 移除 Unzoo One 的终端和技能", { name })
-            : t("已从 {name} 移除 Unzoo One 的终端", { name }),
+            ? t("已从 {name} 移除 Nissewyn 的终端和技能", { name })
+            : t("已从 {name} 移除 Nissewyn 的终端", { name }),
       );
       await load();
     } catch (failure) {
@@ -83,7 +83,7 @@ export function ClientsPanel({
         </button>
       </div>
       <p className="skills-intro">
-        {t("接入后，你在那些客户端里用的智能体也能操作 Unzoo One 的终端和浏览器，并拿到一段终端用法说明；Claude Code、Codex、OpenCode 还会装上你在“技能”里启用的技能，断开时一并移除。它在终端里做的事按“智能体 › 自主程度”判断：普通命令直接执行，删除、推送这类会先进这里的收件箱等你确认；Unzoo One 没打开、手机上也没开着时，要确认的操作会被拒绝。")}
+        {t("接入后，你在那些客户端里用的智能体也能操作 Nissewyn 的终端和浏览器，并拿到一段终端用法说明；Claude Code、Codex、OpenCode 还会装上你在“技能”里启用的技能，断开时一并移除。它在终端里做的事按“智能体 › 自主程度”判断：普通命令直接执行，删除、推送这类会先进这里的收件箱等你确认；Nissewyn 没打开、手机上也没开着时，要确认的操作会被拒绝。")}
       </p>
 
       {error ? (
@@ -137,7 +137,7 @@ export function ClientsPanel({
       )}
 
       {data && !data.terminalReady && (
-        <p className="skills-empty">{t("缺少 Unzoo One 的终端组件，重新安装 Unzoo One 可以修复。")}</p>
+        <p className="skills-empty">{t("缺少 Nissewyn 的终端组件，重新安装 Nissewyn 可以修复。")}</p>
       )}
       {missingBrowser && (
         <div className="clients-browser">

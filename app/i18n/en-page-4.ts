@@ -121,7 +121,7 @@ export const enPage4: Record<string, string> = {
   "任务会继续在后台运行。": "Tasks keep running in the background.",
   "查看稍后提醒": "View snoozed",
   "最近任务": "Recent tasks",
-  "你交给 Unzoo One 的工作": "Work you've handed to Unzoo One",
+  "你交给 Nissewyn 的工作": "Work you've handed to Nissewyn",
   "任务筛选": "Task filter",
   "搜索任务列表": "Search tasks",
   "搜索名称、来源或运行计划": "Search name, source or schedule",

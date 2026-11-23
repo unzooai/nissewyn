@@ -213,14 +213,14 @@ test("运行写下的文件进成果：同一文件只留最近一次，版本�
       created_at: "2026-11-01T00:00:00Z",
       updated_at: "2026-11-01T00:00:00Z",
       paused: false,
-      workdir: "C:\\Users\\me\\Documents\\Unzoo One\\Market scan",
+      workdir: "C:\\Users\\me\\Documents\\Nissewyn\\Market scan",
       runs: [
         {
           id: "run-2",
           attempt: 1,
           state: "succeeded",
           started_at: "2026-11-11T09:00:00Z",
-          workdir: "C:\\Users\\me\\Documents\\Unzoo One\\Market scan",
+          workdir: "C:\\Users\\me\\Documents\\Nissewyn\\Market scan",
           outputs: [
             { path: "report.md", size: 2048, modified: "2026-11-11T09:05:00Z" },
             { path: "data/prices.csv", size: 512, modified: "2026-11-11T09:04:00Z" },
@@ -245,11 +245,11 @@ test("运行写下的文件进成果：同一文件只留最近一次，版本�
   assert.equal(report.sizeKb, 2);
   assert.equal(report.version, 2, "written by two runs");
   assert.equal(report.file.runId, "run-2", "the latest run's copy");
-  assert.equal(report.file.absolutePath, "C:\\Users\\me\\Documents\\Unzoo One\\Market scan\\report.md");
+  assert.equal(report.file.absolutePath, "C:\\Users\\me\\Documents\\Nissewyn\\Market scan\\report.md");
   assert.equal(report.content, "", "read when chosen");
   const prices = items.find((item) => item.filename === "prices.csv");
   assert.equal(prices.type, "数据");
-  assert.equal(prices.file.absolutePath, "C:\\Users\\me\\Documents\\Unzoo One\\Market scan\\data\\prices.csv");
+  assert.equal(prices.file.absolutePath, "C:\\Users\\me\\Documents\\Nissewyn\\Market scan\\data\\prices.csv");
 
   // 读过的内容和重点标记，文件没变时留着；页面自己的成果不动；任务没了的产出不留。
   const loaded = { ...report, content: "# Report", starred: true, file: { ...report.file, loaded: true } };

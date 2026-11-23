@@ -1,4 +1,4 @@
-"""Writing with the agent the person picked for the "writer" role in Unzoo One.
+"""Writing with the agent the person picked for the "writer" role in Nissewyn.
 
 Text only: the agent's own tools are off (no files, no web, no commands); the prompt
 goes on stdin and the answer is the text. It runs on the person's own CLI and plan."""

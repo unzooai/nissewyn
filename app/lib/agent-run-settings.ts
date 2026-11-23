@@ -26,7 +26,7 @@ export type AgentRunSettings = {
    */
   autonomy: AgentAutonomy;
   /**
-   * 智能体在 Unzoo 浏览器里用哪个身份。空串：Unzoo One 给它预留的专用身份；
+   * 智能体在 Unzoo 浏览器里用哪个身份。空串：Nissewyn 给它预留的专用身份；
    * 也可以指定一个现有身份（比如登录了你账号的那个）。
    */
   browserProfile: string;
@@ -36,7 +36,7 @@ export type AgentAutonomy = "cautious" | "balanced" | "autonomous";
 
 export const agentAutonomyLevels: readonly AgentAutonomy[] = ["cautious", "balanced", "autonomous"];
 
-export const AGENT_RUN_SETTINGS_KEY = "unzoo-one.agent-run";
+export const AGENT_RUN_SETTINGS_KEY = "nissewyn.agent-run";
 
 export const defaultAgentRunSettings: AgentRunSettings = {
   agent: "claude-code",

@@ -1,4 +1,4 @@
-# Unzoo One 核心领域模型与协议契约
+# Nissewyn 核心领域模型与协议契约
 
 > 状态：Draft
 > 日期：2026-07-26
@@ -6,8 +6,8 @@
 
 ## 1. 设计规则
 
-1. **One Core** 是 Task、Approval、Grant、Event、Artifact 的唯一事实来源（归属修订 2026-08-06：原为 Unterm Core，见 `unzoo-one#2`）。
-2. Unzoo One UI 不自行推导权威状态。
+1. **One Core** 是 Task、Approval、Grant、Event、Artifact 的唯一事实来源（归属修订 2026-08-06：原为 Unterm Core，见 `nissewyn#2`）。
+2. Nissewyn UI 不自行推导权威状态。
 3. Provider（Unterm Terminal、Unzoo Browser/Computer、Connector）只拥有自身 Action 的执行状态与服务于自身独立使用的局部持久化，不对外充当全局真相。
 4. Brain 不直接获得凭证，也不能签发 Grant。
 5. 每个副作用调用必须具备稳定 Idempotency Key。
@@ -33,7 +33,7 @@ event_01J...
 automation_01J...
 inbox_01J...
 provider_unzoo_local
-client_unzoo_one_desktop
+client_nissewyn_desktop
 ```
 
 要求：
@@ -638,7 +638,7 @@ internal.*
 
 ## 19. 契约交付物
 
-已建成（2026-09-03，ONE-C001 / `unzoo-one#3`）：
+已建成（2026-09-03，ONE-C001 / `nissewyn#3`）：
 
 ```text
 contracts/v0/

@@ -1,5 +1,5 @@
 /**
- * Unzoo One 工作台的数据契约。
+ * Nissewyn 工作台的数据契约。
  *
  * 控制台目前跑在内存 mock 上（app/data/mock.ts）。这一层的存在是为了让
  * 组件只依赖契约，接真实后端时换实现而不动 UI。
@@ -311,13 +311,13 @@ export type WorkspaceSnapshot = {
 };
 
 /**
- * 装好的 Unzoo One 里，任务归本机运行时（unterm）管：它存任务、跑任务、
+ * 装好的 Nissewyn 里，任务归本机运行时（unterm）管：它存任务、跑任务、
  * 按计划定时跑，页面关了也照样。云端演示版没有运行时，available() 为 false，
  * 页面退回本地演示。
  */
-/** 这台机器上智能体能用的：Unzoo One 的终端、Unzoo 浏览器。 */
+/** 这台机器上智能体能用的：Nissewyn 的终端、Unzoo 浏览器。 */
 export type RuntimeCapabilities = {
-  /** 受管模式要把 Unzoo One 终端挂给智能体，靠 unterm-cli。 */
+  /** 受管模式要把 Nissewyn 终端挂给智能体，靠 unterm-cli。 */
   terminal: { governedReady: boolean };
   browser: { installed: boolean; path?: string };
 };
@@ -330,7 +330,7 @@ export type RuntimeBrowser = {
   plan?: string;
   maxProfiles?: number;
   profiles: { id: string; name: string }[];
-  /** Unzoo One 给智能体预留的身份。 */
+  /** Nissewyn 给智能体预留的身份。 */
   reservedProfile: string;
   reserved: boolean;
   /** 设置里指定的身份；没指定是 null。 */
@@ -366,7 +366,7 @@ export type RuntimeSkill = {
   path: string;
 };
 
-/** 这台机器上的一个 AI 客户端，以及它能不能用 Unzoo One 的终端和浏览器。 */
+/** 这台机器上的一个 AI 客户端，以及它能不能用 Nissewyn 的终端和浏览器。 */
 export type RuntimeClient = {
   id: string;
   name: string;
@@ -374,13 +374,13 @@ export type RuntimeClient = {
   config: string;
   terminal: boolean;
   browser: boolean;
-  /** 这个客户端读技能文件夹：接入终端时把 Unzoo One 的技能一起装进去。 */
+  /** 这个客户端读技能文件夹：接入终端时把 Nissewyn 的技能一起装进去。 */
   skills?: boolean;
   error?: string;
 };
 
 export type RuntimeClients = {
-  /** 终端在客户端配置里的名字（产品名，如 unzoo-one）。 */
+  /** 终端在客户端配置里的名字（产品名，如 nissewyn）。 */
   server: string;
   terminalReady: boolean;
   browserInstalled: boolean;
@@ -419,7 +419,7 @@ export type RuntimeTellRule = { kind: string; wish: RuntimeTellWish; hours: stri
 export type RuntimeTellClue = RuntimeTellRule & { count: number };
 export type RuntimeTellRules = { rules: RuntimeTellRule[]; clues: RuntimeTellClue[] };
 
-/** 插件：在 Unzoo One 旁边运行的程序，有自己的控制页面、状态和给智能体的工具。 */
+/** 插件：在 Nissewyn 旁边运行的程序，有自己的控制页面、状态和给智能体的工具。 */
 export type RuntimePluginStatus = "running" | "starting" | "not_answering" | "failed" | "stopped" | "tools_only" | "broken";
 export type RuntimePluginRole = {
   name: string;
@@ -510,7 +510,7 @@ export interface RuntimeTaskPort {
   terminalInput(sessionId: string, input: string): Promise<void>;
   /** 人做完了智能体请他做的事（或者做不了）。 */
   answerHandover(sessionId: string, handoverId: string, done: boolean, note?: string): Promise<void>;
-  /** 把智能体的终端切到 Unzoo One 终端窗口的前台，让人接手。 */
+  /** 把智能体的终端切到 Nissewyn 终端窗口的前台，让人接手。 */
   focusTerminal(sessionId: string): Promise<void>;
   /** 智能体用过的标签页此刻的样子。 */
   tabView(tabId: string): Promise<TabView>;
@@ -523,9 +523,9 @@ export interface RuntimeTaskPort {
   deleteSkill(name: string): Promise<RuntimeSkill[]>;
   /** 导入一个含 SKILL.md 的文件夹。 */
   importSkill(path: string, replace?: boolean): Promise<{ imported: string; skills: RuntimeSkill[] }>;
-  /** 本机的 AI 客户端（Claude 桌面版、Cursor、Codex…）接没接 Unzoo One。 */
+  /** 本机的 AI 客户端（Claude 桌面版、Cursor、Codex…）接没接 Nissewyn。 */
   clients(): Promise<RuntimeClients>;
-  /** 把 Unzoo One 的终端接入（或移出）某个客户端。 */
+  /** 把 Nissewyn 的终端接入（或移出）某个客户端。 */
   connectClient(id: string, connect: boolean): Promise<void>;
   /** 本机的 shell，和新开的终端用哪个。 */
   shells(): Promise<RuntimeShells>;

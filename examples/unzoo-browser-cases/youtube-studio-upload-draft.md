@@ -29,7 +29,7 @@
 
 - Sign-in, 2-step verification, "verify it's you": `agent_session.handover(text="Sign in to the <channel> Google account in this tab", tab_id=T)`.
 - Making it Public / Unlisted / Scheduled is the person's: `agent_session.handover(text="The video '<title>' is uploaded as Private on <channel>. Change visibility to Public or schedule it if it looks right.", tab_id=T)`.
-- The file upload itself is shown to the person by Unzoo One before it happens.
+- The file upload itself is shown to the person by Nissewyn before it happens.
 
 ## Failure handling
 

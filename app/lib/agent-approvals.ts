@@ -43,7 +43,7 @@ export function isAgentApprovalId(id: string): boolean {
 }
 
 /**
- * 外部 AI 客户端（Claude 桌面版、Cursor…）经 Unzoo One 终端要写入时的确认：
+ * 外部 AI 客户端（Claude 桌面版、Cursor…）经 Nissewyn 终端要写入时的确认：
  * unterm 的 pending_input_confirmations 里的一条。没有终端窗口时由控制台来答。
  */
 export type RawInputConfirmation = {
@@ -100,7 +100,7 @@ export function confirmationToApprovalItem(raw: RawInputConfirmation, now: numbe
     id: agentApprovalId(CONFIRMATION_SESSION, String(raw.id)),
     taskId: "",
     title: t("{agent} 请求{action}", { agent, action }),
-    reason: t("{agent} 通过 Unzoo One 的终端要做这件事，做之前需要你确认。", { agent }),
+    reason: t("{agent} 通过 Nissewyn 的终端要做这件事，做之前需要你确认。", { agent }),
     impact: t("批准后会在本机执行：{target}", { target }),
     action,
     target,
@@ -142,20 +142,20 @@ function kindOf(tool: string): Kind {
   return "other";
 }
 
-/** `mcp__<server>__<method>`：智能体经 MCP 调的工具（受管模式下就是 Unzoo One 的终端和浏览器）。 */
+/** `mcp__<server>__<method>`：智能体经 MCP 调的工具（受管模式下就是 Nissewyn 的终端和浏览器）。 */
 export function mcpToolOf(tool: string): { server: string; method: string } | null {
   const match = /^mcp__([^_]+(?:_[^_]+)*?)__(.+)$/.exec(tool);
   return match ? { server: match[1], method: match[2] } : null;
 }
 
 /**
- * 一次 MCP 调用用人话说是什么。Unzoo One 自己的终端（unterm）和浏览器（unzoo）
+ * 一次 MCP 调用用人话说是什么。Nissewyn 自己的终端（unterm）和浏览器（unzoo）
  * 认得出来；别的服务器的说"使用某某的某某"。
  */
 function describeMcp(server: string, method: string): { kind: Kind; action: string; tool: string } {
   const name = method.toLowerCase();
   if (server === "unterm") {
-    const tool = t("Unzoo One 终端");
+    const tool = t("Nissewyn 终端");
     if (/^(session_create|session_split|tab_create|workspace_open)/.test(name)) return { kind: "other", action: t("打开一个终端"), tool };
     if (/^(exec_|session_input|session_send|session_paste|keys_send|input_)/.test(name)) return { kind: "shell", action: t("执行命令"), tool };
     if (/^(fs_write|fs_edit|file_write|file_edit|fs_delete|fs_move)/.test(name)) return { kind: "edit", action: t("修改文件"), tool };

@@ -8,7 +8,7 @@ import type { BrainAgent, RuntimeCapabilities } from "./lib/provider";
  * 设置 › 能力（装好的产品）：智能体在这台机器上真能用的东西。
  *
  * 演示版的“连接器”（邮件、日历、可调的开关和延迟）是做出来给人看的；单机版
- * 只有三样，都是真的：Unzoo One 的终端、Unzoo 浏览器、装在本机的智能体。
+ * 只有三样，都是真的：Nissewyn 的终端、Unzoo 浏览器、装在本机的智能体。
  * 没有的就说没有，以及缺了会怎样。
  */
 export function RuntimeCapabilitiesPanel({
@@ -55,7 +55,7 @@ export function RuntimeCapabilitiesPanel({
                 ? t("正在检查…")
                 : capabilities.terminal.governedReady
                   ? t("受管模式下，智能体的命令都经这里执行；有风险的先进收件箱，你点头才做。")
-                  : t("找不到 unterm-cli，受管模式用不了；请重新安装 Unzoo One。")}
+                  : t("找不到 unterm-cli，受管模式用不了；请重新安装 Nissewyn。")}
             </small>
           </span>
           <em className={capabilities?.terminal.governedReady ? "is-ok" : capabilities ? "is-warn" : ""}>

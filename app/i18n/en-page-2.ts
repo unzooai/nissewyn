@@ -94,7 +94,7 @@ export const enPage2: Record<string, string> = {
   "{normalizedFilename} 已由刘一帆修订；v{editingArtifactVersion} 仍保留在版本记录中。":
     "{normalizedFilename} was revised by Alex Liu; v{editingArtifactVersion} is kept in the version history.",
   "已保存 v{nextVersion}，上一版本可随时恢复": "Saved v{nextVersion}; the previous version can be restored any time",
-  "导入失败，请选择由 Unzoo One 导出的工作区备份": "Import failed — choose a workspace backup exported from Unzoo One",
+  "导入失败，请选择由 Nissewyn 导出的工作区备份": "Import failed — choose a workspace backup exported from Nissewyn",
   "请先确认当前工作区会被这份备份替换": "First confirm that this backup will replace the current workspace",
   "工作区备份已恢复": "Workspace backup restored",
   "已从“{fileName}”恢复 {length} 个任务、{length2} 个成果、{length3} 位成员和 {length4} 条运行记录。":

@@ -1,6 +1,6 @@
 # 第三方源码声明
 
-Unzoo One 自己的代码采用 Business Source License 1.1（见 [LICENSE](LICENSE)）。下面列出的第三方代码不在其内，保留各自的许可证。
+Nissewyn 自己的代码采用 Business Source License 1.1（见 [LICENSE](LICENSE)）。下面列出的第三方代码不在其内，保留各自的许可证。
 
 ## Unterm（`unterm/`）
 
@@ -18,7 +18,7 @@ SIL Open Font License 1.1 发布，见 `unterm/assets/fonts/LICENSE_OFL.txt`。
 `unterm/deps/` 下的 harfbuzz、freetype2、libpng、zlib 各自保留原许可证，
 见对应目录与 [`unterm/licenses/`](unterm/licenses/)。
 
-分发 Unzoo One 的任何形式（源码或安装包）都必须附带上述版权声明与许可文本。
+分发 Nissewyn 的任何形式（源码或安装包）都必须附带上述版权声明与许可文本。
 
 ### 与上游同步
 

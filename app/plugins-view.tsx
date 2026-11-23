@@ -77,7 +77,7 @@ function errorText(failure: unknown): string {
 }
 
 /**
- * 插件：在 Unzoo One 旁边运行的程序，有自己的控制页面、状态和给智能体的工具。
+ * 插件：在 Nissewyn 旁边运行的程序，有自己的控制页面、状态和给智能体的工具。
  *
  * 技能只是给智能体看的做法；需要控制页面、常驻状态或自己代码的，是插件。插件的每个角色可以
  * 单独指定浏览器身份（哪个账号）和智能体、模型（谁来写）。
@@ -414,7 +414,7 @@ function PluginSettings({
           className="plugins-remove"
           disabled={busy}
           onClick={() => {
-            if (window.confirm(t("从 Unzoo One 移除 {name}？它的文件夹和数据都不会删除。", { name: plugin.name }))) {
+            if (window.confirm(t("从 Nissewyn 移除 {name}？它的文件夹和数据都不会删除。", { name: plugin.name }))) {
               void act(() => runtime.removePlugin(plugin.id), t("{name} 已移除", { name: plugin.name }));
             }
           }}

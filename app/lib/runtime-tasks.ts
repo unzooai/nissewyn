@@ -1,7 +1,7 @@
 /**
  * 控制台任务和 unterm 运行时之间的换算。
  *
- * 装好的 Unzoo One 里，任务归运行时管（unterm GET /api/console/tasks）：
+ * 装好的 Nissewyn 里，任务归运行时管（unterm GET /api/console/tasks）：
  * 关掉页面任务照样跑，定时任务到点自己起来，换个浏览器任务还在。页面仍然
  * 本地优先地改任务，改完整个推给运行时；运行记录和由它决定的任务状态则只
  * 从运行时读回来。
@@ -95,7 +95,7 @@ export type RuntimeTurn = RuntimeRun & {
   activity: RuntimeActivity[];
   /** 追问时有：true 接上了原来的对话，false 没有可接的、开了新的。 */
   continued?: boolean | null;
-  /** 这一轮里智能体用过的终端会话（Unzoo One 终端的 id）。 */
+  /** 这一轮里智能体用过的终端会话（Nissewyn 终端的 id）。 */
   terminals: string[];
   /** 这一轮里智能体用过的 Unzoo 浏览器标签页。 */
   tabs: string[];

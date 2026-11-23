@@ -134,14 +134,14 @@ export const enPage1: Record<string, string> = {
   "所有任务": "All tasks",
   "查看运行、确认、失败恢复与已完成任务。": "See running, waiting, failed and finished tasks.",
   "需要你决定的操作": "Actions that need your decision",
-  "Unzoo One 不会在你确认前执行外部发送或敏感访问。":
-    "Unzoo One never sends anything out or touches sensitive data before you approve.",
+  "Nissewyn 不会在你确认前执行外部发送或敏感访问。":
+    "Nissewyn never sends anything out or touches sensitive data before you approve.",
   "任务交付与证据": "Deliverables and evidence",
   "查看 AI 生成的报告、数据和证据包，并追溯到对应任务。":
     "See the reports, data and evidence the AI produced, traced back to their tasks.",
   "系统刚刚做了什么": "What just happened",
   "每一步都有时间、结果和证据，可以随时回看。": "Every step has a time, a result and evidence you can look back at.",
-  "工作方式": "How Unzoo One works for you",
+  "工作方式": "How Nissewyn works for you",
   "决定任务如何运行，以及哪些操作必须经过你确认。": "Decide how tasks run and which actions need your approval.",
   "跟踪产品页面变化": "Track product page changes",
   "检查页面内容变化，只保留有意义的更新并生成摘要。":
