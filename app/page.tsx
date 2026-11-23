@@ -251,6 +251,7 @@ import { PhonePanel } from "./phone-panel";
 import { TerminalPanel } from "./terminal-panel";
 import { TellRulesPanel } from "./tell-rules-panel";
 import { PluginsView } from "./plugins-view";
+import { TerminalPage } from "./terminal-page";
 import { RuntimeUsagePanel } from "./runtime-usage";
 import { RuntimeCapabilitiesPanel } from "./runtime-capabilities";
 import { autostartEnabled, inDesktopApp, openTerminal, revealPath, setAutostart } from "./lib/core-connection";
@@ -1105,6 +1106,7 @@ const navItems: Array<{
  */
 const runtimeNavItems: typeof navItems = [
   { id: "home", label: t("任务"), mobileLabel: t("任务"), icon: MessagesSquare },
+  { id: "terminal", label: t("终端"), mobileLabel: t("终端"), icon: SquareTerminal },
   { id: "approvals", label: t("待确认的操作"), mobileLabel: t("确认"), icon: ShieldCheck },
   { id: "artifacts", label: t("成果"), mobileLabel: t("成果"), icon: Files },
   { id: "plugins", label: t("插件"), mobileLabel: t("插件"), icon: Puzzle },
@@ -1461,6 +1463,11 @@ const viewTitles: Record<ViewId, { eyebrow: string; title: string; description: 
     title: t("系统刚刚做了什么"),
     description: t("每一步都有时间、结果和证据，可以随时回看。"),
   },
+  terminal: {
+    eyebrow: t("终端"),
+    title: t("你的终端"),
+    description: t("在 Nissewyn 里直接开终端、输入命令；智能体用过的终端也在这里接手。"),
+  },
   plugins: {
     eyebrow: t("插件"),
     title: t("在旁边运行的程序"),
@@ -1519,6 +1526,8 @@ function getServerNetworkStatusSnapshot() {
 
 export default function HomePage() {
   const [activeView, setActiveView] = useState<ViewId>("home");
+  const [terminalFocus, setTerminalFocus] = useState<string | undefined>(undefined);
+  const [terminalNewRequest, setTerminalNewRequest] = useState<number | undefined>(undefined);
   const [settingsSection, setSettingsSection] =
     useState<SettingsSectionId>("overview");
   const [query, setQuery] = useState("");
@@ -8879,10 +8888,16 @@ export default function HomePage() {
     }, 180);
   }
 
+  /** 「打开终端」：在 Nissewyn 里开一个新终端（演示版没有运行时，才去开独立窗口）。 */
   function openTerminalFromPage() {
-    openTerminal().catch((error: unknown) =>
-      setNotice(t("没能打开终端：{error}", { error: error instanceof Error ? error.message : String(error) })),
-    );
+    if (!runtimeMode) {
+      openTerminal().catch((error: unknown) =>
+        setNotice(t("没能打开终端：{error}", { error: error instanceof Error ? error.message : String(error) })),
+      );
+      return;
+    }
+    setTerminalNewRequest(Date.now());
+    openView("terminal");
   }
 
   function runOnboardingStep(step: OnboardingStepId) {
@@ -9918,7 +9933,14 @@ export default function HomePage() {
     if (!failed) setNotice(t("正在把“{title}”存为技能", { title: task.title }));
   }
 
+  /** 接手智能体的终端：在终端页里打开它。 */
   async function openAgentTerminal(sessionId: string) {
+    setTerminalFocus(sessionId);
+    openView("terminal");
+  }
+
+  /** 同一个终端放进独立窗口（大型全屏程序更顺滑）。 */
+  async function openTerminalWindow(sessionId: string) {
     try {
       await workspaceProvider.runtime.focusTerminal(sessionId);
       return;
@@ -9991,7 +10013,7 @@ export default function HomePage() {
           {conversationAgent.signInCommand && <code>{conversationAgent.signInCommand}</code>}
         </span>
         <span className="conversation-ready-actions">
-          {desktopApp && (
+          {runtimeMode && (
             <button type="button" onClick={openTerminalFromPage}>
               <SquareTerminal size={14} aria-hidden="true" />
               {t("打开终端")}
@@ -10429,17 +10451,6 @@ export default function HomePage() {
           ))}
         </nav>
 
-        {desktopApp && (
-          <button
-            className="clarity-sidebar-terminal"
-            type="button"
-            onClick={openTerminalFromPage}
-          >
-            <SquareTerminal size={17} aria-hidden="true" />
-            <span>{t("打开终端")}</span>
-          </button>
-        )}
-
         <div className="clarity-sidebar-status">
           <i className={systemStatusTone} />
           <div>
@@ -10485,7 +10496,7 @@ export default function HomePage() {
           </button>
         </div>
 
-        <header className="clarity-header">
+        <header className={`clarity-header${activeView === "plugins" || activeView === "terminal" ? " is-compact" : ""}`}>
           <div className="clarity-page-title">
             <span>{pageTitle.eyebrow}</span>
             <h1>{pageTitle.title}</h1>
@@ -13460,6 +13471,16 @@ export default function HomePage() {
           </section>
         )}
 
+        {activeView === "terminal" && runtimeMode && (
+          <TerminalPage
+            runtime={workspaceProvider.runtime}
+            notify={setNotice}
+            focus={terminalFocus}
+            newRequest={terminalNewRequest}
+            openWindow={desktopApp ? openTerminalWindow : undefined}
+          />
+        )}
+
         {activeView === "plugins" && runtimeMode && (
           <PluginsView runtime={workspaceProvider.runtime} notify={setNotice} />
         )}
@@ -14102,7 +14123,7 @@ export default function HomePage() {
               brain={workspaceProvider.brain}
               runtime={runtimeMode ? workspaceProvider.runtime : null}
               notify={setNotice}
-              openTerminal={desktopApp ? openTerminalFromPage : undefined}
+              openTerminal={runtimeMode ? openTerminalFromPage : undefined}
             />
 
             {runtimeMode && <SkillsPanel runtime={workspaceProvider.runtime} notify={setNotice} />}
@@ -14317,7 +14338,7 @@ export default function HomePage() {
                 checking={runtimeChecking}
                 onRefresh={() => void checkRuntimeCapabilities(true)}
                 onOpenAgents={() => openSettingsSection("agents")}
-                onOpenTerminal={desktopApp ? openTerminalFromPage : undefined}
+                onOpenTerminal={runtimeMode ? openTerminalFromPage : undefined}
               />
               <TerminalPanel runtime={workspaceProvider.runtime} notify={setNotice} />
               <TellRulesPanel runtime={workspaceProvider.runtime} notify={setNotice} />

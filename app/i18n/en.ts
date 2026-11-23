@@ -204,5 +204,5 @@ export const en: Record<string, string> = {
   "十分钟没有任何进展，已停止": "Stopped after ten minutes without any progress",
   "智能体的会话意外中断了": "The agent's session ended unexpectedly",
   "这次运行还没结束，后台服务就停止了": "The background service stopped before this run finished",
-  "Nissewyn | AI 任务工作台": "Nissewyn | The AI task workspace",
+  "Nissewyn | 你的 AI 小帮手": "Nissewyn | Your AI helper, on your own computer",
 };

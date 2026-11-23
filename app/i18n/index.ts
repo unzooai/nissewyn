@@ -99,5 +99,5 @@ export function applyDocumentLanguage(): void {
   document.documentElement.lang = current;
   // The page metadata is English (server rendering); the title follows the
   // language actually shown.
-  document.title = t("Nissewyn | AI 任务工作台");
+  document.title = t("Nissewyn | 你的 AI 小帮手");
 }

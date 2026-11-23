@@ -35,7 +35,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimeAgentModel, RuntimePluginSetting, RuntimePluginStatus, RuntimePlugins, RuntimeTellRules, RuntimeTellWish, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimeAgentModel, RuntimePluginSetting, RuntimePluginStatus, RuntimePlugins, RuntimeTellRules, RuntimeTellWish, RuntimeTerminal, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -458,6 +458,32 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       },
       async focusTerminal(sessionId) {
         await callUnterm("/api/console/computer/terminal/focus", { session_id: sessionId });
+      },
+      async terminals(): Promise<RuntimeTerminal[]> {
+        const data = await getUnterm<{
+          sessions?: Array<{ session_id: string; title?: string | null; shell?: string | null; agent?: boolean }>;
+        }>("/api/console/terminals");
+        return (data.sessions ?? []).map((s) => ({
+          sessionId: String(s.session_id),
+          title: s.title ?? undefined,
+          shell: s.shell ?? undefined,
+          agent: s.agent === true,
+        }));
+      },
+      async createTerminal(options) {
+        const data = await callUnterm<{ session_id?: string | number | null }>("/api/console/terminals/create", {
+          ...(options?.cwd ? { cwd: options.cwd } : {}),
+          ...(options?.cols ? { cols: options.cols } : {}),
+          ...(options?.rows ? { rows: options.rows } : {}),
+        });
+        if (data.session_id === undefined || data.session_id === null) throw new Error(t("没能开出新终端"));
+        return String(data.session_id);
+      },
+      async resizeTerminal(sessionId, cols, rows) {
+        await callUnterm("/api/console/terminals/resize", { session_id: sessionId, cols, rows });
+      },
+      async closeTerminal(sessionId) {
+        await callUnterm("/api/console/terminals/close", { session_id: sessionId });
       },
       async tabView(tabId): Promise<TabView> {
         const data = await callUnterm<{

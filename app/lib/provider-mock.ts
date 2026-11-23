@@ -462,6 +462,18 @@ export function createMockProvider(): WorkspaceProvider {
       async focusTerminal() {
         throw new Error(t("演示版没有本机运行时"));
       },
+      async terminals() {
+        return [];
+      },
+      async createTerminal() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async resizeTerminal() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async closeTerminal() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
       async tabView() {
         throw new Error(t("演示版没有本机运行时"));
       },

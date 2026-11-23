@@ -3,7 +3,7 @@
 Build the Nissewyn installer (Windows MSI).
 
 One product, one installer: the desktop client (this app), its background
-service (unterm-core), the terminal (unterm) and the CLI, with the helpers the
+service (nissewyn-service), the terminal (nissewyn-terminal) and the CLI (nissewyn-cli), with the helpers the
 terminal needs. All of them land flat in the install directory, which is
 where each looks for the others.
 
@@ -57,8 +57,14 @@ if (-not $SkipRuntimeBuild) {
   # product they are installed as; antivirus reputation is per product and
   # publisher, and a mismatch reads as something bundled in.
   $env:UNTERM_BRAND_PRODUCT = "Nissewyn"
+  # And they look like it: the file icon, and the window and tray icon.
+  $env:UNTERM_BRAND_ICON = Join-Path $tauri "icons\icon.ico"
+  $env:UNTERM_BRAND_ICON_PNG = Join-Path $root "brand\nissewyn\nissewyn-mark-256.png"
   try { Run "runtime and terminal (release)" { cargo build --release -p unterm-app -p unterm-cli -p unterm-core } }
-  finally { Pop-Location; Remove-Item Env:UNTERM_BRAND_PRODUCT -ErrorAction SilentlyContinue }
+  finally {
+    Pop-Location
+    Remove-Item Env:UNTERM_BRAND_PRODUCT, Env:UNTERM_BRAND_ICON, Env:UNTERM_BRAND_ICON_PNG -ErrorAction SilentlyContinue
+  }
 }
 
 if (-not $SkipInterfaceBuild) {
@@ -76,10 +82,21 @@ $payload = Join-Path $tauri "payload"
 if (Test-Path $payload) { Remove-Item -Recurse -Force $payload }
 New-Item -ItemType Directory -Path $payload | Out-Null
 
+# The runtime's programs go in under Nissewyn's names (the runtime finds
+# them by the product's name, see unterm_protocol::program_path); nothing
+# installed is called Unterm. The terminal is based on Unterm, MIT licensed:
+# see NOTICE.md.
+$renamed = [ordered]@{
+  "unterm.exe" = "nissewyn-terminal.exe"
+  "unterm-cli.exe" = "nissewyn-cli.exe"
+  "unterm-core.exe" = "nissewyn-service.exe"
+}
+foreach ($pair in $renamed.GetEnumerator()) {
+  $file = Join-Path $release $pair.Key
+  if (-not (Test-Path $file)) { throw "missing: $file" }
+  Copy-Item $file (Join-Path $payload $pair.Value)
+}
 $flat = @(
-  (Join-Path $release "unterm.exe"),
-  (Join-Path $release "unterm-cli.exe"),
-  (Join-Path $release "unterm-core.exe"),
   (Join-Path $helpers "conhost\conpty.dll"),
   (Join-Path $helpers "conhost\OpenConsole.exe"),
   (Join-Path $helpers "angle\libEGL.dll"),
@@ -105,9 +122,17 @@ foreach ($font in "SymbolsNerdFontMono-Regular.ttf", "NotoColorEmoji.ttf", "JetB
 # to (the bridge an AI client starts): Nissewyn's state, Core and port, apart
 # from a standalone Unterm's.
 [System.IO.File]::WriteAllText((Join-Path $payload "unterm-product.txt"), "Nissewyn")
-# What the terminal bridge tells the agents in other clients, beside unterm-cli.exe.
+# The licences travel with the programs: Nissewyn's own, and the MIT notice
+# of Unterm, which the terminal, service and CLI are built from.
+$licences = Join-Path $payload "licenses"
+New-Item -ItemType Directory -Path $licences | Out-Null
+Copy-Item (Join-Path $root "NOTICE.md") $licences
+Copy-Item (Join-Path $root "LICENSE") (Join-Path $licences "LICENSE.txt")
+Copy-Item (Join-Path $unterm "LICENSE.md") (Join-Path $licences "UNTERM-LICENSE.md")
+Copy-Item (Join-Path $unterm "assets/fonts/LICENSE_OFL.txt") $licences
+# What the terminal bridge tells the agents in other clients, beside nissewyn-cli.exe.
 Copy-Item (Join-Path $PSScriptRoot "mcp-instructions.md") $payload
-# Built-in skills, beside unterm-core.exe where the runtime looks for them.
+# Built-in skills, beside nissewyn-service.exe where the runtime looks for them.
 # Each file is also listed under bundle.resources in tauri.conf.json.
 Copy-Item -Recurse (Join-Path $PSScriptRoot "skills") (Join-Path $payload "skills")
 $listed = Get-Content (Join-Path $tauri "tauri.conf.json") -Raw

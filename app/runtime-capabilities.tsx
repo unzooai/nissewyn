@@ -55,7 +55,7 @@ export function RuntimeCapabilitiesPanel({
                 ? t("正在检查…")
                 : capabilities.terminal.governedReady
                   ? t("受管模式下，智能体的命令都经这里执行；有风险的先进收件箱，你点头才做。")
-                  : t("找不到 unterm-cli，受管模式用不了；请重新安装 Nissewyn。")}
+                  : t("找不到 Nissewyn 的命令行工具，受管模式用不了；请重新安装 Nissewyn。")}
             </small>
           </span>
           <em className={capabilities?.terminal.governedReady ? "is-ok" : capabilities ? "is-warn" : ""}>

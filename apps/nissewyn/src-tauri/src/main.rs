@@ -71,7 +71,7 @@ fn live(discovery: &Discovery) -> Option<CoreConnection> {
 /// The Core's program: named explicitly, next to this one (an install), or
 /// the runtime's own build (developing).
 fn core_program() -> Option<PathBuf> {
-    sibling_program("unterm-core", "UNZOO_CORE_EXE")
+    sibling_program("nissewyn-service", "UNZOO_CORE_EXE")
 }
 
 fn start_core(program: &PathBuf) -> std::io::Result<()> {
@@ -210,7 +210,7 @@ fn sibling_program(stem: &str, env: &str) -> Option<PathBuf> {
 /// the agent runs it shows are the ones Nissewyn knows about.
 #[tauri::command]
 fn open_terminal() -> Result<(), String> {
-    let program = sibling_program("unterm", "UNZOO_TERMINAL_EXE")
+    let program = sibling_program("nissewyn-terminal", "UNZOO_TERMINAL_EXE")
         .ok_or("The terminal is missing. Please reinstall Nissewyn.")?;
     Command::new(&program)
         // Its windows are Nissewyn's: the terminal is a feature of this app.

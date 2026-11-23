@@ -7,6 +7,10 @@ Nissewyn 自己的代码采用 Business Source License 1.1（见 [LICENSE](LICEN
 `unterm/` 目录是 [zhitongblog/unterm](https://github.com/zhitongblog/unterm) 的源码，
 通过 `git subtree --squash` 并入，导入时的上游提交为 `f0556e0`（v0.71.22 之后）。
 
+Nissewyn 的终端、后台服务和命令行工具（安装后为 `nissewyn-terminal.exe`、
+`nissewyn-service.exe`、`nissewyn-cli.exe`）由 Unterm 构建，按 MIT 许可证改名并换用
+Nissewyn 的名称、图标和界面；终端命令面板的最后一行写明「based on Unterm (MIT)」。
+
 Unterm 以 MIT 许可证发布，完整许可文本见 [`unterm/LICENSE.md`](unterm/LICENSE.md)：
 
 - Copyright (c) 2026-Present Alex (Unterm)

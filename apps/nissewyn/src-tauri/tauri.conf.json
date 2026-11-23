@@ -35,9 +35,9 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "payload/unterm.exe": "unterm.exe",
-      "payload/unterm-cli.exe": "unterm-cli.exe",
-      "payload/unterm-core.exe": "unterm-core.exe",
+      "payload/nissewyn-terminal.exe": "nissewyn-terminal.exe",
+      "payload/nissewyn-cli.exe": "nissewyn-cli.exe",
+      "payload/nissewyn-service.exe": "nissewyn-service.exe",
       "payload/conpty.dll": "conpty.dll",
       "payload/OpenConsole.exe": "OpenConsole.exe",
       "payload/libEGL.dll": "libEGL.dll",
@@ -49,6 +49,10 @@
       "payload/assets/fonts/JetBrainsMono-Regular.ttf": "assets/fonts/JetBrainsMono-Regular.ttf",
       "payload/mcp-instructions.md": "mcp-instructions.md",
       "payload/unterm-product.txt": "unterm-product.txt",
+      "payload/licenses/NOTICE.md": "licenses/NOTICE.md",
+      "payload/licenses/LICENSE.txt": "licenses/LICENSE.txt",
+      "payload/licenses/UNTERM-LICENSE.md": "licenses/UNTERM-LICENSE.md",
+      "payload/licenses/LICENSE_OFL.txt": "licenses/LICENSE_OFL.txt",
       "payload/skills/unzoo-terminal/SKILL.md": "skills/unzoo-terminal/SKILL.md",
       "payload/skills/unzoo-browser/SKILL.md": "skills/unzoo-browser/SKILL.md",
       "payload/skills/unzoo-deliverables/SKILL.md": "skills/unzoo-deliverables/SKILL.md",

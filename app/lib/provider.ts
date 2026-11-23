@@ -317,7 +317,7 @@ export type WorkspaceSnapshot = {
  */
 /** 这台机器上智能体能用的：Nissewyn 的终端、Unzoo 浏览器。 */
 export type RuntimeCapabilities = {
-  /** 受管模式要把 Nissewyn 终端挂给智能体，靠 unterm-cli。 */
+  /** 受管模式要把 Nissewyn 终端挂给智能体，靠 nissewyn-cli。 */
   terminal: { governedReady: boolean };
   browser: { installed: boolean; path?: string };
 };
@@ -352,6 +352,15 @@ export type TerminalScreen = {
   rowCount: number;
   cols?: number;
   rows?: number;
+};
+
+/** 一个开着的终端：人自己开的，或者智能体用过的。 */
+export type RuntimeTerminal = {
+  sessionId: string;
+  title?: string;
+  shell?: string;
+  /** 智能体用过它。 */
+  agent: boolean;
 };
 
 /** 智能体的一个标签页此刻的样子。image 是可以直接放进 <img> 的 data URL。 */
@@ -512,6 +521,13 @@ export interface RuntimeTaskPort {
   answerHandover(sessionId: string, handoverId: string, done: boolean, note?: string): Promise<void>;
   /** 把智能体的终端切到 Nissewyn 终端窗口的前台，让人接手。 */
   focusTerminal(sessionId: string): Promise<void>;
+  /** 开着的终端（「终端」页列出的那些）。 */
+  terminals(): Promise<RuntimeTerminal[]>;
+  /** 给人开一个新终端，默认在用户目录。返回它的 id。 */
+  createTerminal(options?: { cwd?: string; cols?: number; rows?: number }): Promise<string>;
+  /** 终端跟着页面的大小走。 */
+  resizeTerminal(sessionId: string, cols: number, rows: number): Promise<void>;
+  closeTerminal(sessionId: string): Promise<void>;
   /** 智能体用过的标签页此刻的样子。 */
   tabView(tabId: string): Promise<TabView>;
   /** 把智能体的标签页切到 Unzoo 浏览器的前台。 */

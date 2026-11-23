@@ -268,7 +268,7 @@ export const enPage8: Record<string, string> = {
   "读不到能力：{error}": "Could not check capabilities: {error}",
   "正在检查…": "Checking…",
   "受管模式下，智能体的每条命令都经这里执行，并先进收件箱。": "In governed mode, every command an agent runs goes through here, after it has come to your inbox.",
-  "找不到 unterm-cli，受管模式用不了；请重新安装 Nissewyn。": "unterm-cli is missing, so governed mode cannot work; please reinstall Nissewyn.",
+  "找不到 Nissewyn 的命令行工具，受管模式用不了；请重新安装 Nissewyn。": "Nissewyn's command-line tool is missing, so governed mode cannot work; please reinstall Nissewyn.",
   "可用": "Available",
   "缺少组件": "Missing a component",
   "受管模式下，智能体用它打开和操作网页，每一步同样先进收件箱。": "In governed mode, agents open and use web pages with it; every step comes to your inbox first.",

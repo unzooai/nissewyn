@@ -10,6 +10,8 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
 button,input,textarea,select{font:inherit;color:inherit}
+/* Inside the app (Nissewyn shows the name and refreshes it): the page starts at its status. */
+.embedded header h1,.embedded header>button{display:none}.embedded header{margin-bottom:8px}
 button{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 12px;cursor:pointer}
 button:hover{border-color:var(--soft)}
 button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
@@ -80,6 +82,7 @@ a.link{color:var(--blue);text-decoration:none}
 <div class="wrap" id="app"><p class="muted">加载中…</p></div>
 <div class="toast" id="toast"></div>
 <script>
+if (window.self !== window.top) document.documentElement.classList.add('embedded');
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(p,b){const r=await fetch(p,b===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});return r.json()}

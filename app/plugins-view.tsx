@@ -136,6 +136,7 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<"page" | "settings" | "log">("page");
   const [dir, setDir] = useState("");
+  const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState("");
 
@@ -208,6 +209,7 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
       setSelected(id);
       setTab("settings");
       setDir("");
+      setAdding(false);
     }, t("加好了。看一下它要什么，再打开它。"));
   }
 
@@ -233,9 +235,16 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
               setTab(item.hasPage ? "page" : "settings");
             }}
           >
-            <Puzzle size={15} aria-hidden="true" />
-            <span className="plugins-item-name">{item.name}</span>
-            <span className={`plugins-dot is-${item.enabled ? item.status : "off"}`} title={statusLabel(item)} />
+            <span className="plugins-item-icon">
+              <Puzzle size={15} aria-hidden="true" />
+            </span>
+            <span className="plugins-item-text">
+              <span className="plugins-item-name">{item.name}</span>
+              <span className="plugins-item-state">
+                <i className={`plugins-dot is-${item.enabled ? item.status : "off"}`} />
+                {statusLabel(item)}
+              </span>
+            </span>
           </button>
         ))}
         {data && data.plugins.length === 0 ? (
@@ -243,39 +252,69 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
             {t("还没有插件。插件是一个带 unzoo-plugin.json 的文件夹：有自己的控制页面、状态，以及给智能体用的工具。")}
           </p>
         ) : null}
-        <form
-          className="plugins-add"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void add();
-          }}
-        >
-          <input
-            value={dir}
-            onChange={(event) => setDir(event.target.value)}
-            placeholder={t("插件文件夹的路径")}
-            aria-label={t("插件文件夹的路径")}
-          />
-          <button type="submit" disabled={busy || !dir.trim()}>
+        {adding ? (
+          <form
+            className="plugins-add"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void add();
+            }}
+          >
+            <input
+              autoFocus
+              value={dir}
+              onChange={(event) => setDir(event.target.value)}
+              placeholder={t("插件文件夹的路径")}
+              aria-label={t("插件文件夹的路径")}
+            />
+            <div className="plugins-add-actions">
+              <button type="submit" disabled={busy || !dir.trim()}>
+                {t("添加")}
+              </button>
+              <button type="button" onClick={() => setAdding(false)}>
+                {t("取消")}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button type="button" className="plugins-add-open" onClick={() => setAdding(true)}>
             <FolderPlus size={14} aria-hidden="true" />
-            {t("添加")}
+            {t("添加插件")}
           </button>
-        </form>
+        )}
       </aside>
 
       <div className="plugins-main">
         {!plugin ? null : (
           <>
             <header className="plugins-header">
-              <div>
+              <div className="plugins-title">
                 <h2>
                   {plugin.name} {plugin.version ? <small>{plugin.version}</small> : null}
                 </h2>
-                <p>{plugin.description}</p>
+                <span className={`plugins-state is-${plugin.enabled ? plugin.status : "off"}`}>
+                  <i className={`plugins-dot is-${plugin.enabled ? plugin.status : "off"}`} />
+                  {statusLabel(plugin)}
+                </span>
               </div>
+              <nav className="plugins-tabs" aria-label={t("插件")}>
+                {plugin.hasPage ? (
+                  <button type="button" className={effectiveTab === "page" ? "is-active" : ""} onClick={() => setTab("page")}>
+                    <Puzzle size={14} aria-hidden="true" />
+                    {t("控制页面")}
+                  </button>
+                ) : null}
+                <button type="button" className={effectiveTab === "settings" ? "is-active" : ""} onClick={() => setTab("settings")}>
+                  <Settings2 size={14} aria-hidden="true" />
+                  {t("设置")}
+                </button>
+                <button type="button" className={effectiveTab === "log" ? "is-active" : ""} onClick={() => setTab("log")}>
+                  <ScrollText size={14} aria-hidden="true" />
+                  {t("日志")}
+                </button>
+              </nav>
               <div className="plugins-actions">
-                <span className={`plugins-state is-${plugin.enabled ? plugin.status : "off"}`}>{statusLabel(plugin)}</span>
-                <label className="plugins-switch">
+                <label className="plugins-switch" title={plugin.enabled ? t("关掉它") : t("打开它")}>
                   <input
                     type="checkbox"
                     checked={plugin.enabled}
@@ -287,7 +326,8 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
                       )
                     }
                   />
-                  {t("打开")}
+                  <span className="plugins-switch-track" aria-hidden="true" />
+                  {plugin.enabled ? t("已打开") : t("已关闭")}
                 </label>
                 <button
                   type="button"
@@ -300,24 +340,12 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
                 </button>
               </div>
             </header>
+            {plugin.description ? (
+              <p className="plugins-description" title={plugin.description}>
+                {plugin.description}
+              </p>
+            ) : null}
             {plugin.error ? <p className="plugins-error">{plugin.error}</p> : null}
-
-            <nav className="plugins-tabs" aria-label={t("插件")}>
-              {plugin.hasPage ? (
-                <button type="button" className={effectiveTab === "page" ? "is-active" : ""} onClick={() => setTab("page")}>
-                  <Puzzle size={14} aria-hidden="true" />
-                  {t("控制页面")}
-                </button>
-              ) : null}
-              <button type="button" className={effectiveTab === "settings" ? "is-active" : ""} onClick={() => setTab("settings")}>
-                <Settings2 size={14} aria-hidden="true" />
-                {t("设置")}
-              </button>
-              <button type="button" className={effectiveTab === "log" ? "is-active" : ""} onClick={() => setTab("log")}>
-                <ScrollText size={14} aria-hidden="true" />
-                {t("日志")}
-              </button>
-            </nav>
 
             {effectiveTab === "page" ? (
               plugin.pageUrl ? (
@@ -365,9 +393,9 @@ function PluginSettings({
   return (
     <div className="plugins-settings">
       {plugin.roles.length > 0 ? (
-        <section>
+        <section className="plugins-card">
           <h3>{t("账号与模型")}</h3>
-          <p className="skills-intro">
+          <p className="plugins-card-intro">
             {t("每个角色单独指定：浏览器角色用哪个浏览器身份（登录的是哪个账号），智能体角色用哪个智能体和模型。改了之后插件会重启来读取。")}
           </p>
           {plugin.roles.map((role) => (
@@ -381,9 +409,9 @@ function PluginSettings({
       ) : null}
 
       {plugin.tools.length > 0 || plugin.mcpServer ? (
-        <section>
+        <section className="plugins-card">
           <h3>{t("给智能体的工具")}</h3>
-          <p className="skills-intro">
+          <p className="plugins-card-intro">
             {t("打开后，对话里的智能体可以直接用这些工具。按它声明的用途判断：只读的直接做，发到外部、删除的照常问你；没声明的都当作发到外部。")}
           </p>
           <ul className="plugins-tools">
@@ -397,16 +425,16 @@ function PluginSettings({
         </section>
       ) : null}
 
-      {plugin.domains.length > 0 ? (
-        <section>
-          <h3>{t("会访问的网站")}</h3>
-          <p>{plugin.domains.join("、")}</p>
-        </section>
-      ) : null}
-
-      <section>
-        <h3>{t("位置")}</h3>
-        <p>
+      <section className="plugins-card">
+        <h3>{t("关于")}</h3>
+        {plugin.domains.length > 0 ? (
+          <p className="plugins-about">
+            <span>{t("会访问的网站")}</span>
+            {plugin.domains.join("、")}
+          </p>
+        ) : null}
+        <p className="plugins-about">
+          <span>{t("位置")}</span>
           <code>{plugin.dir}</code>
         </p>
         <button
@@ -509,7 +537,7 @@ function RoleRow({
     const value = role.binding?.profile ?? "";
     return (
       <label className="plugins-role">
-        <span>{role.label}</span>
+        <span className="plugins-role-label">{role.label}</span>
         <select
           value={value}
           disabled={busy}
@@ -543,7 +571,7 @@ function RoleRow({
         void act(() => runtime.bindPluginRole(plugin.id, role.name, agent ? value : null), saved);
       }}
     >
-      <span>{role.label}</span>
+      <span className="plugins-role-label">{role.label}</span>
       <select value={agent} onChange={(event) => pickAgent(event.target.value)} aria-label={t("智能体")}>
         <option value="">{t("还没指定")}</option>
         {AGENTS.map((a) => (
@@ -655,14 +683,17 @@ function SettingsForm({
       }}
     >
       {groups.map((group) => (
-        <section key={group.name || "_"}>
+        <section key={group.name || "_"} className="plugins-card">
           {group.name ? <h3>{group.name}</h3> : null}
-          {group.items.map((s) => (
-            <SettingRow key={s.key} setting={s} value={draft[s.key]} onChange={(v) => set(s.key, v)} />
-          ))}
+          <div className="plugins-config-grid">
+            {group.items.map((s) => (
+              <SettingRow key={s.key} setting={s} value={draft[s.key]} onChange={(v) => set(s.key, v)} />
+            ))}
+          </div>
         </section>
       ))}
-      <div className="plugins-config-actions">
+      <div className={`plugins-config-actions${edits.length > 0 ? " has-edits" : ""}`}>
+        {edits.length > 0 ? <span>{t("{count} 项没保存", { count: edits.length })}</span> : null}
         <button type="submit" disabled={busy || edits.length === 0}>
           {edits.length > 0 ? t("保存 {count} 项改动", { count: edits.length }) : t("保存")}
         </button>
@@ -757,8 +788,8 @@ function SettingRow({
   return (
     <label className={`plugins-setting is-${setting.type}`}>
       <span className="plugins-setting-label">
-        {setting.label}
-        {setting.changed ? <small>{t("已改")}</small> : null}
+        <span>{setting.label}</span>
+        {setting.changed ? <small title={t("和默认值不一样")}>{t("已改")}</small> : null}
       </span>
       {control}
       {setting.help ? <span className="plugins-hint">{setting.help}</span> : null}
