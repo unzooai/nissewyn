@@ -206,20 +206,6 @@ fn sibling_program(stem: &str, env: &str) -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
-/// Open the terminal: another client of the same Core, so its sessions and
-/// the agent runs it shows are the ones Nissewyn knows about.
-#[tauri::command]
-fn open_terminal() -> Result<(), String> {
-    let program = sibling_program("nissewyn-terminal", "UNZOO_TERMINAL_EXE")
-        .ok_or("The terminal is missing. Please reinstall Nissewyn.")?;
-    Command::new(&program)
-        // Its windows are Nissewyn's: the terminal is a feature of this app.
-        .env("UNTERM_PRODUCT_NAME", "Nissewyn")
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| format!("The terminal could not start: {e}"))
-}
-
 /// Show a file a task made in the system's file manager, selected. Only an
 /// existing file or folder; nothing is run but the file manager itself.
 #[tauri::command]
@@ -481,7 +467,7 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![core_connection, open_terminal, reveal_path, autostart_get, autostart_set])
+        .invoke_handler(tauri::generate_handler![core_connection, reveal_path, autostart_get, autostart_set])
         .run(tauri::generate_context!())
         .expect("Nissewyn could not start");
 }

@@ -352,6 +352,8 @@ export type TerminalScreen = {
   rowCount: number;
   cols?: number;
   rows?: number;
+  /** A fingerprint of this read: handed back, the runtime answers only once the terminal changes. */
+  digest?: string;
 };
 
 /** 一个开着的终端：人自己开的，或者智能体用过的。 */
@@ -516,7 +518,7 @@ export interface RuntimeTaskPort {
   browser(): Promise<RuntimeBrowser>;
   /** 智能体用过的终端此刻的画面（只认对话记录里出现过的）。 */
   /** Its recent output, or with `fromLine` only what came since (that line included). */
-  terminalScreen(sessionId: string, fromLine?: number): Promise<TerminalScreen>;
+  terminalScreen(sessionId: string, fromLine?: number, wait?: { known?: string; waitMs?: number }): Promise<TerminalScreen>;
   /** Keys the person typed into it, as the bytes a terminal sends. */
   terminalInput(sessionId: string, input: string): Promise<void>;
   /** 人做完了智能体请他做的事（或者做不了）。 */

@@ -36,7 +36,6 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "payload/nissewyn-terminal.exe": "nissewyn-terminal.exe",
       "payload/nissewyn-cli.exe": "nissewyn-cli.exe",
       "payload/nissewyn-service.exe": "nissewyn-service.exe",
       "payload/conpty.dll": "conpty.dll",

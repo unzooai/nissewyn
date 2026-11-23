@@ -87,7 +87,6 @@ New-Item -ItemType Directory -Path $payload | Out-Null
 # installed is called Unterm. The terminal is based on Unterm, MIT licensed:
 # see NOTICE.md.
 $renamed = [ordered]@{
-  "unterm.exe" = "nissewyn-terminal.exe"
   "unterm-cli.exe" = "nissewyn-cli.exe"
   "unterm-core.exe" = "nissewyn-service.exe"
 }

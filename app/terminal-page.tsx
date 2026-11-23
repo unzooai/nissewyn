@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, ExternalLink, LoaderCircle, Plus, SquareTerminal, X } from "lucide-react";
+import { Bot, ChevronDown, ChevronUp, LoaderCircle, Plus, Search, SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "./i18n";
 import type { RuntimeTerminal, WorkspaceProvider } from "./lib/provider";
@@ -15,17 +15,15 @@ export type TerminalPageProps = {
   focus?: string;
   /** Bumped to ask for a new terminal on arrival ("打开终端"). */
   newRequest?: number;
-  /** The separate window, for heavy full-screen programs (desktop app only). */
-  openWindow?: (sessionId: string) => Promise<void>;
 };
 
 const errorText = (failure: unknown) => (failure instanceof Error ? failure.message : String(failure));
 
 /**
- * 终端页：人自己的终端就在 Nissewyn 里开、用、关，智能体用过的也在这里接手。
- * 独立窗口还在，给大型全屏程序用。
+ * 终端页：人自己的终端就在 Nissewyn 里开、用、关，智能体在用的也在这里接手。
+ * Nissewyn 没有独立的终端窗口，终端就是它的一页。
  */
-export function TerminalPage({ runtime, notify, focus, newRequest, openWindow }: TerminalPageProps) {
+export function TerminalPage({ runtime, notify, focus, newRequest }: TerminalPageProps) {
   const [list, setList] = useState<RuntimeTerminal[] | null>(null);
   const [selected, setSelected] = useState<string | null>(focus ?? null);
   const [creating, setCreating] = useState(false);
@@ -140,17 +138,6 @@ export function TerminalPage({ runtime, notify, focus, newRequest, openWindow }:
           {creating ? <LoaderCircle size={15} className="spin" aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}
         </button>
         <span className="terminal-page-tabs-gap" />
-        {current && openWindow && (
-          <button
-            type="button"
-            className="terminal-page-window"
-            onClick={() => openWindow(current).catch((failure) => notify(t("没能打开独立窗口：{error}", { error: errorText(failure) })))}
-            title={t("大型全屏程序（vim、htop 这类）在独立窗口里更顺滑")}
-          >
-            <ExternalLink size={13} aria-hidden="true" />
-            {t("在独立窗口打开")}
-          </button>
-        )}
       </div>
 
       {loadError && <p className="terminal-page-error">{t("读不到终端列表：{error}", { error: loadError })}</p>}
@@ -214,14 +201,52 @@ const THEME = {
   brightWhite: "#ffffff",
 };
 
+const FONT_KEY = "nissewyn.terminal.fontSize";
+const FONT_MIN = 10;
+const FONT_MAX = 24;
+const FONT_DEFAULT = 13;
+
+function savedFontSize(): number {
+  try {
+    const value = Number(window.localStorage.getItem(FONT_KEY));
+    return value >= FONT_MIN && value <= FONT_MAX ? value : FONT_DEFAULT;
+  } catch {
+    return FONT_DEFAULT;
+  }
+}
+
 /**
- * One terminal, drawn in the page and sized to it: what the runtime holds,
- * read as it changes, with the person's keys sent straight in.
+ * One terminal, drawn in the page and sized to it. Its output arrives as it
+ * comes: each read is held open by the runtime until the terminal shows
+ * something new. The person's keys go straight in; Ctrl+F searches, Ctrl+=
+ * and Ctrl+- change the size, a right click pastes (or copies a selection).
  */
 function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; onSize?: (size: string) => void }) {
   const host = useRef<HTMLDivElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const searcher = useRef<import("@xterm/addon-search").SearchAddon | null>(null);
+  const terminal = useRef<import("@xterm/xterm").Terminal | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "closed" | "failed">("loading");
   const [error, setError] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  const [fontSize, setFontSize] = useState(FONT_DEFAULT);
+  const fontRef = useRef(FONT_DEFAULT);
+
+  const zoom = useCallback((next: number) => {
+    const size = Math.min(FONT_MAX, Math.max(FONT_MIN, next));
+    fontRef.current = size;
+    setFontSize(size);
+    try {
+      window.localStorage.setItem(FONT_KEY, String(size));
+    } catch {
+      // a private window: the size is for this visit only
+    }
+    if (terminal.current) {
+      terminal.current.options.fontSize = size;
+      window.dispatchEvent(new Event("nissewyn-terminal-refit"));
+    }
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -229,23 +254,14 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
     let fit: import("@xterm/addon-fit").FitAddon | null = null;
     let observer: ResizeObserver | null = null;
     let state: ReplayState | null = null;
+    let digest: string | undefined;
     let replaying = false;
     let closed = false;
-    let timer: number | undefined;
-    let reading = false;
-    let readAgain = false;
-    let typedAt = 0;
     let typed = "";
     let flushTimer: number | undefined;
     let resizeTimer: number | undefined;
     let sentSize = "";
-
-    const schedule = (ms?: number) => {
-      window.clearTimeout(timer);
-      if (!alive || closed) return;
-      const since = Date.now() - typedAt;
-      timer = window.setTimeout(() => void read(), ms ?? (since < 3000 ? 150 : since < 60_000 ? 400 : 1200));
-    };
+    const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
     const write = (step: ReplayStep) =>
       new Promise<void>((resolve) => {
@@ -259,15 +275,18 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
         });
       });
 
+    const send = (keys: string) => {
+      if (!keys || closed) return;
+      runtime.terminalInput(id, keys).catch(
+        (failure: unknown) => alive && setError(t("没能把按键送进终端：{message}", { message: errorText(failure) })),
+      );
+    };
+
     const flush = () => {
       flushTimer = undefined;
       const keys = typed;
       typed = "";
-      if (!keys || closed) return;
-      runtime.terminalInput(id, keys).then(
-        () => alive && schedule(60),
-        (failure: unknown) => alive && setError(t("没能把按键送进终端：{message}", { message: errorText(failure) })),
-      );
+      send(keys);
     };
 
     // The page decides the size; the runtime follows, so programs lay out for what is seen.
@@ -278,35 +297,66 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
       } catch {
         return;
       }
-      const size = `${term.cols}x${term.rows}`;
       onSize?.(`${term.cols} × ${term.rows}`);
+      const size = `${term.cols}x${term.rows}`;
       if (size === sentSize) return;
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(() => {
         if (!term) return;
         sentSize = size;
-        runtime.resizeTerminal(id, term.cols, term.rows).then(() => alive && schedule(100), () => undefined);
+        runtime.resizeTerminal(id, term.cols, term.rows).catch(() => undefined);
       }, 150);
     };
 
     const open = async () => {
-      const [{ Terminal }, { FitAddon }] = await Promise.all([import("@xterm/xterm"), import("@xterm/addon-fit")]);
+      const [{ Terminal }, { FitAddon }, { SearchAddon }, { WebLinksAddon }] = await Promise.all([
+        import("@xterm/xterm"),
+        import("@xterm/addon-fit"),
+        import("@xterm/addon-search"),
+        import("@xterm/addon-web-links"),
+      ]);
       if (!alive || !host.current) return;
+      fontRef.current = savedFontSize();
+      setFontSize(fontRef.current);
       const created = new Terminal({
         scrollback: 5000,
-        fontSize: 13,
+        fontSize: fontRef.current,
         fontFamily: '"Cascadia Mono", "JetBrains Mono", ui-monospace, Consolas, Menlo, monospace',
         cursorBlink: true,
         convertEol: true,
+        allowProposedApi: true,
         theme: THEME,
       });
       const fitter = new FitAddon();
+      const finder = new SearchAddon();
       created.loadAddon(fitter);
+      created.loadAddon(finder);
+      created.loadAddon(new WebLinksAddon((_event, uri) => window.open(uri, "_blank", "noopener")));
       created.open(host.current);
       created.attachCustomKeyEventHandler((event) => {
-        if (event.type === "keydown" && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c" && created.hasSelection()) {
+        if (event.type !== "keydown") return true;
+        const mod = event.ctrlKey || event.metaKey;
+        const key = event.key.toLowerCase();
+        if (mod && key === "c" && created.hasSelection()) {
           void navigator.clipboard?.writeText(created.getSelection());
           created.clearSelection();
+          return false;
+        }
+        if (mod && key === "f") {
+          setSearching(true);
+          window.setTimeout(() => searchInput.current?.select(), 0);
+          return false;
+        }
+        if (mod && (key === "=" || key === "+")) {
+          zoom(fontRef.current + 1);
+          return false;
+        }
+        if (mod && key === "-") {
+          zoom(fontRef.current - 1);
+          return false;
+        }
+        if (mod && key === "0") {
+          zoom(FONT_DEFAULT);
           return false;
         }
         return true;
@@ -314,70 +364,89 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
       created.onData((data) => {
         if (closed || FOCUS_REPORT.test(data) || (replaying && TERMINAL_REPORT.test(data))) return;
         typed += data;
-        typedAt = Date.now();
-        if (flushTimer === undefined) flushTimer = window.setTimeout(flush, 15);
+        if (flushTimer === undefined) flushTimer = window.setTimeout(flush, 12);
+      });
+      // A right click pastes; with text selected it copies, as in Windows Terminal.
+      host.current.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        if (created.hasSelection()) {
+          void navigator.clipboard?.writeText(created.getSelection());
+          created.clearSelection();
+          return;
+        }
+        void navigator.clipboard?.readText().then((text) => text && send(text), () => undefined);
       });
       term = created;
+      terminal.current = created;
       fit = fitter;
+      searcher.current = finder;
       observer = new ResizeObserver(sync);
       observer.observe(host.current);
+      window.addEventListener("nissewyn-terminal-refit", sync);
       sync();
       created.focus();
     };
 
-    const read = async () => {
-      if (reading) {
-        readAgain = true;
-        return;
-      }
-      reading = true;
-      try {
-        if (!term) await open();
-        if (!term || !alive) return;
-        const screen = await runtime.terminalScreen(id, state ? state.line : undefined);
-        if (!alive) return;
-        const step = state ? continueReplay(state, screen) : startReplay(screen);
-        state = step.state;
-        await write(step);
-        if (step.kind === "reset") term.scrollToBottom();
-        setStatus("ready");
-        setError(null);
-      } catch (failure) {
-        if (!alive) return;
-        const message = errorText(failure);
-        if (/closed|resolve pane|not open/i.test(message) && state) {
-          closed = true;
-          if (term) term.options.disableStdin = true;
-          setStatus("closed");
-        } else if (!state) {
-          setStatus("failed");
+    const follow = async () => {
+      await open();
+      while (alive && !closed && term) {
+        try {
+          const screen = await runtime.terminalScreen(
+            id,
+            state ? state.line : undefined,
+            state && digest ? { known: digest, waitMs: 10_000 } : undefined,
+          );
+          if (!alive) return;
+          const step = state ? continueReplay(state, screen) : startReplay(screen);
+          state = step.state;
+          await write(step);
+          if (step.kind === "reset") term.scrollToBottom();
+          setStatus("ready");
+          setError(null);
+          // An older runtime has no digest to wait on: ask now and then instead.
+          if (!screen.digest) await sleep(400);
+          digest = screen.digest;
+        } catch (failure) {
+          if (!alive) return;
+          const message = errorText(failure);
+          if (/closed|resolve pane|not open/i.test(message) && state) {
+            closed = true;
+            term.options.disableStdin = true;
+            setStatus("closed");
+            return;
+          }
+          if (!state) {
+            setStatus("failed");
+            setError(message);
+            return;
+          }
           setError(message);
-        } else {
-          setError(message);
+          await sleep(1500);
         }
-      } finally {
-        reading = false;
-      }
-      if (readAgain) {
-        readAgain = false;
-        schedule(0);
-      } else {
-        schedule();
       }
     };
 
-    void read();
+    void follow();
     return () => {
       alive = false;
-      window.clearTimeout(timer);
       window.clearTimeout(flushTimer);
       window.clearTimeout(resizeTimer);
+      window.removeEventListener("nissewyn-terminal-refit", sync);
       observer?.disconnect();
       term?.dispose();
+      terminal.current = null;
+      searcher.current = null;
     };
-  // onSize is a state setter: stable.
+    // onSize is a state setter and zoom is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, runtime]);
+
+  const find = (backwards: boolean) => {
+    if (!query) return;
+    const options = { decorations: { matchOverviewRuler: "#ffd36b", activeMatchColorOverviewRuler: "#ffd36b", matchBackground: "#3a4a72", activeMatchBackground: "#8a6d1f" } };
+    if (backwards) searcher.current?.findPrevious(query, options);
+    else searcher.current?.findNext(query, options);
+  };
 
   return (
     <div className="terminal-page-screen">
@@ -388,8 +457,69 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
       )}
       {status === "failed" && <p className="terminal-page-error">{t("读不到这个终端：{message}", { message: error ?? "" })}</p>}
       {status === "closed" && <p className="terminal-page-note">{t("这个终端已经关了，下面是它最后的样子。")}</p>}
+      {searching && (
+        <div className="terminal-page-search" role="search">
+          <Search size={13} aria-hidden="true" />
+          <input
+            ref={searchInput}
+            value={query}
+            placeholder={t("在终端里查找")}
+            aria-label={t("在终端里查找")}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              if (event.target.value) searcher.current?.findNext(event.target.value, { incremental: true });
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") find(event.shiftKey);
+              if (event.key === "Escape") {
+                setSearching(false);
+                searcher.current?.clearDecorations();
+                terminal.current?.focus();
+              }
+            }}
+          />
+          <button type="button" onClick={() => find(true)} aria-label={t("上一个")} title={t("上一个")}>
+            <ChevronUp size={14} aria-hidden="true" />
+          </button>
+          <button type="button" onClick={() => find(false)} aria-label={t("下一个")} title={t("下一个")}>
+            <ChevronDown size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearching(false);
+              searcher.current?.clearDecorations();
+              terminal.current?.focus();
+            }}
+            aria-label={t("关闭查找")}
+            title={t("关闭查找")}
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       <div ref={host} className="terminal-page-host" hidden={status === "failed"} />
       {error && status === "ready" && <p className="terminal-page-error">{error}</p>}
+      <div className="terminal-page-zoom" aria-label={t("字号")}>
+        <button type="button" onClick={() => zoom(fontSize - 1)} disabled={fontSize <= FONT_MIN} aria-label={t("字小一点")} title={t("字小一点（Ctrl+-）")}>
+          A−
+        </button>
+        <span>{fontSize}</span>
+        <button type="button" onClick={() => zoom(fontSize + 1)} disabled={fontSize >= FONT_MAX} aria-label={t("字大一点")} title={t("字大一点（Ctrl+=）")}>
+          A+
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSearching(true);
+            window.setTimeout(() => searchInput.current?.select(), 0);
+          }}
+          aria-label={t("在终端里查找")}
+          title={t("在终端里查找（Ctrl+F）")}
+        >
+          <Search size={13} aria-hidden="true" />
+        </button>
+      </div>
     </div>
   );
 }

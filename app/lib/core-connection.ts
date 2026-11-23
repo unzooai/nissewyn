@@ -64,12 +64,6 @@ export function coreUrl(connection: CoreConnection, path: string): string {
 }
 
 /** Open the terminal next to Nissewyn (desktop app only). */
-export async function openTerminal(): Promise<void> {
-  const invoke = tauri()?.core?.invoke;
-  if (!invoke) throw new Error(t("终端只能在 Nissewyn 桌面版里打开"));
-  await invoke("open_terminal");
-}
-
 /** Whether the background service starts at sign-in (desktop app on Windows). */
 export async function autostartEnabled(): Promise<boolean> {
   const invoke = tauri()?.core?.invoke;

@@ -427,7 +427,7 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           reserveError: data.reserve_error ?? undefined,
         };
       },
-      async terminalScreen(sessionId, fromLine): Promise<TerminalScreen> {
+      async terminalScreen(sessionId, fromLine, wait): Promise<TerminalScreen> {
         const data = await callUnterm<{
           session_id: string;
           text?: string | null;
@@ -435,7 +435,13 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           row_count?: number | null;
           cols?: number | null;
           rows?: number | null;
-        }>("/api/console/computer/terminal", fromLine === undefined ? { session_id: sessionId } : { session_id: sessionId, from_line: fromLine });
+          digest?: string | null;
+        }>("/api/console/computer/terminal", {
+          session_id: sessionId,
+          ...(fromLine === undefined ? {} : { from_line: fromLine }),
+          // Held open by the runtime until the terminal shows something new.
+          ...(wait?.known ? { known: wait.known, wait_ms: wait.waitMs ?? 10_000 } : {}),
+        });
         return {
           sessionId: data.session_id,
           text: data.text ?? "",
@@ -443,6 +449,7 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           rowCount: data.row_count ?? 0,
           cols: data.cols ?? undefined,
           rows: data.rows ?? undefined,
+          digest: data.digest ?? undefined,
         };
       },
       async answerHandover(sessionId, handoverId, done, note) {

@@ -254,7 +254,7 @@ import { PluginsView } from "./plugins-view";
 import { TerminalPage } from "./terminal-page";
 import { RuntimeUsagePanel } from "./runtime-usage";
 import { RuntimeCapabilitiesPanel } from "./runtime-capabilities";
-import { autostartEnabled, inDesktopApp, openTerminal, revealPath, setAutostart } from "./lib/core-connection";
+import { autostartEnabled, inDesktopApp, revealPath, setAutostart } from "./lib/core-connection";
 import { applyDocumentLanguage, chooseLocale, dateLocale, locale, locales, t, type Locale } from "./i18n";
 import { getWorkspaceProvider } from "./lib/workspace-provider";
 import { isMarkdown, MarkdownView } from "./markdown-view";
@@ -8888,14 +8888,8 @@ export default function HomePage() {
     }, 180);
   }
 
-  /** 「打开终端」：在 Nissewyn 里开一个新终端（演示版没有运行时，才去开独立窗口）。 */
+  /** 「打开终端」：在 Nissewyn 的终端页里开一个新终端。 */
   function openTerminalFromPage() {
-    if (!runtimeMode) {
-      openTerminal().catch((error: unknown) =>
-        setNotice(t("没能打开终端：{error}", { error: error instanceof Error ? error.message : String(error) })),
-      );
-      return;
-    }
     setTerminalNewRequest(Date.now());
     openView("terminal");
   }
@@ -9937,26 +9931,6 @@ export default function HomePage() {
   async function openAgentTerminal(sessionId: string) {
     setTerminalFocus(sessionId);
     openView("terminal");
-  }
-
-  /** 同一个终端放进独立窗口（大型全屏程序更顺滑）。 */
-  async function openTerminalWindow(sessionId: string) {
-    let last: unknown = null;
-    const shown = () =>
-      workspaceProvider.runtime.focusTerminal(sessionId).catch((error: unknown) => {
-        last = error;
-        return false;
-      });
-    // A terminal window already open takes it to the front.
-    if (await shown()) return;
-    if (!desktopApp) throw new Error(t("先打开 Nissewyn 的终端窗口，再点一次。"));
-    // None is: start one, and wait for it to pick this terminal up.
-    await openTerminal();
-    for (let attempt = 0; attempt < 15; attempt++) {
-      await new Promise((resolve) => window.setTimeout(resolve, 800));
-      if (await shown()) return;
-    }
-    throw last instanceof Error ? last : new Error(t("终端窗口开了，但没能切到这个终端"));
   }
 
   async function decideInConversation(sessionId: string, requestId: string, decision: ApprovalDecision) {
@@ -13469,7 +13443,6 @@ export default function HomePage() {
             notify={setNotice}
             focus={terminalFocus}
             newRequest={terminalNewRequest}
-            openWindow={desktopApp ? openTerminalWindow : undefined}
           />
         )}
 
