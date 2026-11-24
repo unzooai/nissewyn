@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://nissewyn.com/sitemap.xml

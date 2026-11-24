@@ -4,80 +4,100 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nissewyn — 住在你电脑里的 AI 小帮手</title>
-<meta name="description" content="Nissewyn 给 Claude Code、Codex 等智能体一台电脑：不会断的终端、带你登录状态的真浏览器、你定的规矩。一切都在你自己的电脑上。">
+<meta name="description" content="Nissewyn 给 Claude Code、Codex 等智能体一台电脑：不会断的终端、带你登录状态的真浏览器、你定的规矩。你睡觉时它干活，数据不出门。">
+<link rel="canonical" href="https://nissewyn.com/zh/">
+<meta name="theme-color" content="#13273f">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Nissewyn">
+<meta property="og:url" content="https://nissewyn.com/zh/">
 <meta property="og:title" content="Nissewyn — 住在你电脑里的 AI 小帮手">
-<meta property="og:description" content="不会断的终端、带你登录状态的真浏览器、你定的规矩——给你已经在用的智能体。数据只在本机。">
-<meta property="og:image" content="/og.png">
+<meta property="og:description" content="你睡觉时它干活，数据不出门。不会断的终端、带你登录状态的真浏览器、你定的规矩——给你已经在用的智能体。">
+<meta property="og:image" content="https://nissewyn.com/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.png">
-<link rel="alternate" hreflang="en" href="/">
-<link rel="alternate" hreflang="zh" href="/zh/">
+<link rel="icon" href="/mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="alternate" hreflang="en" href="https://nissewyn.com/">
+<link rel="alternate" hreflang="zh" href="https://nissewyn.com/zh/">
+<link rel="alternate" hreflang="x-default" href="https://nissewyn.com/">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 
 <nav class="nav"><div class="wrap">
   <a class="brand" href="/zh/"><img src="/mark.svg" alt="">Nissewyn</a>
-  <a class="back" href="https://unzoo.ai/zh/">← 返回 Unzoo</a>
   <div class="nav-links">
+    <a href="#night" class="hide-sm">你睡觉时</a>
     <a href="#how" class="hide-sm">怎么用</a>
     <a href="#safety" class="hide-sm">安全</a>
-    <a href="#unzoo" class="hide-sm">Unzoo 浏览器</a>
-    <a href="#status">进度</a>
+    <a href="#status" class="hide-sm">进度</a>
     <a href="https://github.com/unzooai/unzoo-one">GitHub</a>
-    <a class="lang" href="/" hreflang="en">English</a>
+    <a class="lang" href="/" hreflang="en" lang="en">English</a>
+    <a class="nav-cta" href="mailto:dev@unzoo.ai?subject=Nissewyn%20%E8%AF%95%E7%94%A8%E7%94%B3%E8%AF%B7">申请试用</a>
   </div>
 </div></nav>
 
-<header class="hero"><div class="wrap">
-  <span class="eyebrow"><i></i>Windows 预览版 · 源码公开</span>
-  <h1>住在你电脑里的 AI <em>小帮手</em>。</h1>
-  <p class="lede">智能体已经够聪明了，缺的是一个干活的地方。Nissewyn 给它们一个不会断的终端、一个带你登录状态的真浏览器，以及你定的规矩——都在你自己的电脑上。你睡觉时它干活，数据不出门。</p>
-  <p class="agents">支持 <b>Claude Code</b>、<b>Codex</b>、<b>Antigravity CLI</b>、<b>OpenCode</b>，用你已有的订阅。</p>
-  <div class="cta">
-    <a class="btn primary" href="mailto:dev@unzoo.ai?subject=Nissewyn%20%E8%AF%95%E7%94%A8%E7%94%B3%E8%AF%B7">申请试用</a>
-    <a class="btn" href="https://github.com/unzooai/unzoo-one">看源码</a>
-  </div>
-
-  <div class="mock" role="img" aria-label="Nissewyn：左边是对话，右边是智能体的终端和浏览器，点“发送”之前先问你">
-    <div class="mock-bar"><span></span><span></span><span></span><b>Nissewyn</b></div>
-    <div class="mock-body">
-      <div class="convo">
-        <div class="bubble">去账单后台把上个月的发票都下下来，汇总成一张表，给 Dana 写封邮件草稿。</div>
-        <div class="steps">
-          <div>打开了账单后台（用你的登录）</div>
-          <div>下载了 14 张发票</div>
-          <div>运行 <code>python total.py invoices/</code> → 发票-10月.xlsx</div>
-          <div>写好了给 dana@… 的邮件</div>
-        </div>
-        <div class="ask">
-          <h4>点击「发送」（邮箱）？</h4>
-          <p>把 发票-10月.xlsx 发给 Dana。</p>
-          <div class="why"><b>审核员：</b>你只让写草稿，没让发出去。</div>
-          <div class="row"><span>允许</span><span>拒绝</span></div>
+<header class="hero">
+  <div class="sky" aria-hidden="true"><i style="left:45.3%;top:34.5%"></i><i style="left:91.6%;top:29.0%"></i><i style="left:50.8%;top:36.1%"></i><i style="left:19.1%;top:31.7%"></i><i style="left:62.7%;top:48.0%"></i><i style="left:10.2%;top:19.6%"></i><i style="left:9.9%;top:49.0%"></i><i style="left:69.0%;top:4.4%"></i><i style="left:97.3%;top:58.0%"></i><i style="left:65.1%;top:37.7%"></i><i style="left:16.4%;top:2.9%"></i><i style="left:52.8%;top:5.5%"></i><i style="left:19.6%;top:16.0%"></i><i style="left:3.9%;top:28.9%"></i><i style="left:44.2%;top:50.9%"></i><i style="left:51.9%;top:39.1%"></i><i style="left:50.0%;top:40.4%"></i><i style="left:45.8%;top:18.1%"></i><i style="left:98.8%;top:59.8%"></i><i style="left:83.3%;top:43.1%"></i><i style="left:31.9%;top:15.3%"></i><i style="left:29.3%;top:6.1%"></i><i style="left:76.1%;top:25.2%"></i><i style="left:84.0%;top:24.4%"></i><i style="left:94.9%;top:51.1%"></i><i style="left:1.1%;top:14.2%"></i><i style="left:90.2%;top:29.3%"></i><i style="left:97.1%;top:25.1%"></i><i style="left:8.2%;top:38.5%"></i><i style="left:77.3%;top:17.6%"></i><i style="left:9.5%;top:21.3%"></i><i style="left:95.5%;top:46.0%"></i><i style="left:12.6%;top:16.3%"></i><i style="left:10.9%;top:5.5%"></i><i style="left:79.1%;top:12.3%"></i><i style="left:55.8%;top:28.0%"></i><i style="left:19.7%;top:44.4%"></i><i style="left:13.8%;top:39.3%"></i></div>
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 12l-7.4 3.1L12 22l-2.6-6.9L2 12l7.4-3.1z"/></svg>Windows 预览版 · 源码公开</span>
+        <h1>住在你电脑里的 AI <em>小帮手</em>。</h1>
+        <p class="lede"><strong>你睡觉时它干活，数据不出门。</strong>智能体已经够聪明了，缺的是一个干活的地方。Nissewyn 给它们一个不会断的终端、一个带你登录状态的真浏览器，以及你定的规矩——都在你自己的电脑上。</p>
+        <p class="agents">支持 <b>Claude Code</b>、<b>Codex</b>、<b>Antigravity CLI</b>、<b>OpenCode</b>，用你已有的订阅。</p>
+        <div class="cta">
+          <a class="btn primary" href="mailto:dev@unzoo.ai?subject=Nissewyn%20%E8%AF%95%E7%94%A8%E7%94%B3%E8%AF%B7">申请试用</a>
+          <a class="btn" href="https://github.com/unzooai/unzoo-one">看源码</a>
         </div>
       </div>
-      <div class="computer">
-        <div class="tab">终端</div>
+      <figure class="portrait">
+        <img src="/img/nisse-at-night.webp" srcset="/img/nisse-at-night-440.webp 440w, /img/nisse-at-night.webp 880w" sizes="(max-width: 900px) 78vw, 460px" width="880" height="880" alt="戴着高高红帽子的小精灵，深夜在发光的笔记本电脑前打字，旁边放着一杯咖啡。">
+      </figure>
+    </div>
+
+    <div class="stage">
+      <div class="mock" role="img" aria-label="Nissewyn：左边是对话，右边是智能体的终端和浏览器，点“发送”之前先问你">
+        <div class="mock-bar"><span></span><span></span><span></span><b><img src="/mark.svg" alt="">Nissewyn</b></div>
+        <div class="mock-body">
+          <div class="convo">
+            <div class="bubble">去账单后台把上个月的发票都下下来，汇总成一张表，给 Dana 写封邮件草稿。</div>
+            <div class="steps">
+              <div>打开了账单后台（用你的登录）</div>
+              <div>下载了 14 张发票</div>
+              <div>运行 <code>python total.py invoices/</code> → 发票-10月.xlsx</div>
+              <div>写好了给 dana@… 的邮件</div>
+            </div>
+            <div class="ask">
+              <h4>点击「发送」（邮箱）？</h4>
+              <p>把 发票-10月.xlsx 发给 Dana。</p>
+              <div class="why"><b>审核员：</b>你只让写草稿，没让发出去。</div>
+              <div class="row"><span>允许</span><span>拒绝</span></div>
+            </div>
+          </div>
+          <div class="computer">
+            <div class="tab">终端</div>
 <div class="term"><span class="p">PS ~/invoices&gt;</span> python total.py .
 <span class="d">reading 14 files…</span>
 total  ¥ 128,420.50
 saved  发票-10月.xlsx
 <span class="p">PS ~/invoices&gt;</span> █</div>
-        <div class="tab">浏览器</div>
-        <div class="browser">
-          <div class="url">邮箱 · 以你的身份登录</div>
-          <div class="page">
-            <div class="line" style="width:40%"></div>
-            <div class="line" style="width:85%"></div>
-            <div class="line" style="width:70%"></div>
-            <div class="send">发送</div>
+            <div class="tab">浏览器</div>
+            <div class="browser">
+              <div class="url">邮箱 · 以你的身份登录</div>
+              <div class="page">
+                <div class="line" style="width:40%"></div>
+                <div class="line" style="width:85%"></div>
+                <div class="line" style="width:70%"></div>
+                <div class="send">发送</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-</div></header>
+</header>
 
 <section id="why"><div class="wrap">
   <div class="kicker">为什么</div>
@@ -87,7 +107,7 @@ saved  发票-10月.xlsx
     <div class="card">
       <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg></div>
       <h3>不会断的终端</h3>
-      <p>终端住在后台服务里，关了窗口照样跑；编译、服务、长时间下载，下次还在。你能看着同一个终端，随时接手。</p>
+      <p>终端住在后台服务里，关了应用照样跑；编译、服务、长时间下载，下次还在。在 Nissewyn 里就能看着智能体的终端，随时接手。</p>
     </div>
     <div class="card">
       <div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></div>
@@ -100,6 +120,26 @@ saved  发票-10月.xlsx
       <h3>你定的规矩</h3>
       <p>每个动作按风险分级。看、准备，直接做；发送、付款、删除、装软件，等你点头——在对话里、收件箱里或手机上都行。全部留记录。</p>
     </div>
+  </div>
+</div></section>
+
+<section id="night" class="night-shift"><div class="wrap">
+  <div class="night-grid">
+    <div>
+      <div class="kicker">你睡觉时</div>
+      <h2>Nissewyn 的一个晚上。</h2>
+      <p class="sub">睡前交代一句。醒来时活已经干完，只剩一件该你拿主意的事。</p>
+      <img src="/img/nisse-flat.webp" width="640" height="640" loading="lazy" alt="小精灵坐在夜晚窗边的小桌前，笔记本旁放着一盏提灯和一个杯子。">
+      <p class="note">电脑要开着——关机时什么都不会跑。睡眠时错过的任务，醒来后补跑。</p>
+    </div>
+    <ol class="timeline">
+      <li class="you"><time>23:10</time><div><b>你交代一句，去睡觉</b><span>“今晚盯着这三个价格页，把照片文件夹备份一下，有变化告诉团队。”</span></div></li>
+      <li><time>23:12</time><div><b>它开始干活</b><span>用它自己的浏览器身份打开页面，在它自己的终端里开始备份。</span></div></li>
+      <li><time>01:40</time><div><b>有个页面变了</b><span>前后都存下来，记下变了什么：一个套餐从 29 美元涨到 35 美元。</span></div></li>
+      <li><time>03:05</time><div><b>备份做完</b><span>12 GB 拷完、校验、记录。终端还在，想看随时看。</span></div></li>
+      <li><time>03:06</time><div><b>有风险的那一步等你</b><span>给团队发邮件会发到电脑外面，所以它写好草稿就停下，不会把你叫醒。</span></div></li>
+      <li class="you"><time>07:45</time><div><b>早上的汇报</b><span>三行简报，加一封等你说“发”的草稿。在手机上点一下也行。</span></div></li>
+    </ol>
   </div>
 </div></section>
 
@@ -152,7 +192,7 @@ saved  发票-10月.xlsx
 </div></section>
 
 <section id="unzoo"><div class="wrap">
-  <div class="kicker">Unzoo 家族</div>
+  <div class="kicker">Unzoo 出品</div>
   <h2>Unzoo 浏览器让 AI 在网页上动手，Nissewyn 给它一整台电脑。</h2>
   <p class="sub">Nissewyn 里每一步浏览器操作都跑在 Unzoo 浏览器里——就是你可能已经在 Claude、Cursor、Codex 里用着的那个浏览器、那些身份和任务配方。Nissewyn 在它之上加了终端、对话、定时，以及管住这一切的规矩。</p>
   <div class="family">
@@ -184,10 +224,10 @@ saved  发票-10月.xlsx
     <div class="card"><h3>现在能用</h3><ul class="check">
       <li>Windows 安装包（中文、英文）</li>
       <li>对话即任务，就地追问、就地批准</li>
-      <li>终端和浏览器实时显示在对话旁边，随时接手</li>
+      <li>终端和浏览器就在应用里实时显示，随时接手</li>
       <li>Claude Code、Codex、Antigravity CLI、OpenCode</li>
       <li>定时运行；网页、文件夹、邮件、日历有变化时运行</li>
-      <li>帮手、技能、手机、给其他 AI 应用的 MCP</li>
+      <li>帮手、技能、插件、手机、给其他 AI 应用的 MCP</li>
       <li>发送 / 付款 / 删除的核对和审核员</li>
     </ul></div>
     <div class="card"><h3>接下来</h3><ul class="soon">
@@ -200,9 +240,20 @@ saved  发票-10月.xlsx
   </div>
 </div></section>
 
-<section class="final alt"><div class="wrap">
+<section id="name" class="alt"><div class="wrap">
+  <div class="card name-card">
+    <img class="mark" src="/mark.svg" width="96" height="96" alt="">
+    <div>
+      <p class="say">Nissewyn <small>念作 “尼瑟温”</small></p>
+      <p><em>Nisse</em> 是北欧民间传说里的家宅小精灵：大家睡着以后，它在夜里照看农庄，只要你待它好。<em>Wyn</em> 是古英语里的“喜悦”。一个通宵干活、还干得挺开心的小帮手。</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="final"><div class="wrap">
+  <img class="moon" src="/mark.svg" width="120" height="120" alt="">
   <h2>给你的智能体一台电脑。</h2>
-  <p class="sub">我们分批开放试用。告诉我们你想让智能体帮你做什么。</p>
+  <p class="sub">我们分批开放试用。告诉我们你想让小帮手帮你做什么。</p>
   <div class="cta">
     <a class="btn primary" href="mailto:dev@unzoo.ai?subject=Nissewyn%20%E8%AF%95%E7%94%A8%E7%94%B3%E8%AF%B7">申请试用</a>
     <a class="btn" href="https://github.com/unzooai/unzoo-one">看源码</a>
@@ -210,7 +261,7 @@ saved  发票-10月.xlsx
 </div></section>
 
 <footer><div class="wrap">
-  <span>© 2026 <a href="https://unzoo.ai/zh/">Unzoo</a></span>
+  <span>© 2026 Nissewyn · <a href="https://unzoo.ai/zh/">Unzoo</a> 出品</span>
   <span>源码以 Business Source License 1.1 公开</span>
   <div class="right">
     <a href="https://unzoo.ai/zh/">Unzoo 浏览器</a>
@@ -218,7 +269,7 @@ saved  发票-10月.xlsx
     <a href="https://unzoo.ai/zh/terms">服务条款</a>
     <a href="https://github.com/unzooai/unzoo-one">GitHub</a>
     <a href="mailto:dev@unzoo.ai">dev@unzoo.ai</a>
-    <a href="/" hreflang="en">English</a>
+    <a href="/" hreflang="en" lang="en">English</a>
   </div>
 </div></footer>
 
