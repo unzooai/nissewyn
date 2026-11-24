@@ -172,9 +172,28 @@ export function TerminalPage({ runtime, notify, focus, newRequest }: TerminalPag
   );
 }
 
-/** What xterm answers by itself to questions in replayed output. */
-const TERMINAL_REPORT = /^\x1b\[(\??[\d;]*[Rcn]|>[\d;]*c)$/;
+/**
+ * What xterm answers by itself to questions in the output it is shown:
+ * cursor position, device attributes, mode reports, colours, keyboard flags.
+ * The runtime already answered the program; a second answer would arrive as
+ * typing.
+ */
+const TERMINAL_REPORT =
+  /^(?:\x1b\[\??[\d;]*[Rcn]|\x1b\[[>=][\d;]*c|\x1b\[\??[\d;]*\$y|\x1b\[\?[\d;]*u|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1bP[^\x1b]*\x1b\\)+$/;
 const FOCUS_REPORT = /^\x1b\[[IO]$/;
+
+/** How long the runtime holds a read open while the terminal prints nothing. */
+const RAW_WAIT_MS = 10_000;
+
+/**
+ * The first read of a terminal that has printed more than is kept starts
+ * mid-stream, maybe inside an escape: begin at the next line instead.
+ */
+function fromALineStart(text: string, start: number): string {
+  if (start === 0) return text;
+  const newline = text.indexOf("\n");
+  return newline >= 0 && newline < 4096 ? text.slice(newline + 1) : text;
+}
 
 /** Nissewyn's night: the same blue as the mark, cream text, the star's yellow cursor. */
 const THEME = {
@@ -309,22 +328,37 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
     };
 
     const open = async () => {
-      const [{ Terminal }, { FitAddon }, { SearchAddon }, { WebLinksAddon }] = await Promise.all([
+      const [{ Terminal }, { FitAddon }, { SearchAddon }, { WebLinksAddon }, { Unicode11Addon }, { WebglAddon }] = await Promise.all([
         import("@xterm/xterm"),
         import("@xterm/addon-fit"),
         import("@xterm/addon-search"),
         import("@xterm/addon-web-links"),
+        import("@xterm/addon-unicode11"),
+        import("@xterm/addon-webgl"),
       ]);
       if (!alive || !host.current) return;
       fontRef.current = savedFontSize();
       setFontSize(fontRef.current);
       const created = new Terminal({
-        scrollback: 5000,
+        scrollback: 10_000,
         fontSize: fontRef.current,
-        fontFamily: '"Cascadia Mono", "JetBrains Mono", ui-monospace, Consolas, Menlo, monospace',
+        // Latin first; Chinese falls back to the system's UI font, which
+        // lines up with two cells better than a serif fallback.
+        fontFamily: '"Cascadia Mono", "JetBrains Mono", Consolas, "Microsoft YaHei UI", "PingFang SC", ui-monospace, Menlo, monospace',
+        lineHeight: 1.15,
+        letterSpacing: 0,
         cursorBlink: true,
-        convertEol: true,
+        cursorStyle: "bar",
+        cursorInactiveStyle: "outline",
+        // Raw output keeps its carriage returns; only the line fallback needs this.
+        convertEol: false,
+        // Box lines and blocks drawn by the renderer, not the font: no gaps
+        // between rows in full-screen programs' frames and logos.
+        customGlyphs: true,
+        drawBoldTextInBrightColors: false,
+        minimumContrastRatio: 1,
         allowProposedApi: true,
+        smoothScrollDuration: 0,
         theme: THEME,
       });
       const fitter = new FitAddon();
@@ -332,7 +366,19 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
       created.loadAddon(fitter);
       created.loadAddon(finder);
       created.loadAddon(new WebLinksAddon((_event, uri) => window.open(uri, "_blank", "noopener")));
+      // Widths as current programs count them (emoji, symbols): columns line up.
+      created.loadAddon(new Unicode11Addon());
+      created.unicode.activeVersion = "11";
       created.open(host.current);
+      // The GPU renderer: crisp, fast with full-screen programs. Without
+      // WebGL (or when the GPU drops it) the default renderer takes over.
+      try {
+        const webgl = new WebglAddon();
+        webgl.onContextLoss(() => webgl.dispose());
+        created.loadAddon(webgl);
+      } catch {
+        // no WebGL here: the DOM renderer stays
+      }
       created.attachCustomKeyEventHandler((event) => {
         if (event.type !== "keydown") return true;
         const mod = event.ctrlKey || event.metaKey;
@@ -387,8 +433,58 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
       created.focus();
     };
 
+    const ended = (message: string) => /closed|resolve pane|not open|not found/i.test(message);
+
+    // The output exactly as it came: what draws full-screen programs right.
+    // False when this runtime cannot give it (older, or the terminal is a
+    // closed agent's, kept only as lines): the line replay below takes over.
+    const followRaw = async (): Promise<boolean> => {
+      let first;
+      try {
+        first = await runtime.terminalOutput(id);
+      } catch {
+        return false;
+      }
+      if (!first || !alive || !term) return !alive;
+      await write({ kind: "reset", data: fromALineStart(first.text, first.start), state: { line: 0, written: "" } });
+      term.scrollToBottom();
+      setStatus("ready");
+      let offset = first.end;
+      while (alive && !closed && term) {
+        try {
+          const next = await runtime.terminalOutput(id, offset, RAW_WAIT_MS);
+          if (!alive) return true;
+          if (!next) return true;
+          if (next.start > offset) {
+            // What we had was dropped before we read it: draw from what is kept.
+            await write({ kind: "reset", data: fromALineStart(next.text, next.start), state: { line: 0, written: "" } });
+          } else if (next.text) {
+            await write({ kind: "append", data: next.text, state: { line: 0, written: "" } });
+          }
+          offset = next.end;
+          setError(null);
+        } catch (failure) {
+          if (!alive) return true;
+          const message = errorText(failure);
+          if (ended(message)) {
+            closed = true;
+            term.options.disableStdin = true;
+            setStatus("closed");
+            return true;
+          }
+          setError(message);
+          await sleep(1500);
+        }
+      }
+      return true;
+    };
+
     const follow = async () => {
       await open();
+      if (await followRaw()) return;
+      if (!alive || !term) return;
+      // Lines lost their carriage returns: line feeds have to bring them back.
+      term.options.convertEol = true;
       while (alive && !closed && term) {
         try {
           const screen = await runtime.terminalScreen(
@@ -409,7 +505,7 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
         } catch (failure) {
           if (!alive) return;
           const message = errorText(failure);
-          if (/closed|resolve pane|not open/i.test(message) && state) {
+          if (ended(message) && state) {
             closed = true;
             term.options.disableStdin = true;
             setStatus("closed");

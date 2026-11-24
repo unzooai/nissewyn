@@ -356,6 +356,18 @@ export type TerminalScreen = {
   digest?: string;
 };
 
+/**
+ * A live terminal's output exactly as it arrived, carriage returns and all:
+ * bytes `start` to `end` of everything it printed. Replayed in an emulator it
+ * draws full-screen programs as they are. `start` later than the offset asked
+ * for means those bytes are gone and the viewer starts over.
+ */
+export type TerminalOutput = {
+  text: string;
+  start: number;
+  end: number;
+};
+
 /** 一个开着的终端：人自己开的，或者智能体用过的。 */
 export type RuntimeTerminal = {
   sessionId: string;
@@ -519,6 +531,12 @@ export interface RuntimeTaskPort {
   /** 智能体用过的终端此刻的画面（只认对话记录里出现过的）。 */
   /** Its recent output, or with `fromLine` only what came since (that line included). */
   terminalScreen(sessionId: string, fromLine?: number, wait?: { known?: string; waitMs?: number }): Promise<TerminalScreen>;
+  /**
+   * A live terminal's raw output from byte `fromByte` on (the newest stretch
+   * without one), held open up to `waitMs` while nothing new comes. `null`
+   * from a runtime too old to give it: use `terminalScreen` instead.
+   */
+  terminalOutput(sessionId: string, fromByte?: number, waitMs?: number): Promise<TerminalOutput | null>;
   /** Keys the person typed into it, as the bytes a terminal sends. */
   terminalInput(sessionId: string, input: string): Promise<void>;
   /** 人做完了智能体请他做的事（或者做不了）。 */
