@@ -14,7 +14,7 @@
   --lime: #d7ff5d;
   --amber: #ffbd66;
   --coral: #ff746c;
-  --blue: #82b7ff;
+  --blue: #a8b6d9;
   --violet: #b99cff;
   --shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
 }
@@ -442,7 +442,7 @@ button {
 }
 
 .palette-row.blue svg:first-child {
-  background: rgba(130, 183, 255, 0.15);
+  background: rgba(168, 182, 217, 0.15);
   color: var(--blue);
 }
 
@@ -524,7 +524,7 @@ button {
   background:
     linear-gradient(90deg, rgba(244, 245, 239, 0.05) 1px, transparent 1px),
     linear-gradient(rgba(244, 245, 239, 0.05) 1px, transparent 1px),
-    linear-gradient(135deg, rgba(215, 255, 93, 0.08), rgba(130, 183, 255, 0.045) 42%, rgba(255, 116, 108, 0.045)),
+    linear-gradient(135deg, rgba(215, 255, 93, 0.08), rgba(168, 182, 217, 0.045) 42%, rgba(255, 116, 108, 0.045)),
     #0d100e;
   background-size: 28px 28px, 28px 28px, auto, auto;
 }
@@ -687,9 +687,9 @@ button {
 }
 
 .stage-card.analyze {
-  border-color: rgba(130, 183, 255, 0.34);
+  border-color: rgba(168, 182, 217, 0.34);
   background:
-    radial-gradient(circle at 46% 18%, rgba(130, 183, 255, 0.2), transparent 42%),
+    radial-gradient(circle at 46% 18%, rgba(168, 182, 217, 0.2), transparent 42%),
     rgba(10, 13, 13, 0.9);
 }
 
@@ -799,7 +799,7 @@ button {
 .signal-lines i {
   display: block;
   border-radius: 10px 10px 4px 4px;
-  background: linear-gradient(180deg, rgba(130, 183, 255, 0.72), rgba(130, 183, 255, 0.16));
+  background: linear-gradient(180deg, rgba(168, 182, 217, 0.72), rgba(168, 182, 217, 0.16));
 }
 
 .signal-lines i:nth-child(1) {

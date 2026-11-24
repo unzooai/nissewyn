@@ -1,4 +1,4 @@
-# Unzoo One 关键页面与状态蓝图
+# Nissewyn 关键页面与状态蓝图
 
 > 版本：Screen Blueprints v0.1
 > 依赖：[C1 产品设计系统](c1-product-design-system.md)、[产品体验详细规格](product-experience-spec.md)
@@ -401,7 +401,7 @@ Tray 菜单：
 - Active Tasks。
 - Needs Attention。
 - Pause All。
-- Open Unzoo One。
+- Open Nissewyn。
 - Emergency Stop。
 - Quit UI。
 

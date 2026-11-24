@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./light-theme.css";
+import "@xterm/xterm/css/xterm.css";
 import "./clarity.css";
 
 const geistSans = Geist({
@@ -15,30 +16,30 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Unzoo One | AI 任务操作系统",
+  title: "Nissewyn | Your AI helper, on your own computer",
   description:
-    "运行、审批并追踪长期 AI 任务，让每一步执行都有证据、边界和清晰结果。",
+    "The little helper that lives in your computer: your AI gets a terminal, a browser and a place to work. It works while you sleep, and nothing leaves home.",
   openGraph: {
-    title: "Unzoo One | AI 任务控制台",
-    description: "让长期 AI 任务的执行、审批和证据都清晰可见。",
+    title: "Nissewyn | Your AI helper, on your own computer",
+    description: "The little helper that lives in your computer. It works while you sleep, and nothing leaves home.",
     images: [
       {
-        url: "https://unzoo-one-console.matiancheng528.chatgpt.site/og.png",
-        width: 1740,
-        height: 909,
-        alt: "Unzoo One AI 任务控制台",
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Nissewyn, the little helper that lives in your computer",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Unzoo One | AI 任务控制台",
-    description: "让长期 AI 任务的执行、审批和证据都清晰可见。",
-    images: ["https://unzoo-one-console.matiancheng528.chatgpt.site/og.png"],
+    title: "Nissewyn | Your AI helper, on your own computer",
+    description: "The little helper that lives in your computer. It works while you sleep, and nothing leaves home.",
+    images: ["/og.png"],
   },
   icons: {
-    icon: "/unzoo-favicon-v6.png",
-    shortcut: "/unzoo-favicon-v6.png",
+    icon: "/nissewyn-favicon.png",
+    shortcut: "/nissewyn-favicon.png",
   },
 };
 
@@ -48,7 +49,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

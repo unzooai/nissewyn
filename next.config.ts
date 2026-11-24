@@ -12,7 +12,7 @@ import type { NextConfig } from "next";
  *
  * 静态版仍然是预渲染的完整首屏，不是白屏 SPA。
  */
-const isStaticTarget = process.env.UNZOO_ONE_TARGET === "static";
+const isStaticTarget = process.env.NISSEWYN_TARGET === "static";
 
 /**
  * 不设 basePath：vinext 的预渲染在 basePath 下只导出得到 404。导出的 HTML

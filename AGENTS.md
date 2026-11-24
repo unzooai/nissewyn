@@ -1,4 +1,4 @@
-# Unzoo One agent execution policy
+# Nissewyn agent execution policy
 
 These rules apply to every AI agent working in this repository.
 

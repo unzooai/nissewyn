@@ -1,4 +1,4 @@
-# Unzoo One Connector、MCP、Skill 与 Persona 规范
+# Nissewyn Connector、MCP、Skill 与 Persona 规范
 
 > 状态：Draft
 > 日期：2026-07-26
@@ -101,7 +101,7 @@ evidence:
 
 ### Managed OAuth
 
-- Unzoo One Cloud 只代理 OAuth handshake。
+- Nissewyn Cloud 只代理 OAuth handshake。
 - Token 最终保存在本地 Vault。
 - Cloud 不长期保存 Access Token。
 
@@ -419,11 +419,11 @@ SDK 提供：
 CLI：
 
 ```text
-unzoo-one dev init connector
-unzoo-one dev validate
-unzoo-one dev test
-unzoo-one dev pack
-unzoo-one dev sign
+nissewyn dev init connector
+nissewyn dev validate
+nissewyn dev test
+nissewyn dev pack
+nissewyn dev sign
 ```
 
 ## 18. Connector 测试场景

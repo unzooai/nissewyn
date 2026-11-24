@@ -1,0 +1,798 @@
+"use client";
+
+import { FolderPlus, Puzzle, RefreshCw, RotateCcw, ScrollText, Settings2, Trash2 } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { t } from "./i18n";
+import type {
+  RuntimeAgentModel,
+  RuntimePlugin,
+  RuntimePluginRole,
+  RuntimePluginSetting,
+  RuntimePluginSettingValue,
+  RuntimePlugins,
+  RuntimeTaskPort,
+} from "./lib/provider";
+
+type Port = Pick<
+  RuntimeTaskPort,
+  | "plugins"
+  | "addPlugin"
+  | "enablePlugin"
+  | "restartPlugin"
+  | "removePlugin"
+  | "bindPluginRole"
+  | "setPluginSettings"
+  | "pluginLog"
+  | "agentModels"
+>;
+
+const AGENTS: { id: string; label: string }[] = [
+  { id: "claude-code", label: "Claude Code" },
+  { id: "codex-cli", label: "Codex" },
+  { id: "agy", label: "Antigravity CLI" },
+  { id: "opencode", label: "OpenCode" },
+];
+/** 自己填模型名时选的那一项。 */
+const OTHER = "__other__";
+
+function statusLabel(plugin: RuntimePlugin): string {
+  if (!plugin.enabled) return t("已关闭");
+  switch (plugin.status) {
+    case "running":
+      return t("运行中");
+    case "starting":
+      return t("正在启动");
+    case "not_answering":
+      return t("启动了但没有响应");
+    case "failed":
+      return t("没有运行起来");
+    case "tools_only":
+      return t("只提供工具");
+    case "broken":
+      return t("清单有问题");
+    default:
+      return t("已停止");
+  }
+}
+
+function doesLabel(word: string): string {
+  switch (word) {
+    case "read":
+      return t("只读");
+    case "change":
+      return t("改本机的东西");
+    case "run":
+      return t("运行程序");
+    case "pay":
+      return t("花钱");
+    case "delete":
+      return t("删除");
+    default:
+      return t("发到外部");
+  }
+}
+
+function errorText(failure: unknown): string {
+  return failure instanceof Error ? failure.message : String(failure);
+}
+
+/**
+ * 插件：在 Nissewyn 旁边运行的程序，有自己的控制页面、状态和给智能体的工具。
+ *
+ * 技能只是给智能体看的做法；需要控制页面、常驻状态或自己代码的，是插件。插件的每个角色可以
+ * 单独指定浏览器身份（哪个账号）和智能体、模型（谁来写）。
+ */
+// Can the page be reached? A refused connection rejects; anything that answers resolves.
+async function reachable(url: string): Promise<boolean> {
+  try {
+    await fetch(url, { mode: "no-cors", cache: "no-store", signal: AbortSignal.timeout(3000) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// The plugin's own page. A plugin restarts whenever its settings or bindings change, and an
+// iframe that loads in that gap shows the browser's "connection refused" page and stays on it.
+// So: load it only once the plugin answers, keep checking, and load it again after it comes back.
+function PluginFrame({ url, title }: { url: string; title: string }) {
+  const [up, setUp] = useState<boolean | null>(null);
+  const [generation, setGeneration] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    let was: boolean | null = null;
+    let misses = 0;
+    const check = async () => {
+      const ok = await reachable(url);
+      if (!live) return;
+      misses = ok ? 0 : misses + 1;
+      // One slow answer must not throw away a page someone is typing in: down means twice in a row
+      // (or never up yet).
+      if (!ok && was && misses < 2) return;
+      if (ok && was === false) setGeneration((g) => g + 1);
+      was = ok;
+      setUp(ok);
+    };
+    void check();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void check();
+    }, 2000);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [url]);
+
+  if (!up) {
+    return <p className="plugins-empty">{up === null ? t("正在打开页面…") : t("它正在重启，页面回来后自动打开。")}</p>;
+  }
+  return <iframe key={`${url}#${generation}`} className="plugins-frame" src={url} title={title} />;
+}
+
+export function PluginsView({ runtime, notify }: { runtime: Port; notify: (message: string) => void }) {
+  const [data, setData] = useState<RuntimePlugins | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [tab, setTab] = useState<"page" | "settings" | "log">("page");
+  const [dir, setDir] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [log, setLog] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      setData(await runtime.plugins());
+      setError(null);
+    } catch (failure) {
+      setError(errorText(failure));
+    }
+  }, [runtime]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const plugin = useMemo(() => {
+    const list = data?.plugins ?? [];
+    return list.find((p) => p.id === selected) ?? list[0] ?? null;
+  }, [data, selected]);
+
+  // While one is starting, look again shortly.
+  const settling = data?.plugins.some((p) => p.enabled && p.status === "starting") ?? false;
+  useEffect(() => {
+    if (!settling) return;
+    const timer = window.setTimeout(() => void load(), 1500);
+    return () => window.clearTimeout(timer);
+  }, [settling, data, load]);
+
+  // And keep looking while this page is open: a plugin can stop, crash or restart on
+  // its own, and its status and page address must follow.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
+  const loadLog = useCallback(async () => {
+    if (!plugin) return;
+    try {
+      setLog(await runtime.pluginLog(plugin.id));
+    } catch (failure) {
+      setLog(errorText(failure));
+    }
+  }, [plugin, runtime]);
+
+  useEffect(() => {
+    if (tab === "log") void loadLog();
+  }, [tab, loadLog]);
+
+  async function act(what: () => Promise<unknown>, done?: string) {
+    setBusy(true);
+    try {
+      await what();
+      if (done) notify(done);
+      await load();
+    } catch (failure) {
+      notify(t("没有做成：{error}", { error: errorText(failure) }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function add() {
+    const folder = dir.trim();
+    if (!folder) return;
+    await act(async () => {
+      const id = await runtime.addPlugin(folder);
+      setSelected(id);
+      setTab("settings");
+      setDir("");
+      setAdding(false);
+    }, t("加好了。看一下它要什么，再打开它。"));
+  }
+
+  const effectiveTab = plugin && tab === "page" && !plugin.hasPage ? "settings" : tab;
+
+  return (
+    <section className="plugins-view" aria-label={t("插件")}>
+      <aside className="plugins-list">
+        <div className="skills-heading">
+          <span>{t("插件")}</span>
+          <button type="button" onClick={() => void load()} aria-label={t("重新检查")} title={t("重新检查")} disabled={busy}>
+            <RefreshCw size={14} aria-hidden="true" />
+          </button>
+        </div>
+        {error ? <p className="plugins-error">{error}</p> : null}
+        {(data?.plugins ?? []).map((item) => (
+          <button
+            type="button"
+            key={item.id}
+            className={`plugins-item${plugin?.id === item.id ? " is-active" : ""}`}
+            onClick={() => {
+              setSelected(item.id);
+              setTab(item.hasPage ? "page" : "settings");
+            }}
+          >
+            <span className="plugins-item-icon">
+              <Puzzle size={15} aria-hidden="true" />
+            </span>
+            <span className="plugins-item-text">
+              <span className="plugins-item-name">{item.name}</span>
+              <span className="plugins-item-state">
+                <i className={`plugins-dot is-${item.enabled ? item.status : "off"}`} />
+                {statusLabel(item)}
+              </span>
+            </span>
+          </button>
+        ))}
+        {data && data.plugins.length === 0 ? (
+          <p className="plugins-empty">
+            {t("还没有插件。插件是一个带 unzoo-plugin.json 的文件夹：有自己的控制页面、状态，以及给智能体用的工具。")}
+          </p>
+        ) : null}
+        {adding ? (
+          <form
+            className="plugins-add"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void add();
+            }}
+          >
+            <input
+              autoFocus
+              value={dir}
+              onChange={(event) => setDir(event.target.value)}
+              placeholder={t("插件文件夹的路径")}
+              aria-label={t("插件文件夹的路径")}
+            />
+            <div className="plugins-add-actions">
+              <button type="submit" disabled={busy || !dir.trim()}>
+                {t("添加")}
+              </button>
+              <button type="button" onClick={() => setAdding(false)}>
+                {t("取消")}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button type="button" className="plugins-add-open" onClick={() => setAdding(true)}>
+            <FolderPlus size={14} aria-hidden="true" />
+            {t("添加插件")}
+          </button>
+        )}
+      </aside>
+
+      <div className="plugins-main">
+        {!plugin ? null : (
+          <>
+            <header className="plugins-header">
+              <div className="plugins-title">
+                <h2>
+                  {plugin.name} {plugin.version ? <small>{plugin.version}</small> : null}
+                </h2>
+                <span className={`plugins-state is-${plugin.enabled ? plugin.status : "off"}`}>
+                  <i className={`plugins-dot is-${plugin.enabled ? plugin.status : "off"}`} />
+                  {statusLabel(plugin)}
+                </span>
+              </div>
+              <nav className="plugins-tabs" aria-label={t("插件")}>
+                {plugin.hasPage ? (
+                  <button type="button" className={effectiveTab === "page" ? "is-active" : ""} onClick={() => setTab("page")}>
+                    <Puzzle size={14} aria-hidden="true" />
+                    {t("控制页面")}
+                  </button>
+                ) : null}
+                <button type="button" className={effectiveTab === "settings" ? "is-active" : ""} onClick={() => setTab("settings")}>
+                  <Settings2 size={14} aria-hidden="true" />
+                  {t("设置")}
+                </button>
+                <button type="button" className={effectiveTab === "log" ? "is-active" : ""} onClick={() => setTab("log")}>
+                  <ScrollText size={14} aria-hidden="true" />
+                  {t("日志")}
+                </button>
+              </nav>
+              <div className="plugins-actions">
+                <label className="plugins-switch" title={plugin.enabled ? t("关掉它") : t("打开它")}>
+                  <input
+                    type="checkbox"
+                    checked={plugin.enabled}
+                    disabled={busy || plugin.status === "broken"}
+                    onChange={(event) =>
+                      void act(
+                        () => runtime.enablePlugin(plugin.id, event.target.checked),
+                        event.target.checked ? t("{name} 已打开", { name: plugin.name }) : t("{name} 已关闭", { name: plugin.name }),
+                      )
+                    }
+                  />
+                  <span className="plugins-switch-track" aria-hidden="true" />
+                  {plugin.enabled ? t("已打开") : t("已关闭")}
+                </label>
+                <button
+                  type="button"
+                  title={t("重启")}
+                  aria-label={t("重启")}
+                  disabled={busy || !plugin.enabled || plugin.status === "tools_only"}
+                  onClick={() => void act(() => runtime.restartPlugin(plugin.id), t("{name} 已重启", { name: plugin.name }))}
+                >
+                  <RotateCcw size={14} aria-hidden="true" />
+                </button>
+              </div>
+            </header>
+            {plugin.description ? (
+              <p className="plugins-description" title={plugin.description}>
+                {plugin.description}
+              </p>
+            ) : null}
+            {plugin.error ? <p className="plugins-error">{plugin.error}</p> : null}
+
+            {effectiveTab === "page" ? (
+              plugin.pageUrl ? (
+                <PluginFrame url={plugin.pageUrl} title={plugin.name} />
+              ) : (
+                <p className="plugins-empty">
+                  {plugin.enabled ? t("它还没准备好，页面稍后出现。") : t("打开它之后，控制页面在这里。")}
+                </p>
+              )
+            ) : null}
+
+            {effectiveTab === "settings" ? (
+              <PluginSettings plugin={plugin} profiles={data?.browserProfiles ?? []} busy={busy} act={act} runtime={runtime} />
+            ) : null}
+
+            {effectiveTab === "log" ? (
+              <div className="plugins-log">
+                <button type="button" onClick={() => void loadLog()}>
+                  <RefreshCw size={14} aria-hidden="true" />
+                  {t("刷新")}
+                </button>
+                <pre>{log || t("还没有输出")}</pre>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function PluginSettings({
+  plugin,
+  profiles,
+  busy,
+  act,
+  runtime,
+}: {
+  plugin: RuntimePlugin;
+  profiles: { id: string; name: string }[];
+  busy: boolean;
+  act: (what: () => Promise<unknown>, done?: string) => Promise<void>;
+  runtime: Port;
+}) {
+  return (
+    <div className="plugins-settings">
+      {plugin.roles.length > 0 ? (
+        <section className="plugins-card">
+          <h3>{t("账号与模型")}</h3>
+          <p className="plugins-card-intro">
+            {t("每个角色单独指定：浏览器角色用哪个浏览器身份（登录的是哪个账号），智能体角色用哪个智能体和模型。改了之后插件会重启来读取。")}
+          </p>
+          {plugin.roles.map((role) => (
+            <RoleRow key={role.name} plugin={plugin} role={role} profiles={profiles} busy={busy} act={act} runtime={runtime} />
+          ))}
+        </section>
+      ) : null}
+
+      {plugin.settings.length > 0 ? (
+        <SettingsForm key={`${plugin.id}:${JSON.stringify(plugin.settings.map((s) => s.value))}`} plugin={plugin} busy={busy} act={act} runtime={runtime} />
+      ) : null}
+
+      {plugin.tools.length > 0 || plugin.mcpServer ? (
+        <section className="plugins-card">
+          <h3>{t("给智能体的工具")}</h3>
+          <p className="plugins-card-intro">
+            {t("打开后，对话里的智能体可以直接用这些工具。按它声明的用途判断：只读的直接做，发到外部、删除的照常问你；没声明的都当作发到外部。")}
+          </p>
+          <ul className="plugins-tools">
+            {plugin.tools.map((tool) => (
+              <li key={tool.name}>
+                <code>{tool.name}</code>
+                <span>{doesLabel(tool.does)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <section className="plugins-card">
+        <h3>{t("关于")}</h3>
+        {plugin.domains.length > 0 ? (
+          <p className="plugins-about">
+            <span>{t("会访问的网站")}</span>
+            {plugin.domains.join("、")}
+          </p>
+        ) : null}
+        <p className="plugins-about">
+          <span>{t("位置")}</span>
+          <code>{plugin.dir}</code>
+        </p>
+        <button
+          type="button"
+          className="plugins-remove"
+          disabled={busy}
+          onClick={() => {
+            if (window.confirm(t("从 Nissewyn 移除 {name}？它的文件夹和数据都不会删除。", { name: plugin.name }))) {
+              void act(() => runtime.removePlugin(plugin.id), t("{name} 已移除", { name: plugin.name }));
+            }
+          }}
+        >
+          <Trash2 size={14} aria-hidden="true" />
+          {t("移除")}
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function RoleRow({
+  plugin,
+  role,
+  profiles,
+  busy,
+  act,
+  runtime,
+}: {
+  plugin: RuntimePlugin;
+  role: RuntimePluginRole;
+  profiles: { id: string; name: string }[];
+  busy: boolean;
+  act: (what: () => Promise<unknown>, done?: string) => Promise<void>;
+  runtime: Port;
+}) {
+  const current = role.binding ?? role.default ?? {};
+  const [agent, setAgent] = useState(current.agent ?? "");
+  const [model, setModel] = useState(current.model ?? "");
+  const [effort, setEffort] = useState(current.effort ?? "");
+  const [models, setModels] = useState<RuntimeAgentModel[]>([]);
+  const [listing, setListing] = useState<"idle" | "loading" | "done">("idle");
+  const [listError, setListError] = useState<string | null>(null);
+  const [custom, setCustom] = useState(false);
+  const saved = t("{role} 已保存", { role: role.label });
+
+  // 每个智能体有自己的模型：换了智能体就列它的。
+  useEffect(() => {
+    if (role.kind !== "agent" || !agent) {
+      setModels([]);
+      return;
+    }
+    let alive = true;
+    setListing("loading");
+    setListError(null);
+    runtime
+      .agentModels(agent)
+      .then(({ models: list, error }) => {
+        if (!alive) return;
+        setModels(list);
+        setListError(error);
+        setListing("done");
+        setCustom(Boolean(model) && list.length > 0 && !list.some((m) => m.id === model));
+      })
+      .catch((failure) => {
+        if (!alive) return;
+        setModels([]);
+        setListError(errorText(failure));
+        setListing("done");
+      });
+    return () => {
+      alive = false;
+    };
+    // model 只在列表回来时比对一次，不随输入重新列。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agent, role.kind, runtime]);
+
+  const chosen = models.find((m) => m.id === model) ?? null;
+  const efforts = chosen?.efforts ?? [];
+
+  function pickAgent(next: string) {
+    setAgent(next);
+    // 上一个智能体的模型对新的没意义：清空，列表回来后用它的默认模型。
+    setModel("");
+    setEffort("");
+    setCustom(false);
+  }
+
+  useEffect(() => {
+    if (listing === "done" && !model && !custom && models.length > 0) {
+      const preferred = models.find((m) => m.isDefault) ?? models[0];
+      setModel(preferred.id);
+    }
+  }, [listing, models, model, custom]);
+
+  useEffect(() => {
+    if (effort && !efforts.includes(effort)) setEffort("");
+  }, [efforts, effort]);
+
+  if (role.kind === "browser") {
+    const value = role.binding?.profile ?? "";
+    return (
+      <label className="plugins-role">
+        <span className="plugins-role-label">{role.label}</span>
+        <select
+          value={value}
+          disabled={busy}
+          onChange={(event) =>
+            void act(
+              () => runtime.bindPluginRole(plugin.id, role.name, event.target.value ? { profile: event.target.value } : null),
+              saved,
+            )
+          }
+        >
+          <option value="">{t("还没指定")}</option>
+          {profiles.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+          {value && !profiles.some((p) => p.id === value) ? <option value={value}>{value}</option> : null}
+        </select>
+      </label>
+    );
+  }
+
+  return (
+    <form
+      className="plugins-role"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const value: Record<string, string> = { agent };
+        if (model.trim()) value.model = model.trim();
+        if (effort) value.effort = effort;
+        void act(() => runtime.bindPluginRole(plugin.id, role.name, agent ? value : null), saved);
+      }}
+    >
+      <span className="plugins-role-label">{role.label}</span>
+      <select value={agent} onChange={(event) => pickAgent(event.target.value)} aria-label={t("智能体")}>
+        <option value="">{t("还没指定")}</option>
+        {AGENTS.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.label}
+          </option>
+        ))}
+      </select>
+      {agent && listing === "loading" ? (
+        <span className="plugins-hint">{t("正在列出它的模型…")}</span>
+      ) : agent && models.length > 0 && !custom ? (
+        <select
+          value={model}
+          onChange={(event) => {
+            if (event.target.value === OTHER) {
+              setCustom(true);
+              setModel("");
+            } else {
+              setModel(event.target.value);
+            }
+          }}
+          aria-label={t("模型")}
+        >
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label === m.id ? m.id : `${m.label} (${m.id})`}
+            </option>
+          ))}
+          <option value={OTHER}>{t("其他（自己填）")}</option>
+        </select>
+      ) : agent ? (
+        <input
+          value={model}
+          onChange={(event) => setModel(event.target.value)}
+          placeholder={listError ? t("列不出模型，自己填（留空用默认）") : t("模型（留空用默认）")}
+          aria-label={t("模型")}
+          title={listError ?? undefined}
+        />
+      ) : null}
+      {efforts.length > 0 ? (
+        <select value={effort} onChange={(event) => setEffort(event.target.value)} aria-label={t("推理强度")}>
+          <option value="">
+            {chosen?.defaultEffort ? t("默认强度（{effort}）", { effort: chosen.defaultEffort }) : t("默认强度")}
+          </option>
+          {efforts.map((e) => (
+            <option key={e} value={e}>
+              {e}
+            </option>
+          ))}
+        </select>
+      ) : null}
+      <button type="submit" disabled={busy || listing === "loading"}>
+        {t("保存")}
+      </button>
+    </form>
+  );
+}
+
+type Draft = Record<string, RuntimePluginSettingValue>;
+const NEWLINE = "\n";
+
+function same(a: RuntimePluginSettingValue, b: RuntimePluginSettingValue): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** 插件声明的设置，按组列出。关着也能改；开着时保存会让它重启来读取。 */
+function SettingsForm({
+  plugin,
+  busy,
+  act,
+  runtime,
+}: {
+  plugin: RuntimePlugin;
+  busy: boolean;
+  act: (what: () => Promise<unknown>, done?: string) => Promise<void>;
+  runtime: Port;
+}) {
+  const saved = useMemo(() => Object.fromEntries(plugin.settings.map((s) => [s.key, s.value])) as Draft, [plugin.settings]);
+  // 保存后父组件换 key 重建这个表单，草稿从新存的值开始。
+  const [draft, setDraft] = useState<Draft>(saved);
+
+  const groups = useMemo(() => {
+    const out: { name: string; items: RuntimePluginSetting[] }[] = [];
+    for (const s of plugin.settings) {
+      const group = out.find((g) => g.name === s.group) ?? out[out.push({ name: s.group, items: [] }) - 1];
+      group.items.push(s);
+    }
+    return out;
+  }, [plugin.settings]);
+
+  const edits = plugin.settings.filter((s) => !same(draft[s.key], saved[s.key]));
+  const set = (key: string, value: RuntimePluginSettingValue) => setDraft((d) => ({ ...d, [key]: value }));
+
+  function save() {
+    const values: Record<string, RuntimePluginSettingValue> = {};
+    for (const s of edits) values[s.key] = draft[s.key];
+    void act(
+      () => runtime.setPluginSettings(plugin.id, values),
+      plugin.status === "running" ? t("设置已保存，{name} 已重启来读取", { name: plugin.name }) : t("设置已保存"),
+    );
+  }
+
+  return (
+    <form
+      className="plugins-config"
+      onSubmit={(event) => {
+        event.preventDefault();
+        save();
+      }}
+    >
+      {groups.map((group) => (
+        <section key={group.name || "_"} className="plugins-card">
+          {group.name ? <h3>{group.name}</h3> : null}
+          <div className="plugins-config-grid">
+            {group.items.map((s) => (
+              <SettingRow key={s.key} setting={s} value={draft[s.key]} onChange={(v) => set(s.key, v)} />
+            ))}
+          </div>
+        </section>
+      ))}
+      <div className={`plugins-config-actions${edits.length > 0 ? " has-edits" : ""}`}>
+        {edits.length > 0 ? <span>{t("{count} 项没保存", { count: edits.length })}</span> : null}
+        <button type="submit" disabled={busy || edits.length === 0}>
+          {edits.length > 0 ? t("保存 {count} 项改动", { count: edits.length }) : t("保存")}
+        </button>
+        {edits.length > 0 ? (
+          <button type="button" onClick={() => setDraft(saved)} disabled={busy}>
+            {t("撤销改动")}
+          </button>
+        ) : null}
+        {plugin.settings.some((s) => s.changed) ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              if (window.confirm(t("把 {name} 的设置全部恢复成默认？", { name: plugin.name }))) {
+                const values: Record<string, null> = {};
+                for (const s of plugin.settings) if (s.changed) values[s.key] = null;
+                void act(() => runtime.setPluginSettings(plugin.id, values), t("已恢复默认"));
+              }
+            }}
+          >
+            {t("全部恢复默认")}
+          </button>
+        ) : null}
+      </div>
+    </form>
+  );
+}
+
+function SettingRow({
+  setting,
+  value,
+  onChange,
+}: {
+  setting: RuntimePluginSetting;
+  value: RuntimePluginSettingValue;
+  onChange: (value: RuntimePluginSettingValue) => void;
+}) {
+  const bounds = { min: setting.min ?? undefined, max: setting.max ?? undefined };
+  let control: ReactNode;
+  switch (setting.type) {
+    case "bool":
+      control = <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
+      break;
+    case "number":
+      control = (
+        <input
+          type="number"
+          {...bounds}
+          value={typeof value === "number" ? value : ""}
+          onChange={(e) => onChange(e.target.value === "" ? setting.default : Number(e.target.value))}
+        />
+      );
+      break;
+    case "choice":
+      control = (
+        <select value={String(value)} onChange={(e) => onChange(e.target.value)}>
+          {setting.choices.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+      );
+      break;
+    case "range": {
+      const pair = Array.isArray(value) && value.length === 2 ? (value as [number, number]) : [0, 0];
+      control = (
+        <span className="plugins-range">
+          <input type="number" {...bounds} value={pair[0]} onChange={(e) => onChange([Number(e.target.value), pair[1]])} />
+          <span>–</span>
+          <input type="number" {...bounds} value={pair[1]} onChange={(e) => onChange([pair[0], Number(e.target.value)])} />
+        </span>
+      );
+      break;
+    }
+    case "list":
+      control = (
+        <textarea
+          rows={Math.min(8, Math.max(2, (Array.isArray(value) ? value.length : 0) + 1))}
+          value={Array.isArray(value) ? value.join(NEWLINE) : ""}
+          onChange={(e) => onChange(e.target.value.split(NEWLINE))}
+          placeholder={t("每行一项")}
+        />
+      );
+      break;
+    case "textarea":
+      control = <textarea rows={4} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
+      break;
+    default:
+      control = <input value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
+  }
+  return (
+    <label className={`plugins-setting is-${setting.type}`}>
+      <span className="plugins-setting-label">
+        <span>{setting.label}</span>
+        {setting.changed ? <small title={t("和默认值不一样")}>{t("已改")}</small> : null}
+      </span>
+      {control}
+      {setting.help ? <span className="plugins-hint">{setting.help}</span> : null}
+    </label>
+  );
+}
