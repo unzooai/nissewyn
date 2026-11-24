@@ -1,7 +1,7 @@
 {
   "id": "xtools",
   "name": "Xtools",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "你的 X 账号运营助理:学你的说话方式,按读者作息发原创,在同行新帖下前排回复,接住读者,每周按效果调整打法。任何领域都能用。",
   "run": {
     "command": [
@@ -11,6 +11,9 @@
     "health": "/api/ping"
   },
   "page": "/",
+  "i18n": {
+    "en": "i18n/en.json"
+  },
   "mcp": {
     "command": [
       "python",

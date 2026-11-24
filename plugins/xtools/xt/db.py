@@ -5,7 +5,7 @@ import sqlite3
 import threading
 import time
 
-from . import env
+from . import env, i18n
 
 _LOCK = threading.RLock()
 _CONN = None
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS seen (
 CREATE TABLE IF NOT EXISTS snapshots (at REAL, followers INTEGER, following INTEGER);
 
 -- What happened, for the page and the weekly report.
-CREATE TABLE IF NOT EXISTS log (at REAL, level TEXT, what TEXT);
+CREATE TABLE IF NOT EXISTS log (at REAL, level TEXT, what TEXT, msg TEXT);
 """
 
 
@@ -54,6 +54,8 @@ def conn():
             for col in ('views', 'likes', 'replies', 'measured_at'):      # added in 2.1: how our replies did
                 if col not in have:
                     _CONN.execute('ALTER TABLE actions ADD COLUMN %s %s' % (col, 'REAL' if col == 'measured_at' else 'INTEGER'))
+            if 'msg' not in {r[1] for r in _CONN.execute('PRAGMA table_info(log)')}:   # 2.2: the log in any language
+                _CONN.execute('ALTER TABLE log ADD COLUMN msg TEXT')
             _CONN.commit()
         return _CONN
 
@@ -85,8 +87,23 @@ def kv_set(k, v):
 
 
 def log(what, level='info'):
-    run('INSERT INTO log(at, level, what) VALUES(?, ?, ?)', (time.time(), level, what))
+    """`what` is a Msg (or plain Chinese text); it is kept with its template so the page
+    can show it in the reader's language."""
+    run('INSERT INTO log(at, level, what, msg) VALUES(?, ?, ?, ?)',
+        (time.time(), level, str(what), json.dumps(i18n.dump(what), ensure_ascii=False)))
     print(time.strftime('%H:%M:%S'), level, what, flush=True)
+
+
+def logs(limit):
+    """The latest log lines, each in the language being answered in."""
+    out = []
+    for r in q('SELECT at, level, what, msg FROM log ORDER BY at DESC LIMIT ?', (limit,)):
+        try:
+            stored = json.loads(r['msg']) if r['msg'] else r['what']
+        except ValueError:
+            stored = r['what']
+        out.append({'at': r['at'], 'level': r['level'], 'what': i18n.render(stored)})
+    return out
 
 
 def playbook():

@@ -13,6 +13,7 @@ import threading
 import time
 
 from . import env
+from .i18n import msg
 
 IS_WIN = sys.platform == 'win32'
 _NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0) if IS_WIN else 0
@@ -46,14 +47,14 @@ def _command(w, out_file):
     if name == 'claude-code':
         exe = _which('claude')
         if not exe:
-            raise WriterError('没找到 Claude Code CLI')
+            raise WriterError(msg('没找到 {cli}', cli='Claude Code CLI'))
         argv = [exe, '-p', '--output-format', 'text', '--strict-mcp-config',
                 '--disallowedTools', 'Bash,PowerShell,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Task']
         return argv + (['--model', model] if model else [])
     if name == 'codex-cli':
         exe = _which('codex')
         if not exe:
-            raise WriterError('没找到 Codex CLI')
+            raise WriterError(msg('没找到 {cli}', cli='Codex CLI'))
         argv = [exe, 'exec', '--skip-git-repo-check', '-s', 'read-only', '--color', 'never',
                 '-c', 'mcp_servers={}', '-o', out_file]
         if model:
@@ -64,19 +65,19 @@ def _command(w, out_file):
     if name == 'opencode':
         exe = _which('opencode')
         if not exe:
-            raise WriterError('没找到 OpenCode CLI')
+            raise WriterError(msg('没找到 {cli}', cli='OpenCode CLI'))
         return [exe, 'run'] + (['-m', model] if model else [])
     if name == 'agy':
         exe = _which('agy')
         if not exe:
-            raise WriterError('没找到 Antigravity CLI')
+            raise WriterError(msg('没找到 {cli}', cli='Antigravity CLI'))
         argv = [exe, '--disable-slash-commands']
         if model:
             argv += ['--model', model]
         if effort:
             argv += ['--effort', effort]
         return argv + ['-p', PROMPT_ARG]   # agy takes the prompt as -p's value, not from stdin
-    raise WriterError('不支持的智能体:%s' % name)
+    raise WriterError(msg('不支持的智能体:{agent}', agent=name))
 
 
 PROMPT_ARG = object()   # where the prompt goes when the CLI wants it as an argument
@@ -110,9 +111,9 @@ def write(prompt, redlines=None):
                                    encoding='utf-8', errors='replace', cwd=_workdir(), timeout=_TIMEOUT,
                                    creationflags=_NO_WINDOW)
             except subprocess.TimeoutExpired:
-                raise WriterError('写稿超过 %d 秒' % _TIMEOUT)
+                raise WriterError(msg('写稿超过 {n} 秒', n=_TIMEOUT))
             except OSError as e:
-                raise WriterError('写稿的智能体没能启动:%s' % e)
+                raise WriterError(msg('写稿的智能体没能启动:{error}', error=e))
             text = ''
             if w.get('agent') == 'codex-cli':
                 try:
@@ -123,7 +124,7 @@ def write(prompt, redlines=None):
             text = (text or p.stdout or '').strip()
             if p.returncode != 0 or not text:
                 tail = ' | '.join((p.stderr or p.stdout or '').strip().splitlines()[-3:])
-                raise WriterError('写稿失败(退出码 %s):%s' % (p.returncode, tail[:300]))
+                raise WriterError(msg('写稿失败(退出码 {code}):{tail}', code=p.returncode, tail=tail[:300]))
             return _clean(text)
         finally:
             try:
@@ -144,11 +145,11 @@ def write_json(prompt, redlines=None):
     text = write(prompt + '\n\n只输出 JSON,不要别的文字,不要代码块标记。', redlines)
     m = re.search(r'(\{.*\}|\[.*\])', text, re.S)
     if not m:
-        raise WriterError('写稿的智能体没有给出 JSON:%s' % text[:200])
+        raise WriterError(msg('写稿的智能体没有给出 JSON:{text}', text=text[:200]))
     try:
         return json.loads(m.group(1))
     except ValueError as e:
-        raise WriterError('JSON 解析失败:%s' % e)
+        raise WriterError(msg('JSON 解析失败:{error}', error=e))
 
 
 def weighted_len(text):

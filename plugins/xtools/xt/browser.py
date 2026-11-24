@@ -7,6 +7,7 @@ import urllib.error
 import urllib.request
 
 from . import env
+from .i18n import msg
 
 BASE = 'http://127.0.0.1:9399'
 _LOCK = threading.RLock()     # one action at a time on the account: never two tabs racing
@@ -26,7 +27,7 @@ def _call(path, body=None, timeout=60):
     except urllib.error.HTTPError as e:
         raise BrowserError('%s: HTTP %s %s' % (path, e.code, e.read()[:200].decode('utf-8', 'replace')))
     except (urllib.error.URLError, OSError) as e:
-        raise BrowserError('Unzoo 浏览器没有响应(%s)' % e)
+        raise BrowserError(msg('Unzoo 浏览器没有响应({error})', error=e))
     if isinstance(r, dict) and r.get('success') is False:
         raise BrowserError('%s: %s' % (path, r.get('error') or r))
     return r.get('data') if isinstance(r, dict) and 'data' in r else r
@@ -53,8 +54,8 @@ def signed_out_text():
         name = next((p['name'] for p in profiles() if p['id'] == pid), None) or pid
     except BrowserError:
         name = pid
-    return ('浏览器身份「%s」里 X 没有登录。如果你的 X 登录在别的身份里,到 设置 › X 账号 选那个;'
-            '否则在这个身份里登录 X。' % name)
+    return msg('浏览器身份「{profile}」里 X 没有登录。如果你的 X 登录在别的身份里,到 设置 › X 账号 选那个;'
+               '否则在这个身份里登录 X。', profile=name)
 
 
 def _alive(tab):
@@ -69,7 +70,7 @@ def tab():
     with _LOCK:
         profile = env.browser_profile()
         if not profile:
-            raise BrowserError('还没指定 X 账号用哪个浏览器身份(Nissewyn › 插件 › Xtools › 设置 › 账号与模型)')
+            raise BrowserError(msg('还没指定 X 账号用哪个浏览器身份(Nissewyn › 插件 › Xtools › 设置 › 账号与模型)'))
         if _TAB['id'] and _TAB.get('profile') == profile and _alive(_TAB['id']):
             return _TAB['id']
         d = _call('/api/v1/tabs/create', {'profile_id': profile, 'url': 'about:blank'})

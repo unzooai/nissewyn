@@ -6,6 +6,7 @@ import re
 import time
 
 from . import browser, clock, db, env, playbook, writer, x
+from .i18n import dump, load, msg, of
 
 KINDS = ('reply', 'quote', 'like', 'follow')
 
@@ -15,22 +16,22 @@ KINDS = ('reply', 'quote', 'like', 'follow')
 def halted():
     """Why automation is stopped, or None."""
     if env.setting('paused'):
-        return '已在设置里暂停'
+        return msg('已在设置里暂停')
     h = db.kv_get('halt')
     if h and h.get('until', 0) > time.time() and h.get('profile', env.browser_profile()) == env.browser_profile():
-        return h.get('why')
+        return load(h.get('why'))
     return None
 
 
 def halt(why, minutes):
-    db.kv_set('halt', {'why': why, 'until': time.time() + minutes * 60, 'at': time.time(), 'profile': env.browser_profile()})
-    db.log('停下 %d 分钟:%s' % (minutes, why), 'warn')
+    db.kv_set('halt', {'why': dump(why), 'until': time.time() + minutes * 60, 'at': time.time(), 'profile': env.browser_profile()})
+    db.log(msg('停下 {minutes} 分钟:{why}', minutes=minutes, why=why), 'warn')
 
 
 def on_unhealthy(state):
     minutes = {'limited': 180, 'locked': 60 * 24 * 7, 'signed_out': 60 * 24, 'error': 30}.get(state, 60)
-    why = {'limited': 'X 提示操作太频繁(限流)', 'locked': 'X 账号被锁或需要验证,请到浏览器里处理',
-           'signed_out': browser.signed_out_text(), 'error': 'X 页面出错'}.get(state, state)
+    why = {'limited': msg('X 提示操作太频繁(限流)'), 'locked': msg('X 账号被锁或需要验证,请到浏览器里处理'),
+           'signed_out': browser.signed_out_text(), 'error': msg('X 页面出错')}.get(state, state)
     halt(why, minutes)
 
 
@@ -136,7 +137,7 @@ def _redline_hit(text):
 def _book():
     book = db.playbook()
     if not book.get('pillars'):
-        raise RuntimeError('还没有打法:先在 Xtools 页面完成「开始」')
+        raise RuntimeError(msg('还没有打法:先在 Xtools 页面完成「开始」'))
     return book
 
 
@@ -188,7 +189,7 @@ def write_post(pillar=None, fmt=None, extra=''):
         parts[-1] = parts[-1].rstrip() + '\n' + link
     hit = _redline_hit(' '.join(parts))
     if hit:
-        raise RuntimeError('写出来的内容碰到红线(%s),已丢弃' % hit)
+        raise RuntimeError(msg('写出来的内容碰到红线({topic}),已丢弃', topic=hit))
     return {'pillar': pillar['name'], 'format': fmt, 'parts': parts, 'source': json.dumps([m['handle'] for m in material])}
 
 
@@ -214,9 +215,9 @@ def plan_day():
     for t in times:
         try:
             pid = add_post(write_post(), due_at=t)
-            db.log('写好今天的原创 #%d,%s 发' % (pid, clock.fmt(t)))
+            db.log(msg('写好今天的原创 #{id},{at} 发', id=pid, at=clock.fmt(t)))
         except Exception as e:
-            db.log('写原创失败:%s' % e, 'warn')
+            db.log(msg('写原创失败:{error}', error=of(e)), 'warn')
             break
     sessions = clock.spread_over_awake(env.setting('sessions.per_day') or 0, max(start, now), end)
     db.kv_set('sessions', {'day': start, 'at': sessions, 'done': []})
@@ -259,7 +260,7 @@ def radar(accounts=4, keywords=2):
         got += _remember(posts, 'kw:' + k)
         browser.pause(3, 8)
     db.kv_set('radar_turn', turn + 1)
-    db.log('雷达:新看到 %d 条' % got)
+    db.log(msg('雷达:新看到 {n} 条', n=got))
     return got
 
 
@@ -323,15 +324,15 @@ def frontrow(max_drafts=4):
         try:
             text = write_reply(r, book)
         except Exception as e:
-            db.log('起草前排回复失败:%s' % e, 'warn')
+            db.log(msg('起草前排回复失败:{error}', error=of(e)), 'warn')
             break
         db.run("UPDATE seen SET used=? WHERE url=?", ('reply' if text else 'skip', r['url']))
         if text:
-            _queue('reply', r, text, '前排回复:@%s 的新帖' % r['handle'])
+            _queue('reply', r, text, '前排回复')
             _queue('like', r, reason='回复前先点赞')
             made += 1
     if made:
-        db.log('起草前排回复 %d 条' % made)
+        db.log(msg('起草前排回复 {n} 条', n=made))
     return made
 
 
@@ -396,7 +397,7 @@ def mentions():
             ans = writer.write_json(MENTION.format(voice=playbook.voice_block(book), handle=p['handle'], text=p['text'][:800],
                                                    context='', lang=_lang_of(p['text'])), env.setting('redlines'))
         except Exception as e:
-            db.log('处理通知失败:%s' % e, 'warn')
+            db.log(msg('处理通知失败:{error}', error=of(e)), 'warn')
             break
         act = ans.get('action') if isinstance(ans, dict) else 'skip'
         db.run("UPDATE seen SET used=? WHERE url=?", (act, p['url']))
@@ -411,7 +412,7 @@ def mentions():
         elif act == 'like':
             _queue('like', p, reason='读者的附和')
     if made:
-        db.log('读者通知:起草回复 %d 条' % made)
+        db.log(msg('读者通知:起草回复 {n} 条', n=made))
     return made
 
 
@@ -465,10 +466,10 @@ def publish_due(post_id=None):
             return 0
         if res.get('ok'):
             db.run("UPDATE posts SET status='published', published_at=?, url=? WHERE id=?", (time.time(), res.get('url'), r['id']))
-            db.log('发出原创 #%d %s' % (r['id'], res.get('url') or ''))
+            db.log(msg('发出原创 #{id} {url}', id=r['id'], url=res.get('url') or ''))
         else:
             db.run("UPDATE posts SET status='failed', error=? WHERE id=?", (res.get('error'), r['id']))
-            db.log('原创 #%d 没发出去:%s' % (r['id'], res.get('error')), 'warn')
+            db.log(msg('原创 #{id} 没发出去:{error}', id=r['id'], error=res.get('error')), 'warn')
         return 1
     return 0
 
@@ -484,8 +485,8 @@ def same_account():
         on_unhealthy('signed_out')
         return False
     if want and got != want:
-        halt('浏览器身份「%s」里登录的是 @%s,不是打法对应的 @%s;什么都没做。请到 设置 › X 账号 选对身份,'
-             '或在这个身份里换回 @%s' % (profile, got, want, want), 60)
+        halt(msg('浏览器身份「{profile}」里登录的是 @{got},不是打法对应的 @{want};什么都没做。'
+                 '请到 设置 › X 账号 选对身份,或在这个身份里换回 @{want}', profile=profile, got=got, want=want), 60)
         return False
     return True
 
@@ -529,7 +530,7 @@ def run_actions(limits):
             on_unhealthy(e.state)
             break
         except browser.BrowserError as e:
-            db.log('浏览器出错:%s' % e, 'warn')
+            db.log(msg('浏览器出错:{error}', error=of(e)), 'warn')
             break
         if res.get('ok'):
             db.run("UPDATE actions SET status='done', done_at=?, result_url=? WHERE id=?", (time.time(), res.get('url'), a['id']))
@@ -538,7 +539,7 @@ def run_actions(limits):
             db.run("UPDATE actions SET status='failed', error=?, done_at=? WHERE id=?", (res.get('error'), time.time(), a['id']))
         gap()
     if any(done.values()):
-        db.log('会话:回复 %(reply)d、引用 %(quote)d、点赞 %(like)d、关注 %(follow)d' % done)
+        db.log(msg('会话:回复 {reply}、引用 {quote}、点赞 {like}、关注 {follow}', **done))
     return done
 
 
@@ -604,7 +605,7 @@ def measure():
         if not p['is_reply']:
             db.run('UPDATE posts SET views=?, likes=?, replies=?, reposts=?, bookmarks=?, measured_at=? WHERE url=?',
                    (p['views'], p['likes'], p['replies'], p['reposts'], p['bookmarks'], time.time(), p['url']))
-    db.log('记录数据:粉丝 %s' % prof.get('followers'))
+    db.log(msg('记录数据:粉丝 {n}', n=prof.get('followers')))
 
 
 def weekly_learn():
@@ -625,7 +626,9 @@ def weekly_learn():
             ratio = avg[p['name']] / overall
             new = round(min(3.0, max(0.3, p.get('weight', 1.0) * (0.7 + 0.3 * ratio))), 2)
             if abs(new - p.get('weight', 1.0)) >= 0.05:
-                changes.append('「%s」权重 %.2f → %.2f(平均互动 %.0f,整体 %.0f)' % (p['name'], p.get('weight', 1.0), new, avg[p['name']], overall))
+                changes.append(dump(msg('「{pillar}」权重 {old} → {new}(平均互动 {avg},整体 {overall})', pillar=p['name'],
+                                        old='%.2f' % p.get('weight', 1.0), new='%.2f' % new,
+                                        avg='%.0f' % avg[p['name']], overall='%.0f' % overall)))
                 p['weight'] = new
     # Accounts whose posts we replied to and that then engaged with us stay; others drop down the list.
     report = {
@@ -639,5 +642,5 @@ def weekly_learn():
     book.setdefault('history', []).append(report)
     book['history'] = book['history'][-12:]
     db.save_playbook(book)
-    db.log('周报:%d 条原创,调整 %d 处' % (len(rows), len(changes)))
+    db.log(msg('周报:{posts} 条原创,调整 {changes} 处', posts=len(rows), changes=len(changes)))
     return report
