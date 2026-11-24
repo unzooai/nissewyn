@@ -4,6 +4,7 @@ import time
 import traceback
 
 from . import browser, clock, db, engine, env, x
+from .i18n import msg, of, tr
 
 _RUNNING = {'job': None, 'since': None}
 _BEAT = {'at': None, 'idle': None}    # the clock's last tick, and why it did nothing (or None)
@@ -21,7 +22,7 @@ def heartbeat():
 def run_job(name, fn, *args):
     """Run a job now unless another one is running; logs what went wrong."""
     if not _LOCK.acquire(blocking=False):
-        return {'ok': False, 'error': '正在做:%s' % _RUNNING['job']}
+        return {'ok': False, 'error': tr('正在做:{job}', job=_RUNNING['job'])}
     _RUNNING.update(job=name, since=time.time())
     try:
         return {'ok': True, 'result': fn(*args)}
@@ -29,7 +30,7 @@ def run_job(name, fn, *args):
         engine.on_unhealthy(e.state)
         return {'ok': False, 'error': e.state}
     except Exception as e:
-        db.log('%s 出错:%s' % (name, e), 'warn')
+        db.log(msg('{job} 出错:{error}', job=name, error=of(e)), 'warn')
         traceback.print_exc()
         return {'ok': False, 'error': str(e)}
     finally:

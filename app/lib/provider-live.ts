@@ -13,7 +13,7 @@
  *   环境读不到文件。要么 unterm 给个固定入口，要么让用户在设置里填。
  */
 
-import { t } from "../i18n";
+import { locale, t } from "../i18n";
 import type { ConnectorCheckResult, ConnectorId } from "../types";
 import {
   CONFIRMATION_SESSION,
@@ -34,6 +34,7 @@ import {
 } from "./brain-events";
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
+import { pageInLanguage, pluginWords, type PluginCatalogs } from "./plugin-i18n";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
 import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimeAgentModel, RuntimePluginSetting, RuntimePluginStatus, RuntimePlugins, RuntimeTellRules, RuntimeTellWish, RuntimeTerminal, TabView, TerminalOutput, TerminalScreen, WorkspaceProvider } from "./provider";
 
@@ -626,32 +627,46 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           mcp_server?: string | null; tools?: { name: string; does: string }[]; domains?: string[];
           settings?: RuntimePluginSetting[];
           roles?: { name: string; kind: "browser" | "agent"; label?: string; default?: Record<string, string> | null; binding?: Record<string, string> | null }[];
+          i18n?: PluginCatalogs;
         };
+        const lang = locale();
         const data = await getUnterm<{ plugins?: Raw[]; browser_profiles?: { id: string; name?: string }[] }>("/api/plugins");
         return {
-          plugins: (data.plugins ?? []).map((raw) => ({
-            id: raw.id,
-            name: raw.name ?? raw.id,
-            version: raw.version ?? "",
-            description: raw.description ?? "",
-            dir: raw.dir ?? "",
-            enabled: Boolean(raw.enabled),
-            status: raw.status ?? "stopped",
-            error: raw.error ?? null,
-            pageUrl: raw.page_url ?? null,
-            hasPage: Boolean(raw.has_page),
-            mcpServer: raw.mcp_server ?? null,
-            tools: raw.tools ?? [],
-            roles: (raw.roles ?? []).map((role) => ({
-              name: role.name,
-              kind: role.kind,
-              label: role.label ?? role.name,
-              default: role.default ?? null,
-              binding: role.binding ?? null,
-            })),
-            settings: (raw.settings ?? []).map((s) => ({ ...s, help: s.help ?? "", choices: s.choices ?? [], min: s.min ?? null, max: s.max ?? null })),
-            domains: raw.domains ?? [],
-          })),
+          plugins: (data.plugins ?? []).map((raw) => {
+            // The manifest's own text in the interface language, when the plugin gives it.
+            const w = pluginWords(raw.i18n, lang);
+            return {
+              id: raw.id,
+              name: w(raw.name ?? raw.id),
+              version: raw.version ?? "",
+              description: w(raw.description ?? ""),
+              dir: raw.dir ?? "",
+              enabled: Boolean(raw.enabled),
+              status: raw.status ?? "stopped",
+              error: raw.error ?? null,
+              pageUrl: pageInLanguage(raw.page_url ?? null, lang),
+              hasPage: Boolean(raw.has_page),
+              mcpServer: raw.mcp_server ?? null,
+              tools: raw.tools ?? [],
+              roles: (raw.roles ?? []).map((role) => ({
+                name: role.name,
+                kind: role.kind,
+                label: w(role.label ?? role.name),
+                default: role.default ?? null,
+                binding: role.binding ?? null,
+              })),
+              settings: (raw.settings ?? []).map((s) => ({
+                ...s,
+                group: w(s.group ?? ""),
+                label: w(s.label),
+                help: w(s.help ?? ""),
+                choices: (s.choices ?? []).map((c) => ({ ...c, label: w(c.label) })),
+                min: s.min ?? null,
+                max: s.max ?? null,
+              })),
+              domains: raw.domains ?? [],
+            };
+          }),
           browserProfiles: (data.browser_profiles ?? []).map((p) => ({ id: p.id, name: p.name ?? p.id })),
         };
       },

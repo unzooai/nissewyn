@@ -4,6 +4,7 @@ import re
 import time
 
 from . import env
+from .i18n import tr
 
 
 def parse_tz(text):
@@ -91,5 +92,5 @@ def fmt_here(ts, now=None):
             - time.mktime((today.tm_year, today.tm_mon, today.tm_mday, 0, 0, 0, 0, 0, -1)))
     days = round(days / 86400)
     clock_part = time.strftime('%H:%M', t)
-    word = {0: '今天', 1: '明天', 2: '后天'}.get(days)
-    return f'{word} {clock_part}' if word else time.strftime('%m-%d %H:%M', t)
+    word = {0: '今天 {time}', 1: '明天 {time}', 2: '后天 {time}'}.get(days)
+    return tr(word, time=clock_part) if word else time.strftime('%m-%d %H:%M', t)

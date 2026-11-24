@@ -5,6 +5,7 @@ import re
 import time
 
 from . import browser, clock, db, env, writer, x
+from .i18n import msg
 
 
 def score(p):
@@ -128,11 +129,11 @@ DRAFT = """替一个人填好他 X 账号运营的三项基本信息。根据下
 def read_site(url):
     """A website's title, description, headings and text, read in the account's browser."""
     if not re.match(r'^https?://[^\s/]+\.[^\s]+', url or ''):
-        raise RuntimeError('网址要以 http:// 或 https:// 开头')
+        raise RuntimeError(msg('网址要以 http:// 或 https:// 开头'))
     browser.go(url, settle=(3, 5))
     got = browser.js(SITE_JS) or {}
     if not (got.get('text') or '').strip():
-        raise RuntimeError('打开了 %s 但没读到文字' % url)
+        raise RuntimeError(msg('打开了 {url} 但没读到文字', url=url))
     return got
 
 
@@ -140,14 +141,14 @@ def draft_about(source, url=''):
     """Fill in who / audience / goal from the person's website or X account; the person edits it."""
     d = db.kv_get('about_draft') or {}
     if source == 'site':
-        db.log('读网站:%s' % url)
+        db.log(msg('读网站:{url}', url=url))
         site = read_site(url)
         text = '\n'.join(filter(None, [site.get('title'), site.get('description'), ' / '.join(site.get('heads') or []), site.get('text')]))
         db.kv_set('site_draft', {'url': url, 'text': text[:6000], 'at': time.time()})
         material = '他的网站 %s:\n%s' %(url, text[:6000])
         d['site'] = url
     else:
-        db.log('读 X 账号:主页和最近的帖')
+        db.log(msg('读 X 账号:主页和最近的帖'))
         learned = learn_account()
         db.kv_set('learned_draft', {'at': time.time(), 'learned': learned, 'profile': env.browser_profile()})
         prof = learned.get('profile') or {}
@@ -163,21 +164,23 @@ def draft_about(source, url=''):
             d[k] = ans[k].strip()
     d.update(at=time.time(), filled_from=source)
     db.kv_set('about_draft', d)
-    db.log('已按%s填好「我是谁、想吸引的人、目标」,可以再改' % ('网站' if source == 'site' else 'X 账号'))
+    db.log(msg('已按网站填好「我是谁、想吸引的人、目标」,可以再改') if source == 'site'
+           else msg('已按 X 账号填好「我是谁、想吸引的人、目标」,可以再改'))
     return d
 
 
 def setup(about):
     """First run: learn the account, propose a playbook, save it."""
-    db.log('开始读账号:主页、最近的帖和它们的数据')
+    db.log(msg('开始读账号:主页、最近的帖和它们的数据'))
     fresh = db.kv_get('learned_draft') or {}
     learned = (fresh['learned'] if fresh.get('at', 0) > time.time() - 6 * 3600 and fresh.get('profile') == env.browser_profile()
                else learn_account())
-    db.log('读完 @%s:%d 条帖;让写稿的智能体给出打法' % (learned['handle'], learned['posts']))
+    db.log(msg('读完 @{handle}:{n} 条帖;让写稿的智能体给出打法', handle=learned['handle'], n=learned['posts']))
     plan = propose(about, learned)
     book = {'about': about, 'learned': learned, **plan, 'created_at': time.time(), 'history': []}
     db.save_playbook(book)
-    db.log('打法已生成:%d 个内容支柱、%d 个关键词、%d 个要盯的账号' % (len(plan['pillars']), len(plan['keywords']), len(plan['watch'])))
+    db.log(msg('打法已生成:{pillars} 个内容支柱、{keywords} 个关键词、{watch} 个要盯的账号',
+               pillars=len(plan['pillars']), keywords=len(plan['keywords']), watch=len(plan['watch'])))
     return book
 
 

@@ -9,14 +9,16 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from xt import browser, clock, db, engine, env, playbook, scheduler, stats  # noqa: E402
+from xt import browser, clock, db, engine, env, i18n, playbook, scheduler, stats  # noqa: E402
+from xt.i18n import msg, tr  # noqa: E402
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
+LANGS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'i18n')
 
 
 def background(name, fn, *args):
     threading.Thread(target=scheduler.run_job, args=(name, fn) + args, daemon=True).start()
-    return {'ok': True, 'started': name}
+    return {'ok': True, 'started': tr(name)}
 
 
 JOBS = {
@@ -40,6 +42,11 @@ def _post_view(r):
     return r
 
 
+def _running():
+    job = scheduler.running()
+    return {**job, 'job': tr(job['job']) if job['job'] else None}
+
+
 def state():
     book = db.playbook()
     start = db.today_start()
@@ -52,8 +59,8 @@ def state():
         'profile_bound': bool(env.browser_profile()),
         'in_nissewyn': env.in_nissewyn(),
         'browser': browser.reachable(),
-        'halted': engine.halted(),
-        'running': scheduler.running(),
+        'halted': i18n.render(engine.halted()) if engine.halted() else None,
+        'running': _running(),
         'awake': clock.audience_awake(),
         'automation': {k: env.automation(k) for k in ('posts', 'mentions', 'replies', 'quotes', 'likes', 'follows')},
         'today': {
@@ -65,7 +72,7 @@ def state():
         },
         'queue': {s: db.one('SELECT COUNT(*) n FROM actions WHERE status=?', (s,))['n'] for s in ('pending', 'queued')},
         'followers': snaps,
-        'log': db.q('SELECT at, level, what FROM log ORDER BY at DESC LIMIT 40'),
+        'log': db.logs(40),
         'timezones': env.setting('audience.timezones'),
         'warmup': _warmup_view(book),
         'status': _status(book, sessions),
@@ -81,32 +88,32 @@ def _status(book, sessions):
         nxt.append((p['due_at'], '发原创'))
     nxt += [(t, '互动会话') for t in sessions.get('at', []) if t > now and t not in sessions.get('done', [])]
     nxt.sort()
-    nxt = '%s %s' % (clock.fmt(nxt[0][0]), nxt[0][1]) if nxt else ''
-    def out(state, text, detail=''):
-        return {'state': state, 'text': text, 'detail': detail, 'next': nxt,
-                'beat': beat['at'], 'job': job['job'], 'since': job['since']}
+    nxt = '%s %s' % (clock.fmt(nxt[0][0]), tr(nxt[0][1])) if nxt else ''
+    def out(state, text, detail='', **values):
+        return {'state': state, 'text': tr(text, **values), 'detail': i18n.render(detail) if detail else '', 'next': nxt,
+                'beat': beat['at'], 'job': tr(job['job']) if job['job'] else None, 'since': job['since']}
     if os.environ.get('XTOOLS_NO_SCHEDULER'):
-        return out('off', '没有在运行', '自动调度被关掉了(XTOOLS_NO_SCHEDULER),只能手动操作')
+        return out('off', '没有在运行', msg('自动调度被关掉了(XTOOLS_NO_SCHEDULER),只能手动操作'))
     if job['job']:
-        return out('working', '运行中 · 正在' + job['job'], '已经 %d 秒' % (now - job['since']))
+        return out('working', '运行中 · 正在{job}', msg('已经 {n} 秒', n=int(now - job['since'])), job=job['job'])
     if not book.get('pillars'):
         if not env.browser_profile():
-            return out('problem', '已启动 · 还没指定 X 账号', '到 Nissewyn › 插件 › Xtools › 设置,选登录了你 X 的浏览器身份')
-        return out('waiting', '已启动 · 等你完成下面的「开始」', '填好你是谁、想吸引谁、目标,它读完账号后自动开始运营')
+            return out('problem', '已启动 · 还没指定 X 账号', msg('到 Nissewyn › 插件 › Xtools › 设置,选登录了你 X 的浏览器身份'))
+        return out('waiting', '已启动 · 等你完成下面的「开始」', msg('填好你是谁、想吸引谁、目标,它读完账号后自动开始运营'))
     if env.setting('paused'):
-        return out('off', '已暂停', '在 Nissewyn › 插件 › Xtools › 设置 里关掉「全部暂停」就继续')
+        return out('off', '已暂停', msg('在 Nissewyn › 插件 › Xtools › 设置 里关掉「全部暂停」就继续'))
     h = engine.halted()
     if h:
         return out('problem', '已停下', h)
     if not beat['at'] or now - beat['at'] > 180:
-        return out('problem', '调度没有在跑', '超过 3 分钟没有动静;到 Nissewyn 里把 Xtools 关掉再打开')
+        return out('problem', '调度没有在跑', msg('超过 3 分钟没有动静;到 Nissewyn 里把 Xtools 关掉再打开'))
     if beat['idle'] == 'no_browser':
-        return out('problem', '等浏览器', 'Unzoo 浏览器没有响应,连上后自动继续')
+        return out('problem', '等浏览器', msg('Unzoo 浏览器没有响应,连上后自动继续'))
     if beat['idle'] == 'error':
-        return out('problem', '运行中 · 上一轮出错', '看下面「最近」里的记录')
+        return out('problem', '运行中 · 上一轮出错', msg('看下面「最近」里的记录'))
     if beat['idle'] == 'asleep':
-        return out('on', '运行中 · 读者在睡觉', '这段时间只按时发原创,不互动')
-    return out('on', '运行中 · 等下一件事', '每分钟检查一次')
+        return out('on', '运行中 · 读者在睡觉', msg('这段时间只按时发原创,不互动'))
+    return out('on', '运行中 · 等下一件事', msg('每分钟检查一次'))
 
 
 def _warmup_view(book):
@@ -116,14 +123,14 @@ def _warmup_view(book):
     prof = (book.get('learned') or {}).get('profile') or {}
     todo = []
     if prof.get('default_avatar'):
-        todo.append('换一张真实的头像')
+        todo.append(tr('换一张真实的头像'))
     if prof.get('banner') is False:
-        todo.append('加一张横幅图')
+        todo.append(tr('加一张横幅图'))
     if not (prof.get('bio') or '').strip():
-        todo.append('写一句简介:你是谁、关注你能看到什么')
+        todo.append(tr('写一句简介:你是谁、关注你能看到什么'))
     # The person's own clock, not the readers' zone: "11-24 07:49" in UTC-8 read as
     # this morning on a UTC+9 computer, while the switch was still hours away.
-    return {**w, 'next': clock.fmt_here(w['next_at']), 'end': clock.fmt_here(w['end_at']), 'todo': todo,
+    return {**w, 'name': tr(w['name']), 'what': tr(w['what']), 'next': clock.fmt_here(w['next_at']), 'end': clock.fmt_here(w['end_at']), 'todo': todo,
             'mode': env.setting('warmup.mode'), 'new_account': engine.is_new_account(book)}
 
 
@@ -134,7 +141,10 @@ def handle_get(path, qs):
     if path == '/api/state':
         return state()
     if path == '/api/playbook':
-        return db.playbook()
+        book = db.playbook()
+        for report in book.get('history') or []:       # the weekly changes, in the reader's language
+            report['changes'] = [i18n.render(c) for c in report.get('changes') or []]
+        return book
     if path == '/api/stats':
         return stats.stats(max(1, min(90, int(one('days', 30)))))
     if path == '/api/posts':
@@ -148,7 +158,7 @@ def handle_get(path, qs):
     if path == '/api/seen':
         return {'items': db.q('SELECT * FROM seen ORDER BY captured_at DESC LIMIT 150')}
     if path == '/api/log':
-        return {'items': db.q('SELECT * FROM log ORDER BY at DESC LIMIT 300')}
+        return {'items': db.logs(300)}
     return None
 
 
@@ -162,7 +172,7 @@ def handle_post(path, body):
         src = 'site' if body.get('source') == 'site' else 'account'
         url = (body.get('url') or '').strip()
         if src == 'site' and not url:
-            return {'ok': False, 'error': '先填网站地址'}
+            return {'ok': False, 'error': tr('先填网站地址')}
         return background('读网站、填写基本信息' if src == 'site' else '读 X 账号、填写基本信息', playbook.draft_about, src, url)
     if path == '/api/setup':
         about = {k: (body.get(k) or '').strip() for k in ('who', 'audience', 'goal', 'site')}
@@ -187,22 +197,22 @@ def handle_post(path, body):
     if path == '/api/warmup':
         if body.get('action') == 'end':
             db.kv_set('warmup_ended', True)
-            db.log('养号期提前结束')
+            db.log(msg('养号期提前结束'))
         elif body.get('action') == 'restart':
             db.kv_set('warmup_ended', None)
             db.kv_set('warmup_start', time.time())
-            db.log('养号期从今天重新开始')
+            db.log(msg('养号期从今天重新开始'))
         return {'ok': True}
     if path == '/api/resume':
         db.kv_set('halt', None)
-        db.log('已恢复自动运行')
+        db.log(msg('已恢复自动运行'))
         return {'ok': True}
     if path == '/api/posts/write':
         def write():
             book = db.playbook()
             pillar = next((p for p in book.get('pillars', []) if p['name'] == body.get('pillar')), None)
             pid = engine.add_post(engine.write_post(pillar, body.get('format'), body.get('extra', '')))
-            db.log('写好一条草稿 #%d' % pid)
+            db.log(msg('写好一条草稿 #{id}', id=pid))
         return background('写一条原创', write)
     if path == '/api/posts/save':
         db.run('UPDATE posts SET parts=? WHERE id=?', (json.dumps(body['parts'], ensure_ascii=False), body['id']))
@@ -244,13 +254,24 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
+    def _lang(self, u):
+        """The page asks for its language with X-Lang (or ?lang=); without one, the default."""
+        i18n.use(self.headers.get('X-Lang') or (parse_qs(u.query).get('lang') or [None])[0])
+
     def do_GET(self):
         u = urlparse(self.path)
+        self._lang(u)
+        if u.path.startswith('/i18n/'):
+            f = os.path.normpath(os.path.join(LANGS, u.path[len('/i18n/'):]))
+            if not f.startswith(LANGS) or not os.path.isfile(f):
+                return self._send(404, {'error': 'not found'})
+            with open(f, 'rb') as fh:
+                return self._send(200, fh.read())
         if u.path.startswith('/api/'):
             try:
                 out = handle_get(u.path, parse_qs(u.query))
             except Exception as e:
-                return self._send(500, {'ok': False, 'error': str(e)})
+                return self._send(500, {'ok': False, 'error': i18n.render(i18n.of(e))})
             return self._send(200 if out is not None else 404, out if out is not None else {'error': 'not found'})
         name = 'index.html' if u.path in ('/', '') else u.path.lstrip('/')
         f = os.path.normpath(os.path.join(WEB, name))
@@ -263,12 +284,13 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         u = urlparse(self.path)
+        self._lang(u)
         n = int(self.headers.get('Content-Length') or 0)
         try:
             body = json.loads(self.rfile.read(n) or b'{}') if n else {}
             out = handle_post(u.path, body)
         except Exception as e:
-            return self._send(500, {'ok': False, 'error': str(e)})
+            return self._send(500, {'ok': False, 'error': i18n.render(i18n.of(e))})
         self._send(200 if out is not None else 404, out if out is not None else {'error': 'not found'})
 
 

@@ -3,6 +3,7 @@ import json
 import time
 
 from . import clock, db, playbook
+from .i18n import tr
 
 
 def _avg(rows, key):
@@ -63,7 +64,7 @@ def stats(days=30):
                    "AND done_at>? AND measured_at IS NOT NULL", (since,))
     for r in replies:
         r['bookmarks'] = r['reposts'] = 0
-        r['who'] = '回读者' if r['reason'] == '回读者' else '@' + (r['target_handle'] or '?')
+        r['who'] = tr('回读者') if r['reason'] == '回读者' else '@' + (r['target_handle'] or '?')
 
     return {
         'days': days,
