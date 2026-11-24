@@ -33,7 +33,7 @@
 - 替 Provider 做它自己那一层的执行闸门（纵深防御的另一层由 Provider 各自实现）。
 
 对应 Issue：`nissewyn#2`（Epic）、`#3`–`#13`、
-[#14 timestamp pattern 放宽](https://github.com/unzooai/unzoo-one/issues/14)（`contracts/v0` 冻结前处理）。
+[#14 timestamp pattern 放宽](https://github.com/unzooai/nissewyn/issues/14)（`contracts/v0` 冻结前处理）。
 
 ### `zhitongblog/unterm`
 
