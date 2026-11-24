@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from xt import browser, clock, db, engine, env, i18n, playbook, scheduler, stats  # noqa: E402
+from xt import browser, clock, db, engine, env, human, i18n, playbook, scheduler, stats  # noqa: E402
 from xt.i18n import msg, tr  # noqa: E402
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
@@ -51,7 +51,7 @@ def state():
     book = db.playbook()
     start = db.today_start()
     snaps = db.q('SELECT at, followers FROM snapshots ORDER BY at DESC LIMIT 30')[::-1]
-    sessions = db.kv_get('sessions') or {}
+    plan = human.visits()
     return {
         'setup': bool(book.get('pillars')),
         'about_draft': db.kv_get('about_draft') or {},
@@ -68,27 +68,32 @@ def state():
                                                   "ORDER BY COALESCE(due_at, created_at)", (start, start))],
             'done': {k: db.count_today('actions', 'kind', k, done=('done',)) for k in engine.KINDS},
             'left': {k: engine.cap_left(k) for k in ('post',) + engine.KINDS},
-            'sessions': [{'at': clock.fmt(t), 'done': t in sessions.get('done', [])} for t in sessions.get('at', [])],
+            # The day's visits to X, on this computer's clock (they follow the owner's day).
+            'visits': [{'at': clock.fmt_here(v['at']), 'kind': v['kind'], 'minutes': round(v['minutes']),
+                        'done': v['at'] in plan['done']} for v in plan['items']],
+            'owner_hours': env.setting('owner.active_hours'),
         },
         'queue': {s: db.one('SELECT COUNT(*) n FROM actions WHERE status=?', (s,))['n'] for s in ('pending', 'queued')},
         'followers': snaps,
         'log': db.logs(40),
         'timezones': env.setting('audience.timezones'),
         'warmup': _warmup_view(book),
-        'status': _status(book, sessions),
+        'status': _status(book),
     }
 
 
-def _status(book, sessions):
+def _status(book):
     """Is it running, in one line: state (on / working / waiting / off / problem), what, next."""
     now, beat, job = time.time(), scheduler.heartbeat(), scheduler.running()
     nxt = []
     p = db.one("SELECT due_at FROM posts WHERE status='scheduled' ORDER BY due_at LIMIT 1")
     if p:
         nxt.append((p['due_at'], '发原创'))
-    nxt += [(t, '互动会话') for t in sessions.get('at', []) if t > now and t not in sessions.get('done', [])]
+    v = human.next_visit()
+    if v:
+        nxt.append((v['at'], '逛一会儿 X' if v['kind'] == 'session' else '看一眼 X'))
     nxt.sort()
-    nxt = '%s %s' % (clock.fmt(nxt[0][0]), tr(nxt[0][1])) if nxt else ''
+    nxt = '%s %s' % (clock.fmt_here(nxt[0][0]), tr(nxt[0][1])) if nxt else ''
     def out(state, text, detail='', **values):
         return {'state': state, 'text': tr(text, **values), 'detail': i18n.render(detail) if detail else '', 'next': nxt,
                 'beat': beat['at'], 'job': tr(job['job']) if job['job'] else None, 'since': job['since']}
@@ -112,8 +117,8 @@ def _status(book, sessions):
     if beat['idle'] == 'error':
         return out('problem', '运行中 · 上一轮出错', msg('看下面「最近」里的记录'))
     if beat['idle'] == 'asleep':
-        return out('on', '运行中 · 读者在睡觉', msg('这段时间只按时发原创,不互动'))
-    return out('on', '运行中 · 等下一件事', msg('每分钟检查一次'))
+        return out('on', '运行中 · 不在你上 X 的时段', msg('这段时间不刷 X、不互动,只按时发排好的原创'))
+    return out('on', '运行中 · 等下一次上 X', msg('每天上 X 的次数、时间和时长都不一样'))
 
 
 def _warmup_view(book):

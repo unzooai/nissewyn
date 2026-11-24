@@ -16,6 +16,7 @@ DEFAULTS = {
     'posts.formats': ['short', 'thread'],
     'posts.language': 'auto',
     'posts.link': '', 'posts.link_every': 5,
+    'owner.active_hours': [9, 24],
     'sessions.per_day': 3,
     'sessions.replies': [2, 4], 'sessions.likes': [4, 8], 'sessions.follows': [0, 2],
     'frontrow.max_age_hours': 3, 'frontrow.max_replies_on_post': 150,

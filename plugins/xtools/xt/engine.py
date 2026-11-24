@@ -5,7 +5,7 @@ import random
 import re
 import time
 
-from . import browser, clock, db, env, playbook, writer, x
+from . import browser, clock, db, env, human, playbook, writer, x
 from .i18n import dump, load, msg, of
 
 KINDS = ('reply', 'quote', 'like', 'follow')
@@ -119,8 +119,7 @@ def cap_left(kind):
 
 
 def gap():
-    lo, hi = env.setting('pace.gap_seconds') or [25, 90]
-    time.sleep(random.uniform(lo, hi))
+    human.sleep(human.gap())
 
 
 def _redline_hit(text):
@@ -211,7 +210,7 @@ def plan_day():
     planned = db.one("SELECT COUNT(*) n FROM posts WHERE due_at>=? AND due_at<? AND status IN ('scheduled','draft','published')",
                      (start, end))['n']
     want = max(0, min(env.setting('posts.per_day') or 0, _warm_cap('post', 99)) - planned)
-    times = [t for t in clock.spread_over_awake(want + 2, max(start, now + 600), end)][:want]
+    times = clock.spread_over_awake(want + 2, max(start, now + 600), end, also=human.owner_awake)[:want]
     for t in times:
         try:
             pid = add_post(write_post(), due_at=t)
@@ -219,8 +218,6 @@ def plan_day():
         except Exception as e:
             db.log(msg('写原创失败:{error}', error=of(e)), 'warn')
             break
-    sessions = clock.spread_over_awake(env.setting('sessions.per_day') or 0, max(start, now), end)
-    db.kv_set('sessions', {'day': start, 'at': sessions, 'done': []})
 
 
 # ---- watching the niche --------------------------------------------------------
@@ -242,26 +239,9 @@ def _remember(posts, source):
     return n
 
 
-def radar(accounts=4, keywords=2):
-    """A few watched accounts and keywords per run, rotating through all of them."""
-    book = _book()
-    me = (book.get('learned') or {}).get('handle', '').lower()
-    watch = [w['handle'] for w in book.get('watch') or [] if w.get('handle', '').lower() != me]
-    kws = book.get('keywords') or []
-    turn = db.kv_get('radar_turn', 0)
-    got = 0
-    for i in range(min(accounts, len(watch))):
-        h = watch[(turn * accounts + i) % len(watch)]
-        got += _remember(x.posts_of(h, want=5), 'watch:' + h)
-        browser.pause(3, 8)
-    for i in range(min(keywords, len(kws))):
-        k = kws[(turn * keywords + i) % len(kws)]
-        posts = [p for p in x.search(k, want=12) if not _redline_hit(p['text'])]
-        got += _remember(posts, 'kw:' + k)
-        browser.pause(3, 8)
-    db.kv_set('radar_turn', turn + 1)
-    db.log(msg('雷达:新看到 {n} 条', n=got))
-    return got
+def radar():
+    """Look around the field now: the timeline, one watched account, one search -- a short visit."""
+    return visit({'kind': 'session', 'minutes': random.uniform(4, 8)}, plan=['home', 'account', 'search'])
 
 
 def _queue(kind, target, text='', reason='', soon=True):
@@ -357,6 +337,9 @@ def quotes(n=1):
             break
         if _already(r['url'], 'quote') or _redline_hit(r['text']):
             continue
+        if relevance(r, {'terms': _terms(book), 'watched': {w['handle'].lower() for w in book.get('watch') or [] if w.get('handle')},
+                         'talked': set()}) < 0.34:
+            continue                 # popular, but not the account's subject
         text = writer.write(QUOTE.format(voice=playbook.voice_block(book), handle=r['handle'], views=r['views'],
                                          text=r['text'][:1200], lang=_lang_of(r['text'])), env.setting('redlines'))
         db.run("UPDATE seen SET used='quote' WHERE url=?", (r['url'],))
@@ -379,11 +362,18 @@ MENTION = """{voice}
 - 广告、骂人、碰红线、看不懂:skip。"""
 
 
-def mentions():
-    """Readers first: answer questions, like thanks, skip noise."""
+def mentions(glance=False):
+    """Readers first: answer questions, like thanks, skip noise. With answering readers off,
+    or on a quick look, the notifications are only read."""
     book = _book()
     me = (book.get('learned') or {}).get('handle', '').lower()
-    items = [p for p in x.mentions(want=env.setting('mentions.max_per_run') * 3 or 15) if p['handle'].lower() != me]
+    want = random.randint(4, 8) if glance else (env.setting('mentions.max_per_run') or 5) * 3
+    items = [p for p in x.mentions(want=want) if p['handle'].lower() != me]
+    if glance or env.automation('mentions') == 'off':
+        for p in items:
+            if not db.one('SELECT 1 FROM seen WHERE url=?', (p['url'],)):
+                _remember([p], 'mention')
+        return 0
     made = 0
     for p in items:
         if made >= (env.setting('mentions.max_per_run') or 5):
@@ -417,22 +407,27 @@ def mentions():
 
 
 def discover_follows(n=3):
-    """Watched accounts we do not follow yet, and authors of strong posts in the niche."""
+    """People worth following are people the account already has something to do with: the
+    accounts the plan watches, people who talked to it, authors it liked more than once.
+    Never strangers just because their post was popular. They are followed during a visit,
+    after a look at their page."""
     if cap_left('follow') <= 0:
         return 0                     # warm-up stage 1, or today's follows used up
     book = _book()
     done = {r['target_handle'].lower() for r in db.q("SELECT target_handle FROM actions WHERE kind='follow'") if r['target_handle']}
     me = (book.get('learned') or {}).get('handle', '').lower()
     cands = [w['handle'] for w in book.get('watch') or []]
-    cands += [r['handle'] for r in db.q("SELECT handle, MAX(likes) l FROM seen WHERE source LIKE 'kw:%' GROUP BY handle "
-                                        "ORDER BY l DESC LIMIT 20")]
+    cands += [r['handle'] for r in db.q("SELECT handle FROM seen WHERE source='mention' GROUP BY handle")]
+    cands += [r['target_handle'] for r in db.q("SELECT target_handle, COUNT(*) n FROM actions WHERE kind='like' AND status='done' "
+                                               "GROUP BY target_handle HAVING n >= 2 ORDER BY n DESC")]
+    random.shuffle(cands)
     made = 0
     for h in cands:
-        if made >= n:
+        if made >= random.randint(1, n):
             break
         if not h or h.lower() in done or h.lower() == me:
             continue
-        _queue('follow', {'url': 'https://x.com/' + h, 'handle': h}, reason='同领域账号')
+        _queue('follow', {'url': 'https://x.com/' + h, 'handle': h}, reason='同领域账号', soon=False)
         done.add(h.lower())
         made += 1
     return made
@@ -504,21 +499,29 @@ def do_action(a):
     return {'ok': False, 'error': 'unknown kind'}
 
 
-def run_actions(limits):
-    """Carry out queued actions, up to `limits` per kind, a person's pace apart."""
-    done = {k: 0 for k in KINDS}
+def run_actions(limits, most=None, done=None, check=True):
+    """Carry out queued actions, up to `limits` per kind and `most` in all, a person's pace apart.
+    Inside a visit the account was checked when X was opened (`check=False`)."""
+    done = done if done is not None else {k: 0 for k in KINDS}
     first_stage = stage() == 1
     rows = db.q("SELECT * FROM actions WHERE status='queued' AND due_at<=? ORDER BY "
                 "CASE reason WHEN '回读者' THEN 0 ELSE 1 END, due_at LIMIT 40", (time.time(),))
-    if rows:
+    readers = [r for r in rows if r['reason'] == '回读者']
+    rest = [r for r in rows if r['reason'] != '回读者']
+    random.shuffle(rest)                         # not in the order they were queued
+    rows = readers + rest
+    if rows and check:
         try:
             if not same_account():
                 return done
         except x.Unhealthy as e:
             on_unhealthy(e.state)
             return done
+    n = 0
     for a in rows:
         k = a['kind']
+        if most is not None and n >= most:
+            break
         if halted() or done[k] >= limits.get(k, 0) or cap_left(k) <= 0:
             continue
         if first_stage and k == 'reply' and a['reason'] != '回读者':
@@ -537,53 +540,197 @@ def run_actions(limits):
             done[k] += 1
         else:
             db.run("UPDATE actions SET status='failed', error=?, done_at=? WHERE id=?", (res.get('error'), time.time(), a['id']))
+        n += 1
         gap()
-    if any(done.values()):
-        db.log(msg('会话:回复 {reply}、引用 {quote}、点赞 {like}、关注 {follow}', **done))
     return done
 
 
 def session():
-    """One burst of activity, like a person checking X: readers first, then the front row, likes, follows."""
+    """A visit now, as if the person opened X for a while."""
+    return visit({'kind': 'session', 'minutes': random.uniform(6, 15)})
+
+
+# ---- visits ----------------------------------------------------------------------
+# A visit is one stretch of someone using X: it opens X, reads, likes what it reads and
+# cares about, looks at an account or a search, does a few of the queued things, leaves.
+# What it does and in what order is drawn afresh each time (see human.moves).
+
+_STOP = {'with', 'your', 'that', 'this', 'from', 'what', 'have', 'about', 'into', 'more', 'like', 'just',
+         'they', 'them', 'than', 'when', 'will', 'here', 'there', 'their', 'make', 'does', 'over'}
+
+
+def _terms(book):
+    """Words that make a post the account's kind of post: its keywords and pillar topics."""
+    words = set()
+    for k in book.get('keywords') or []:
+        k = k.lower().strip()
+        if k:
+            words.add(k)
+            words |= {w for w in re.split(r'[\s,，、/]+', k) if len(w) >= 3}
+    for p in book.get('pillars') or []:
+        for t in [p.get('name', '')] + list(p.get('examples') or []):
+            words |= {w for w in re.split(r'[\s,，、/:：;；()（）.!?]+', (t or '').lower()) if len(w) >= 4}
+    return words - _STOP
+
+
+def relevance(post, state):
+    """0 when the post has nothing to do with the account; up to 1.5 for a post on its
+    topics from someone it watches or who talked to it."""
+    text = (post.get('text') or '').lower()
+    r = min(1.0, sum(1 for w in state['terms'] if w in text) / 3.0)
+    h = (post.get('handle') or '').lower()
+    if h in state['watched']:
+        r += 0.5
+    if h in state['talked']:
+        r += 0.6
+    return min(r, 1.5)
+
+
+def _record(kind, post, reason, res):
+    db.run('INSERT INTO actions(kind, target_url, target_handle, target_text, text, reason, status, due_at, done_at, '
+           'result_url, error, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+           (kind, post.get('url'), post.get('handle'), (post.get('text') or '')[:1000], '', reason,
+            'done' if res.get('ok') else 'failed', time.time(), time.time(), res.get('url'), res.get('error'), time.time()))
+
+
+def _like_while_reading(state):
+    """Called for each post as it is read: like it there and then, now and then, if it is
+    the account's kind of post. Nothing off-topic, nothing old, fewer of the huge ones."""
+    def on_post(p):
+        if state['likes'] <= 0 or cap_left('like') <= 0:
+            return
+        h = (p.get('handle') or '').lower()
+        if not p.get('text') or h == state['me'] or p.get('repost_by') or p.get('pinned'):
+            return
+        if time.time() - (p.get('at') or 0) > 3 * 86400 or _redline_hit(p['text']) or _already(p['url'], 'like'):
+            return
+        r = relevance(p, state)
+        if r <= 0:
+            return                   # scrolled past, as a person does with what is not theirs
+        chance = min(0.6, 0.12 + 0.35 * r)
+        if (p.get('likes') or 0) > 5000:
+            chance *= 0.4            # one more like on a huge post says little
+        if state['stage'] == 1:
+            chance *= 0.7
+        if not human.chance(chance):
+            return
+        mode = env.automation('likes')
+        if mode == 'off':
+            return
+        if mode == 'approve':
+            _queue('like', p, reason='读到的相关帖')
+            state['likes'] -= 1
+            return
+        res = x.like_here(p['url'])
+        _record('like', p, '读到的相关帖', res)
+        if res.get('ok'):
+            state['likes'] -= 1
+            state['done']['like'] += 1
+            human.sleep(random.uniform(1, 4))
+    return on_post
+
+
+def _pick_watched(book, state):
+    """One watched account, those not looked at for a while more likely."""
+    watch = [w['handle'] for w in book.get('watch') or [] if w.get('handle') and w['handle'].lower() != state['me']]
+    if not watch:
+        return None
+    last = {r['source'][6:].lower(): r['t'] for r in db.q("SELECT source, MAX(captured_at) t FROM seen WHERE source LIKE 'watch:%' GROUP BY source")}
+    weights = [1 + min(48, (time.time() - last.get(h.lower(), 0)) / 3600) for h in watch]
+    return random.choices(watch, weights)[0]
+
+
+def _pick_keyword(book):
+    kws = book.get('keywords') or []
+    if not kws:
+        return None
+    recent = db.kv_get('kw_recent') or []
+    fresh = [k for k in kws if k not in recent] or kws
+    k = random.choice(fresh)
+    db.kv_set('kw_recent', (recent + [k])[-max(1, min(3, len(kws) - 1)):])
+    return k
+
+
+def _maybe_follow_here(handle, state):
+    """On a watched account's page: follow it, sometimes, if not yet."""
+    if state['follows'] <= 0 or cap_left('follow') <= 0 or _already('https://x.com/' + handle, 'follow'):
+        return
+    if not human.chance(0.35):
+        return
+    mode = env.automation('follows')
+    target = {'url': 'https://x.com/' + handle, 'handle': handle}
+    if mode == 'approve':
+        _queue('follow', target, reason='同领域账号')
+    elif mode == 'auto':
+        res = x.follow(handle, here=True)
+        _record('follow', target, '同领域账号', res)
+        if res.get('ok'):
+            state['follows'] -= 1
+            state['done']['follow'] += 1
+
+
+def visit(v, plan=None):
+    """One visit to X (see the note above). `v` is {'kind': 'session'|'glance', 'minutes'}."""
     if halted():
         return None
+    book = _book()
+    kind = v.get('kind', 'session')
+    deadline = time.time() + float(v.get('minutes') or 10) * 60
     r = lambda key: random.randint(*(env.setting(key) or [0, 0]))
-    warm = stage()
+    state = {
+        'me': ((book.get('learned') or {}).get('handle') or '').lower(),
+        'terms': _terms(book),
+        'watched': {w['handle'].lower() for w in book.get('watch') or [] if w.get('handle')},
+        'talked': {r_['handle'].lower() for r_ in db.q("SELECT DISTINCT handle FROM seen WHERE source='mention'") if r_['handle']},
+        'stage': stage(),
+        'likes': r('sessions.likes') if kind == 'session' else random.randint(0, 2),
+        'follows': r('sessions.follows') if kind == 'session' else 0,
+        'done': {k: 0 for k in KINDS},
+    }
+    limits = ({'reply': r('sessions.replies'), 'quote': 1, 'like': 3, 'follow': max(1, state['follows'])}
+              if kind == 'session' else {'reply': 1, 'quote': 0, 'like': 1, 'follow': 0})
+    measured = db.one('SELECT 1 FROM snapshots WHERE at>?', (human._local_midnight(time.time()),))
+    plan = plan or human.moves(kind, bool(book.get('watch')), bool(book.get('keywords')), first_today=not measured)
+    on_post = _like_while_reading(state)
     try:
-        x.mentions(want=5)       # look at notifications first, as a person would
-        browser.scroll()
-        if warm or random.random() < 0.5:
-            browse(likes=random.randint(2, 5) if warm == 1 else 0)
+        if not same_account():            # this opens X, as a person does
+            return None
+        for i, move in enumerate(plan):
+            if i and time.time() > deadline:
+                break
+            if move == 'home':
+                here = i == 0
+                _remember(x.read(None if here else x.X + '/home', random.randint(6, 18) if kind == 'session' else random.randint(3, 8),
+                                 max_scrolls=random.randint(3, 8), on_post=on_post), 'home')
+            elif move == 'notifications':
+                mentions(glance=kind == 'glance')
+            elif move == 'account':
+                h = _pick_watched(book, state)
+                if h:
+                    _remember(x.posts_of(h, want=random.randint(3, 7), on_post=on_post), 'watch:' + h)
+                    _maybe_follow_here(h, state)
+            elif move == 'search':
+                k = _pick_keyword(book)
+                if k:
+                    posts = [p for p in x.search(k, want=random.randint(6, 14), latest=human.chance(0.6), on_post=on_post)
+                             if not _redline_hit(p['text'])]
+                    _remember(posts, 'kw:' + k)
+            elif move == 'me':
+                measure()
+            # Between moves, a few of the queued things, not all at once.
+            if human.chance(0.55):
+                run_actions(limits, most=random.randint(1, 2), done=state['done'], check=False)
+            human.sleep(random.uniform(2, 9))
+        if time.time() < deadline + 120:
+            run_actions(limits, done=state['done'], check=False)
     except x.Unhealthy as e:
         on_unhealthy(e.state)
-        return None
-    return run_actions({'reply': r('sessions.replies'), 'quote': 1, 'like': r('sessions.likes'), 'follow': r('sessions.follows')})
-
-
-def browse(likes=0):
-    """Read like a person: scroll the home timeline, open a post now and then, look in on
-    one account in the niche. With `likes`, like a few of the niche posts it read (in
-    warm-up stage 1 this is what the account mostly does)."""
-    _remember(x.home(want=random.randint(8, 20)), 'home')
-    book = db.playbook()
-    watch = [w['handle'] for w in book.get('watch') or []]
-    if watch:
-        h = random.choice(watch)
-        _remember(x.posts_of(h, want=5), 'watch:' + h)
-        browser.pause(4, 12)
-    if likes <= 0:
-        return 0
-    rows = db.q("SELECT * FROM seen WHERE (source LIKE 'watch:%' OR source LIKE 'kw:%') AND captured_at>? "
-                "ORDER BY likes DESC LIMIT 40", (time.time() - 48 * 3600,))
-    made = 0
-    for row in rows:
-        if made >= likes:
-            break
-        if _already(row['url'], 'like') or _redline_hit(row['text']):
-            continue
-        if _queue('like', row, reason='养号:读到的同领域好帖', soon=False):
-            made += 1
-    return made
+    except browser.BrowserError as e:
+        db.log(msg('浏览器出错:{error}', error=of(e)), 'warn')
+    done = state['done']
+    if any(done.values()):
+        db.log(msg('会话:回复 {reply}、引用 {quote}、点赞 {like}、关注 {follow}', **done))
+    return done
 
 
 # ---- measuring and learning ---------------------------------------------------------

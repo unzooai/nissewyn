@@ -69,7 +69,9 @@ def python_text():
             if isinstance(node, ast.Assign) and any(getattr(t, 'id', '') in ('JOBS', 'STAGES') for t in node.targets):
                 out |= {c.value for c in ast.walk(node.value) if _const(c)}
     # Built from parts at run time.
-    out |= {'今天 {time}', '明天 {time}', '后天 {time}', '发原创', '互动会话', '回读者', '已在设置里暂停'}
+    out |= {'今天 {time}', '明天 {time}', '后天 {time}', '发原创', '互动会话', '回读者', '已在设置里暂停',
+            '逛一会儿 X', '看一眼 X',
+            '雷达:新看到 {n} 条'}            # written by 2.2 and earlier, still in the log
     return {s for s in out if HAN.search(s)}
 
 

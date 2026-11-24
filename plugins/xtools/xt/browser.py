@@ -146,5 +146,7 @@ def pause(lo=0.8, hi=2.2):
 
 
 def scroll(px=None):
-    js('window.scrollBy(0, %d)' % (px or random.randint(600, 1100)))
-    pause(1.2, 2.8)
+    """A flick of the wheel: uneven distance, smooth, a short settle. Negative goes back up."""
+    px = px or int(random.choice([random.uniform(300, 700), random.uniform(600, 1200), random.uniform(900, 1600)]))
+    js('window.scrollBy({top: %d, behavior: "smooth"})' % px)
+    pause(0.8, 2.6)

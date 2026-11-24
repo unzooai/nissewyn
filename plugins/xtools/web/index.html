@@ -211,7 +211,8 @@ function vToday(){
    <div class="row"><div class="card" style="flex:2"><h2>${T('今天的原创')}</h2>${t.posts.length?t.posts.map(post).join(''):`<p class="muted">${T('今天还没有。到时间会自动写,也可以现在写一条。')}</p>`}
      <div class="acts" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button onclick="writeOne()">${T('写一条')}</button><button onclick="run('plan')">${T('按计划补齐今天')}</button></div></div>
    <div style="flex:1;min-width:260px"><div class="card"><h2>${T('粉丝')}</h2>${spark(f)}</div>
-     <div class="card"><h2>${T('今天的互动会话')}</h2>${t.sessions.length?t.sessions.map(s=>`<div>${s.done?'✓':'·'} ${esc(s.at)}</div>`).join(''):`<p class="muted">${T('还没排')}</p>`}
+     <div class="card"><h2>${T('今天什么时候上 X')}</h2>${t.visits.length?t.visits.map(v=>`<div class="${v.done?'muted':''}">${v.done?'✓':'·'} ${esc(v.at)} · ${v.kind==='session'?T('逛一会儿,约 {n} 分钟',{n:v.minutes}):T('看一眼')}</div>`).join(''):`<p class="muted">${T('今天不再上 X 了')}</p>`}
+     <p class="hint">${T('只在你平时上 X 的时段({from}–{to} 点,这台电脑的时间)里;次数、时间、时长每天随机,边界也每天前后浮动。',{from:(t.owner_hours||[9,24])[0],to:(t.owner_hours||[9,24])[1]})}</p>
      <div class="acts" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button onclick="run('session')">${T('现在跑一场')}</button><button onclick="run('radar')">${T('看一圈领域')}</button><button onclick="run('mentions')">${T('看通知')}</button></div></div>
      <div class="card"><h2>${T('自动化')}</h2>${Object.entries(S.automation).map(([k,v])=>`<div class="soft">${T('{what}:{mode}',{what:T(AUTO[k]),mode:T(MODE[v])})}</div>`).join('')}<p class="hint">${T('在 Nissewyn › 插件 › Xtools › 设置 里改')}</p></div></div></div>
    ${logCard(10)}`;
