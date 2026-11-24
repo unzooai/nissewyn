@@ -444,6 +444,26 @@ export type RuntimeTellRule = { kind: string; wish: RuntimeTellWish; hours: stri
 export type RuntimeTellClue = RuntimeTellRule & { count: number };
 export type RuntimeTellRules = { rules: RuntimeTellRule[]; clues: RuntimeTellClue[] };
 
+/**
+ * 整个应用的代理：后台服务启动的一切（终端、智能体、插件、git、安装）都走它。
+ * off 不用；auto 跟着这台电脑的系统代理（Clash 等）；manual 用填的地址。
+ */
+export type RuntimeProxyMode = "off" | "auto" | "manual";
+export type RuntimeProxy = {
+  mode: RuntimeProxyMode;
+  http: string;
+  socks: string;
+  noProxy: string;
+  /** 这台电脑自己的代理（不管设置开没开都会看）。 */
+  detected: { source: string; http: string | null; socks: string | null } | null;
+  /** 从现在起启动的程序实际拿到的：开了但连不上时为空，程序直接上网。 */
+  applied: { http: string | null; socks: string | null };
+};
+export type RuntimeProxyChange =
+  | { mode: "off" }
+  | { mode: "auto" }
+  | { mode: "manual"; http: string; socks: string; noProxy: string };
+
 /** 插件：在 Nissewyn 旁边运行的程序，有自己的控制页面、状态和给智能体的工具。 */
 export type RuntimePluginStatus = "running" | "starting" | "not_answering" | "failed" | "stopped" | "tools_only" | "broken";
 export type RuntimePluginRole = {
@@ -577,6 +597,9 @@ export interface RuntimeTaskPort {
   tellRules(): Promise<RuntimeTellRules>;
   /** 忘掉一类事的规则和线索。 */
   forgetTellRule(kind: string): Promise<void>;
+  /** 整个应用的代理设置。 */
+  proxy(): Promise<RuntimeProxy>;
+  setProxy(change: RuntimeProxyChange): Promise<void>;
   plugins(): Promise<RuntimePlugins>;
   addPlugin(dir: string): Promise<string>;
   enablePlugin(id: string, enabled: boolean): Promise<void>;

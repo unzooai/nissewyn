@@ -36,7 +36,7 @@ import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import { pageInLanguage, pluginWords, type PluginCatalogs } from "./plugin-i18n";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimeAgentModel, RuntimePluginSetting, RuntimePluginStatus, RuntimePlugins, RuntimeTellRules, RuntimeTellWish, RuntimeTerminal, TabView, TerminalOutput, TerminalScreen, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimeAgentModel, RuntimePluginSetting, RuntimePluginStatus, RuntimePlugins, RuntimeProxy, RuntimeTellRules, RuntimeTellWish, RuntimeTerminal, TabView, TerminalOutput, TerminalScreen, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -619,6 +619,42 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
       },
       async forgetTellRule(kind) {
         await callUnterm("/api/tell-rules/forget", { kind });
+      },
+      async proxy(): Promise<RuntimeProxy> {
+        const data = await getUnterm<{
+          enabled?: boolean;
+          mode?: string;
+          http_proxy?: string | null;
+          socks_proxy?: string | null;
+          no_proxy?: string | null;
+          detected?: { source?: string; http?: string | null; socks?: string | null } | null;
+          applied?: Record<string, string>;
+        }>("/api/proxy");
+        const mode = !data.enabled ? "off" : data.mode === "manual" ? "manual" : "auto";
+        return {
+          mode,
+          http: data.http_proxy ?? "",
+          socks: data.socks_proxy ?? "",
+          noProxy: data.no_proxy ?? "",
+          detected: data.detected
+            ? { source: data.detected.source ?? "", http: data.detected.http ?? null, socks: data.detected.socks ?? null }
+            : null,
+          applied: { http: data.applied?.HTTPS_PROXY ?? null, socks: data.applied?.ALL_PROXY ?? null },
+        };
+      },
+      async setProxy(change) {
+        if (change.mode === "off") {
+          await callUnterm("/api/proxy", { enabled: false });
+        } else if (change.mode === "auto") {
+          await callUnterm("/api/proxy", { enabled: true });
+        } else {
+          await callUnterm("/api/proxy", {
+            enabled: true,
+            http_proxy: change.http.trim(),
+            socks_proxy: change.socks.trim(),
+            no_proxy: change.noProxy.trim(),
+          });
+        }
       },
       async plugins(): Promise<RuntimePlugins> {
         type Raw = {
