@@ -222,6 +222,15 @@ const FOCUS_REPORT = /^\x1b\[[IO]$/;
 const RAW_WAIT_MS = 10_000;
 
 /**
+ * While a program streams output, the next read waits until this long after
+ * the last one: a few big reads instead of hundreds of small ones. Typing is
+ * unaffected -- a small read (an echo, a prompt) is followed at once.
+ */
+const RAW_STREAM_GAP_MS = 40;
+/** A read this big means a program is streaming. */
+const RAW_STREAM_CHUNK = 2048;
+
+/**
  * The first read of a terminal that has printed more than is kept starts
  * mid-stream, maybe inside an escape: begin at the next line instead.
  */
@@ -486,8 +495,13 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
       term.scrollToBottom();
       setStatus("ready");
       let offset = first.end;
+      let asked = 0;
       while (alive && !closed && term) {
         try {
+          const gap = asked + RAW_STREAM_GAP_MS - performance.now();
+          if (gap > 0) await sleep(gap);
+          if (!alive) return true;
+          asked = performance.now();
           const next = await runtime.terminalOutput(id, offset, RAW_WAIT_MS);
           if (!alive) return true;
           if (!next) return true;
@@ -497,6 +511,8 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
           } else if (next.text) {
             await write({ kind: "append", data: next.text, state: { line: 0, written: "" } });
           }
+          // Only a stream pauses: an echoed key or a prompt is read at once.
+          if (next.text.length < RAW_STREAM_CHUNK) asked = 0;
           offset = next.end;
           setError(null);
         } catch (failure) {
