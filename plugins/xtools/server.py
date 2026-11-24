@@ -121,7 +121,9 @@ def _warmup_view(book):
         todo.append('加一张横幅图')
     if not (prof.get('bio') or '').strip():
         todo.append('写一句简介:你是谁、关注你能看到什么')
-    return {**w, 'next': clock.fmt(w['next_at']), 'end': clock.fmt(w['end_at']), 'todo': todo,
+    # The person's own clock, not the readers' zone: "11-24 07:49" in UTC-8 read as
+    # this morning on a UTC+9 computer, while the switch was still hours away.
+    return {**w, 'next': clock.fmt_here(w['next_at']), 'end': clock.fmt_here(w['end_at']), 'todo': todo,
             'mode': env.setting('warmup.mode'), 'new_account': engine.is_new_account(book)}
 
 

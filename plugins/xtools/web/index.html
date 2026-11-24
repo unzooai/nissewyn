@@ -214,7 +214,7 @@ async function warmup(action){if(!confirm(action==='end'?'结束养号期?之后
 function warmCard(){const w=S.warmup;if(!w)return '';
   const steps=[1,2,3].map(i=>`<span class="pill ${i===w.stage?'warn':i<w.stage?'ok':''}">${i<w.stage?'✓ ':''}${['','只逛','开口','起步'][i]}</span>`).join(' → ');
   return `<div class="card"><h2>养号期 · 第 ${w.day} / ${w.days} 天</h2><div style="margin:6px 0">${steps}</div>
-    <p>现在是「${esc(w.name)}」:${esc(w.what)}。${w.stage<3?`${esc(w.next)} 进入下一阶段,`:''}${esc(w.end)} 结束。</p>
+    <p>现在是「${esc(w.name)}」:${esc(w.what)}。${w.stage<3?`${esc(w.next)} 进入「${['','只逛','开口','起步'][w.stage+1]}」,`:''}${esc(w.end)} 结束(都是这台电脑的时间)。</p>
     ${w.todo.length?`<p class="hint">趁这几天把主页补齐(X 对空主页的新号更警惕):${w.todo.map(esc).join(';')}。</p>`:''}
     <p class="hint">${w.mode==='on'?'设置里选了「总是养号」。':'因为这是新号或小号(粉丝不到 500 或注册不到半年)。'}在设置 › 上限与节奏 里可以改天数或关掉。</p>
     <div class="acts" style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="warmup('end')">提前结束</button><button onclick="warmup('restart')">从今天重新算</button></div></div>`}
