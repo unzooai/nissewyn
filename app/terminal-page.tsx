@@ -1,8 +1,10 @@
 "use client";
 
-import { Bot, ChevronDown, ChevronUp, LoaderCircle, Plus, Search, SquareTerminal, X } from "lucide-react";
+import { Bot, ChevronDown, ChevronUp, FolderOpen, LoaderCircle, Plus, Search, SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "./i18n";
+import { inDesktopApp, pickFolder } from "./lib/core-connection";
+import { readTerminalCwd } from "./lib/terminal-settings";
 import type { RuntimeTerminal, WorkspaceProvider } from "./lib/provider";
 import { continueReplay, startReplay, type ReplayState, type ReplayStep } from "./lib/terminal-replay";
 
@@ -43,18 +45,39 @@ export function TerminalPage({ runtime, notify, focus, newRequest }: TerminalPag
     }
   }, [runtime]);
 
-  const create = useCallback(async () => {
-    setCreating(true);
+  // Opens where Settings › Terminal says (the person's folder by default), or in `cwd`.
+  const create = useCallback(
+    async (cwd?: string) => {
+      setCreating(true);
+      const where = cwd ?? readTerminalCwd();
+      try {
+        const id = await runtime.createTerminal(where ? { cwd: where } : undefined);
+        await load();
+        setSelected(id);
+      } catch (failure) {
+        notify(
+          where
+            ? t("没能在 {cwd} 开出终端：{error}", { cwd: where, error: errorText(failure) })
+            : t("没能开出新终端：{error}", { error: errorText(failure) }),
+        );
+      } finally {
+        setCreating(false);
+      }
+    },
+    [runtime, load, notify],
+  );
+
+  const [desktop, setDesktop] = useState(false);
+  useEffect(() => setDesktop(inDesktopApp()), []);
+
+  const createElsewhere = async () => {
     try {
-      const id = await runtime.createTerminal();
-      await load();
-      setSelected(id);
+      const picked = await pickFolder(currentInfo?.cwd || readTerminalCwd());
+      if (picked) await create(picked);
     } catch (failure) {
-      notify(t("没能开出新终端：{error}", { error: errorText(failure) }));
-    } finally {
-      setCreating(false);
+      notify(t("没能打开文件夹选择：{error}", { error: errorText(failure) }));
     }
-  }, [runtime, load, notify]);
+  };
 
   useEffect(() => {
     void load();
@@ -137,6 +160,18 @@ export function TerminalPage({ runtime, notify, focus, newRequest }: TerminalPag
         >
           {creating ? <LoaderCircle size={15} className="spin" aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}
         </button>
+        {desktop && (
+          <button
+            type="button"
+            className="terminal-page-add"
+            onClick={() => void createElsewhere()}
+            disabled={creating}
+            aria-label={t("在别的文件夹开终端")}
+            title={t("在别的文件夹开终端")}
+          >
+            <FolderOpen size={15} aria-hidden="true" />
+          </button>
+        )}
         <span className="terminal-page-tabs-gap" />
       </div>
 
@@ -162,6 +197,7 @@ export function TerminalPage({ runtime, notify, focus, newRequest }: TerminalPag
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/nissewyn-mark.png" alt="" width={56} height={56} />
           <p>{t("在这里开一个终端，直接在 Nissewyn 里输入命令。智能体正在用的终端也会出现在上面。")}</p>
+          <p className="terminal-page-hint">{t("新终端从哪个文件夹开始，在 设置 › 能力 › 终端 里改。")}</p>
           <button type="button" className="terminal-page-new" onClick={() => void create()} disabled={creating}>
             <Plus size={14} aria-hidden="true" />
             {t("新终端")}

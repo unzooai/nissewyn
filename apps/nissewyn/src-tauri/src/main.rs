@@ -236,6 +236,17 @@ fn reveal_path(path: String) -> Result<(), String> {
     spawned.map(|_| ()).map_err(|e| format!("The folder could not be opened: {e}"))
 }
 
+/// Let the person choose a folder with the system's own picker, starting
+/// in `start` when it is one. `None` when they cancel.
+#[tauri::command]
+async fn pick_folder(window: tauri::Window, start: Option<String>) -> Option<String> {
+    let mut dialog = rfd::AsyncFileDialog::new().set_parent(&window);
+    if let Some(start) = start.map(PathBuf::from).filter(|p| p.is_dir()) {
+        dialog = dialog.set_directory(start);
+    }
+    dialog.pick_folder().await.map(|folder| folder.path().display().to_string())
+}
+
 // ---- start with the system -------------------------------------------------
 
 /// Where Windows keeps what starts at sign-in, for this user only.
@@ -467,7 +478,7 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![core_connection, reveal_path, autostart_get, autostart_set])
+        .invoke_handler(tauri::generate_handler![core_connection, reveal_path, pick_folder, autostart_get, autostart_set])
         .run(tauri::generate_context!())
         .expect("Nissewyn could not start");
 }

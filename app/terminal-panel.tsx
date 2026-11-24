@@ -1,9 +1,12 @@
 "use client";
 
-import { Download, RefreshCw, SquareTerminal } from "lucide-react";
+import { Download, FolderOpen, RefreshCw, SquareTerminal } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "./i18n";
+import { readAgentRunSettings } from "./lib/agent-run-settings";
+import { inDesktopApp, pickFolder } from "./lib/core-connection";
 import type { RuntimeShells, RuntimeTaskPort } from "./lib/provider";
+import { readTerminalCwd, writeTerminalCwd } from "./lib/terminal-settings";
 
 /**
  * 设置 › 能力 › 终端。
@@ -22,7 +25,40 @@ export function TerminalPanel({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [termName, setTermName] = useState("");
+  const [cwd, setCwd] = useState("");
+  const [savedCwd, setSavedCwd] = useState("");
+  const [agentCwd, setAgentCwd] = useState("");
+  const [desktop, setDesktop] = useState(false);
   const poll = useRef<number | null>(null);
+
+  // Browser storage and the desktop shell are only known in the browser.
+  useEffect(() => {
+    const saved = readTerminalCwd();
+    setCwd(saved);
+    setSavedCwd(saved);
+    setAgentCwd(readAgentRunSettings().cwd);
+    setDesktop(inDesktopApp());
+  }, []);
+
+  function saveCwd(next: string) {
+    const value = next.trim();
+    if (!writeTerminalCwd(value)) {
+      notify(t("没能保存：这个窗口不能存设置"));
+      return;
+    }
+    setCwd(value);
+    setSavedCwd(value);
+    notify(value ? t("新开的终端会在 {cwd} 打开", { cwd: value }) : t("新开的终端会在你的用户文件夹打开"));
+  }
+
+  async function chooseCwd() {
+    try {
+      const picked = await pickFolder(cwd || agentCwd);
+      if (picked) saveCwd(picked);
+    } catch (failure) {
+      notify(t("没能打开文件夹选择：{error}", { error: failure instanceof Error ? failure.message : String(failure) }));
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -75,7 +111,7 @@ export function TerminalPanel({
     <section className="settings-group clients-group" id="settings-terminal" aria-label={t("终端")}>
       <div className="skills-heading">
         <span>{t("终端")}</span>
-        <h2>{t("新开的终端用哪个 shell")}</h2>
+        <h2>{t("新开的终端在哪里打开、用哪个 shell")}</h2>
         <button type="button" onClick={() => void load()} aria-label={t("重新检查")} title={t("重新检查")} disabled={busy !== null}>
           <RefreshCw size={14} aria-hidden="true" />
         </button>
@@ -90,6 +126,39 @@ export function TerminalPanel({
         <p className="skills-empty">{t("正在读取…")}</p>
       ) : (
         <>
+          <div className="terminal-settings-row">
+            <label htmlFor="terminal-cwd">{t("打开位置")}</label>
+            <input
+              id="terminal-cwd"
+              value={cwd}
+              placeholder={t("你的用户文件夹")}
+              spellCheck={false}
+              onChange={(event) => setCwd(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") saveCwd(cwd);
+              }}
+            />
+            {desktop && (
+              <button type="button" onClick={() => void chooseCwd()} title={t("选择文件夹")}>
+                <FolderOpen size={14} aria-hidden="true" /> {t("选择…")}
+              </button>
+            )}
+            <button type="button" disabled={cwd.trim() === savedCwd} onClick={() => saveCwd(cwd)}>
+              {t("保存")}
+            </button>
+          </div>
+          <p className="skills-intro">
+            {t("在终端页点 + 开的终端从这里开始，留空就是你的用户文件夹。只开一次别的地方，用终端页 + 旁边的文件夹按钮。")}
+            {agentCwd && agentCwd !== savedCwd && (
+              <>
+                {" "}
+                <button type="button" className="link-button" onClick={() => saveCwd(agentCwd)}>
+                  {t("用智能体的工作目录（{cwd}）", { cwd: agentCwd })}
+                </button>
+              </>
+            )}
+          </p>
+
           <div className="terminal-settings-row">
             <label htmlFor="terminal-default-shell">{t("默认 shell")}</label>
             <select
