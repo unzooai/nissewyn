@@ -28184,10 +28184,15 @@ body {
 .terminal-page-zoom span { min-width: 18px; text-align: center; }
 
 /* Settings › Preferences › Network proxy */
+.proxy-group > .skills-intro,
+.proxy-group > .skills-empty {
+  padding: 14px 22px 0;
+}
+
 .proxy-form {
   display: grid;
   gap: 12px;
-  padding: 4px 0 2px;
+  padding: 14px 22px 20px;
 }
 
 .proxy-fields {
