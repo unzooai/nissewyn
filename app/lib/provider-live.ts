@@ -35,7 +35,7 @@ import {
 import { parseAgentRunSettings } from "./agent-run-settings";
 import { coreConnection, coreUrl } from "./core-connection";
 import type { RuntimeOutputContent, RuntimeRun, RuntimeTask, RuntimeThread } from "./runtime-tasks";
-import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimeAgentModel, RuntimePluginSetting, RuntimePluginStatus, RuntimePlugins, RuntimeTellRules, RuntimeTellWish, RuntimeTerminal, TabView, TerminalScreen, WorkspaceProvider } from "./provider";
+import type { ApprovalDecision, BrainAgent, BrainSession, CapabilityLease, RuntimeBrowser, RuntimeCapabilities, RuntimeClient, RuntimeClients, RuntimePhone, RuntimeShells, RuntimeSkill, RuntimeAgentModel, RuntimePluginSetting, RuntimePluginStatus, RuntimePlugins, RuntimeTellRules, RuntimeTellWish, RuntimeTerminal, TabView, TerminalOutput, TerminalScreen, WorkspaceProvider } from "./provider";
 
 /** unzoo 的能力名和控制台的连接器 id 不是一套词，这里对上。 */
 const CAPABILITY_BY_CONNECTOR: Partial<Record<ConnectorId, string>> = {
@@ -451,6 +451,20 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           rows: data.rows ?? undefined,
           digest: data.digest ?? undefined,
         };
+      },
+      async terminalOutput(sessionId, fromByte, waitMs): Promise<TerminalOutput | null> {
+        const data = await callUnterm<{ raw?: boolean; text?: string | null; start?: number | null; end?: number | null }>(
+          "/api/console/computer/terminal",
+          {
+            session_id: sessionId,
+            raw: true,
+            ...(fromByte === undefined ? {} : { from_byte: fromByte }),
+            ...(waitMs ? { wait_ms: waitMs } : {}),
+          },
+        );
+        // An older runtime ignores `raw` and answers with lines.
+        if (data.raw !== true || typeof data.start !== "number" || typeof data.end !== "number") return null;
+        return { text: data.text ?? "", start: data.start, end: data.end };
       },
       async answerHandover(sessionId, handoverId, done, note) {
         await callUnterm("/api/console/handover", {
