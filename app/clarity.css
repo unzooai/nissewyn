@@ -20584,6 +20584,7 @@ body {
 }
 
 .agent-run-cwd > button,
+.proxy-footer > button,
 .agent-run-signin-actions button,
 .agent-rules header button,
 .agent-rules li button,
@@ -20604,6 +20605,7 @@ body {
 }
 
 .agent-run-cwd > button:disabled,
+.proxy-footer > button:disabled,
 .agent-run-signin-actions button:disabled,
 .agent-rules button:disabled {
   opacity: 0.5;
@@ -28180,3 +28182,71 @@ body {
 }
 .terminal-page-screen:hover .terminal-page-zoom, .terminal-page-zoom:focus-within { opacity: 1; }
 .terminal-page-zoom span { min-width: 18px; text-align: center; }
+
+/* Settings › Preferences › Network proxy */
+.proxy-form {
+  display: grid;
+  gap: 12px;
+  padding: 4px 0 2px;
+}
+
+.proxy-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.proxy-fields label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.proxy-fields label strong {
+  font-size: 13px;
+}
+
+.proxy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--clarity-soft);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.proxy-note svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+.proxy-problem {
+  margin: 0;
+  color: var(--clarity-red);
+  font-size: 13px;
+}
+
+.proxy-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.proxy-footer button {
+  flex: none;
+}
+
+.proxy-hint {
+  color: var(--clarity-soft);
+  font-size: 12px;
+}
+
+@media (max-width: 860px) {
+  .proxy-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

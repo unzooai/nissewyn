@@ -510,6 +510,12 @@ export function createMockProvider(): WorkspaceProvider {
       async forgetTellRule() {
         throw new Error(t("演示版没有本机运行时"));
       },
+      async proxy() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
+      async setProxy() {
+        throw new Error(t("演示版没有本机运行时"));
+      },
       async plugins() {
         return { plugins: [], browserProfiles: [] };
       },

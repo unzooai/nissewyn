@@ -250,6 +250,7 @@ import { ClientsPanel } from "./clients-panel";
 import { PhonePanel } from "./phone-panel";
 import { TerminalPanel } from "./terminal-panel";
 import { TellRulesPanel } from "./tell-rules-panel";
+import { ProxyPanel } from "./proxy-panel";
 import { PluginsView } from "./plugins-view";
 import { TerminalPage } from "./terminal-page";
 import { RuntimeUsagePanel } from "./runtime-usage";
@@ -14082,6 +14083,8 @@ export default function HomePage() {
                 </button>
               </label>
             </div>
+
+            {runtimeMode && <ProxyPanel runtime={workspaceProvider.runtime} notify={setNotice} />}
 
             <AgentRunPanel
               rules={workspaceProvider.agentRules}

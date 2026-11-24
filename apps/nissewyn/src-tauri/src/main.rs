@@ -174,9 +174,14 @@ fn copy_tree(from: &std::path::Path, to: &std::path::Path, skip: &[&str]) -> std
 
 #[cfg(windows)]
 fn pid_alive(pid: u32) -> bool {
+    use std::os::windows::process::CommandExt;
     // tasklist is slow but this runs once, and only on the unusual path.
+    // Without a hidden console of its own, a console program started from
+    // this window-only app flashes a black window on the desktop.
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     Command::new("tasklist")
         .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map(|out| String::from_utf8_lossy(&out.stdout).contains(&pid.to_string()))
         .unwrap_or(false)
