@@ -77,6 +77,17 @@ export async function setAutostart(enabled: boolean): Promise<boolean> {
   return Boolean(await invoke("autostart_set", { enabled }));
 }
 
+/**
+ * Let the person choose a folder with the system's picker (desktop app only),
+ * starting in `start`. `null` when they cancel.
+ */
+export async function pickFolder(start?: string): Promise<string | null> {
+  const invoke = tauri()?.core?.invoke;
+  if (!invoke) throw new Error(t("只有 Nissewyn 桌面版能选择文件夹"));
+  const picked = await invoke("pick_folder", { start: start?.trim() || null });
+  return typeof picked === "string" && picked ? picked : null;
+}
+
 /** Show a file in the system's file manager (desktop app only). */
 export async function revealPath(path: string): Promise<void> {
   const invoke = tauri()?.core?.invoke;

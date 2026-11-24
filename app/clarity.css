@@ -27628,6 +27628,21 @@ body {
   cursor: default;
 }
 
+.terminal-settings-row button svg {
+  vertical-align: -2px;
+}
+
+.skills-intro .link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--clarity-accent, #2f4a86);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
 /* ---- 工作页（插件、终端）：标题收紧，内容顶上来 ---------------------------- */
 .clarity-header.is-compact .clarity-page-title > span,
 .clarity-header.is-compact .clarity-page-title > p { display: none; }
@@ -28104,6 +28119,7 @@ body {
 }
 .terminal-page-empty img { border-radius: 14px; }
 .terminal-page-empty p { max-width: 440px; margin: 0; font-size: 14px; line-height: 1.6; }
+.terminal-page-empty p.terminal-page-hint { font-size: 12px; opacity: 0.7; }
 @media (max-width: 860px) {
   .terminal-page { height: 70vh; }
 }

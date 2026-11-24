@@ -80,3 +80,16 @@ def fmt(ts, tz=None):
     tz = zones()[0] if tz is None else tz
     t = time.gmtime(ts + tz * 3600)
     return time.strftime('%m-%d %H:%M', t)
+
+
+def fmt_here(ts, now=None):
+    """A moment on this computer's own clock, as the person reads it: 今天/明天/后天 HH:MM, else MM-DD HH:MM.
+    Not the readers' time zone -- a schedule about the person's account is read against their own day."""
+    now = time.time() if now is None else now
+    t, today = time.localtime(ts), time.localtime(now)
+    days = (time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1))
+            - time.mktime((today.tm_year, today.tm_mon, today.tm_mday, 0, 0, 0, 0, 0, -1)))
+    days = round(days / 86400)
+    clock_part = time.strftime('%H:%M', t)
+    word = {0: '今天', 1: '明天', 2: '后天'}.get(days)
+    return f'{word} {clock_part}' if word else time.strftime('%m-%d %H:%M', t)
