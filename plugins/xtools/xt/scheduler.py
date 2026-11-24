@@ -1,9 +1,10 @@
 """The clock: once a minute, decide which job is due. One job at a time on the account."""
+import random
 import threading
 import time
 import traceback
 
-from . import browser, clock, db, engine, env, x
+from . import browser, db, engine, env, human, x
 from .i18n import msg, of, tr
 
 _RUNNING = {'job': None, 'since': None}
@@ -47,6 +48,15 @@ def _every(key, seconds):
     return False
 
 
+def _now_and_then(key, about):
+    """True about once per `about` seconds, never on a fixed beat (the next time is drawn
+    between 0.6 and 1.5 times `about`)."""
+    if time.time() >= db.kv_get('next:' + key, 0):
+        db.kv_set('next:' + key, time.time() + about * random.uniform(0.6, 1.5))
+        return True
+    return False
+
+
 def _daily(key):
     day = db.today_start()
     if db.kv_get('day:' + key) != day:
@@ -63,31 +73,26 @@ def tick():
         return 'halted'
     if not browser.reachable():
         return 'no_browser'
-    awake = clock.audience_awake()
     if _daily('plan'):
         run_job('写今天的原创', engine.plan_day)
-    if _daily('measure'):
-        run_job('记录数据', engine.measure)
     if env.setting('learn.weekly') and _every('learn', 7 * 86400) and db.kv_get('first_run_at', time.time()) < time.time() - 6 * 86400:
         run_job('周报', engine.weekly_learn)
     run_job('到点发原创', engine.publish_due)
-    if not awake:
+    # Everything else in the browser happens in visits, inside the owner's own day (human.py):
+    # no timer that opens X every so many minutes around the clock.
+    if not human.owner_awake():
         return 'asleep'
-    if _every('mentions', 30 * 60):
-        run_job('看读者通知', engine.mentions)
-    if _every('radar', 90 * 60):
-        run_job('领域雷达', engine.radar)
+    v = human.due_visit()
+    if not v:
+        return 'between'
+    run_job('逛一会儿 X' if v['kind'] == 'session' else '看一眼 X', engine.visit, v)
+    # Drafting that needs no browser, after a visit has read something, at uneven intervals.
+    if _now_and_then('frontrow', 2 * 3600):
         run_job('起草前排回复', engine.frontrow)
-    if _every('quotes', 8 * 3600):
+    if _now_and_then('quotes', 8 * 3600):
         run_job('起草引用', engine.quotes)
-    if _every('follows', 12 * 3600):
+    if _now_and_then('follows', 12 * 3600):
         run_job('找要关注的人', engine.discover_follows)
-    plan = db.kv_get('sessions') or {}
-    due = [t for t in plan.get('at', []) if t <= time.time() and t not in plan.get('done', [])]
-    if due:
-        plan.setdefault('done', []).append(due[0])
-        db.kv_set('sessions', plan)
-        run_job('互动会话', engine.session)
 
 
 def loop():

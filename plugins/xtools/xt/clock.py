@@ -43,12 +43,13 @@ def slots(n, start_ts, end_ts):
     return sorted(start_ts + width * i + random.uniform(0.1, 0.9) * width for i in range(n))
 
 
-def awake_windows(day_start, day_end):
-    """[(start, end)] of the stretches in [day_start, day_end) where some audience is awake, by 15 minutes."""
+def awake_windows(day_start, day_end, also=None):
+    """[(start, end)] of the stretches in [day_start, day_end) where some audience is awake
+    (and `also(t)` holds, when given), by 15 minutes."""
     out, cur = [], None
     t = day_start
     while t < day_end:
-        if audience_awake(t):
+        if audience_awake(t) and (also is None or also(t)):
             cur = [t, t + 900] if cur is None else [cur[0], t + 900]
         elif cur:
             out.append(tuple(cur))
@@ -59,9 +60,10 @@ def awake_windows(day_start, day_end):
     return out
 
 
-def spread_over_awake(n, day_start, day_end):
-    """n moments spread across the awake stretches of the day, proportional to their length."""
-    wins = awake_windows(day_start, day_end)
+def spread_over_awake(n, day_start, day_end, also=None):
+    """n moments spread across the awake stretches of the day, proportional to their length.
+    With `also`, only where that holds too -- unless it never does, then where readers are awake."""
+    wins = (also and awake_windows(day_start, day_end, also)) or awake_windows(day_start, day_end)
     total = sum(e - s for s, e in wins)
     if not total or n <= 0:
         return []

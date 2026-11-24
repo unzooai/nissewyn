@@ -3,11 +3,13 @@
 Every read returns plain dicts; every action returns {"ok": bool, ...} and checks the
 account's health afterwards. Selectors are X's data-testid attributes."""
 import json
+import random
 import re
 import time
 import urllib.parse
 
 from . import browser as b
+from . import human
 
 X = 'https://x.com'
 DIALOG_OPEN = """!!document.querySelector('[role="dialog"] [data-testid="tweetTextarea_0"]')"""
@@ -91,14 +93,55 @@ def me():
       const s = document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]');
       const m = s && s.innerText.match(/@([A-Za-z0-9_]{1,15})/);
       if (m) return m[1];
+      // A narrow window folds the side nav to icons: no text, but the avatar names the account.
+      const av = s && s.querySelector('[data-testid^="UserAvatar-Container-"]');
+      if (av) return av.getAttribute('data-testid').slice('UserAvatar-Container-'.length);
       const a = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]');
       return a && a.getAttribute("href");
-    })()''', 15)
+    })()''', 20)
     return h.strip('/') if h else None
 
 
-def _collect(url, want, max_scrolls=8, keep=None):
+# Where the app's own links go: on X already, a person clicks them instead of typing an address.
+_NAV = {
+    '/home': 'a[data-testid="AppTabBar_Home_Link"]',
+    '/notifications': 'a[data-testid="AppTabBar_Notifications_Link"]',
+}
+
+
+def _on_x():
+    try:
+        return (b.js('location.hostname') or '').endswith('x.com')
+    except b.BrowserError:
+        return False
+
+
+def open_page(url):
+    """Go to an X page the way a person would: by the app's own link when there is one
+    and X is already open, else by its address."""
+    path = url[len(X):] if url.startswith(X) else url
+    link = _NAV.get(path) or (_NAV['/notifications'] if path == '/notifications/mentions' else None)
+    if link and _on_x() and b.js('!!document.querySelector(%s)' % json.dumps(link)):
+        human.sleep(human.think())
+        b.click(link)
+        if path == '/notifications/mentions':
+            tab = 'a[href="/notifications/mentions"]'
+            if b.wait_for('!!document.querySelector(%s)' % json.dumps(tab), 8):
+                human.sleep(human.think())
+                b.click(tab)
+        if b.wait_for('location.pathname === %s' % json.dumps(path), 10):
+            b.pause(1.5, 3.5)
+            return
     b.go(url)
+
+
+def read(url, want, max_scrolls=8, keep=None, on_post=None):
+    """Read a page of posts as a person does: each new post is looked at for as long as it
+    takes to read; the scroll is uneven and now and then goes back up. `on_post(post)` is
+    called for each post as it is read (to like it there and then). None as `url` reads the
+    page that is open."""
+    if url:
+        open_page(url)
     _check()
     b.wait_for('!!document.querySelector(\'article[data-testid="tweet"]\')', 15)
     seen, out = set(), []
@@ -108,10 +151,19 @@ def _collect(url, want, max_scrolls=8, keep=None):
                 continue
             seen.add(p['url'])
             out.append(p)
+            human.sleep(human.dwell(p.get('text'), p.get('has_media')))
+            if on_post:
+                on_post(p)
         if len(out) >= want:
             break
+        if human.chance(0.08):
+            b.scroll(-random.randint(250, 600))      # back up to something just passed
         b.scroll()
     return out[:want]
+
+
+def _collect(url, want, max_scrolls=8, keep=None):
+    return read(url, want, max_scrolls=max_scrolls, keep=keep)
 
 
 def profile(handle):
@@ -159,20 +211,20 @@ def home(want=15):
     return _collect(X + '/home', want, max_scrolls=max(3, want // 4))
 
 
-def posts_of(handle, want=40, include_replies=False):
+def posts_of(handle, want=40, include_replies=False, on_post=None):
     """Recent posts written by this account (not reposts), newest first."""
     keep = lambda p: p['handle'].lower() == handle.lower() and not p['repost_by'] and (include_replies or not p['is_reply'])
     url = '%s/%s%s' % (X, handle, '/with_replies' if include_replies else '')
-    return _collect(url, want, max_scrolls=max(4, want // 4), keep=keep)
+    return read(url, want, max_scrolls=max(4, want // 4), keep=keep, on_post=on_post)
 
 
 def mentions(want=20):
     return _collect(X + '/notifications/mentions', want, max_scrolls=4)
 
 
-def search(query, want=20, latest=True):
+def search(query, want=20, latest=True, on_post=None):
     url = '%s/search?q=%s&src=typed_query%s' % (X, urllib.parse.quote(query), '&f=live' if latest else '')
-    return _collect(url, want, max_scrolls=4, keep=lambda p: not p['repost_by'])
+    return read(url, want, max_scrolls=4, keep=lambda p: not p['repost_by'], on_post=on_post)
 
 
 def thread_context(url, want=6):
@@ -195,6 +247,33 @@ def _main_article_js(sid, inner):
       if (!art) return null;
       %s
     })()""" % (sid, inner)
+
+
+def _tag(sid, testid):
+    """Mark the button `testid` of post `sid` on this page and bring it into view, so the
+    human click (a real pointer moving to it) can find it; True when it is there."""
+    return bool(b.js(r"""(() => {
+      document.querySelectorAll('[data-xt-act]').forEach(e => e.removeAttribute('data-xt-act'));
+      const arts = [...document.querySelectorAll('article[data-testid="tweet"]')];
+      const art = arts.find(a => [...a.querySelectorAll('a[href*="/status/%s"] time')].length);
+      const btn = art && art.querySelector('[data-testid="%s"]');
+      if (!btn) return false;
+      btn.setAttribute('data-xt-act', '1');
+      btn.scrollIntoView({block: 'center', behavior: 'smooth'});
+      return true; })()""" % (sid, testid)))
+
+
+def _press(sid, testid):
+    """A person's click on that post's button."""
+    if not _tag(sid, testid):
+        return False
+    human.sleep(human.think())
+    b.click('[data-xt-act="1"]')
+    return True
+
+
+def _text_of(sid):
+    return b.js(_main_article_js(sid, 'return (art.querySelector(\'[data-testid="tweetText"]\')||{}).innerText||"";')) or ''
 
 
 def _type_into(selector, text):
@@ -292,8 +371,9 @@ def reply(url, text, handle=None, dry_run=False):
     _check()
     if not b.wait_for(_main_article_js(sid, 'return !!art.querySelector(\'[data-testid="reply"]\');'), 15):
         return {'ok': False, 'error': 'post-not-found'}
-    b.pause(2, 5)   # read it first
-    b.js(_main_article_js(sid, 'art.querySelector(\'[data-testid="reply"]\').click(); return true;'))
+    human.sleep(human.dwell(_text_of(sid)))   # read it first
+    if not _press(sid, 'reply'):
+        return {'ok': False, 'error': 'reply-button-not-found'}
     if not b.wait_for('!!document.querySelector(\'[data-testid="tweetTextarea_0"]\')', 10):
         return {'ok': False, 'error': 'reply-box-not-found'}
     if not _type_into(_box(0), text):
@@ -324,15 +404,35 @@ def like(url, dry_run=False):
         return {'ok': False, 'error': 'like-button-not-found'}
     if dry_run:
         return {'ok': True, 'dry_run': True}
-    b.pause(1.5, 4)
-    b.js(_main_article_js(sid, 'art.querySelector(\'[data-testid="like"]\').click(); return true;'))
+    human.sleep(human.dwell(_text_of(sid)))
+    if not _press(sid, 'like'):
+        return {'ok': False, 'error': 'like-button-not-found'}
     ok = b.wait_for(_main_article_js(sid, 'return !!art.querySelector(\'[data-testid="unlike"]\');'), 8)
     _check()
     return {'ok': bool(ok)}
 
 
-def follow(handle, dry_run=False):
-    b.go('%s/%s' % (X, handle))
+def like_here(url, dry_run=False):
+    """Like a post on the page being read (the timeline, a search, a profile) without
+    leaving it: the way a like is usually given."""
+    sid = _status_id(url)
+    if not sid:
+        return {'ok': False, 'error': 'no-status-id'}
+    if dry_run:
+        return {'ok': _tag(sid, 'like'), 'dry_run': True}
+    if not _press(sid, 'like'):
+        return {'ok': False, 'error': 'like-button-not-found'}
+    ok = b.wait_for(r"""(() => { const arts = [...document.querySelectorAll('article[data-testid="tweet"]')];
+      const art = arts.find(a => [...a.querySelectorAll('a[href*="/status/%s"] time')].length);
+      return !!(art && art.querySelector('[data-testid="unlike"]')); })()""" % sid, 8)
+    _check()
+    return {'ok': bool(ok)}
+
+
+def follow(handle, dry_run=False, here=False):
+    """Follow from the account's own page; `here` when that page is already open."""
+    if not (here and (b.js('location.pathname') or '').lower().rstrip('/') == '/' + handle.lower()):
+        b.go('%s/%s' % (X, handle))
     _check()
     # The header button names the account: aria-label "Follow @handle".
     find = r"""(() => { const h = %s.toLowerCase();
@@ -346,7 +446,13 @@ def follow(handle, dry_run=False):
         return {'ok': False, 'error': 'follow-button-not-found'}
     if dry_run:
         return {'ok': True, 'dry_run': True}
-    b.pause(1.5, 4)
+    # Look at who it is first: the bio, a few of their posts, then back up to the button.
+    human.sleep(random.uniform(2, 5))
+    for _ in range(random.randint(1, 3)):
+        b.scroll(random.randint(350, 800))
+        human.sleep(random.uniform(1.5, 5))
+    b.js('window.scrollTo({top: 0, behavior: "smooth"})')
+    human.sleep(human.think() + 0.8)
     b.click('[data-testid="primaryColumn"] [data-testid="%s"]' % state)
     ok = bool(b.wait_for('(%s) === "following"' % find, 8))
     _check()
