@@ -1,0 +1,18 @@
+{
+  "schema": "security/risk.schema.json",
+  "reason": "不可逆的动作只留结果、不留 before/after，事后无从对账。",
+  "instance": {
+    "risk": "external_side_effect",
+    "side_effect": "external",
+    "resource_scopes": [
+      "browser"
+    ],
+    "sensitive_inputs": [
+      "fields.email",
+      "fields.phone"
+    ],
+    "reversible": false,
+    "approval_mode": "per_call",
+    "evidence_policy": "result_only"
+  }
+}

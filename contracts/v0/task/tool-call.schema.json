@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/task/tool-call.schema.json",
+  "title": "ToolCall",
+  "description": "Brain 提出的一次工具调用在 Core 侧的记录。Brain 只能提出，授权由 Policy 给，执行由 Provider 做。",
+
+  "type": "object",
+  "required": [
+    "schema_version",
+    "tool_call_id",
+    "run_id",
+    "step_id",
+    "provider_id",
+    "tool",
+    "arguments",
+    "risk",
+    "state",
+    "idempotency_key",
+    "requested_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "tool_call.v0" },
+    "tool_call_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/tool_call_id"
+    },
+    "run_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/run_id"
+    },
+    "step_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/step_id"
+    },
+    "brain_thread_id": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/thread_id" },
+        { "type": "null" }
+      ]
+    },
+    "provider_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/provider_id"
+    },
+
+    "tool": {
+      "description": "Provider manifest 里声明过的工具名，如 browser.navigate。",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*([.][a-z][a-z0-9_]*)+$"
+    },
+    "arguments": { "type": "object" },
+    "arguments_hash": {
+      "description": "canonical JSON 的 sha256。Approval 绑定的就是它，执行前 Provider 再算一次。",
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/sha256"
+    },
+
+    "risk": {
+      "description": "Core 依据 manifest 解析出来的风险，不采信 Brain 自称的风险。",
+      "$ref": "https://contracts.unzoo.ai/v0/security/risk.schema.json#/$defs/risk_level"
+    },
+    "resource_request": {
+      "description": "这次调用要触达的具体资源。Policy 拿它和 Grant 的范围比对。",
+      "$ref": "https://contracts.unzoo.ai/v0/workspace/capability-scope.schema.json#/$defs/capability_scope"
+    },
+
+    "state": { "$ref": "#/$defs/tool_call_state" },
+
+    "idempotency_key": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/idempotency_key"
+    },
+
+    "approval_id": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/approval_id" },
+        { "type": "null" }
+      ]
+    },
+    "grant_id": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/grant_id" },
+        { "type": "null" }
+      ]
+    },
+    "action_id": {
+      "description": "Provider 侧的动作 ID。发出去之后必须有，reconcile 靠它。",
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/action_id" },
+        { "type": "null" }
+      ]
+    },
+
+    "requested_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    },
+    "finished_at": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp" },
+        { "type": "null" }
+      ]
+    },
+    "error": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/error.schema.json#/$defs/error_body" },
+        { "type": "null" }
+      ]
+    }
+  },
+
+  "allOf": [
+    {
+      "$comment": "等审批就必须有 Approval，否则这个调用永远等不到人。",
+      "if": { "properties": { "state": { "const": "waiting_approval" } }, "required": ["state"] },
+      "then": {
+        "required": ["approval_id"],
+        "properties": {
+          "approval_id": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/approval_id"
+          }
+        }
+      }
+    },
+    {
+      "$comment": "已授权之后必须挂 Grant。Provider 会独立校验 Grant，没有 Grant 的 Mutation 一律拒绝。",
+      "if": {
+        "properties": {
+          "state": { "enum": ["authorized", "dispatched", "executing", "verifying", "succeeded"] }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["grant_id"],
+        "properties": {
+          "grant_id": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/grant_id"
+          }
+        }
+      }
+    },
+    {
+      "$comment": "发出去之后必须有 action_id，包括 unknown。没有它就无法 reconcile，只能靠猜。",
+      "if": {
+        "properties": {
+          "state": { "enum": ["dispatched", "executing", "verifying", "succeeded", "unknown"] }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["action_id"],
+        "properties": {
+          "action_id": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/action_id"
+          }
+        }
+      }
+    },
+    {
+      "$comment": "失败和拒绝必须带原因。",
+      "if": {
+        "properties": { "state": { "enum": ["failed", "denied"] } },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/error.schema.json#/$defs/error_body"
+          }
+        }
+      }
+    },
+    {
+      "$comment": "非 read 的调用必须给出资源范围和参数哈希——Policy 没有范围就没法判，Approval 没有哈希就绑不住。",
+      "if": {
+        "properties": { "risk": { "not": { "const": "read" } } },
+        "required": ["risk"]
+      },
+      "then": { "required": ["resource_request", "arguments_hash"] }
+    }
+  ],
+
+  "$defs": {
+    "tool_call_state": {
+      "description": "unknown 表示 Provider 连接丢失、无法确认动作是否发生。涉及副作用时不得自动重试，必须先 reconcile。",
+      "enum": [
+        "requested",
+        "policy_checking",
+        "waiting_approval",
+        "authorized",
+        "dispatched",
+        "executing",
+        "verifying",
+        "succeeded",
+        "failed",
+        "denied",
+        "cancelled",
+        "unknown"
+      ]
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "events/envelope.schema.json",
+  "reason": "aggregate_type 是 approval，aggregate_id 却是个 task。事件回放会挂到错误的对象上。",
+  "instance": {
+    "schema_version": "event.v0",
+    "event_id": "event_01JBQ8XH000000000000000009",
+    "sequence": 9,
+    "type": "approval.requested",
+    "aggregate_type": "approval",
+    "aggregate_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "actor": {
+      "type": "core",
+      "id": "one_core"
+    },
+    "timestamp": "2026-09-03T02:11:30Z",
+    "data": {
+      "kind": "external_side_effect",
+      "expires_at": "2026-09-03T02:26:30Z"
+    }
+  }
+}

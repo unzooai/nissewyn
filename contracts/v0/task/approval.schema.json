@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/task/approval.schema.json",
+  "title": "Approval",
+  "description": "一次授权请求。只能解决一次，第一响应者胜出，allowed 不等于已执行。Approval 只授权 canonical_payload 里展示过的那一个动作。",
+
+  "type": "object",
+  "required": [
+    "schema_version",
+    "approval_id",
+    "tool_call_id",
+    "task_id",
+    "kind",
+    "title",
+    "canonical_payload",
+    "allowed_decisions",
+    "state",
+    "created_at",
+    "expires_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "approval.v0" },
+    "approval_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/approval_id"
+    },
+    "tool_call_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/tool_call_id"
+    },
+    "task_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/task_id"
+    },
+    "run_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/run_id"
+    },
+
+    "kind": {
+      "enum": [
+        "local_mutation",
+        "command_execution",
+        "external_side_effect",
+        "credential_access",
+        "financial",
+        "destructive",
+        "plan"
+      ]
+    },
+
+    "title": {
+      "description": "面向用户的一句话。必须由 canonical_payload 生成，不能用 Brain 自己写的描述替代真实参数。",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "summary": { "type": "string" },
+
+    "canonical_payload": { "$ref": "#/$defs/canonical_payload" },
+
+    "resource_preview": {
+      "description": "给用户看的资源摘要，由 canonical_payload.resources 渲染。",
+      "type": "object"
+    },
+    "content_preview": {
+      "description": "要发出去的内容摘要。密码字段必须已脱敏。",
+      "type": "object"
+    },
+
+    "allowed_decisions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/decision" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+
+    "state": { "enum": ["pending", "allowed", "denied", "expired", "cancelled"] },
+
+    "created_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    },
+    "expires_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    },
+
+    "resolved_by": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/actor" },
+        { "type": "null" }
+      ]
+    },
+    "resolved_at": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp" },
+        { "type": "null" }
+      ]
+    },
+    "resolution": {
+      "oneOf": [{ "$ref": "#/$defs/decision" }, { "type": "null" }]
+    },
+    "issued_grant_id": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/grant_id" },
+        { "type": "null" }
+      ]
+    }
+  },
+
+  "allOf": [
+    {
+      "$comment": "解决了就必须记下是谁、什么时候、决定是什么。审计要求可归因。",
+      "if": {
+        "properties": { "state": { "enum": ["allowed", "denied"] } },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["resolved_by", "resolved_at", "resolution"],
+        "properties": {
+          "resolved_by": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/actor"
+          },
+          "resolution": { "$ref": "#/$defs/decision" }
+        }
+      }
+    },
+    {
+      "$comment": "拒绝就是 deny，批准就不能是 deny。避免 state 和 resolution 互相打架。",
+      "if": { "properties": { "state": { "const": "denied" } }, "required": ["state"] },
+      "then": { "properties": { "resolution": { "const": "deny" } } }
+    },
+    {
+      "if": { "properties": { "state": { "const": "allowed" } }, "required": ["state"] },
+      "then": { "properties": { "resolution": { "not": { "const": "deny" } } } }
+    },
+    {
+      "$comment": "§11：credential/financial/destructive 不支持长期 Allow，选项里就不该出现。",
+      "if": {
+        "properties": {
+          "kind": { "enum": ["credential_access", "financial", "destructive"] }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "properties": {
+          "allowed_decisions": {
+            "items": { "enum": ["allow_once", "deny"] }
+          }
+        }
+      }
+    }
+  ],
+
+  "$defs": {
+    "decision": {
+      "description": "见 security-and-trust-model.md §11。",
+      "enum": ["allow_once", "allow_for_task", "allow_exact_for_automation", "deny"]
+    },
+
+    "canonical_payload": {
+      "description": "TOCTOU 控制的核心。用户批的是这一份；Provider 执行前重算 arguments_hash 比对，对不上就拒绝并重新审批。",
+      "type": "object",
+      "required": [
+        "tool",
+        "arguments_hash",
+        "risk",
+        "resources",
+        "task_id",
+        "run_id",
+        "step_id",
+        "expires_at"
+      ],
+      "properties": {
+        "tool": { "type": "string", "minLength": 1 },
+        "arguments_hash": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/sha256"
+        },
+        "content_preview_hash": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/sha256"
+        },
+        "risk": {
+          "$ref": "https://contracts.unzoo.ai/v0/security/risk.schema.json#/$defs/risk_level"
+        },
+        "resources": {
+          "$ref": "https://contracts.unzoo.ai/v0/workspace/capability-scope.schema.json#/$defs/capability_scope"
+        },
+        "task_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/task_id"
+        },
+        "run_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/run_id"
+        },
+        "step_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/step_id"
+        },
+        "expires_at": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+        }
+      }
+    }
+  }
+}

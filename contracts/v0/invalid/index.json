@@ -1,0 +1,165 @@
+{
+  "$comment": "反例固件。每一条对应一条真实约束，测试断言它们必须被拒绝——防的是 schema 越改越松却没人发现。",
+  "cases": [
+    {
+      "name": "task-terminal-with-active-run.json",
+      "schema": "task/task.schema.json",
+      "reason": "已完成的 Task 还挂着活动 Run。终态不能回到 running，要继续干活得开新 Run。"
+    },
+    {
+      "name": "task-local-time.json",
+      "schema": "task/task.schema.json",
+      "reason": "created_at 带了时区偏移。所有时间必须是 UTC，本地化只在 UI 层做。"
+    },
+    {
+      "name": "run-succeeded-without-finished-at.json",
+      "schema": "task/run.schema.json",
+      "reason": "Run 成功了却没有 finished_at，UI 会永远显示在运行中。"
+    },
+    {
+      "name": "run-failed-without-error.json",
+      "schema": "task/run.schema.json",
+      "reason": "失败不给 error。只说失败不说为什么，用户和 reconcile 都没法往下走。"
+    },
+    {
+      "name": "tool-call-authorized-without-grant.json",
+      "schema": "task/tool-call.schema.json",
+      "reason": "已授权却没有 grant_id。Provider 会独立校验 Grant，没有 Grant 的 Mutation 一律拒绝。"
+    },
+    {
+      "name": "tool-call-unknown-without-action-id.json",
+      "schema": "task/tool-call.schema.json",
+      "reason": "unknown 状态却没有 action_id，无法 reconcile，只能靠猜动作发生没发生。"
+    },
+    {
+      "name": "tool-call-mutation-without-hash.json",
+      "schema": "task/tool-call.schema.json",
+      "reason": "非 read 的调用没给 arguments_hash 和 resource_request，Approval 绑不住、Policy 判不了。"
+    },
+    {
+      "name": "approval-financial-long-lived.json",
+      "schema": "task/approval.schema.json",
+      "reason": "financial 类审批给出了 allow_for_task。高风险不支持长期 Allow。"
+    },
+    {
+      "name": "approval-denied-but-allowed.json",
+      "schema": "task/approval.schema.json",
+      "reason": "state 是 denied，resolution 却是 allow_once。两者自相矛盾。"
+    },
+    {
+      "name": "grant-destructive-not-single-use.json",
+      "schema": "security/capability-grant.schema.json",
+      "reason": "destructive 的 Grant 不是一次性、也没绑定具体 ToolCall，等于签了一张长期删除许可。"
+    },
+    {
+      "name": "grant-mutation-without-approval.json",
+      "schema": "security/capability-grant.schema.json",
+      "reason": "非 read 的 Grant 没有对应 Approval。除了 read，一切都得有人批过。"
+    },
+    {
+      "name": "risk-financial-auto.json",
+      "schema": "security/risk.schema.json",
+      "reason": "financial 工具声明成 auto 放行。这一档必须每次二次确认。"
+    },
+    {
+      "name": "risk-read-with-side-effect.json",
+      "schema": "security/risk.schema.json",
+      "reason": "声明成 read 却说会改外部状态。工具的风险声明本身就是错的。"
+    },
+    {
+      "name": "risk-irreversible-without-evidence.json",
+      "schema": "security/risk.schema.json",
+      "reason": "不可逆的动作只留结果、不留 before/after，事后无从对账。"
+    },
+    {
+      "name": "scope-browser-act-without-domain.json",
+      "schema": "workspace/capability-scope.schema.json",
+      "reason": "浏览器范围给了 act 却不限域名，等于全网可写。"
+    },
+    {
+      "name": "scope-connector-write-without-target.json",
+      "schema": "workspace/capability-scope.schema.json",
+      "reason": "Connector 给了写权限却没有确切目标，可以发给任何人。"
+    },
+    {
+      "name": "policy-allow-without-reason.json",
+      "schema": "security/policy-decision.schema.json",
+      "reason": "判定为 allow，原因却是 requires_approval。放行必须说清楚凭什么放行。"
+    },
+    {
+      "name": "policy-auto-read-on-mutation.json",
+      "schema": "security/policy-decision.schema.json",
+      "reason": "用 auto_read 放行了一个 external_side_effect。read 工具不能自行假定 read。"
+    },
+    {
+      "name": "action-result-unknown-retry.json",
+      "schema": "provider/action-result.schema.json",
+      "reason": "unknown 却建议直接重试。副作用类动作必须先 reconcile，否则会重复执行。"
+    },
+    {
+      "name": "action-result-ok-but-failed.json",
+      "schema": "provider/action-result.schema.json",
+      "reason": "ok 为 true，state 却是 failed。"
+    },
+    {
+      "name": "error-non-retryable-with-delay.json",
+      "schema": "common/error.schema.json",
+      "reason": "不可重试却给了重试间隔，调用方会照着睡一觉再撞一次墙。"
+    },
+    {
+      "name": "error-unknown-code-prefix.json",
+      "schema": "common/error.schema.json",
+      "reason": "错误码前缀不在约定分类里。调用方按 code 分支，前缀必须稳定。"
+    },
+    {
+      "name": "automation-standing-grant-destructive.json",
+      "schema": "automation/automation.schema.json",
+      "reason": "常驻授权里出现了 destructive。这一档不支持长期 Allow，每次都要人。"
+    },
+    {
+      "name": "automation-schedule-without-timezone.json",
+      "schema": "automation/automation.schema.json",
+      "reason": "定时触发只给 cron 不给时区，跨夏令时会漂。"
+    },
+    {
+      "name": "artifact-screenshot-public.json",
+      "schema": "artifact/artifact.schema.json",
+      "reason": "截图标成 public。截图可能拍到任何东西，默认 private。"
+    },
+    {
+      "name": "artifact-evidence-without-redaction-flag.json",
+      "schema": "artifact/artifact.schema.json",
+      "reason": "证据类 Artifact 没说明脱敏做没做过，下游只能猜。"
+    },
+    {
+      "name": "provider-manifest-tool-without-risk.json",
+      "schema": "provider/manifest.schema.json",
+      "reason": "注册了一个没有完整风险声明的工具。七个字段缺一不予注册。"
+    },
+    {
+      "name": "brain-event-error-without-body.json",
+      "schema": "brain/events.schema.json#/$defs/brain_event",
+      "reason": "error 事件只有一句自由文本，没有结构化 error，上层没法分支也没法归因。"
+    },
+    {
+      "name": "brain-output-delta-without-stream.json",
+      "schema": "brain/events.schema.json#/$defs/brain_event",
+      "reason": "output.delta 不带 stream。消费方分不清这段是对用户说的话还是推理，要么全展示把推理漏给用户，要么全藏掉丢了回答。"
+    },
+    {
+      "name": "brain-reasoning-summary-event.json",
+      "schema": "brain/events.schema.json#/$defs/brain_event",
+      "reason": "reasoning.summary 已移除。推理文本走 output.delta + stream: reasoning，和回答留在同一条序列里，顺序才不会丢。"
+    },
+    {
+      "name": "event-aggregate-id-mismatch.json",
+      "schema": "events/envelope.schema.json",
+      "reason": "aggregate_type 是 approval，aggregate_id 却是个 task。事件回放会挂到错误的对象上。"
+    },
+    {
+      "name": "timestamp-unknown-offset.json",
+      "schema": "task/task.schema.json",
+      "reason": "时间用了 -00:00。RFC 3339 里它表示「偏移未知」而不是 UTC，正是「所有时间必须是 UTC」这条规则要挡的东西——放宽到接受 +00:00 时不能把它一起放进来。"
+    }
+  ]
+}

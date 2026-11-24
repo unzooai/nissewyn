@@ -1,0 +1,38 @@
+{
+  "schema": "artifact/artifact.schema.json",
+  "reason": "截图标成 public。截图可能拍到任何东西，默认 private。",
+  "instance": {
+    "schema_version": "artifact.v0",
+    "artifact_id": "artifact_01JBQ8XGD36Y1X8E9WBCP2FJ0K",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "step_id": "step_01JBQ8XG8Y1S6R3Z4QWXH7AD5E",
+    "kind": "screenshot",
+    "name": "competitive-pricing.md",
+    "uri": "artifact://task_01JBQ8XG4T7N2M9V0KRSD3WZ1A/competitive-pricing.md",
+    "mime_type": "image/png",
+    "size": 20480,
+    "sha256": "9c1e40ab9c1e40ab9c1e40ab9c1e40ab9c1e40ab9c1e40ab9c1e40ab9c1e40ab",
+    "sensitivity": "public",
+    "created_by": "tool_call:call_01JBQ8XG9Z2T7S4A5RXYJ8BE6F",
+    "validation": {
+      "state": "passed",
+      "checks": [
+        {
+          "name": "markdown_parses",
+          "ok": true
+        },
+        {
+          "name": "no_secret_pattern",
+          "ok": true
+        }
+      ]
+    },
+    "retention": {
+      "policy": "days",
+      "days": 90
+    },
+    "created_at": "2026-09-03T02:13:10Z",
+    "redacted": true
+  }
+}

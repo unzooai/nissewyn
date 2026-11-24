@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/task/step.schema.json",
+  "title": "Step",
+  "description": "用户能看懂的工作阶段。Step 不等于 ToolCall——一个 Step 可以有多个 ToolCall。计划变化用 supersede 表达，不覆写历史。",
+
+  "type": "object",
+  "required": ["schema_version", "step_id", "run_id", "sequence", "title", "state"],
+  "properties": {
+    "schema_version": { "const": "step.v0" },
+    "step_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/step_id"
+    },
+    "run_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/run_id"
+    },
+    "sequence": { "type": "integer", "minimum": 0 },
+
+    "title": {
+      "description": "必须面向用户。“调用 browser.navigate”不是合格的 Step 标题。",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "description": { "type": "string" },
+
+    "state": {
+      "enum": [
+        "planned",
+        "running",
+        "waiting_approval",
+        "waiting_provider",
+        "succeeded",
+        "failed",
+        "skipped",
+        "cancelled",
+        "superseded"
+      ]
+    },
+
+    "provider_hint": {
+      "description": "计划阶段的倾向，不是授权。真正走哪个 Provider 由 Tool Routing 决定。",
+      "type": "string"
+    },
+
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/step_id"
+      },
+      "uniqueItems": true
+    },
+
+    "supersedes": {
+      "description": "改计划时指向被替代的 Step，那个 Step 置为 superseded。",
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/step_id" },
+        { "type": "null" }
+      ]
+    },
+
+    "retry_policy": {
+      "type": "object",
+      "properties": {
+        "max_attempts": { "type": "integer", "minimum": 1 },
+        "backoff_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "started_at": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp" },
+        { "type": "null" }
+      ]
+    },
+    "finished_at": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp" },
+        { "type": "null" }
+      ]
+    }
+  },
+
+  "allOf": [
+    {
+      "$comment": "superseded 的 Step 已经不再推进，必须有结束时间。谁替代了它记在新 Step 的 supersedes 上。",
+      "if": { "properties": { "state": { "const": "superseded" } }, "required": ["state"] },
+      "then": {
+        "required": ["finished_at"],
+        "properties": {
+          "finished_at": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+          }
+        }
+      }
+    }
+  ],
+
+  "$comment": "JSON Schema 表达不了「depends_on 不含自身」和「依赖图无环」，这两条由 Core 在写入时校验，见 contracts/v0/README.md「schema 管不到的规则」。"
+}

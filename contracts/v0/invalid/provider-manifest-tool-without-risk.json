@@ -1,0 +1,122 @@
+{
+  "schema": "provider/manifest.schema.json",
+  "reason": "注册了一个没有完整风险声明的工具。七个字段缺一不予注册。",
+  "instance": {
+    "schema_version": "provider_manifest.v0",
+    "provider_id": "provider_unzoo_local",
+    "name": "Unzoo Browser Provider",
+    "version": "1.5.0",
+    "optional": false,
+    "protocol_versions": [
+      "provider.v0"
+    ],
+    "endpoint": {
+      "kind": "http",
+      "address": "http://127.0.0.1:9399"
+    },
+    "identity": {
+      "auth": "bearer_token",
+      "client_id": "client_unzoo_one_core",
+      "token_ref": "secret://provider/unzoo/local-token"
+    },
+    "tools": [
+      {
+        "tool": "browser.navigate",
+        "title": "打开网页",
+        "description": "在授权的 Profile 里打开一个地址。",
+        "arguments_schema": {
+          "type": "object",
+          "required": [
+            "url"
+          ],
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        },
+        "risk_declaration": {
+          "risk": "read",
+          "side_effect": "none",
+          "resource_scopes": [
+            "browser"
+          ],
+          "sensitive_inputs": [],
+          "reversible": true,
+          "approval_mode": "auto",
+          "evidence_policy": "result_only"
+        },
+        "cancelable": true
+      },
+      {
+        "tool": "browser.submit_form",
+        "title": "提交表单",
+        "description": "把填好的表单提交出去。对方会收到一条记录。",
+        "arguments_schema": {
+          "type": "object",
+          "required": [
+            "url",
+            "fields"
+          ],
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "fields": {
+              "type": "object"
+            }
+          }
+        },
+        "risk_declaration": {
+          "risk": "external_side_effect",
+          "side_effect": "external",
+          "resource_scopes": [
+            "browser"
+          ],
+          "sensitive_inputs": [
+            "fields.email",
+            "fields.phone"
+          ],
+          "reversible": false,
+          "approval_mode": "per_call"
+        },
+        "cancelable": false
+      },
+      {
+        "tool": "browser.get_cookies",
+        "title": "读取 Cookie",
+        "arguments_schema": {
+          "type": "object",
+          "required": [
+            "domain"
+          ],
+          "properties": {
+            "domain": {
+              "type": "string"
+            }
+          }
+        },
+        "risk_declaration": {
+          "risk": "credential_access",
+          "side_effect": "none",
+          "resource_scopes": [
+            "browser"
+          ],
+          "sensitive_inputs": [
+            "domain"
+          ],
+          "reversible": true,
+          "approval_mode": "per_call",
+          "evidence_policy": "result_only"
+        },
+        "cancelable": true
+      }
+    ],
+    "health": {
+      "state": "online",
+      "checked_at": "2026-09-03T02:12:06Z",
+      "latency_ms": 14
+    }
+  }
+}

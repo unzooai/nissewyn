@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/workspace/capability-scope.schema.json",
+  "title": "能力范围",
+  "description": "对应 security-and-trust-model.md §10。Grant、Approval 和 Provider 校验共用这一份范围定义——三处各写一份的话，Provider 就无法独立验证 Grant 没有越界。",
+
+  "$ref": "#/$defs/capability_scope",
+
+  "$defs": {
+    "access_mode": { "enum": ["read", "write"] },
+
+    "files": {
+      "type": "object",
+      "required": ["roots", "access"],
+      "properties": {
+        "roots": {
+          "description": "已 canonicalize 的绝对路径。执行前必须复查，防目录穿越和符号链接逃逸。",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "access": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/access_mode" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "globs": { "type": "array", "items": { "type": "string" } },
+        "max_bytes": { "type": "integer", "minimum": 0 },
+        "symlink_policy": { "enum": ["deny", "follow_within_root"] }
+      }
+    },
+
+    "terminal": {
+      "description": "禁止把 shell command 当普通字符串前缀授权——授的是 argv，不是前缀。",
+      "type": "object",
+      "required": ["argv", "cwd"],
+      "properties": {
+        "argv": {
+          "description": "精确 argv。第一个元素是可执行文件，其余是参数，逐项匹配。",
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "cwd": { "type": "string", "minLength": 1 },
+        "env_allowlist": { "type": "array", "items": { "type": "string" } },
+        "timeout_ms": { "type": "integer", "minimum": 0 },
+        "network": { "type": "boolean", "default": false },
+        "elevation": { "type": "boolean", "default": false }
+      }
+    },
+
+    "browser": {
+      "type": "object",
+      "required": ["profiles", "access"],
+      "properties": {
+        "profiles": {
+          "description": "由用户显式选择。Work/Personal 不自动混用。",
+          "type": "array",
+          "items": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/profile_id"
+          },
+          "minItems": 1
+        },
+        "domains": {
+          "description": "允许的 origin 或域名。空数组表示不限，仅 read 允许不限。",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "tabs": { "type": "array", "items": { "type": "string" } },
+        "access": {
+          "type": "array",
+          "items": { "enum": ["read", "act", "download", "upload"] },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "cookie_access": {
+          "description": "读 Cookie 属于 credential_access，默认关闭。",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "只要能动页面就必须限定域名，否则 Grant 等于全网可写。",
+          "if": {
+            "properties": {
+              "access": { "contains": { "enum": ["act", "download", "upload"] } }
+            },
+            "required": ["access"]
+          },
+          "then": { "properties": { "domains": { "minItems": 1 } } }
+        }
+      ]
+    },
+
+    "desktop": {
+      "type": "object",
+      "required": ["application", "window_id", "input_types"],
+      "properties": {
+        "application": { "type": "string", "minLength": 1 },
+        "process_id": { "type": "integer", "minimum": 0 },
+        "window_id": { "type": "string", "minLength": 1 },
+        "display_id": { "type": "string" },
+        "frame_id": {
+          "description": "观察帧标识。执行时帧已过期就必须拒绝，防止照着旧坐标点击。",
+          "type": "string"
+        },
+        "input_types": {
+          "type": "array",
+          "items": { "enum": ["pointer", "keyboard", "scroll"] },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+
+    "connector": {
+      "type": "object",
+      "required": ["account", "access"],
+      "properties": {
+        "account": { "type": "string", "minLength": 1 },
+        "organization": { "type": "string" },
+        "object_types": { "type": "array", "items": { "type": "string" } },
+        "access": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/access_mode" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "targets": {
+          "description": "精确目标，如收件人、频道、仓库。写操作必须给出，不接受通配。",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "access": { "contains": { "const": "write" } } },
+            "required": ["access"]
+          },
+          "then": { "required": ["targets"], "properties": { "targets": { "minItems": 1 } } }
+        }
+      ]
+    },
+
+    "capability_scope": {
+      "description": "至少给出一类范围。空范围不是无限范围，是无效声明。",
+      "type": "object",
+      "properties": {
+        "files": { "$ref": "#/$defs/files" },
+        "terminal": { "$ref": "#/$defs/terminal" },
+        "browser": { "$ref": "#/$defs/browser" },
+        "desktop": { "$ref": "#/$defs/desktop" },
+        "connector": { "$ref": "#/$defs/connector" }
+      },
+      "minProperties": 1
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "schema": "task/tool-call.schema.json",
+  "reason": "已授权却没有 grant_id。Provider 会独立校验 Grant，没有 Grant 的 Mutation 一律拒绝。",
+  "instance": {
+    "schema_version": "tool_call.v0",
+    "tool_call_id": "call_01JBQ8XG9Z2T7S4A5RXYJ8BE6F",
+    "run_id": "run_01JBQ8XG5V8P3N0W1MSTE4XA2B",
+    "step_id": "step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D",
+    "brain_thread_id": "thread_01JBQ8XGG69B4A1H2ZEFS5JN3P",
+    "provider_id": "provider_unzoo_local",
+    "tool": "browser.submit_form",
+    "arguments": {
+      "url": "https://pricing.example.com/quote",
+      "fields": {
+        "seats": "25",
+        "plan": "team"
+      }
+    },
+    "arguments_hash": "3f2a1c9e3f2a1c9e3f2a1c9e3f2a1c9e3f2a1c9e3f2a1c9e3f2a1c9e3f2a1c9e",
+    "risk": "external_side_effect",
+    "resource_request": {
+      "browser": {
+        "profiles": [
+          "profile_work"
+        ],
+        "domains": [
+          "pricing.example.com"
+        ],
+        "access": [
+          "read",
+          "act"
+        ],
+        "cookie_access": false
+      }
+    },
+    "state": "authorized",
+    "idempotency_key": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A/step_01JBQ8XG7X0R5Q2Y3PVWG6ZC4D/submit-quote-1",
+    "approval_id": "approval_01JBQ8XGA03V8T5B6SYZK9CF7G",
+    "grant_id": null,
+    "action_id": null,
+    "requested_at": "2026-09-03T02:11:30Z",
+    "finished_at": null,
+    "error": null
+  }
+}

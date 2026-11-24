@@ -1,0 +1,30 @@
+{
+  "files": {
+    "roots": [
+      "D:/work/research"
+    ],
+    "access": [
+      "read",
+      "write"
+    ],
+    "globs": [
+      "**/*.md",
+      "**/*.csv"
+    ],
+    "max_bytes": 10485760,
+    "symlink_policy": "deny"
+  },
+  "browser": {
+    "profiles": [
+      "profile_work"
+    ],
+    "domains": [
+      "pricing.example.com"
+    ],
+    "access": [
+      "read",
+      "act"
+    ],
+    "cookie_access": false
+  }
+}

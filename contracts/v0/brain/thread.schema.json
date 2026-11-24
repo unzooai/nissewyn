@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/brain/thread.schema.json",
+  "title": "BrainThread 与 BrainTurn",
+  "description": "某个 Adapter 的持久上下文，以及其中的一轮。原始隐藏推理不进产品数据库——只保存用户消息、模型可见消息、reasoning summary 和工具事件。",
+
+  "$ref": "#/$defs/brain_thread",
+
+  "$defs": {
+    "brain_thread": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "thread_id",
+        "run_id",
+        "adapter",
+        "provider",
+        "model",
+        "state",
+        "created_at"
+      ],
+      "properties": {
+        "schema_version": { "const": "brain_thread.v0" },
+        "thread_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/thread_id"
+        },
+        "run_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/run_id"
+        },
+        "adapter": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/slug"
+        },
+        "provider": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+
+        "external_thread_id": {
+          "description": "Adapter 自己的会话 ID。与内部 ID 分开保存。",
+          "type": ["string", "null"]
+        },
+
+        "state": { "enum": ["active", "idle", "interrupted", "finished", "failed", "closed"] },
+
+        "snapshot_ref": {
+          "description": "上下文快照 Artifact。换 Brain 时新 Thread 引用它，而不是把原始上下文塞进新 Prompt。",
+          "oneOf": [
+            { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/artifact_id" },
+            { "type": "null" }
+          ]
+        },
+        "supersedes_thread_id": {
+          "description": "切换 Brain 时指向上一个 Thread。",
+          "oneOf": [
+            { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/thread_id" },
+            { "type": "null" }
+          ]
+        },
+
+        "usage": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/usage"
+        },
+
+        "created_at": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+        },
+        "closed_at": {
+          "oneOf": [
+            { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+
+    "brain_turn": {
+      "type": "object",
+      "required": ["schema_version", "turn_id", "thread_id", "state", "started_at"],
+      "properties": {
+        "schema_version": { "const": "brain_turn.v0" },
+        "turn_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/turn_id"
+        },
+        "thread_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/thread_id"
+        },
+        "input_ref": {
+          "description": "本轮输入。长输入存成 Artifact，这里放引用。",
+          "type": ["string", "null"]
+        },
+        "state": { "enum": ["running", "completed", "interrupted", "failed"] },
+        "summary": { "type": ["string", "null"] },
+        "usage": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/usage"
+        },
+        "started_at": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+        },
+        "finished_at": {
+          "oneOf": [
+            { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "state": { "enum": ["completed", "interrupted", "failed"] } },
+            "required": ["state"]
+          },
+          "then": {
+            "required": ["finished_at"],
+            "properties": {
+              "finished_at": {
+                "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

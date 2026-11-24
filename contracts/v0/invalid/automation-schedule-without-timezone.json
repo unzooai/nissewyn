@@ -1,0 +1,50 @@
+{
+  "schema": "automation/automation.schema.json",
+  "reason": "定时触发只给 cron 不给时区，跨夏令时会漂。",
+  "instance": {
+    "schema_version": "automation.v0",
+    "automation_id": "automation_01JBQ8XGK92E7D4M5CHJW8NR6S",
+    "title": "每天早上的竞品价格巡检",
+    "instructions": "检查 pricing.example.com 的三档价格有没有变，变了就写一条摘要。",
+    "trigger": {
+      "type": "schedule",
+      "cron": "0 8 * * 1-5"
+    },
+    "brain_policy": {
+      "preferred_brain": "codex_cli",
+      "max_cost_usd_per_run": 0.5
+    },
+    "workspace_refs": [
+      "workspace_research"
+    ],
+    "profile_refs": [
+      "profile_work"
+    ],
+    "standing_grants": [
+      {
+        "provider_id": "provider_unzoo_local",
+        "tool": "browser.navigate",
+        "targets": [
+          "pricing.example.com"
+        ],
+        "risk_ceiling": "read"
+      }
+    ],
+    "notification_route": {
+      "attention_route": "mobile",
+      "notify_on": [
+        "approval",
+        "failure"
+      ]
+    },
+    "budget": {
+      "max_usd": 15
+    },
+    "concurrency_policy": "skip_if_running",
+    "misfire_policy": "run_once",
+    "enabled": true,
+    "task_id": null,
+    "created_at": "2026-08-20T01:00:00Z",
+    "updated_at": "2026-08-20T01:00:00Z"
+  }
+}

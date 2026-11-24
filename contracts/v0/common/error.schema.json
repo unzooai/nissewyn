@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/common/error.schema.json",
+  "title": "错误信封",
+  "description": "所有 v0 接口的错误统一用这个形状。code 稳定，message 可变——调用方只允许对 code 分支，禁止解析 message。",
+
+  "type": "object",
+  "required": ["error"],
+  "properties": {
+    "error": { "$ref": "#/$defs/error_body" }
+  },
+
+  "$defs": {
+    "error_code": {
+      "description": "稳定错误码，前缀必须落在 domain-model-and-contracts.md §18 的分类里。",
+      "type": "string",
+      "pattern": "^(validation|auth|policy|approval|provider|brain|task|artifact|storage|internal)[.][a-z0-9_]+([.][a-z0-9_]+)*$"
+    },
+
+    "error_body": {
+      "type": "object",
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": { "$ref": "#/$defs/error_code" },
+        "message": {
+          "description": "面向开发者，英文，可随版本变化。",
+          "type": "string",
+          "minLength": 1
+        },
+        "user_message": {
+          "description": "面向用户，本地化，说清楚接下来会发生什么。缺省时 UI 按 code 自己兜底。",
+          "type": "string"
+        },
+        "retryable": { "type": "boolean" },
+        "retry_after_ms": { "type": "integer", "minimum": 0 },
+        "details": { "type": "object" },
+        "correlation_id": {
+          "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/correlation_id"
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "不可重试就不该给重试间隔，否则调用方会照着睡一觉再撞一次墙。",
+          "if": { "properties": { "retryable": { "const": false } }, "required": ["retryable"] },
+          "then": { "not": { "required": ["retry_after_ms"] } }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/task/run.schema.json",
+  "title": "Run",
+  "description": "Task 的一次执行尝试。同一个 Task 可以有多个 Run；重试、恢复和 Automation 的每次触发都是新 Run，不覆写历史。",
+
+  "type": "object",
+  "required": ["schema_version", "run_id", "task_id", "attempt", "trigger", "state", "started_at"],
+  "properties": {
+    "schema_version": { "const": "run.v0" },
+    "run_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/run_id"
+    },
+    "task_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/task_id"
+    },
+    "attempt": { "type": "integer", "minimum": 1 },
+
+    "trigger": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["user", "automation", "retry", "resume", "system"] },
+        "ref": {
+          "description": "触发来源。automation 时是 automation_id，retry/resume 时是上一个 run_id。",
+          "type": ["string", "null"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "enum": ["automation", "retry", "resume"] } },
+            "required": ["type"]
+          },
+          "then": { "required": ["ref"], "properties": { "ref": { "type": "string" } } }
+        }
+      ]
+    },
+
+    "state": { "$ref": "#/$defs/run_state" },
+
+    "brain_thread_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/thread_id"
+      }
+    },
+
+    "started_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    },
+    "finished_at": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp" },
+        { "type": "null" }
+      ]
+    },
+
+    "result_summary": { "type": ["string", "null"] },
+    "usage": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/usage"
+    },
+    "error": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/error.schema.json#/$defs/error_body" },
+        { "type": "null" }
+      ]
+    }
+  },
+
+  "allOf": [
+    {
+      "$comment": "结束了就得有结束时间。没有 finished_at 的 succeeded 会让 UI 永远显示在跑。",
+      "if": {
+        "properties": { "state": { "$ref": "#/$defs/terminal_run_state" } },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["finished_at"],
+        "properties": {
+          "finished_at": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+          }
+        }
+      }
+    },
+    {
+      "$comment": "失败必须带错误。只说失败不说为什么，用户和 reconcile 都没法往下走。",
+      "if": {
+        "properties": { "state": { "enum": ["failed", "cancel_failed"] } },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["error"],
+        "properties": {
+          "error": { "$ref": "https://contracts.unzoo.ai/v0/common/error.schema.json#/$defs/error_body" }
+        }
+      }
+    }
+  ],
+
+  "$defs": {
+    "run_state": {
+      "enum": [
+        "queued",
+        "running",
+        "waiting_approval",
+        "waiting_human",
+        "waiting_provider",
+        "paused",
+        "cancelling",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "cancel_failed",
+        "interrupted"
+      ]
+    },
+    "terminal_run_state": {
+      "enum": ["succeeded", "failed", "cancelled", "cancel_failed", "interrupted"]
+    }
+  }
+}

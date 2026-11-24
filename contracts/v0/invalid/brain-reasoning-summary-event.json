@@ -1,0 +1,12 @@
+{
+  "schema": "brain/events.schema.json#/$defs/brain_event",
+  "reason": "reasoning.summary 已移除。推理文本走 output.delta + stream: reasoning，和回答留在同一条序列里，顺序才不会丢。",
+  "instance": {
+    "schema_version": "brain_event.v0",
+    "event": "reasoning.summary",
+    "at": "2026-09-03T02:10:02+00:00",
+    "session_id": "ags_7f31c0",
+    "cursor": 3,
+    "text": "先查三家竞品的定价页。"
+  }
+}

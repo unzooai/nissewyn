@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/brain/adapter.schema.json",
+  "title": "Brain Adapter Manifest",
+  "description": "一个可插拔大脑的声明。调用方只给 adapter id 和提示词，具体命令由宿主从 manifest 解析——页面和 Brain 都决定不了跑什么进程。",
+
+  "type": "object",
+  "required": [
+    "schema_version",
+    "adapter_id",
+    "name",
+    "provider",
+    "transport",
+    "protocol_versions",
+    "models",
+    "capabilities"
+  ],
+  "properties": {
+    "schema_version": { "const": "brain_adapter.v0" },
+
+    "adapter_id": {
+      "description": "如 codex_cli、claude_code、gemini_cli、opencode。",
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/slug"
+    },
+    "name": { "type": "string", "minLength": 1 },
+
+    "provider": { "type": "string", "minLength": 1 },
+
+    "transport": {
+      "description": "cli_jsonl 是 Codex/Claude CLI 那种逐行 JSON；sdk 是进程内 SDK；acp/mcp 是协议接入。",
+      "enum": ["cli_jsonl", "sdk", "acp", "mcp"]
+    },
+
+    "protocol_versions": {
+      "type": "array",
+      "items": {
+        "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/protocol_version"
+      },
+      "minItems": 1
+    },
+
+    "launch": {
+      "description": "cli_jsonl 才有。argv 由宿主解析和执行，调用方不得传入或覆盖。",
+      "type": "object",
+      "required": ["argv"],
+      "properties": {
+        "argv": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "cwd": { "type": "string" },
+        "env_allowlist": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["model_id"],
+        "properties": {
+          "model_id": { "type": "string", "minLength": 1 },
+          "context_window": { "type": "integer", "minimum": 1 },
+          "default": { "type": "boolean" }
+        }
+      }
+    },
+
+    "capabilities": {
+      "type": "object",
+      "required": ["streaming", "tool_calls", "interrupt"],
+      "properties": {
+        "streaming": { "type": "boolean" },
+        "tool_calls": { "type": "boolean" },
+        "interrupt": {
+          "description": "能不能在一轮进行中打断。做不到的 Adapter，Cancel 只能等本轮结束。",
+          "type": "boolean"
+        },
+        "resume": { "type": "boolean" },
+        "reasoning_summary": { "type": "boolean" },
+        "vision": { "type": "boolean" }
+      }
+    },
+
+    "credential_ref": {
+      "description": "只存引用。Adapter 不把密钥交给 Brain，也不写进 Prompt。",
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/secret_ref"
+    }
+  },
+
+  "allOf": [
+    {
+      "if": { "properties": { "transport": { "const": "cli_jsonl" } }, "required": ["transport"] },
+      "then": { "required": ["launch"] }
+    }
+  ]
+}

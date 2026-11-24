@@ -1,0 +1,21 @@
+# 仓库内一律 LF，检出也是 LF（不跟随本机的 core.autocrlf）。
+#
+# 起因是 contracts/v0：那份 schema 要跨三个仓库、跨平台使用，unterm 那边是
+# Windows 上的 Rust。行尾随机器变化的话，同一份 schema 在两台机器上算出的
+# sha256 不同——而「按内容哈希比对」正是契约本身依赖的东西。
+* text=auto eol=lf
+
+# 二进制，Git 不要按文本处理
+*.png binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+
+# SVG 是文本，跟着上面的 LF 规则走，这里只是说明它不是二进制
+*.svg text
+
+# 工具生成，代码统计里不算人写的
+package-lock.json linguist-generated=true

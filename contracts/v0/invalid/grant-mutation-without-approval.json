@@ -1,0 +1,41 @@
+{
+  "schema": "security/capability-grant.schema.json",
+  "reason": "非 read 的 Grant 没有对应 Approval。除了 read，一切都得有人批过。",
+  "instance": {
+    "schema_version": "grant.v0",
+    "grant_id": "grant_01JBQ8XGB14W9V6C7TZAM0DG8H",
+    "subject": "brain:thread_01JBQ8XGG69B4A1H2ZEFS5JN3P",
+    "task_id": "task_01JBQ8XG4T7N2M9V0KRSD3WZ1A",
+    "provider_id": "provider_unzoo_local",
+    "capabilities": [
+      "browser.read",
+      "browser.act"
+    ],
+    "resources": {
+      "browser": {
+        "profiles": [
+          "profile_work"
+        ],
+        "domains": [
+          "pricing.example.com"
+        ],
+        "access": [
+          "read",
+          "act"
+        ],
+        "cookie_access": false
+      }
+    },
+    "risk_ceiling": "external_side_effect",
+    "constraints": {
+      "max_calls": 1,
+      "single_use": true,
+      "external_commit": true,
+      "bound_tool_call_id": "call_01JBQ8XG9Z2T7S4A5RXYJ8BE6F"
+    },
+    "issued_from_approval": null,
+    "issued_at": "2026-09-03T02:12:05Z",
+    "expires_at": "2026-09-03T02:42:05Z",
+    "revoked_at": null
+  }
+}

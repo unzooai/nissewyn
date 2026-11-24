@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/common/primitives.schema.json",
+  "title": "共享原语",
+  "description": "ID、时间、哈希、Actor、敏感度等跨对象复用的基础类型。所有 v0 schema 都从这里取，不各写一份。",
+
+  "$defs": {
+    "ulid": {
+      "description": "ULID 或 UUIDv7 的 Crockford Base32 形式，26 位，具备时间排序能力。",
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+
+    "slug": {
+      "description": "注册表类 ID 的可读后缀，如 provider_unzoo_local 的 unzoo_local。",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[_-][a-z0-9]+)*$",
+      "maxLength": 64
+    },
+
+    "timestamp": {
+      "description": "RFC 3339 UTC。零偏移的两种写法都收：`Z` 和 `+00:00`——它们语义相同，规则是「必须是 UTC」而不是「必须字面写成 Z」。非零偏移一律拒绝，本地时区只在 UI 层做，不进协议。`-00:00` 也拒绝：RFC 3339 里它表示偏移未知，不是 UTC。",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]+)?(Z|[+]00:00)$"
+    },
+
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+
+    "protocol_version": {
+      "description": "对象或接口的协议版本，如 task.v0、provider.v0。",
+      "type": "string",
+      "pattern": "^[a-z_]+[.]v[0-9]+$"
+    },
+
+    "task_id": { "type": "string", "pattern": "^task_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "run_id": { "type": "string", "pattern": "^run_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "step_id": { "type": "string", "pattern": "^step_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "thread_id": { "type": "string", "pattern": "^thread_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "turn_id": { "type": "string", "pattern": "^turn_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "tool_call_id": { "type": "string", "pattern": "^call_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "approval_id": { "type": "string", "pattern": "^approval_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "grant_id": { "type": "string", "pattern": "^grant_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "action_id": { "type": "string", "pattern": "^action_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "artifact_id": { "type": "string", "pattern": "^artifact_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "event_id": { "type": "string", "pattern": "^event_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "automation_id": { "type": "string", "pattern": "^automation_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "inbox_item_id": { "type": "string", "pattern": "^inbox_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "memory_id": { "type": "string", "pattern": "^memory_[0-9A-HJKMNP-TV-Z]{26}$" },
+
+    "provider_id": {
+      "description": "Provider 是注册表对象，ID 稳定可读，不随进程重启变化。",
+      "type": "string",
+      "pattern": "^provider_[a-z0-9]+(_[a-z0-9]+)*$"
+    },
+    "client_id": {
+      "type": "string",
+      "pattern": "^client_[a-z0-9]+(_[a-z0-9]+)*$"
+    },
+    "workspace_id": {
+      "type": "string",
+      "pattern": "^workspace_([0-9A-HJKMNP-TV-Z]{26}|[a-z0-9]+([_-][a-z0-9]+)*)$"
+    },
+    "profile_id": {
+      "type": "string",
+      "pattern": "^profile_([0-9A-HJKMNP-TV-Z]{26}|[a-z0-9]+([_-][a-z0-9]+)*)$"
+    },
+
+    "secret_ref": {
+      "description": "只存引用，不存值。数据库和日志里出现 secret 明文即为缺陷。",
+      "type": "string",
+      "pattern": "^secret://[a-z0-9-]+(/[A-Za-z0-9._-]+)+$"
+    },
+
+    "artifact_uri": {
+      "description": "Artifact 逻辑地址。不得直接暴露任意文件系统路径。",
+      "type": "string",
+      "pattern": "^artifact://[A-Za-z0-9._/-]+$"
+    },
+
+    "actor": {
+      "description": "谁做的。审计要求每条记录可归因。",
+      "type": "object",
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "enum": ["user", "core", "brain", "provider", "automation", "system"] },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "sensitivity": {
+      "description": "数据外发级别，见 security-and-trust-model.md §12。",
+      "enum": ["public", "internal", "private", "secret"]
+    },
+
+    "usage": {
+      "type": "object",
+      "properties": {
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": "integer", "minimum": 0 },
+        "cached_input_tokens": { "type": "integer", "minimum": 0 },
+        "cost_usd": { "type": "number", "minimum": 0 }
+      }
+    },
+
+    "budget": {
+      "description": "空对象表示不限。超限之后怎么办由 Policy 决定，不在 schema 里表达。",
+      "type": "object",
+      "properties": {
+        "max_usd": { "type": "number", "minimum": 0 },
+        "max_tokens": { "type": "integer", "minimum": 0 },
+        "max_wall_clock_ms": { "type": "integer", "minimum": 0 },
+        "max_tool_calls": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "retention": {
+      "type": "object",
+      "properties": {
+        "policy": { "enum": ["keep", "days", "until_disconnect", "user_controlled"] },
+        "days": { "type": "integer", "minimum": 0 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "policy": { "const": "days" } }, "required": ["policy"] },
+          "then": { "required": ["days"] }
+        }
+      ]
+    },
+
+    "idempotency_key": {
+      "description": "由 Task Engine 生成，不由 Brain 任意生成。形如 task_x/step_y/logical-op-1。",
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 200
+    },
+
+    "correlation_id": { "type": "string", "minLength": 1 }
+  }
+}

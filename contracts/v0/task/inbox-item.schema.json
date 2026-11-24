@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.unzoo.ai/v0/task/inbox-item.schema.json",
+  "title": "InboxItem",
+  "description": "统一的注意力入口。Approval 本身与它的收件箱展示分离：同一个 Approval 只有一个 InboxItem，transport 的投递状态单独记，不保存第二份 resolution。",
+
+  "type": "object",
+  "required": [
+    "schema_version",
+    "inbox_item_id",
+    "task_id",
+    "kind",
+    "source_ref",
+    "state",
+    "attention_route",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "inbox_item.v0" },
+    "inbox_item_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/inbox_item_id"
+    },
+    "task_id": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/task_id"
+    },
+    "run_id": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/run_id" },
+        { "type": "null" }
+      ]
+    },
+
+    "kind": { "enum": ["approval", "question", "error", "result", "reconcile"] },
+
+    "source_ref": {
+      "description": "指向真正的对象。kind 为 approval 时是 approval_id。",
+      "type": "string",
+      "minLength": 1
+    },
+
+    "state": { "enum": ["pending", "resolved", "expired", "cancelled"] },
+
+    "attention_route": {
+      "description": "无人值守只改变这里，不提高 Autonomy Policy。",
+      "enum": ["default", "desktop", "mobile", "email", "silent"]
+    },
+
+    "deliveries": {
+      "description": "各 transport 的投递状态。投递失败不影响 Approval 本身的状态。",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["transport", "state"],
+        "properties": {
+          "transport": { "enum": ["desktop", "mobile", "email", "webhook"] },
+          "state": { "enum": ["queued", "sent", "delivered", "failed"] },
+          "at": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+          }
+        }
+      }
+    },
+
+    "created_at": {
+      "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+    },
+    "resolved_at": {
+      "oneOf": [
+        { "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp" },
+        { "type": "null" }
+      ]
+    }
+  },
+
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "approval" } }, "required": ["kind"] },
+      "then": {
+        "properties": {
+          "source_ref": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/approval_id"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "state": { "enum": ["resolved", "expired", "cancelled"] } },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["resolved_at"],
+        "properties": {
+          "resolved_at": {
+            "$ref": "https://contracts.unzoo.ai/v0/common/primitives.schema.json#/$defs/timestamp"
+          }
+        }
+      }
+    }
+  ]
+}

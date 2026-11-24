@@ -1,10 +1,15 @@
 # Unzoo One 产品架构与 Unterm / Unzoo 能力审计
 
-> 状态：产品架构草案  
-> 日期：2026-07-26  
+> 状态：产品架构草案
+> 日期：2026-07-26
 > 范围：Unterm、Unzoo Browser、Codex / Claude / Gemini 等 Agent Runtime
 
 > 产品名：**Unzoo One — Your Personal AI Operating System**
+
+> **归属修订 2026-08-06**：本文档 §1、§4、§6、§8、§10 原将 Unterm 定位为「个人助理控制平面」。
+> 该定位已纠正——**Unzoo One 自身是唯一控制平面**，Unterm 与 Unzoo 是同级 Provider。
+> 详见 `unzooai/unzoo-one#2`（One Epic）、`zhitongblog/unterm#20`（Unterm 收窄为 Terminal Provider）、
+> `unzooai/unzoo#73`（Unzoo Provider Epic）。§3 的能力审计为当时事实记录，保留不改。
 
 ## 1. 执行摘要
 
@@ -14,13 +19,16 @@
 
 推荐的核心分工：
 
-- **Unterm**：个人助理控制平面，负责任务、会话、大脑路由、权限、审批、记忆、调度、审计与产物。
-- **Unzoo**：浏览器和桌面 Computer Provider，负责观察页面与桌面、执行动作、管理浏览器身份，并提供动作证据。
+- **Unzoo One**：唯一控制平面。自有常驻运行时 `one-core`，负责 Workspace、任务、大脑路由、权限、审批、记忆、调度、Provider 编排、审计与产物。
+- **Unterm**：Terminal Provider。负责 PTY、Session、Screen、Scrollback、终端内 Agent 会话，以及自身的本地执行闸门。同时是一个独立的 AI 原生终端产品。
+- **Unzoo**：Browser / Computer Provider。负责观察页面与桌面、执行动作、管理浏览器身份，并提供动作证据。
 - **Codex / Claude / Gemini / OpenCode 等**：可插拔 Brain Provider，负责推理、规划和生成下一步行动。
 - **MCP / SDK / ACP**：能力与大脑接入协议。
-- **本地持久化层**：保存任务、运行、事件、审批、记忆、产物和审计记录。
+- **本地持久化层**：由 One 持有，保存任务、运行、事件、审批、记忆、产物和审计记录。
 
-不建议让 Unterm 与 Unzoo 各自维护一套完整的全局任务系统和通用大脑。平台必须只有一个全局控制平面，Unzoo 内部 Brain 应定位为“浏览器局部自动驾驶”。
+平台只能有一个全局控制平面，且它必须是产品自身而不是某个 Provider。Provider 拥有服务于自身独立使用的局部状态是正当的，但不对外充当全局真相；Unzoo 内部 Brain 定位为“浏览器局部自动驾驶”。
+
+授权是**两层纵深防御**，不是两套真相：One 决定「该不该做」，Provider 决定「能不能在我这里做」——Provider 不信任调用方，即使 One 声称已授权仍自行校验 lease 与 scope。
 
 ## 2. 产品目标
 
@@ -254,9 +262,9 @@ REST Audit、Workflow Evidence、Human Action Report 和 OpLogger 各自存在�
 └─────────────────────────────┬───────────────────────────────┘
                               │
 ┌─────────────────────────────▼───────────────────────────────┐
-│                        Unterm Core                           │
+│                    Unzoo One Core (one-core)                 │
 │                                                             │
-│ Task Engine        Brain Router       Memory                │
+│ Workspace          Task Engine        Brain Router          │
 │ Scheduler          Policy Engine      Artifact Registry     │
 │ Identity/Vault     Event Bus          Audit/Observability   │
 │ Provider Registry  Recovery           Cost/Quota Router     │
@@ -266,10 +274,10 @@ REST Audit、Workflow Evidence、Human Action Report 和 OpLogger 各自存在�
                │                              │
   ┌────────────┼─────────────┐       ┌────────┼──────────────┐
   │            │             │       │        │              │
-Codex SDK  Claude SDK   Gemini/ACP  Terminal  Unzoo         Connectors
-Codex CLI  Claude CLI   OpenCode    Files    Browser        Mail
-                                             Computer       Calendar
-                                             Profiles       Docs/IM
+Codex SDK  Claude SDK   Gemini/ACP  Unterm    Unzoo         Connectors
+Codex CLI  Claude CLI   OpenCode    Terminal  Browser        Mail
+                                    PTY/Files Computer       Calendar
+                                              Profiles       Docs/IM
 ```
 
 ## 5. 核心协议
@@ -379,131 +387,66 @@ provider.events
 | `financial` | 购买、支付、转账 | 每次审批 |
 | `destructive` | 删除、覆盖、撤销账号 | 每次审批并显示影响范围 |
 
-## 6. Unterm 产品需求
+## 6. 职责划分与 Issue 对照
 
-## P0
+> **2026-08-06 归属修订**：本节原为「Unterm 产品需求 U-001~U-007」，把 Task Engine、Brain Runtime、
+> Policy/Approval、Provider Registry、Audit/Artifact 全部指派给 Unterm。该划分已纠正。
 
-### U-001：True Headless Core
+### 6.1 划分原则
 
-要求：
+1. **控制平面必须是产品自身。** 平台能力寄生在某个 Provider 上，会导致：卸载该 Provider 等于卸载产品；
+   产品迭代要等 Provider 发版；不需要该 Provider 的用户被迫安装它。
+2. **Provider 提供能力并守住自己的门；One 决定何时使用该能力。**
+3. **授权两层，纵深防御。** One 决定「该不该做」，Provider 决定「能不能在我这里做」。
+4. **边界对象由 `contracts/v0` 统一定义**，三仓库共同冻结，任何一方不单独定义。
 
-- 独立于 GUI 启动。
-- 负责 MCP、PTY、Task Engine、Policy、Audit。
-- GUI 和 CLI 作为客户端连接。
-- 支持 Windows Service / macOS LaunchAgent。
+### 6.2 Unzoo One 自身实现（P0）
 
-验收：
+| 能力 | Issue |
+|---|---|
+| `contracts/v0` 跨仓库对象与错误 schema 冻结 | `unzoo-one#3` |
+| One Core 自有常驻运行时 | `unzoo-one#4` |
+| Durable Task Engine | `unzoo-one#5` |
+| Policy、Approval、Grant 与 Inbox | `unzoo-one#6` |
+| Provider Registry：发现、协商、租约与编排 | `unzoo-one#7` |
+| Artifact Registry 与跨 Provider 证据链 | `unzoo-one#8` |
+| Workspace Context & Isolation | `unzoo-one#9` |
+| Brain Router：多脑路由、成本配额与 handoff | `unzoo-one#10` |
+| Tool Routing：强制意图路由 | `unzoo-one#11` |
+| Distribution & Runtime Supervisor | `unzoo-one#12` |
+| 平台能力（记忆/触发器/连接器/模型路由/移动审批，P1） | `unzoo-one#13` |
 
-1. 不启动 GUI 可创建 PTY 并运行 Codex。
-2. 关闭 GUI，进行中的任务不受影响。
-3. 重启 Core 后未完成任务能够恢复或明确标记 interrupted。
-4. GUI 重新连接后能看到完整历史状态。
+### 6.3 Unterm 作为 Terminal Provider
 
-### U-002：Unified Brain Adapter Runtime
+| 能力 | Issue |
+|---|---|
+| 0.60 终端 parity gate（**唯一前置**） | `unterm#24` |
+| True Headless Core：终端会话与 MCP 脱离 GUI | `unterm#12` |
+| 终端内 Agent 会话的结构化事件流 | `unterm#13` |
+| Terminal Action Gateway：唯一本地执行闸门 | `unterm#15` |
+| PTY 授权旁路修复 | `unterm#16`（已完成） |
+| Terminal 持久化动作日志 | `unterm#18` |
+| Managed Agent 约束：不得绕过 Gateway | `unterm#22` |
+| Path Scope 强制校验 | `unterm#26` |
+| Provider Manifest、Lease 与 Task Context 接入 | `unterm#27` |
+| 可被托管的运行时契约 | `unterm#28` |
 
-要求：
+Epic：`unterm#20`。Unterm 不实现通用 Task 引擎、Provider Registry、Workspace 模型、
+Artifact Registry、Memory/Scheduler/Connector/Model Router 与三进程 Supervisor。
 
-- 支持 SDK、JSONL CLI、ACP 等 Adapter。
-- 标准事件流、取消、恢复、审批和用量统计。
-- 同一 Task 可以切换或降级 Brain。
+**Unterm 是可选组件**：MVP 场景 A（网页调研生成报告）不涉及终端，用户不该被迫安装它。
 
-验收：
+### 6.4 同一能力的三方分层
 
-1. Codex SDK 与 Claude Agent SDK 输出相同事件结构。
-2. 可以中断一个 Brain 并从持久化上下文恢复。
-3. Tool Request 必须进入统一策略引擎。
-4. Adapter 崩溃不会导致 Task 数据丢失。
-
-### U-003：Durable Task Engine
-
-建议使用 SQLite，核心表：
-
-```text
-tasks
-runs
-steps
-brain_threads
-tool_calls
-approvals
-capability_grants
-artifacts
-events
-memories
-```
-
-验收：
-
-- 每个调用都有 `task_id`、`run_id`、`step_id` 和 `idempotency_key`。
-- 支持 retry、timeout、cancel、resume。
-- 重启后状态一致。
-- 重复提交同一 idempotency key 不重复产生副作用。
-
-### U-004：Central Policy and Approval Engine
-
-要求：
-
-- 基于 Agent、Task、Provider、Tool、资源范围和风险等级判断。
-- 支持 allow once、allow for task、always allow、deny。
-- 支持提交前审批。
-
-验收：
-
-- 拒绝 `external.publish` 后，直接调用、Workflow 和 Brain 都不能绕过。
-- 所有 PTY 写入路径进入同一个授权入口。
-- `allowed_patterns` 真正参与判断。
-- 未识别工具默认拒绝副作用操作。
-
-### U-005：修复 PTY 授权旁路
-
-覆盖：
-
-```text
-session.input
-exec.send
-exec.run
-exec.run_wait
-未来所有等价写入方法
-```
-
-验收：
-
-- 相同命令通过任一入口获得完全相同的策略结果。
-- `Always` 模式下任何 PTY 写入都不能绕过确认。
-- 审计明确区分 attempted、approved、denied、executed。
-
-### U-006：Provider Registry 与 Unzoo Binding
-
-要求：
-
-- 自动发现 Unzoo daemon。
-- 读取 Capability Manifest。
-- 协议版本协商。
-- 健康检查、事件订阅和租约管理。
-- 设置页一键绑定、暂停和撤销。
-
-验收：
-
-- Unzoo 升级或端口变化后能够重新发现。
-- Provider 离线时 Task 自动等待或降级。
-- 取消 Task 时同步取消 Unzoo 动作。
-
-### U-007：Persistent Audit and Artifact Registry
-
-验收：
-
-- 审计重启后可查询。
-- 敏感字段经过脱敏。
-- Screenshot、diff、报告、下载文件作为 Artifact 关联 Task。
-- 可导出单个 Task 的完整证据包。
-
-## P1
-
-- U-101：长期个人记忆与检索。
-- U-102：Cron、Webhook、文件变化、邮件、日历触发器。
-- U-103：模型路由、成本、配额和自动降级。
-- U-104：移动端通知、接管和审批。
-- U-105：邮件、日历、联系人、文档和即时通讯连接器。
-- U-106：个人助理 Dashboard，包括今日任务、等待审批、失败任务和产物。
+| 能力 | Unzoo One | Unterm | Unzoo |
+|---|---|---|---|
+| 任务 | 全局 Task/Run/Step（#5） | 局部会话记录（#12） | Provider durable state（`unzoo#101`） |
+| 授权 | Grant/Approval/Inbox（#6） | 本地执行闸门（#15） | Control Surface Enforcement（`unzoo#82`/`#97`） |
+| 路径 | Workspace 模型（#9） | path scope 强制（#26） | filesystem sandbox（`unzoo#108`） |
+| 编排 | Registry 主动面（#7） | manifest/lease 被动面（#27） | Provider binding（`unzoo#70`/`#107`） |
+| 产物 | Artifact Registry（#8） | 产物引用（#18） | Workflow evidence |
+| 大脑 | 多脑路由与计费（#10） | 终端内 Agent 事件流（#13） | 浏览器局部自动驾驶 |
+| 分发 | Supervisor 与安装（#12） | 可被托管（#28） | Managed Runtime（`unzoo#79`/`#105`） |
 
 ## 7. Unzoo 产品需求
 
@@ -658,16 +601,16 @@ evidence_policy
 
 ### 第一阶段：安全地跑起来
 
-1. 修复 Unterm PTY 授权旁路。
-2. 抽离 `unterm-core`。
-3. 建立 Durable Task Engine。
-4. 实现 Codex JSONL / SDK Brain Adapter。
-5. 实现 Provider Registry 和 Unzoo 绑定。
-6. Unzoo 增加结构化工具风险元数据。
+1. 冻结 `contracts/v0` 跨仓库契约（P0-Blocker）。
+2. 建立 `one-core` 自有常驻运行时。
+3. 在 One 中建立 Durable Task Engine 与 Policy/Approval。
+4. 实现 Provider Registry，先接 Unzoo Browser（不依赖终端即可跑通场景 A）。
+5. 实现 Brain Router 与 Codex/Claude Adapter。
+6. Unterm 完成 0.60 parity gate 后，作为 Terminal Provider 接入。
 
 ### 第二阶段：浏览器数字同事
 
-1. 用 Unterm 接管全局 Task、Policy、Memory。
+1. One 持有全局 Task、Policy、Memory。
 2. Unzoo 作为 Browser Provider。
 3. 接入 Workflow Evidence。
 4. 实现 Scheduler、通知、人工审批。
@@ -720,8 +663,12 @@ evidence_policy
 
 在目标架构中：
 
-- **Unterm 是数字同事的操作系统和控制中心。**
+- **Unzoo One 是数字同事本身——操作系统与控制中心。**
 - **Unzoo 是它操作网页和电脑的眼睛与手。**
+- **Unterm 是它操作终端的手，同时也是一个可独立存在的终端产品。**
 - **Codex、Claude 等是可以按任务切换的大脑。**
 
-只要坚持这一职责边界，就能避免两个产品重复造轮子，并形成比单一 Agent、单一模型或单纯浏览器自动化更强的完整系统。
+只要坚持这一职责边界，就能避免重复造轮子，并形成比单一 Agent、单一模型或单纯浏览器自动化更强的完整系统。
+
+关键在于：控制平面必须属于产品自身。把它托付给任何一个 Provider，产品就失去了独立演进的能力，
+而那个 Provider 也会被迫背上不属于它的复杂度。

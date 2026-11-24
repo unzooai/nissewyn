@@ -1,0 +1,14 @@
+{
+  "risk": "external_side_effect",
+  "side_effect": "external",
+  "resource_scopes": [
+    "browser"
+  ],
+  "sensitive_inputs": [
+    "fields.email",
+    "fields.phone"
+  ],
+  "reversible": false,
+  "approval_mode": "per_call",
+  "evidence_policy": "before_after"
+}

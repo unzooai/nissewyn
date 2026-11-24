@@ -1,0 +1,16 @@
+{
+  "schema": "workspace/capability-scope.schema.json",
+  "reason": "浏览器范围给了 act 却不限域名，等于全网可写。",
+  "instance": {
+    "browser": {
+      "profiles": [
+        "profile_work"
+      ],
+      "domains": [],
+      "access": [
+        "read",
+        "act"
+      ]
+    }
+  }
+}

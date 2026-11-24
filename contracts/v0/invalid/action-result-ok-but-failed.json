@@ -1,0 +1,31 @@
+{
+  "schema": "provider/action-result.schema.json",
+  "reason": "ok 为 true，state 却是 failed。",
+  "instance": {
+    "schema_version": "action_result.v0",
+    "action_id": "action_01JBQ8XGC25X0W7D8VABN1EH9J",
+    "tool_call_id": "call_01JBQ8XG9Z2T7S4A5RXYJ8BE6F",
+    "ok": true,
+    "state": "failed",
+    "error_code": "provider.timeout",
+    "error": null,
+    "retry_hint": null,
+    "result": {
+      "status": 200,
+      "confirmation_id": "Q-88213"
+    },
+    "evidence": {
+      "before": [
+        "artifact_01JBQ8XGE47Z2Y9F0XCDQ3GK1M"
+      ],
+      "after": [
+        "artifact_01JBQ8XGF58A3Z0G1YDER4HM2N"
+      ],
+      "diff": {
+        "url": "https://pricing.example.com/quote/thanks"
+      }
+    },
+    "started_at": "2026-09-03T02:12:06Z",
+    "finished_at": "2026-09-03T02:12:44Z"
+  }
+}
