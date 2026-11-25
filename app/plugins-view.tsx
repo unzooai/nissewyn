@@ -2,7 +2,7 @@
 
 import { FolderPlus, Puzzle, RefreshCw, RotateCcw, ScrollText, Settings2, Trash2 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
-import { t } from "./i18n";
+import { locale, t } from "./i18n";
 import type {
   RuntimeAgentModel,
   RuntimePlugin,
@@ -596,6 +596,15 @@ function RoleRow({
           ))}
           {value && !profiles.some((p) => p.id === value) ? <option value={value}>{value}</option> : null}
         </select>
+        {profiles.length === 0 ? (
+          <span className="plugins-hint">
+            {t("未检测到 Unzoo 浏览器身份。请先")}{" "}
+            <a href={locale() === "zh-CN" ? "https://unzoo.ai/zh/download" : "https://unzoo.ai/en/download"} target="_blank" rel="noreferrer">
+              {t("安装并打开 Unzoo 浏览器")}
+            </a>
+            {t("，然后点左侧刷新按钮。")}
+          </span>
+        ) : null}
       </label>
     );
   }

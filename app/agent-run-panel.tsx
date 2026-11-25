@@ -11,7 +11,7 @@ import {
   type AgentRunSettings,
 } from "./lib/agent-run-settings";
 import type { AgentRule, AgentRulePort, BrainAgent, BrainPort, RuntimeBrowser, RuntimeTaskPort } from "./lib/provider";
-import { t } from "./i18n";
+import { locale, t } from "./i18n";
 
 /**
  * 设置 › 智能体：任务交给 agent 时在哪个目录跑、是否受管，以及托管会话的
@@ -411,8 +411,23 @@ export function AgentRunPanel({
             )}
           </span>
           <span className="agent-run-signin-actions">
+            {browser && !browser.installed && (
+              <a
+                className="agent-browser-upgrade"
+                href={locale() === "zh-CN" ? "https://unzoo.ai/zh/download" : "https://unzoo.ai/en/download"}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t("下载 Unzoo 浏览器")}
+              </a>
+            )}
             {browser?.reachable && !browser.ready && (
-              <a className="agent-browser-upgrade" href="https://unzoo.ai/#pricing" target="_blank" rel="noreferrer">
+              <a
+                className="agent-browser-upgrade"
+                href={locale() === "zh-CN" ? "https://unzoo.ai/zh/pricing" : "https://unzoo.ai/en/pricing"}
+                target="_blank"
+                rel="noreferrer"
+              >
                 {t("升级 Unzoo")}
               </a>
             )}
@@ -517,7 +532,8 @@ export function AgentRunPanel({
 function browserSummary(browser: RuntimeBrowser | null, error: string | null): string {
   if (error) return t("读不到浏览器的情况：{error}", { error });
   if (!browser) return t("正在读取…");
-  if (!browser.installed) return t("这台电脑没有装 Unzoo 浏览器，智能体打不开网页。");
+  if (!browser.installed)
+    return t("这台电脑还没有装 Unzoo 浏览器。下载并打开一次后点“重新检查”即可让智能体操作网页（不装也能继续使用终端与本地文件能力）。");
   if (!browser.reachable) return t("Unzoo 浏览器没有在运行。打开它后点“重新检查”。");
   const plan =
     browser.maxProfiles !== undefined

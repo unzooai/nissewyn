@@ -90,12 +90,29 @@ fn unzoo_service_path() -> Option<std::path::PathBuf> {
     if let Some(path) = std::env::var_os("UNZOO_SERVICE").map(std::path::PathBuf::from) {
         return path.is_file().then_some(path);
     }
-    let candidates: &[&str] = if cfg!(windows) {
-        &[r"C:\Program Files\Unzoo Browser\services\unzoo-service.exe"]
-    } else {
-        &[]
-    };
-    candidates.iter().map(std::path::PathBuf::from).find(|p| p.is_file())
+    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+    #[cfg(windows)]
+    {
+        candidates.push(std::path::PathBuf::from(
+            r"C:\Program Files\Unzoo Browser\services\unzoo-service.exe",
+        ));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        candidates.push(std::path::PathBuf::from(
+            "/Applications/Unzoo Browser.app/Contents/MacOS/unzoo-service",
+        ));
+        if let Some(home) = std::env::var_os("HOME").map(std::path::PathBuf::from) {
+            candidates.push(
+                home.join("Applications")
+                    .join("Unzoo Browser.app")
+                    .join("Contents")
+                    .join("MacOS")
+                    .join("unzoo-service"),
+            );
+        }
+    }
+    candidates.into_iter().find(|p| p.is_file())
 }
 
 /// GET /api/console/capabilities — what an agent can use on this machine:
@@ -145,20 +162,34 @@ pub(crate) fn api_client_connect(body: &[u8]) -> Response {
 /// adds its server to every AI client it knows. Its server is its to manage;
 /// this only starts the program that does.
 pub(crate) fn api_client_browser() -> Response {
-    let script = unzoo_service_path()
-        .and_then(|service| service.parent().and_then(|dir| dir.parent()).map(|root| root.join("setup-mcp.ps1")))
-        .filter(|script| script.is_file());
-    let Some(script) = script else {
-        return Response::err(404, "Not Found", "Unzoo Browser's setup (setup-mcp.ps1) was not found");
+    #[cfg(windows)]
+    let (program, script, args): (&str, Option<std::path::PathBuf>, Vec<&str>) = {
+        let script = unzoo_service_path()
+            .and_then(|service| service.parent().and_then(|dir| dir.parent()).map(|root| root.join("setup-mcp.ps1")))
+            .filter(|script| script.is_file());
+        ("powershell", script, vec!["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
     };
-    let mut cmd = std::process::Command::new("powershell");
-    cmd.args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
-        .arg(&script)
-        .arg("-Silent")
-        .stdin(std::process::Stdio::null());
+    #[cfg(not(windows))]
+    let (program, script, args): (&str, Option<std::path::PathBuf>, Vec<&str>) = {
+        let script = unzoo_service_path()
+            .and_then(|service| {
+                service
+                    .parent()
+                    .and_then(|dir| dir.parent())
+                    .map(|contents| contents.join("Resources").join("setup-mcp.sh"))
+            })
+            .filter(|script| script.is_file());
+        ("bash", script, vec![])
+    };
+    let Some(script) = script else {
+        return Response::err(404, "Not Found", "Unzoo Browser's MCP setup script was not found");
+    };
+    let mut cmd = std::process::Command::new(program);
+    cmd.args(&args).arg(&script).stdin(std::process::Stdio::null());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
+        cmd.arg("-Silent");
         cmd.creation_flags(0x0800_0000);
     }
     let output = cmd.output();
