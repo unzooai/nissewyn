@@ -1,12 +1,13 @@
 "use client";
 
-import { Bot, ChevronDown, ChevronUp, FolderOpen, LoaderCircle, Plus, Search, SquareTerminal, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpToLine, Bot, ChevronDown, ChevronUp, CircleAlert, FolderOpen, LoaderCircle, Plus, Search, SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "./i18n";
 import { inDesktopApp, pickFolder } from "./lib/core-connection";
 import { readTerminalCwd } from "./lib/terminal-settings";
 import type { RuntimeTerminal, WorkspaceProvider } from "./lib/provider";
 import { continueReplay, startReplay, type ReplayState, type ReplayStep } from "./lib/terminal-replay";
+import { blockAlive, blockCommand, blockFailed, blockOutput, nearestBlock, parseShellMark, type CommandBlock } from "./lib/terminal-blocks";
 
 type Runtime = WorkspaceProvider["runtime"];
 
@@ -17,7 +18,19 @@ export type TerminalPageProps = {
   focus?: string;
   /** Bumped to ask for a new terminal on arrival ("打开终端"). */
   newRequest?: number;
+  /** Start a conversation with this request filled in (a failed command handed to the agent). */
+  onAskAgent?: (request: string) => void;
 };
+
+/** The request a failed command becomes: what ran, where, and what it said. */
+function failedCommandRequest(failure: FailedCommand, cwd?: string): string {
+  const parts = [t("这条命令在终端里没有成功（退出码 {code}），帮我找出原因并修好。", { code: failure.code })];
+  if (cwd) parts.push(t("文件夹：{cwd}", { cwd }));
+  if (failure.command) parts.push(t("命令：{command}", { command: failure.command }));
+  const fence = "```";
+  if (failure.output) parts.push(`${t("输出（最后一部分）：")}\n${fence}\n${failure.output}\n${fence}`);
+  return parts.join("\n\n");
+}
 
 const errorText = (failure: unknown) => (failure instanceof Error ? failure.message : String(failure));
 
@@ -25,7 +38,7 @@ const errorText = (failure: unknown) => (failure instanceof Error ? failure.mess
  * 终端页：人自己的终端就在 Nissewyn 里开、用、关，智能体在用的也在这里接手。
  * Nissewyn 没有独立的终端窗口，终端就是它的一页。
  */
-export function TerminalPage({ runtime, notify, focus, newRequest }: TerminalPageProps) {
+export function TerminalPage({ runtime, notify, focus, newRequest, onAskAgent }: TerminalPageProps) {
   const [list, setList] = useState<RuntimeTerminal[] | null>(null);
   const [selected, setSelected] = useState<string | null>(focus ?? null);
   const [creating, setCreating] = useState(false);
@@ -179,7 +192,13 @@ export function TerminalPage({ runtime, notify, focus, newRequest }: TerminalPag
 
       {current ? (
         <>
-          <LiveTerminal key={current} id={current} runtime={runtime} onSize={setSize} />
+          <LiveTerminal
+            key={current}
+            id={current}
+            runtime={runtime}
+            onSize={setSize}
+            onAskAgent={onAskAgent ? (failure) => onAskAgent(failedCommandRequest(failure, currentInfo?.cwd)) : undefined}
+          />
           <footer className="terminal-page-status">
             {currentInfo?.agent ? (
               <span className="is-agent">
@@ -285,7 +304,22 @@ function savedFontSize(): number {
  * something new. The person's keys go straight in; Ctrl+F searches, Ctrl+=
  * and Ctrl+- change the size, a right click pastes (or copies a selection).
  */
-function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; onSize?: (size: string) => void }) {
+/** A command that failed, as handed to the agent. */
+export type FailedCommand = { command: string; output: string; code: number };
+
+type Block = CommandBlock<import("@xterm/xterm").IMarker>;
+
+function LiveTerminal({
+  id,
+  runtime,
+  onSize,
+  onAskAgent,
+}: {
+  id: string;
+  runtime: Runtime;
+  onSize?: (size: string) => void;
+  onAskAgent?: (failure: FailedCommand) => void;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const searcher = useRef<import("@xterm/addon-search").SearchAddon | null>(null);
@@ -296,6 +330,25 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
   const [query, setQuery] = useState("");
   const [fontSize, setFontSize] = useState(FONT_DEFAULT);
   const fontRef = useRef(FONT_DEFAULT);
+  // One block per command the shell marked (OSC 133), oldest first.
+  const blocks = useRef<Block[]>([]);
+  const [failedCount, setFailedCount] = useState(0);
+  // The failed command shown in the bar under the terminal: the latest one, or the one jumped to.
+  const [failure, setFailure] = useState<Block | null>(null);
+
+  /** Scroll to the previous (up) or next command, or only failed ones. Reads refs only: stable. */
+  const jump = useCallback((up: boolean, onlyFailed: boolean) => {
+    const term = terminal.current;
+    if (!term) return;
+    const top = term.buffer.active.viewportY;
+    // From the bottom, "up" starts at the last line so the latest command is first.
+    const from = up && top >= term.buffer.active.baseY ? term.buffer.active.length : top;
+    const index = nearestBlock(blocks.current, from, up, onlyFailed);
+    if (index < 0) return;
+    const block = blocks.current[index];
+    term.scrollToLine(Math.max(0, block.prompt.line));
+    if (onlyFailed) setFailure(block);
+  }, []);
 
   const zoom = useCallback((next: number) => {
     const size = Math.min(FONT_MAX, Math.max(FONT_MIN, next));
@@ -325,12 +378,19 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
     let flushTimer: number | undefined;
     let resizeTimer: number | undefined;
     let sentSize = "";
+    // False while what was printed before the page opened is replayed.
+    let live = false;
     const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
     const write = (step: ReplayStep) =>
       new Promise<void>((resolve) => {
         if (!term) return resolve();
-        if (step.kind === "reset") term.reset();
+        if (step.kind === "reset") {
+          term.reset();
+          blocks.current = [];
+          setFailedCount(0);
+          setFailure(null);
+        }
         if (!step.data) return resolve();
         replaying = true;
         term.write(step.data, () => {
@@ -404,6 +464,8 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
         minimumContrastRatio: 1,
         allowProposedApi: true,
         smoothScrollDuration: 0,
+        // Where failed commands and search matches show beside the scroll bar.
+        overviewRuler: { width: 8 },
         theme: THEME,
       });
       const fitter = new FitAddon();
@@ -415,6 +477,42 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
       created.loadAddon(new Unicode11Addon());
       created.unicode.activeVersion = "11";
       created.open(host.current);
+      // The shell's command marks: where each prompt, command and output
+      // starts, and the exit code when it ends.
+      created.parser.registerOscHandler(133, (data) => {
+        const shellMark = parseShellMark(data);
+        if (!shellMark) return false;
+        const list = blocks.current;
+        if (shellMark.kind === "A") {
+          const prompt = created.registerMarker(0);
+          if (prompt) list.push({ prompt });
+          // Trimmed out of the scrollback: forget them.
+          if (list.length > 64 && !blockAlive(list[0])) blocks.current = list.filter(blockAlive);
+          return true;
+        }
+        const block = list.at(-1);
+        if (!block) return true;
+        if (shellMark.kind === "B") {
+          const at = created.registerMarker(0);
+          if (at) block.command = { mark: at, x: created.buffer.active.cursorX };
+        } else if (shellMark.kind === "C") {
+          block.output = created.registerMarker(0);
+          if (live) setFailure(null);
+        } else if (block.output && block.code === undefined) {
+          block.end = created.registerMarker(0);
+          block.code = shellMark.code;
+          if (blockFailed(block)) {
+            const failedMark = created.registerDecoration({
+              marker: block.prompt,
+              overviewRulerOptions: { color: "#ff6b5e", position: "full" },
+            });
+            failedMark?.onRender((element) => element.classList.add("terminal-block-failed"));
+            setFailedCount((count) => count + 1);
+            if (live) setFailure(block);
+          }
+        }
+        return true;
+      });
       // The GPU renderer: crisp, fast with full-screen programs. Without
       // WebGL (or when the GPU drops it) the default renderer takes over.
       try {
@@ -433,7 +531,12 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
           created.clearSelection();
           return false;
         }
-        if (mod && key === "f") {
+        // Ctrl+Up / Ctrl+Down: the previous / next command (not inside full-screen programs).
+      if (mod && !event.shiftKey && (key === "arrowup" || key === "arrowdown") && created.buffer.active.type === "normal" && blocks.current.length) {
+        jump(key === "arrowup", false);
+        return false;
+      }
+      if (mod && key === "f") {
           setSearching(true);
           window.setTimeout(() => searchInput.current?.select(), 0);
           return false;
@@ -493,6 +596,7 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
       if (!first || !alive || !term) return !alive;
       await write({ kind: "reset", data: fromALineStart(first.text, first.start), state: { line: 0, written: "" } });
       term.scrollToBottom();
+      live = true;
       setStatus("ready");
       let offset = first.end;
       let asked = 0;
@@ -589,6 +693,13 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, runtime]);
 
+  const askAgent = (block: Block) => {
+    const term = terminal.current;
+    if (!term || !onAskAgent) return;
+    const buffer = term.buffer.active;
+    onAskAgent({ command: blockCommand(buffer, block), output: blockOutput(buffer, block), code: block.code ?? 1 });
+  };
+
   const find = (backwards: boolean) => {
     if (!query) return;
     const options = { decorations: { matchOverviewRuler: "#ffd36b", activeMatchColorOverviewRuler: "#ffd36b", matchBackground: "#3a4a72", activeMatchBackground: "#8a6d1f" } };
@@ -648,7 +759,47 @@ function LiveTerminal({ id, runtime, onSize }: { id: string; runtime: Runtime; o
       )}
       <div ref={host} className="terminal-page-host" hidden={status === "failed"} />
       {error && status === "ready" && <p className="terminal-page-error">{error}</p>}
+      {failure && (
+        <div className="terminal-page-failed" role="status">
+          <CircleAlert size={14} aria-hidden="true" />
+          <span>{t("命令没有成功（退出码 {code}）", { code: failure.code ?? "" })}</span>
+          {onAskAgent && (
+            <button type="button" onClick={() => askAgent(failure)}>
+              <Bot size={13} aria-hidden="true" /> {t("交给智能体看看")}
+            </button>
+          )}
+          <button
+            type="button"
+            className="terminal-page-failed-close"
+            onClick={() => {
+              setFailure(null);
+              terminal.current?.focus();
+            }}
+            aria-label={t("关闭")}
+            title={t("关闭")}
+          >
+            <X size={13} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       <div className="terminal-page-zoom" aria-label={t("字号")}>
+        <button type="button" onClick={() => jump(true, false)} aria-label={t("上一条命令")} title={t("上一条命令（Ctrl+↑）")}>
+          <ArrowUpToLine size={13} aria-hidden="true" />
+        </button>
+        <button type="button" onClick={() => jump(false, false)} aria-label={t("下一条命令")} title={t("下一条命令（Ctrl+↓）")}>
+          <ArrowDownToLine size={13} aria-hidden="true" />
+        </button>
+        {failedCount > 0 && (
+          <button
+            type="button"
+            className="terminal-page-zoom-failed"
+            onClick={() => jump(true, true)}
+            aria-label={t("上一条失败的命令")}
+            title={t("上一条失败的命令（共 {count} 条）", { count: failedCount })}
+          >
+            <CircleAlert size={13} aria-hidden="true" /> {failedCount}
+          </button>
+        )}
         <button type="button" onClick={() => zoom(fontSize - 1)} disabled={fontSize <= FONT_MIN} aria-label={t("字小一点")} title={t("字小一点（Ctrl+-）")}>
           A−
         </button>

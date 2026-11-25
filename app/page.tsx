@@ -1731,6 +1731,8 @@ export default function HomePage() {
   /** 对话页打开的那段对话；null 是“新对话”。 */
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversationNonce, setConversationNonce] = useState(0);
+  // A request to fill in when the new conversation opens (e.g. a failed command from the terminal).
+  const [conversationSeed, setConversationSeed] = useState<string | undefined>(undefined);
   const [inspectedRunTaskId, setInspectedRunTaskId] =
     useState<string | null>(null);
   const [inspectedRunId, setInspectedRunId] = useState<string | null>(null);
@@ -6976,6 +6978,7 @@ export default function HomePage() {
   function beginCreateTask() {
     // 装好的产品里，新建就是开一段新对话。
     if (runtimeMode) {
+      setConversationSeed(undefined);
       setConversationId(null);
       setConversationNonce((value) => value + 1);
       openView("home");
@@ -11277,6 +11280,7 @@ export default function HomePage() {
             selectedId={conversationId}
             onSelect={setConversationId}
             newNonce={conversationNonce}
+            newText={conversationSeed}
             onStart={startConversation}
             onFollowUp={sendConversationFollowUp}
             onStop={stopConversation}
@@ -13444,6 +13448,12 @@ export default function HomePage() {
             notify={setNotice}
             focus={terminalFocus}
             newRequest={terminalNewRequest}
+            onAskAgent={(request) => {
+              setConversationSeed(request);
+              setConversationId(null);
+              setConversationNonce((value) => value + 1);
+              openView("home");
+            }}
           />
         )}
 
