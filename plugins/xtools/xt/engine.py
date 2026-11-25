@@ -29,10 +29,37 @@ def halt(why, minutes):
 
 
 def on_unhealthy(state):
-    minutes = {'limited': 180, 'locked': 60 * 24 * 7, 'signed_out': 60 * 24, 'error': 30}.get(state, 60)
-    why = {'limited': msg('X 提示操作太频繁(限流)'), 'locked': msg('X 账号被锁或需要验证,请到浏览器里处理'),
+    if state == 'limited':
+        return _limited()
+    minutes = {'locked': 60 * 24 * 7, 'signed_out': 60 * 24, 'error': 30}.get(state, 60)
+    why = {'locked': msg('X 账号被锁或需要验证,请到浏览器里处理'),
            'signed_out': browser.signed_out_text(), 'error': msg('X 页面出错')}.get(state, state)
     halt(why, minutes)
+
+
+def _limited(now=None):
+    """X said too much, too fast. A person told that stops for the day; told again within the
+    week, they use X less for days, not the same as before the moment the pause is over:
+      first time in a week   no more X today (until the owner's next day, at least 3 hours)
+      second time            the same, then 3 days at half of everything
+      third time and on      2 days off, then a week at under a third"""
+    now = time.time() if now is None else now
+    strikes = [t for t in db.kv_get('limit_strikes') or [] if now - t < 7 * 86400] + [now]
+    db.kv_set('limit_strikes', strikes)
+    start = human.owner_window(now)[0]
+    until = start if start > now else human.owner_window(now + 86400)[0]
+    until = max(until, now + 3 * 3600)
+    n = len(strikes)
+    if n == 1:
+        why = msg('X 提示操作太频繁(限流):今天不再上 X')
+    else:
+        if n >= 3:
+            until = max(until, now + 2 * 86400)
+        factor, days = (0.5, 3) if n == 2 else (0.3, 7)
+        db.kv_set('slow', {'factor': factor, 'until': until + days * 86400, 'at': now})
+        why = msg('X 一周内第 {n} 次提示操作太频繁(限流):先停到 {until},之后 {days} 天只做平时的 {pct}%',
+                  n=n, until=clock.fmt_here(until), days=days, pct=int(factor * 100))
+    halt(why, max(1, round((until - now) / 60)))
 
 
 # ---- warm-up (养号期) ------------------------------------------------------------
@@ -108,6 +135,9 @@ def _warm_cap(kind, cap):
 def cap_left(kind):
     """How many more of this kind today, after warm-up, today's count and the hourly limit."""
     cap = _warm_cap(kind, env.setting('caps.' + kind) or 0)
+    f = human.slow_factor()
+    if f < 1:
+        cap = int(cap * f)
     if kind == 'post':
         done = db.count_today('posts', 'kind', 'post', done=('published',))
     else:
@@ -640,6 +670,41 @@ def _pick_watched(book, state):
     return random.choices(watch, weights)[0]
 
 
+# How much one visit and one day may read and load. A new account reads less: a person new
+# to X does not go through hundreds of posts a day, and X watches new accounts closest.
+READ = {'session': 40, 'glance': 12, 'day': 300, 'day_new': 150}
+PAGES = {'session': 2, 'glance': 1, 'day': 8}          # whole-page loads (see x.BUDGET)
+SEARCHES = {'day': 3, 'day_new': 1}
+
+
+def today_use():
+    """What has been read, loaded and searched today (the owner's day)."""
+    u = db.kv_get('use') or {}
+    if u.get('day') != human.day_key():
+        u = {'day': human.day_key(), 'posts': 0, 'pages': 0, 'searches': 0}
+    return u
+
+
+def _use(**n):
+    u = today_use()
+    for k, v in n.items():
+        u[k] = u.get(k, 0) + v
+    db.kv_set('use', u)
+
+
+def read_left(kind, book=None):
+    """How many posts this visit may still read today."""
+    new = is_new_account(book) or warmup() is not None
+    f = human.slow_factor()
+    day = int(READ['day_new' if new else 'day'] * f)
+    return max(0, min(int(READ.get(kind, READ['session']) * f), day - today_use()['posts']))
+
+
+def searches_left(book=None):
+    new = is_new_account(book) or warmup() is not None
+    return max(0, SEARCHES['day_new' if new else 'day'] - today_use()['searches'])
+
+
 def _pick_keyword(book):
     kws = book.get('keywords') or []
     if not kws:
@@ -689,30 +754,42 @@ def visit(v, plan=None):
     }
     limits = ({'reply': r('sessions.replies'), 'quote': 1, 'like': 3, 'follow': max(1, state['follows'])}
               if kind == 'session' else {'reply': 1, 'quote': 0, 'like': 1, 'follow': 0})
-    measured = db.one('SELECT 1 FROM snapshots WHERE at>?', (human._local_midnight(time.time()),))
-    plan = plan or human.moves(kind, bool(book.get('watch')), bool(book.get('keywords')), first_today=not measured)
+    plan = plan or human.moves(kind, bool(book.get('watch')), bool(book.get('keywords')), first_today=not measured_today())
     on_post = _like_while_reading(state)
+    # The visit's page loads: X is loaded once (if it is not open already) and then moved in.
+    pages = min(PAGES.get(kind, 1), max(0, PAGES['day'] - today_use()['pages']))
+    browser.LOADS['pages'] = 0
+    x.BUDGET['pages'] = pages
+
+    def want(lo, hi):
+        return min(random.randint(lo, hi), read_left(kind, book))
+
+    def took(posts):
+        _use(posts=len(posts))
+        return posts
     try:
-        if not same_account():            # this opens X, as a person does
+        if not same_account():            # this opens X when it is not open, as a person does
             return None
         for i, move in enumerate(plan):
             if i and time.time() > deadline:
                 break
+            if move in ('home', 'account', 'search') and read_left(kind, book) <= 0:
+                continue                  # read enough for now
             if move == 'home':
-                here = i == 0
-                _remember(x.read(None if here else x.X + '/home', random.randint(6, 18) if kind == 'session' else random.randint(3, 8),
-                                 max_scrolls=random.randint(3, 8), on_post=on_post), 'home')
+                n = want(6, 18) if kind == 'session' else want(3, 8)
+                _remember(took(x.read(x.X + '/home', n, max_scrolls=random.randint(3, 6), on_post=on_post, fresh=True)), 'home')
             elif move == 'notifications':
                 mentions(glance=kind == 'glance')
             elif move == 'account':
                 h = _pick_watched(book, state)
                 if h:
-                    _remember(x.posts_of(h, want=random.randint(3, 7), on_post=on_post), 'watch:' + h)
+                    _remember(took(x.posts_of(h, want=want(3, 7), on_post=on_post)), 'watch:' + h)
                     _maybe_follow_here(h, state)
             elif move == 'search':
-                k = _pick_keyword(book)
+                k = _pick_keyword(book) if searches_left(book) > 0 else None
                 if k:
-                    posts = [p for p in x.search(k, want=random.randint(6, 14), latest=human.chance(0.6), on_post=on_post)
+                    _use(searches=1)
+                    posts = [p for p in took(x.search(k, want=want(6, 12), latest=human.chance(0.6), on_post=on_post))
                              if not _redline_hit(p['text'])]
                     _remember(posts, 'kw:' + k)
             elif move == 'me':
@@ -720,13 +797,18 @@ def visit(v, plan=None):
             # Between moves, a few of the queued things, not all at once.
             if human.chance(0.55):
                 run_actions(limits, most=random.randint(1, 2), done=state['done'], check=False)
-            human.sleep(random.uniform(2, 9))
+            human.sleep(random.uniform(4, 15))
         if time.time() < deadline + 120:
             run_actions(limits, done=state['done'], check=False)
+    except x.OutOfPages:
+        pass                              # would have had to reload X again: the visit ends here
     except x.Unhealthy as e:
         on_unhealthy(e.state)
     except browser.BrowserError as e:
         db.log(msg('浏览器出错:{error}', error=of(e)), 'warn')
+    finally:
+        _use(pages=browser.LOADS['pages'])
+        x.BUDGET['pages'] = None
     done = state['done']
     if any(done.values()):
         db.log(msg('会话:回复 {reply}、引用 {quote}、点赞 {like}、关注 {follow}', **done))
@@ -735,7 +817,13 @@ def visit(v, plan=None):
 
 # ---- measuring and learning ---------------------------------------------------------
 
+def measured_today():
+    return db.one('SELECT 1 FROM snapshots WHERE at>?', (human._local_midnight(time.time()),)) is not None
+
+
 def measure():
+    """A look at the account's own page, once a day: the counts at the top and its latest
+    posts, on that one page. The replies tab only when it has replied lately."""
     book = db.playbook()
     handle = (book.get('learned') or {}).get('handle')
     if not handle:
@@ -745,13 +833,16 @@ def measure():
         db.run('INSERT INTO snapshots(at, followers, following) VALUES(?,?,?)', (time.time(), prof['followers'], prof.get('following')))
         book['learned']['profile'] = {**(book['learned'].get('profile') or {}), **prof}
         db.save_playbook(book)
-    for p in x.posts_of(handle, want=40, include_replies=True):
-        # our replies and quotes too: how they did, for the numbers page
-        db.run("UPDATE actions SET views=?, likes=?, replies=?, measured_at=? WHERE result_url=? AND kind IN ('reply','quote')",
-               (p['views'], p['likes'], p['replies'], time.time(), p['url']))
-        if not p['is_reply']:
-            db.run('UPDATE posts SET views=?, likes=?, replies=?, reposts=?, bookmarks=?, measured_at=? WHERE url=?',
-                   (p['views'], p['likes'], p['replies'], p['reposts'], p['bookmarks'], time.time(), p['url']))
+    for p in x.posts_of(handle, want=random.randint(8, 15)):
+        db.run('UPDATE posts SET views=?, likes=?, replies=?, reposts=?, bookmarks=?, measured_at=? WHERE url=?',
+               (p['views'], p['likes'], p['replies'], p['reposts'], p['bookmarks'], time.time(), p['url']))
+    replied = db.one("SELECT 1 FROM actions WHERE kind IN ('reply','quote') AND status='done' AND result_url IS NOT NULL "
+                     "AND done_at>?", (time.time() - 3 * 86400,))
+    if replied:
+        for p in x.posts_of(handle, want=random.randint(5, 8), include_replies=True):
+            # our replies and quotes: how they did, for the numbers page
+            db.run("UPDATE actions SET views=?, likes=?, replies=?, measured_at=? WHERE result_url=? AND kind IN ('reply','quote')",
+                   (p['views'], p['likes'], p['replies'], time.time(), p['url']))
     db.log(msg('记录数据:粉丝 {n}', n=prof.get('followers')))
 
 

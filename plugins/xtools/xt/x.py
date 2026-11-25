@@ -55,11 +55,26 @@ READ_POSTS = r"""
 })()
 """
 
+# What X itself says on the page -- its notices, alerts, dialogs and the column's own
+# messages -- never what people wrote: posts, names, bios, trends and the composer are left
+# out, so a post that talks about rate limits (common in this niche) is not taken for one.
 HEALTH = r"""
 (() => {
-  const p = location.pathname, txt = (document.body ? document.body.innerText : '').slice(0, 4000);
+  const p = location.pathname;
   if (/^\/account\/access|^\/account\/suspended/.test(p)) return 'locked';
   if (/^\/(i\/flow\/)?login/.test(p) || document.querySelector('a[href="/login"][data-testid="loginButton"]')) return 'signed_out';
+  const skip = 'article, [data-testid="tweetText"], [data-testid="UserDescription"], [data-testid="UserName"], ' +
+               '[data-testid="UserCell"], [data-testid="trend"], [data-testid^="tweetTextarea"], [contenteditable="true"]';
+  const roots = [...document.querySelectorAll('[data-testid="toast"], [role="alert"], [role="dialog"], [data-testid="primaryColumn"], [data-testid="error-detail"]')];
+  let txt = '';
+  for (const r of roots) {
+    const w = document.createTreeWalker(r, NodeFilter.SHOW_TEXT,
+      {acceptNode: n => n.parentElement && n.parentElement.closest(skip) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT});
+    let n;
+    while ((n = w.nextNode()) && txt.length < 4000) txt += n.nodeValue + ' ';
+  }
+  if (!document.querySelector('[data-testid="primaryColumn"]'))   // X's bare error page
+    txt += (document.body ? document.body.innerText : '').slice(0, 2000);
   if (/rate limit|exceeded the (number|limit)|over the daily limit|请求过多|超出.*限制|制限を超え/i.test(txt)) return 'limited';
   if (/suspended|已被冻结|凍結/i.test(txt) && /account|账号|アカウント/i.test(txt) && p.split('/').length <= 2) return 'locked';
   if (/Something went wrong|出错了|問題が発生/i.test(txt) && !document.querySelector('article')) return 'error';
@@ -85,8 +100,10 @@ def _check():
 
 
 def me():
-    """The signed-in handle (without @), or None if X is not signed in."""
-    b.go(X + '/home')
+    """The signed-in handle (without @), or None if X is not signed in. Read off the page
+    that is open when X is open already: no reload just to see who is signed in."""
+    if not _on_x():
+        _load(X + '/home')
     # X has moved the "Profile" tab out of the side nav; the account button bottom-left
     # ("name\n@handle") is there either way, the old tab is the fallback.
     h = b.wait_for(r'''(() => {
@@ -102,11 +119,22 @@ def me():
     return h.strip('/') if h else None
 
 
-# Where the app's own links go: on X already, a person clicks them instead of typing an address.
-_NAV = {
-    '/home': 'a[data-testid="AppTabBar_Home_Link"]',
-    '/notifications': 'a[data-testid="AppTabBar_Notifications_Link"]',
-}
+# ---- moving around ---------------------------------------------------------------
+# A person loads X once and then moves inside it: the side bar, a name on a post, the time
+# of a post, the search box. A typed address reloads the whole app -- a burst of requests
+# X counts -- so it is the last resort, and a visit has only so many (`BUDGET`).
+
+BUDGET = {'pages': None}          # whole-page loads allowed in this visit; None = no limit
+
+
+class OutOfPages(RuntimeError):
+    """The visit has used its page loads; it ends here rather than reload X again."""
+
+
+def _load(url):
+    if BUDGET['pages'] is not None and b.LOADS['pages'] >= BUDGET['pages']:
+        raise OutOfPages(url)
+    b.go(url)
 
 
 def _on_x():
@@ -116,46 +144,123 @@ def _on_x():
         return False
 
 
-def open_page(url):
-    """Go to an X page the way a person would: by the app's own link when there is one
-    and X is already open, else by its address."""
-    path = url[len(X):] if url.startswith(X) else url
-    link = _NAV.get(path) or (_NAV['/notifications'] if path == '/notifications/mentions' else None)
-    if link and _on_x() and b.js('!!document.querySelector(%s)' % json.dumps(link)):
-        human.sleep(human.think())
-        b.click(link)
-        if path == '/notifications/mentions':
-            tab = 'a[href="/notifications/mentions"]'
-            if b.wait_for('!!document.querySelector(%s)' % json.dumps(tab), 8):
-                human.sleep(human.think())
-                b.click(tab)
-        if b.wait_for('location.pathname === %s' % json.dumps(path), 10):
+def _path(url):
+    return url[len(X):] if url.startswith(X) else url
+
+
+def _here():
+    return b.js('location.pathname + location.search') or ''
+
+
+def _same(a, b_):
+    norm = lambda u: urllib.parse.unquote(u or '').rstrip('/').lower()
+    return norm(a) == norm(b_)
+
+
+# A link on the page that goes to `path`: the side bar's first, then one in view, then any;
+# tagged so the human click (a real pointer) can find it, and brought into view.
+_FIND_LINK = r"""(() => {
+  const want = %s.toLowerCase().replace(/\/$/, '');
+  document.querySelectorAll('[data-xt-nav]').forEach(e => e.removeAttribute('data-xt-nav'));
+  const links = [...document.querySelectorAll('a[href]')].filter(a => {
+    const h = (a.getAttribute('href') || '').toLowerCase().replace(/\/$/, '');
+    return h === want && a.offsetParent !== null;
+  });
+  if (!links.length) return false;
+  const inView = a => { const r = a.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; };
+  const a = links.find(a => a.closest('nav')) || links.find(inView) || links[0];
+  a.setAttribute('data-xt-nav', a.closest('nav') ? 'nav' : '1');
+  if (!inView(a)) a.scrollIntoView({block: 'center', behavior: 'smooth'});
+  return true;
+})()"""
+
+
+def _arrived(path, seconds=10):
+    want = urllib.parse.unquote(path.split('?')[0]).rstrip('/').lower()
+    return bool(b.wait_for('decodeURIComponent(location.pathname).replace(/\\/$/, "").toLowerCase() === %s'
+                           % json.dumps(want), seconds))
+
+
+def _by_link(path):
+    """Click a link to `path` on the page, as a person does; True when it took us there."""
+    if not b.js(_FIND_LINK % json.dumps(path)):
+        return False
+    human.sleep(human.think())
+    b.click('a[data-xt-nav]')
+    return _arrived(path)
+
+
+def _route(path):
+    """Move inside the open app when nothing on the page links there (an account nobody on
+    the page mentions, say): the app's own router takes us, as its links do -- no reload.
+    True when the app followed (its title changes with the page)."""
+    before = b.js('document.title') or ''
+    b.js('(() => { history.pushState({}, "", %s); dispatchEvent(new PopStateEvent("popstate", {state: history.state})); })()'
+         % json.dumps(path))
+    if not _arrived(path, 5):
+        return False
+    return bool(b.wait_for('document.title !== %s' % json.dumps(before), 8))
+
+
+def open_page(url, fresh=False):
+    """Go to an X page the way a person would: stay when it is open already, else by a link
+    on the page, else through the app; by its address only when X is not open (or the app
+    will not follow). `fresh`: when already there, look at what is new -- back to the top,
+    and the side bar's link asked again (X then fetches the timeline's new posts only)."""
+    path = _path(url)
+    if _on_x():
+        if _same(_here(), path):
+            if fresh:
+                b.js('window.scrollTo({top: 0, behavior: "smooth"})')
+                b.pause(1.0, 2.5)
+                if b.js(_FIND_LINK % json.dumps(path)) and b.js('!!document.querySelector(\'a[data-xt-nav="nav"]\')'):
+                    human.sleep(human.think())
+                    b.click('a[data-xt-nav="nav"]')
+                    b.pause(1.5, 3.0)
+            return
+        if path == '/notifications/mentions' and not _same(_here(), '/notifications'):
+            _by_link('/notifications')
+            b.pause(1.0, 2.5)
+        if _by_link(path) or _route(path):
             b.pause(1.5, 3.5)
             return
-    b.go(url)
+    _load(X + path)
 
 
-def read(url, want, max_scrolls=8, keep=None, on_post=None):
+def read(url, want, max_scrolls=8, keep=None, on_post=None, fresh=False):
     """Read a page of posts as a person does: each new post is looked at for as long as it
     takes to read; the scroll is uneven and now and then goes back up. `on_post(post)` is
     called for each post as it is read (to like it there and then). None as `url` reads the
     page that is open."""
     if url:
-        open_page(url)
+        open_page(url, fresh=fresh)
     _check()
     b.wait_for('!!document.querySelector(\'article[data-testid="tweet"]\')', 15)
-    seen, out = set(), []
+    seen, out, idle = set(), [], 0
     for _ in range(max_scrolls):
+        new = 0
         for p in b.js(READ_POSTS) or []:
-            if p['url'] in seen or (keep and not keep(p)):
+            if p['url'] in seen:
                 continue
             seen.add(p['url'])
+            new += 1
+            if keep and not keep(p):
+                continue
             out.append(p)
             human.sleep(human.dwell(p.get('text'), p.get('has_media')))
             if on_post:
                 on_post(p)
         if len(out) >= want:
             break
+        if not new:
+            # Nothing new came in: wait for it the way one does, and after two such waits
+            # stop -- scrolling on regardless is what has X serve page after page.
+            idle += 1
+            if idle >= 2:
+                break
+            human.sleep(random.uniform(3, 7))
+        else:
+            idle = 0
         if human.chance(0.08):
             b.scroll(-random.randint(250, 600))      # back up to something just passed
         b.scroll()
@@ -168,7 +273,7 @@ def _collect(url, want, max_scrolls=8, keep=None):
 
 def profile(handle):
     """Followers, following, name, bio of a profile."""
-    b.go('%s/%s' % (X, handle))
+    open_page('%s/%s' % (X, handle))
     _check()
     got = b.wait_for(r"""(() => {
       const f = [...document.querySelectorAll('a[href$="/followers"], a[href$="/verified_followers"]')][0];
@@ -208,23 +313,62 @@ def _joined_at(text):
 
 def home(want=15):
     """The home timeline, read the way a person scrolls it."""
-    return _collect(X + '/home', want, max_scrolls=max(3, want // 4))
+    return read(X + '/home', want, max_scrolls=max(3, want // 4), fresh=True)
 
 
-def posts_of(handle, want=40, include_replies=False, on_post=None):
+def posts_of(handle, want=12, include_replies=False, on_post=None):
     """Recent posts written by this account (not reposts), newest first."""
     keep = lambda p: p['handle'].lower() == handle.lower() and not p['repost_by'] and (include_replies or not p['is_reply'])
     url = '%s/%s%s' % (X, handle, '/with_replies' if include_replies else '')
-    return read(url, want, max_scrolls=max(4, want // 4), keep=keep, on_post=on_post)
+    return read(url, want, max_scrolls=max(3, want // 4), keep=keep, on_post=on_post)
 
 
 def mentions(want=20):
     return _collect(X + '/notifications/mentions', want, max_scrolls=4)
 
 
-def search(query, want=20, latest=True, on_post=None):
-    url = '%s/search?q=%s&src=typed_query%s' % (X, urllib.parse.quote(query), '&f=live' if latest else '')
-    return read(url, want, max_scrolls=4, keep=lambda p: not p['repost_by'], on_post=on_post)
+SEARCH_BOX = 'input[data-testid="SearchBox_Search_Input"]'
+
+
+def _search_box(query, latest):
+    """Search the way a person does: in the search box (the side bar's, or Explore's), sent,
+    then the Latest tab. True when the results are open."""
+    if not _on_x():
+        return False
+    box = '!!document.querySelector(%s)' % json.dumps(SEARCH_BOX)
+    if not b.js(box) and not _by_link('/explore'):
+        return False
+    if not b.wait_for(box, 8):
+        return False
+    human.sleep(human.think())
+    b.click(SEARCH_BOX)
+    # What a previous search left in the box goes first, as select-all and typing over does.
+    b.js(r"""(() => { const e = document.querySelector(%s); if (!e || !e.value) return;
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      set.call(e, ''); e.dispatchEvent(new Event('input', {bubbles: true})); })()""" % json.dumps(SEARCH_BOX))
+    b.type_text(SEARCH_BOX, query)
+    b.pause(0.6, 1.6)
+    b.js('(() => { const e = document.querySelector(%s); const f = e && e.closest("form");'
+         ' if (f) { if (f.requestSubmit) f.requestSubmit(); else f.submit(); } })()' % json.dumps(SEARCH_BOX))
+    if not _arrived('/search', 10):
+        return False
+    b.pause(1.5, 3.5)
+    if latest and 'f=live' not in _here():
+        tab = r"""(() => { document.querySelectorAll('[data-xt-nav]').forEach(e => e.removeAttribute('data-xt-nav'));
+          const a = document.querySelector('a[role="tab"][href*="f=live"]');
+          if (!a) return false; a.setAttribute('data-xt-nav', '1'); return true; })()"""
+        if b.js(tab):
+            human.sleep(human.think())
+            b.click('a[data-xt-nav]')
+            b.wait_for("location.search.includes('f=live')", 8)
+            b.pause(1.0, 2.5)
+    return True
+
+
+def search(query, want=12, latest=True, on_post=None):
+    if not _search_box(query, latest):
+        open_page('%s/search?q=%s&src=typed_query%s' % (X, urllib.parse.quote(query), '&f=live' if latest else ''))
+    return read(None, want, max_scrolls=4, keep=lambda p: not p['repost_by'], on_post=on_post)
 
 
 def thread_context(url, want=6):
@@ -315,7 +459,12 @@ def _send(button='tweetButton'):
 
 
 def _latest_own_url(handle, after, near_text=''):
-    """The URL of the post we just made: newest of ours since `after`."""
+    """The URL of the post we just made: the "View" link in X's own notice while it is up,
+    else the newest of ours since `after` on our replies page."""
+    href = b.wait_for('(() => { const a = document.querySelector(\'[data-testid="toast"] a[href*="/status/"]\');'
+                      ' return a ? a.getAttribute("href") : ""; })()', 4)
+    if href:
+        return X + href
     for p in posts_of(handle, want=6, include_replies=True):
         if p['at'] >= after - 120 and (not near_text or _norm(near_text)[:20] in _norm(p['text'])):
             return p['url']
@@ -346,7 +495,7 @@ def post(parts, handle=None, image=None, dry_run=False):
 
 def _post_one(text, handle=None, image=None, dry_run=False):
     started = time.time()
-    b.go(X + '/compose/post')
+    open_page(X + '/compose/post')
     _check()
     if not b.wait_for(DIALOG_OPEN, 15):
         return {'ok': False, 'error': 'composer-not-found'}
@@ -359,15 +508,16 @@ def _post_one(text, handle=None, image=None, dry_run=False):
         return {'ok': True, 'dry_run': True}
     if not _send('tweetButton'):
         return {'ok': False, 'error': 'send-failed'}
+    url = _latest_own_url(handle, started, text) if handle else ''
     b.pause(2, 4)
     _check()
-    return {'ok': True, 'url': _latest_own_url(handle, started, text) if handle else ''}
+    return {'ok': True, 'url': url}
 
 
 def reply(url, text, handle=None, dry_run=False):
     sid = _status_id(url)
     started = time.time()
-    b.go(url)
+    open_page(url)
     _check()
     if not b.wait_for(_main_article_js(sid, 'return !!art.querySelector(\'[data-testid="reply"]\');'), 15):
         return {'ok': False, 'error': 'post-not-found'}
@@ -382,9 +532,10 @@ def reply(url, text, handle=None, dry_run=False):
         return {'ok': True, 'dry_run': True}
     if not _send('tweetButton'):
         return {'ok': False, 'error': 'send-failed'}
+    url = _latest_own_url(handle, started, text) if handle else ''
     b.pause(2, 4)
     _check()
-    return {'ok': True, 'url': _latest_own_url(handle, started, text) if handle else ''}
+    return {'ok': True, 'url': url}
 
 
 def quote(url, text, handle=None, dry_run=False):
@@ -394,7 +545,11 @@ def quote(url, text, handle=None, dry_run=False):
 
 def like(url, dry_run=False):
     sid = _status_id(url)
-    b.go(url)
+    if _on_x() and _tag(sid, 'unlike'):
+        return {'ok': True, 'already': True}
+    if _on_x() and _tag(sid, 'like'):
+        return like_here(url, dry_run=dry_run)      # it is on the page open now
+    open_page(url)
     _check()
     state = b.wait_for(_main_article_js(sid, 'return art.querySelector(\'[data-testid="unlike"]\') ? "liked" : '
                                              '(art.querySelector(\'[data-testid="like"]\') ? "can" : null);'), 15)
@@ -431,8 +586,7 @@ def like_here(url, dry_run=False):
 
 def follow(handle, dry_run=False, here=False):
     """Follow from the account's own page; `here` when that page is already open."""
-    if not (here and (b.js('location.pathname') or '').lower().rstrip('/') == '/' + handle.lower()):
-        b.go('%s/%s' % (X, handle))
+    open_page('%s/%s' % (X, handle))
     _check()
     # The header button names the account: aria-label "Follow @handle".
     find = r"""(() => { const h = %s.toLowerCase();

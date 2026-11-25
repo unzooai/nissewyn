@@ -65,6 +65,19 @@ def _weight(ts):
     return _HOURLY[hour] * (1.0 if clock.audience_awake(ts) else 0.4)
 
 
+def slowdown(now=None):
+    """After X has rate-limited the account more than once in a week it does less for a
+    while: {'factor': 0-1, 'until'}; None when it is back to normal."""
+    now = time.time() if now is None else now
+    s = db.kv_get('slow')
+    return s if s and s.get('until', 0) > now else None
+
+
+def slow_factor(now=None):
+    s = slowdown(now)
+    return s['factor'] if s else 1.0
+
+
 def plan_day(ts=None, rnd=None):
     """Today's visits: [{'at', 'kind': 'session'|'glance', 'minutes'}], in time order."""
     ts = time.time() if ts is None else ts
@@ -73,6 +86,9 @@ def plan_day(ts=None, rnd=None):
     light = rnd.random() < 0.13              # some days you are just busier
     sessions = max(0, (env.setting('sessions.per_day') or 0) + rnd.choice([-1, 0, 0, 0, 1]))
     glances = rnd.choice([1, 2, 2, 3])
+    f = slow_factor(ts)
+    if f < 1:
+        sessions, glances = max(1, round(sessions * f)) if sessions else 0, min(glances, 1)
     if light:
         sessions, glances = max(1, sessions // 2) if sessions else 0, rnd.choice([0, 1])
     slots = [start + i * SLOT for i in range(int((end - start) // SLOT))]

@@ -173,5 +173,174 @@ class Follows(unittest.TestCase):
         self.assertLessEqual(follows, {'simonw', 'browser_use'})
 
 
+class FakeX:
+    """The browser, as far as moving around X goes: where it is, what links the page has,
+    whether the app follows a route. Counts page loads, clicks and scrolls."""
+
+    def __init__(self, path=None, links=(), routes=True, posts=()):
+        self.path, self.links, self.routes = path, set(links), routes
+        self.loads, self.clicks, self.posts, self.scrolls = [], [], list(posts), 0
+        self.title, self.found = 'X', None
+
+    def js(self, expr, timeout=30):
+        if expr == 'location.hostname':
+            return 'x.com' if self.path else ''
+        if expr == 'location.pathname + location.search':
+            return self.path or ''
+        if expr == 'document.title':
+            return self.title
+        if 'const want' in expr:
+            want = json.loads(expr.split('const want = ')[1].split('.toLowerCase')[0])
+            self.found = next((l for l in self.links if l.lower() == want.lower()), None)
+            return bool(self.found)
+        if 'pushState' in expr:
+            if self.routes:
+                self.path = json.loads(expr.split('history.pushState({}, "", ')[1].split('); dispatch')[0])
+                self.title = 'moved'
+            return None
+        if 'document.title !==' in expr:
+            return self.title != json.loads(expr.split('!== ')[1])
+        if 'map(a =>' in expr:                       # the posts on the page
+            return self.posts[:3 + 3 * self.scrolls]
+        if 'toLowerCase() ===' in expr:            # arrived?
+            want = json.loads(expr.split('=== ')[1])
+            return (self.path or '').split('?')[0].rstrip('/').lower() == want
+        if 'signed_out' in expr:
+            return 'ok'
+        if 'SideNav_AccountSwitcher_Button' in expr:
+            return 'Unzooai'
+        if 'data-xt-nav="nav"' in expr:
+            return False
+        return True
+
+    def go(self, url, settle=None):
+        self.loads.append(url)
+        self.path = url[len('https://x.com'):]
+        browser_mod.LOADS['pages'] += 1
+
+    def click(self, selector):
+        self.clicks.append(selector)
+        if 'data-xt-nav' in selector and self.found:
+            self.path = self.found
+
+    def wait_for(self, expr, seconds=15, every=1.2):
+        return self.js(expr)
+
+    def scroll(self, px=None):
+        self.scrolls += 1
+
+
+from xt import browser as browser_mod  # noqa: E402
+
+
+class Moving(unittest.TestCase):
+    """X is loaded once and then moved in, by clicking, as a person does."""
+    NAMES = ('js', 'go', 'click', 'wait_for', 'pause', 'scroll')
+
+    def setUp(self):
+        self.saved = {k: getattr(browser_mod, k) for k in self.NAMES}
+        self.old_sleep = human.sleep
+        human.sleep = lambda s: None
+        browser_mod.LOADS['pages'] = 0
+
+    def tearDown(self):
+        for k, v in self.saved.items():
+            setattr(browser_mod, k, v)
+        human.sleep = self.old_sleep
+        x.BUDGET['pages'] = None
+
+    def use(self, fake):
+        for k in ('js', 'go', 'click', 'wait_for', 'scroll'):
+            setattr(browser_mod, k, getattr(fake, k))
+        browser_mod.pause = lambda lo=0, hi=0: None
+        return fake
+
+    def test_x_open_already_is_not_reloaded_to_see_who_is_signed_in(self):
+        f = self.use(FakeX('/search?q=mcp'))
+        x.me()
+        self.assertEqual(f.loads, [])
+
+    def test_x_not_open_is_loaded_once(self):
+        f = self.use(FakeX(None))
+        x.me()
+        self.assertEqual(f.loads, ['https://x.com/home'])
+
+    def test_a_link_on_the_page_is_clicked_not_typed(self):
+        f = self.use(FakeX('/home', links=['/simonw']))
+        x.open_page('https://x.com/simonw')
+        self.assertEqual((f.loads, f.path), ([], '/simonw'))
+        self.assertTrue(f.clicks)
+
+    def test_with_no_link_it_moves_inside_the_app(self):
+        f = self.use(FakeX('/home'))
+        x.open_page('https://x.com/simonw/status/1')
+        self.assertEqual((f.loads, f.path), ([], '/simonw/status/1'))
+
+    def test_the_address_is_the_last_resort_and_a_visit_has_few(self):
+        f = self.use(FakeX('/home', routes=False))
+        x.BUDGET['pages'] = 1
+        x.open_page('https://x.com/simonw')
+        self.assertEqual(f.loads, ['https://x.com/simonw'])
+        with self.assertRaises(x.OutOfPages):
+            x.open_page('https://x.com/browser_use')
+        self.assertEqual(len(f.loads), 1)
+
+    def test_the_page_open_already_is_stayed_on(self):
+        f = self.use(FakeX('/Unzooai'))
+        x.open_page('https://x.com/unzooai')
+        self.assertEqual((f.loads, f.clicks), ([], []))
+
+    def test_reading_stops_when_nothing_new_comes(self):
+        posts = [{'url': 'https://x.com/a/status/%d' % i, 'handle': 'a', 'text': 'hi', 'has_media': False} for i in range(6)]
+        f = self.use(FakeX('/home', posts=posts))
+        got = x.read(None, want=50, max_scrolls=20)
+        self.assertEqual(len(got), 6)
+        self.assertLessEqual(f.scrolls, 4, 'kept scrolling a page with nothing new')
+
+
+class Limited(unittest.TestCase):
+    """Told "too many" by X, it stops for the day; told again within the week, it does less for days."""
+
+    def setUp(self):
+        db.save_playbook(BOOK)
+        for k in ('limit_strikes', 'slow', 'halt'):
+            db.kv_set(k, None)
+
+    def tearDown(self):
+        for k in ('limit_strikes', 'slow', 'halt'):
+            db.kv_set(k, None)
+
+    def test_once_is_the_rest_of_the_day_and_no_slowdown(self):
+        now = local(0, 15)
+        engine._limited(now)
+        self.assertGreaterEqual(db.kv_get('halt')['until'], human.owner_window(now + 86400)[0] - 3600 - (time.time() - now))
+        self.assertIsNone(human.slowdown(now))
+
+    def test_again_within_the_week_slows_down_for_days(self):
+        now = local(0, 15)
+        engine._limited(now - 2 * 86400)
+        engine._limited(now)
+        s = human.slowdown(now)
+        self.assertEqual(s['factor'], 0.5)
+        self.assertGreater(s['until'], now + 3 * 86400)
+        engine._limited(now + 60)
+        s = human.slowdown(now)
+        self.assertEqual(s['factor'], 0.3)
+        self.assertGreater(s['until'], now + 9 * 86400)
+
+    def test_long_ago_limits_are_forgotten(self):
+        now = local(0, 15)
+        engine._limited(now - 8 * 86400)
+        engine._limited(now)
+        self.assertIsNone(human.slowdown(now))
+
+    def test_a_slowdown_means_fewer_visits_and_less_reading(self):
+        normal = sum(len(human.plan_day(local(d, 0), random.Random(d))) for d in range(10))
+        db.kv_set('slow', {'factor': 0.5, 'until': time.time() + 30 * 86400})
+        slow = sum(len(human.plan_day(local(d, 0), random.Random(d))) for d in range(10))
+        self.assertLess(slow, normal)
+        self.assertLessEqual(engine.read_left('session'), engine.READ['session'] // 2)
+
+
 if __name__ == '__main__':
     unittest.main()

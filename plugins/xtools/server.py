@@ -57,6 +57,10 @@ def state():
         'about_draft': db.kv_get('about_draft') or {},
         'handle': (book.get('learned') or {}).get('handle'),
         'profile_bound': bool(env.browser_profile()),
+        # An identity an AI client browses with ("mcp-..."): X then sees that client's
+        # browsing as the account's too. The account is better off with one of its own.
+        'profile_shared': (env.browser_profile() or '').startswith('mcp-'),
+        'slow': _slow_view(),
         'in_nissewyn': env.in_nissewyn(),
         'browser': browser.reachable(),
         'halted': i18n.render(engine.halted()) if engine.halted() else None,
@@ -119,6 +123,11 @@ def _status(book):
     if beat['idle'] == 'asleep':
         return out('on', '运行中 · 不在你上 X 的时段', msg('这段时间不刷 X、不互动,只按时发排好的原创'))
     return out('on', '运行中 · 等下一次上 X', msg('每天上 X 的次数、时间和时长都不一样'))
+
+
+def _slow_view():
+    s = human.slowdown()
+    return {'pct': int(s['factor'] * 100), 'until': clock.fmt_here(s['until'])} if s else None
 
 
 def _warmup_view(book):

@@ -12,6 +12,10 @@ from .i18n import msg
 BASE = 'http://127.0.0.1:9399'
 _LOCK = threading.RLock()     # one action at a time on the account: never two tabs racing
 _TAB = {'id': None}
+_ALIVE_FOR = 120              # a tab that answered this recently is taken to be there still
+# Whole-page loads (an address typed) and in-app moves, counted for the visit's budget: a
+# person on X loads it once and then moves by clicking, and every load is a burst of requests.
+LOADS = {'pages': 0, 'moves': 0}
 
 
 class BrowserError(RuntimeError):
@@ -66,16 +70,33 @@ def _alive(tab):
 
 
 def tab():
-    """Our own tab in the account's profile, made once and reused (never someone else's tab)."""
+    """Our own tab in the account's profile, made once and reused (never someone else's tab).
+    It is asked whether it is still there only when it has not answered for a while, not
+    before every step."""
     with _LOCK:
         profile = env.browser_profile()
         if not profile:
             raise BrowserError(msg('还没指定 X 账号用哪个浏览器身份(Nissewyn › 插件 › Xtools › 设置 › 账号与模型)'))
-        if _TAB['id'] and _TAB.get('profile') == profile and _alive(_TAB['id']):
-            return _TAB['id']
+        if _TAB['id'] and _TAB.get('profile') == profile:
+            if time.time() - _TAB.get('ok_at', 0) < _ALIVE_FOR or _alive(_TAB['id']):
+                return _TAB['id']
         d = _call('/api/v1/tabs/create', {'profile_id': profile, 'url': 'about:blank'})
-        _TAB.update(id=d['tab_id'], profile=profile)
+        _TAB.update(id=d['tab_id'], profile=profile, ok_at=time.time())
         return _TAB['id']
+
+
+def _on_tab(path, body, timeout):
+    """A call on our tab. When the tab has gone (closed by hand) it is made again once."""
+    t = tab()
+    try:
+        r = _call(path, dict(body, tab_id=t), timeout=timeout)
+    except BrowserError:
+        if _alive(t):
+            raise
+        _TAB['id'] = None
+        r = _call(path, dict(body, tab_id=tab()), timeout=timeout)
+    _TAB['ok_at'] = time.time()
+    return r
 
 
 def close():
@@ -89,26 +110,29 @@ def close():
 
 
 def go(url, settle=(2.5, 5.0)):
-    t = tab()
-    _call('/api/v1/navigate', {'tab_id': t, 'url': url}, timeout=60)
+    """Load a page by its address: the whole page again. Counted (see LOADS)."""
+    _on_tab('/api/v1/navigate', {'url': url}, timeout=60)
+    LOADS['pages'] += 1
     time.sleep(random.uniform(*settle))
-    return t
+    return _TAB['id']
 
 
 def js(expr, timeout=30):
-    r = _call('/api/v1/evaluate', {'tab_id': tab(), 'expression': expr}, timeout=timeout)
+    r = _on_tab('/api/v1/evaluate', {'expression': expr}, timeout=timeout)
     return r.get('result') if isinstance(r, dict) else r
 
 
-def wait_for(expr, seconds=15, every=0.6):
-    """Poll a JS expression until it is truthy; its value, or None."""
+def wait_for(expr, seconds=15, every=1.2):
+    """Look again now and then until a JS expression is truthy; its value, or None. The
+    first look is right away; after that about every `every` seconds, unevenly."""
     end = time.time() + seconds
-    while time.time() < end:
+    while True:
         v = js(expr)
         if v:
             return v
-        time.sleep(every)
-    return None
+        if time.time() >= end:
+            return None
+        time.sleep(min(max(0.2, end - time.time()), random.uniform(every * 0.7, every * 1.4)))
 
 
 def click(selector):
@@ -116,7 +140,7 @@ def click(selector):
     could not see a change afterwards (focusing a text box changes nothing visible); callers
     check the outcome they need themselves."""
     try:
-        return _call('/api/v1/human/click', {'tab_id': tab(), 'selector': selector}, timeout=60)
+        return _on_tab('/api/v1/human/click', {'selector': selector}, timeout=60)
     except BrowserError as e:
         if 'not_verified' in str(e):
             return None
@@ -125,7 +149,7 @@ def click(selector):
 
 def type_text(selector, text):
     """A person's typing into an element (rhythm, read-back)."""
-    return _call('/api/v1/human/type', {'tab_id': tab(), 'selector': selector, 'text': text}, timeout=180)
+    return _on_tab('/api/v1/human/type', {'selector': selector, 'text': text}, timeout=180)
 
 
 def paste(selector, text):
@@ -138,7 +162,7 @@ def paste(selector, text):
 
 
 def upload(selector, path):
-    return _call('/api/v1/upload', {'tab_id': tab(), 'selector': selector, 'file_path': path}, timeout=60)
+    return _on_tab('/api/v1/upload', {'selector': selector, 'file_path': path}, timeout=60)
 
 
 def pause(lo=0.8, hi=2.2):
@@ -146,7 +170,12 @@ def pause(lo=0.8, hi=2.2):
 
 
 def scroll(px=None):
-    """A flick of the wheel: uneven distance, smooth, a short settle. Negative goes back up."""
-    px = px or int(random.choice([random.uniform(300, 700), random.uniform(600, 1200), random.uniform(900, 1600)]))
+    """A flick of the wheel: part of a screen to most of one, smooth, then a moment for the
+    eye to land. Never more than a screen at once: what was skipped was never read, and
+    racing down a timeline is what makes X fetch page after page. Negative goes back up."""
+    if px is None:
+        screen = _TAB.get('screen') or js('window.innerHeight') or 800
+        _TAB['screen'] = screen
+        px = int(screen * random.choice([random.uniform(0.35, 0.6), random.uniform(0.5, 0.85), random.uniform(0.7, 1.0)]))
     js('window.scrollBy({top: %d, behavior: "smooth"})' % px)
-    pause(0.8, 2.6)
+    pause(1.4, 3.6)
