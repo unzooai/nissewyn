@@ -99,7 +99,7 @@ export function turnOutcome(events: BrainEvent[]): { done: boolean; state?: stri
   return { done: false };
 }
 
-const brainIds: readonly BrainId[] = ["claude-code", "codex-cli", "opencode", "agy"];
+const brainIds: readonly BrainId[] = ["claude-code", "codex-cli", "opencode", "agy", "api"];
 
 export function isBrainId(value: unknown): value is BrainId {
   return typeof value === "string" && (brainIds as readonly string[]).includes(value);

@@ -31,6 +31,7 @@ const AGENTS: { id: string; label: string }[] = [
   { id: "codex-cli", label: "Codex" },
   { id: "agy", label: "Antigravity CLI" },
   { id: "opencode", label: "OpenCode" },
+  { id: "api", label: "API Model (BYOK)" },
 ];
 /** 自己填模型名时选的那一项。 */
 const OTHER = "__other__";

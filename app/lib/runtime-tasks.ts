@@ -639,6 +639,7 @@ const agentNames: Record<string, string> = {
   "codex-cli": "Codex CLI",
   opencode: "OpenCode",
   agy: "Antigravity CLI (agy)",
+  api: "API Model (BYOK)",
 };
 
 /**
