@@ -164,6 +164,26 @@ pub fn signed_in_with(
             // not the same as not able to run.
             None
         }
+        "qwen-code" => {
+            if any_env(&["DASHSCOPE_API_KEY", "OPENAI_API_KEY", "QWEN_API_KEY"]) {
+                return Some((true, "api_key"));
+            }
+            Some((
+                file(home.join(".qwen").join("oauth_creds.json"))
+                    || file(home.join(".qwen").join("settings.json")),
+                "credentials_file",
+            ))
+        }
+        "kimi-code" => {
+            if any_env(&["MOONSHOT_API_KEY", "KIMI_API_KEY"]) {
+                return Some((true, "api_key"));
+            }
+            Some((
+                file(home.join(".kimi").join("config.toml"))
+                    || file(home.join(".kimi").join("credentials.json")),
+                "credentials_file",
+            ))
+        }
         // agy signs in with a Google account and keeps it in the OS
         // credential store; nothing outside it can tell.
         _ => None,
@@ -178,6 +198,8 @@ pub fn sign_in_command(id: &str) -> Option<&'static str> {
         "gemini-cli" => Some("gemini"),
         "opencode" => Some("opencode auth login"),
         "agy" => Some("agy"),
+        "qwen-code" => Some("qwen"),
+        "kimi-code" => Some("kimi"),
         _ => None,
     }
 }

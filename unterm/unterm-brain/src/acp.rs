@@ -379,6 +379,28 @@ impl AcpHost {
         }
     }
 
+    /// `qwen --acp`: Alibaba Qwen Code CLI over ACP.
+    pub fn qwen() -> Self {
+        Self {
+            id: "qwen",
+            subcommand: None,
+            flag: Some("--acp"),
+            env: Vec::new(),
+            state: Mutex::new(HostState::default()),
+        }
+    }
+
+    /// `kimi acp`: Moonshot Kimi Code CLI over ACP.
+    pub fn kimi() -> Self {
+        Self {
+            id: "kimi",
+            subcommand: Some("acp"),
+            flag: None,
+            env: Vec::new(),
+            state: Mutex::new(HostState::default()),
+        }
+    }
+
     fn request(state: &mut HostState, method: &str, params: Value) -> String {
         state.next_id += 1;
         json!({"jsonrpc": "2.0", "id": state.next_id, "method": method, "params": params})

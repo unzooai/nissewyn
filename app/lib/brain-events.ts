@@ -99,7 +99,7 @@ export function turnOutcome(events: BrainEvent[]): { done: boolean; state?: stri
   return { done: false };
 }
 
-const brainIds: readonly BrainId[] = ["claude-code", "codex-cli", "opencode", "agy", "api"];
+const brainIds: readonly BrainId[] = ["claude-code", "codex-cli", "opencode", "agy", "qwen-code", "kimi-code", "api"];
 
 export function isBrainId(value: unknown): value is BrainId {
   return typeof value === "string" && (brainIds as readonly string[]).includes(value);
@@ -128,5 +128,7 @@ export function agentForAdapter(adapter: string | undefined): BrainId {
   if (adapter === "codex") return "codex-cli";
   if (adapter === "opencode") return "opencode";
   if (adapter === "agy") return "agy";
+  if (adapter === "qwen") return "qwen-code";
+  if (adapter === "kimi") return "kimi-code";
   return "claude-code";
 }

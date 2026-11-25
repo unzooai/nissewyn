@@ -133,6 +133,8 @@ export function helperName(agent: string): string {
   if (id === "claude-code" || id === "claude") return "Claude Code";
   if (id === "opencode") return "OpenCode";
   if (id === "agy" || id === "antigravity") return "Antigravity";
+  if (id === "qwen-code" || id === "qwen") return "Qwen Code";
+  if (id === "kimi-code" || id === "kimi") return "Kimi Code";
   if (id === "api") return "API Model";
   return agent;
 }

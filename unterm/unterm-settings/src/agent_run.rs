@@ -46,6 +46,8 @@ fn hosted_args(agent_id: &str) -> Option<&'static [&'static str]> {
         "codex-cli" => Some(&[]),
         "opencode" => Some(&[]),
         "agy" | "antigravity" => Some(&[]),
+        "qwen-code" => Some(&[]),
+        "kimi-code" => Some(&[]),
         "api" => Some(&["api-agent"]),
         _ => None,
     }
@@ -528,6 +530,8 @@ pub(crate) fn agent_of(adapter: &str) -> Option<&'static str> {
         "codex" => Some("codex-cli"),
         "opencode" => Some("opencode"),
         "agy" => Some("agy"),
+        "qwen" => Some("qwen-code"),
+        "kimi" => Some("kimi-code"),
         _ => None,
     }
 }
@@ -542,6 +546,8 @@ fn adapter_of(agent_id: &str) -> &'static str {
         "codex-cli" => "codex",
         "opencode" => "opencode",
         "agy" | "antigravity" => "agy",
+        "qwen-code" => "qwen",
+        "kimi-code" => "kimi",
         _ => "generic",
     }
 }

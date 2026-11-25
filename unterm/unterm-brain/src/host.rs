@@ -166,6 +166,8 @@ pub fn host_for(adapter: &str) -> Option<Box<dyn HostProtocol>> {
         "opencode" => Some(Box::new(crate::acp::AcpHost::opencode())),
         "codex" => Some(Box::new(crate::codex_app::CodexAppHost::new())),
         "agy" => Some(Box::new(crate::acp::AcpHost::agy())),
+        "qwen" => Some(Box::new(crate::acp::AcpHost::qwen())),
+        "kimi" => Some(Box::new(crate::acp::AcpHost::kimi())),
         _ => None,
     }
 }

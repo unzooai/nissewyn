@@ -46,7 +46,7 @@ export const defaultAgentRunSettings: AgentRunSettings = {
   browserProfile: "",
 };
 
-const knownAgents: readonly string[] = ["claude-code", "codex-cli", "opencode", "agy", "api"];
+const knownAgents: readonly string[] = ["claude-code", "codex-cli", "opencode", "agy", "qwen-code", "kimi-code", "api"];
 
 export function parseAgentRunSettings(text: string | null): AgentRunSettings {
   if (!text) return { ...defaultAgentRunSettings };

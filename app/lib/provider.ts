@@ -145,7 +145,7 @@ export interface PolicyPort {
 }
 
 /** 能驱动的 brain。和 unterm agent manifest 里的 id 对齐。 */
-export type BrainId = "claude-code" | "codex-cli" | "opencode" | "agy" | "api";
+export type BrainId = "claude-code" | "codex-cli" | "opencode" | "agy" | "api" | "qwen-code" | "kimi-code";
 
 /** 内置 API Agent 配置（OpenAI / Anthropic 兼容协议）。 */
 export type RuntimeApiAgent = {
