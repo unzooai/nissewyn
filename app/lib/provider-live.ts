@@ -428,6 +428,67 @@ export function createLiveProvider(fallback: WorkspaceProvider): WorkspaceProvid
           reserveError: data.reserve_error ?? undefined,
         };
       },
+      async apiAgent() {
+        const data = await getUnterm<{
+          protocol?: string;
+          preset?: string;
+          base_url?: string;
+          model?: string;
+          api_key_set?: boolean;
+          configured?: boolean;
+        }>("/api/console/api-agent");
+        return {
+          protocol: data.protocol === "anthropic" ? "anthropic" : "openai",
+          preset: data.preset ?? "deepseek",
+          baseUrl: data.base_url ?? "https://api.deepseek.com/v1",
+          model: data.model ?? "deepseek-chat",
+          apiKeySet: data.api_key_set === true,
+          configured: data.configured === true,
+        };
+      },
+      async saveApiAgent(update) {
+        const data = await callUnterm<{
+          protocol?: string;
+          preset?: string;
+          base_url?: string;
+          model?: string;
+          api_key_set?: boolean;
+          configured?: boolean;
+        }>("/api/console/api-agent", {
+          protocol: update.protocol,
+          preset: update.preset,
+          base_url: update.baseUrl,
+          model: update.model,
+          api_key: update.apiKey,
+          clear_key: update.clearKey,
+        });
+        return {
+          protocol: data.protocol === "anthropic" ? "anthropic" : "openai",
+          preset: data.preset ?? "deepseek",
+          baseUrl: data.base_url ?? "",
+          model: data.model ?? "",
+          apiKeySet: data.api_key_set === true,
+          configured: data.configured === true,
+        };
+      },
+      async testApiAgent(update) {
+        const data = await callUnterm<{ ok?: boolean; latency_ms?: number; reply?: string }>(
+          "/api/console/api-agent/test",
+          update
+            ? {
+                protocol: update.protocol,
+                base_url: update.baseUrl,
+                model: update.model,
+                api_key: update.apiKey,
+              }
+            : {},
+        );
+        return {
+          ok: data.ok === true,
+          latencyMs: data.latency_ms ?? 0,
+          reply: data.reply ?? "OK",
+        };
+      },
       async terminalScreen(sessionId, fromLine, wait): Promise<TerminalScreen> {
         const data = await callUnterm<{
           session_id: string;

@@ -47,4 +47,30 @@ export const enPage12: Record<string, string> = {
   "文件夹：{cwd}": "Folder: {cwd}",
   "命令：{command}": "Command: {command}",
   "输出（最后一部分）：": "Output (the last part):",
+  // Built-in API Agent & Unzoo Browser onboarding
+  "API 模型配置（支持国产模型与自定义接口）": "API Model Configuration (China AI & Custom Endpoints)",
+  "已就绪：无需安装外部 CLI，直接通过 Nissewyn 受管终端、Unzoo 浏览器和插件工具执行任务。":
+    "Ready: run tasks directly through Nissewyn's governed terminal, Unzoo Browser and plugin tools without installing an external CLI.",
+  "选一个厂商预设并填入 API Key，密钥仅存在本机受保护文件中，不会发送给我们的服务器。":
+    "Pick a provider preset and enter your API key. The key is stored locally in a protected file and never sent to our servers.",
+  "厂商预设": "Provider preset",
+  "接口协议": "Protocol",
+  "OpenAI 兼容（/chat/completions）": "OpenAI-compatible (/chat/completions)",
+  "Anthropic 兼容（/v1/messages）": "Anthropic-compatible (/v1/messages)",
+  "模型名": "Model",
+  "（已保存）": "(saved)",
+  "本机 Ollama 可留空": "Optional for local Ollama",
+  "已保存在本机，留空保持不变": "Saved locally — leave blank to keep",
+  "粘贴你的 API Key": "Paste your API key",
+  "API 模型配置已保存": "API model settings saved",
+  "保存失败：{error}": "Save failed: {error}",
+  "保存配置": "Save settings",
+  "连接成功（{ms}ms）：{reply}": "Connected ({ms}ms): {reply}",
+  "连接失败：{error}": "Connection failed: {error}",
+  "下载 Unzoo 浏览器": "Download Unzoo Browser",
+  "这台电脑还没有装 Unzoo 浏览器。下载并打开一次后点“重新检查”即可让智能体操作网页（不装也能继续使用终端与本地文件能力）。":
+    "Unzoo Browser is not installed yet. Download and open it once, then click “Check again” so agents can browse (terminal and local file tools still work without it).",
+  "未检测到 Unzoo 浏览器身份。请先": "No Unzoo Browser profiles found. Please",
+  "安装并打开 Unzoo 浏览器": "install and open Unzoo Browser",
+  "，然后点左侧刷新按钮。": ", then click the refresh button on the left.",
 };

@@ -46,7 +46,7 @@ export const defaultAgentRunSettings: AgentRunSettings = {
   browserProfile: "",
 };
 
-const knownAgents: readonly string[] = ["claude-code", "codex-cli", "opencode", "agy"];
+const knownAgents: readonly string[] = ["claude-code", "codex-cli", "opencode", "agy", "api"];
 
 export function parseAgentRunSettings(text: string | null): AgentRunSettings {
   if (!text) return { ...defaultAgentRunSettings };
@@ -88,7 +88,7 @@ export function writeAgentRunSettings(settings: AgentRunSettings): boolean {
 }
 
 /** 能受管的智能体：自带 shell 关掉，终端和浏览器换成我们的。 */
-const governedAgents: readonly string[] = ["claude-code", "codex-cli", "opencode"];
+const governedAgents: readonly string[] = ["claude-code", "codex-cli", "opencode", "api"];
 
 /**
  * 这次运行用什么模式。Claude Code、Codex、OpenCode 支持受管；别的 agent

@@ -20,6 +20,7 @@ clap.workspace = true
 clap_complete.workspace = true
 dirs-next.workspace = true
 hostname.workspace = true
+http_req.workspace = true
 humantime.workspace = true
 image.workspace = true
 log.workspace = true

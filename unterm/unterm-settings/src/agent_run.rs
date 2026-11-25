@@ -46,6 +46,7 @@ fn hosted_args(agent_id: &str) -> Option<&'static [&'static str]> {
         "codex-cli" => Some(&[]),
         "opencode" => Some(&[]),
         "agy" | "antigravity" => Some(&[]),
+        "api" => Some(&["api-agent"]),
         _ => None,
     }
 }
@@ -60,7 +61,11 @@ pub(crate) fn supports_hosted(agent_id: &str) -> bool {
 /// Whether this agent has a governed preset: its own shell off, Unterm's in
 /// its place -- see [`governed_args`] and [`session_env`].
 pub(crate) fn supports_governed(agent_id: &str) -> bool {
-    matches!(agent_id, "claude-code" | "codex-cli" | "opencode")
+    matches!(agent_id, "claude-code" | "codex-cli" | "opencode" | "api")
+}
+
+pub(crate) fn cli_binary_path() -> Option<std::path::PathBuf> {
+    unterm_cli_path()
 }
 
 /// Where `unterm-cli` is: next to this binary (an installed Unterm), one
@@ -408,6 +413,23 @@ fn governed_args(agent_id: &str, browser_profile: Option<&str>, helper: bool) ->
                 prompt,
             ])
         }
+        "api" => {
+            let mut mounted = serde_json::Map::new();
+            for server in &servers {
+                let mut spec = json!({"type": "stdio", "command": server.command, "args": server.args});
+                if !server.env.is_empty() {
+                    spec["env"] = Value::Object(server.env.iter().map(|(k, v)| (k.clone(), json!(v))).collect());
+                }
+                mounted.insert(server.name.clone(), spec);
+            }
+            Ok(vec![
+                "api-agent".into(),
+                "--mcp-config".into(),
+                json!({"mcpServers": mounted}).to_string(),
+                "--append-system-prompt".into(),
+                prompt,
+            ])
+        }
         "codex-cli" => {
             let mut out = Vec::new();
             for server in &servers {
@@ -516,7 +538,7 @@ pub(crate) fn adapter_name(agent_id: &str) -> &'static str {
 
 fn adapter_of(agent_id: &str) -> &'static str {
     match agent_id {
-        "claude-code" => "claude",
+        "claude-code" | "api" => "claude",
         "codex-cli" => "codex",
         "opencode" => "opencode",
         "agy" | "antigravity" => "agy",
@@ -633,9 +655,8 @@ pub(crate) fn session_command(agent_id: &str, body: &Value) -> Result<Vec<Value>
         let helper = body.get("helper").and_then(Value::as_bool).unwrap_or(false);
         match governed_args(agent_id, string_field(body, "browser_profile"), helper) {
             Ok(mut governed) => {
-                // Claude's preset is its whole command line; the others add
-                // theirs to the hosted mode's own arguments.
-                if agent_id != "claude-code" {
+                // Claude and built-in API presets carry their full command line.
+                if agent_id != "claude-code" && agent_id != "api" {
                     let mut all: Vec<String> = hosted_args(agent_id).unwrap_or(&[]).iter().map(|a| a.to_string()).collect();
                     all.append(&mut governed);
                     governed = all;

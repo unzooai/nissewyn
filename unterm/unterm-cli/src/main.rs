@@ -10,6 +10,7 @@ use clap::{Parser, ValueHint};
 use clap_complete::{generate as generate_completion, shells::Shell};
 
 mod agent;
+mod api_agent;
 mod client;
 mod cockpit_hooks;
 mod exec;
@@ -338,6 +339,12 @@ enum SubCommand {
     McpTrim(mcp_trim::McpTrimCommand),
 
     #[command(
+        name = "api-agent",
+        about = "Run Nissewyn's built-in OpenAI/Anthropic-compatible API agent over stream-json."
+    )]
+    ApiAgent(api_agent::ApiAgentCommand),
+
+    #[command(
         name = "quit",
         about = "Quit every Unterm window and the Core (ending its sessions), \
                  wait until they are gone, and exit non-zero if anything survived"
@@ -463,6 +470,7 @@ fn main() -> Result<()> {
         SubCommand::SetupAi(cmd) => run_setup_ai(cmd, opts.json),
         SubCommand::McpStdio(cmd) => run_mcp_stdio(cmd),
         SubCommand::McpTrim(cmd) => mcp_trim::run(cmd),
+        SubCommand::ApiAgent(cmd) => api_agent::run(cmd),
         SubCommand::Quit(cmd) => quit::run(cmd, opts.json),
         SubCommand::Update(cmd) => update::run(cmd, opts.json),
         SubCommand::Cli(cmd) => legacy::run_cli(cmd, opts.json),

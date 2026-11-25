@@ -7,6 +7,7 @@
 //! shared auth token.
 
 mod agent_run;
+pub mod api_agent;
 mod browser;
 pub mod clients;
 mod console_tasks;

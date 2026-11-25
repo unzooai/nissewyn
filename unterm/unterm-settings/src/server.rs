@@ -634,6 +634,9 @@ fn route(req: &Request, auth_token: &str, handler: &McpHandler) -> Response {
         ("POST", "/api/console/clients/browser") => super::agent_run::api_client_browser(),
         ("GET", "/api/console/run-settings") => super::console_tasks::api_settings_get(),
         ("POST", "/api/console/run-settings") => super::console_tasks::api_settings_set(&req.body),
+        ("GET", "/api/console/api-agent") => super::api_agent::api_get(),
+        ("POST", "/api/console/api-agent") => super::api_agent::api_set(&req.body),
+        ("POST", "/api/console/api-agent/test") => super::api_agent::api_test(&req.body),
         ("GET", "/api/console/helpers") => Response::ok_json(json!({
             "helpers": super::helpers::all_helpers_summary(),
             "active_count": super::helpers::active_count(),

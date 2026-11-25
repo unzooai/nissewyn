@@ -145,7 +145,26 @@ export interface PolicyPort {
 }
 
 /** 能驱动的 brain。和 unterm agent manifest 里的 id 对齐。 */
-export type BrainId = "claude-code" | "codex-cli" | "opencode" | "agy";
+export type BrainId = "claude-code" | "codex-cli" | "opencode" | "agy" | "api";
+
+/** 内置 API Agent 配置（OpenAI / Anthropic 兼容协议）。 */
+export type RuntimeApiAgent = {
+  protocol: "openai" | "anthropic";
+  preset: string;
+  baseUrl: string;
+  model: string;
+  apiKeySet: boolean;
+  configured: boolean;
+};
+
+export type RuntimeApiAgentUpdate = {
+  protocol?: "openai" | "anthropic";
+  preset?: string;
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string;
+  clearKey?: boolean;
+};
 
 /** 能交任务的一个 agent：这台机器上装了没有，能用哪些模式。 */
 export type BrainAgent = {
@@ -548,6 +567,10 @@ export interface RuntimeTaskPort {
   capabilities(): Promise<RuntimeCapabilities>;
   /** 智能体的浏览器身份。读的时候，额度有空又没指定别的，运行时会把专用身份建好。 */
   browser(): Promise<RuntimeBrowser>;
+  /** 内置 API Agent 配置与连接测试。 */
+  apiAgent?(): Promise<RuntimeApiAgent>;
+  saveApiAgent?(update: RuntimeApiAgentUpdate): Promise<RuntimeApiAgent>;
+  testApiAgent?(update?: RuntimeApiAgentUpdate): Promise<{ ok: boolean; latencyMs: number; reply: string }>;
   /** 智能体用过的终端此刻的画面（只认对话记录里出现过的）。 */
   /** Its recent output, or with `fromLine` only what came since (that line included). */
   terminalScreen(sessionId: string, fromLine?: number, wait?: { known?: string; waitMs?: number }): Promise<TerminalScreen>;

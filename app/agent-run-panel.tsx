@@ -10,8 +10,40 @@ import {
   type AgentAutonomy,
   type AgentRunSettings,
 } from "./lib/agent-run-settings";
-import type { AgentRule, AgentRulePort, BrainAgent, BrainPort, RuntimeBrowser, RuntimeTaskPort } from "./lib/provider";
+import type {
+  AgentRule,
+  AgentRulePort,
+  BrainAgent,
+  BrainPort,
+  RuntimeApiAgent,
+  RuntimeBrowser,
+  RuntimeTaskPort,
+} from "./lib/provider";
 import { locale, t } from "./i18n";
+
+type ApiPreset = {
+  id: string;
+  label: string;
+  protocol: "openai" | "anthropic";
+  baseUrl: string;
+  model: string;
+  keyOptional?: boolean;
+};
+
+const API_PRESETS: ApiPreset[] = [
+  { id: "deepseek", label: "DeepSeek（深度求索）", protocol: "openai", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
+  { id: "qwen", label: "通义千问 Qwen（阿里云百炼）", protocol: "openai", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", model: "qwen-plus" },
+  { id: "kimi", label: "Kimi（月之暗面 Moonshot）", protocol: "openai", baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-auto" },
+  { id: "glm", label: "智谱 GLM（BigModel）", protocol: "openai", baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4-plus" },
+  { id: "minimax", label: "MiniMax", protocol: "openai", baseUrl: "https://api.minimax.chat/v1", model: "MiniMax-Text-01" },
+  { id: "doubao", label: "豆包 / 火山方舟（Volcengine）", protocol: "openai", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "doubao-1-5-pro-32k-250115" },
+  { id: "siliconflow", label: "硅基流动 SiliconFlow", protocol: "openai", baseUrl: "https://api.siliconflow.cn/v1", model: "deepseek-ai/DeepSeek-V3" },
+  { id: "openai", label: "OpenAI", protocol: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4.1" },
+  { id: "anthropic", label: "Anthropic Claude", protocol: "anthropic", baseUrl: "https://api.anthropic.com/v1", model: "claude-sonnet-4-20250514" },
+  { id: "openrouter", label: "OpenRouter", protocol: "openai", baseUrl: "https://openrouter.ai/api/v1", model: "anthropic/claude-sonnet-4" },
+  { id: "ollama", label: "Ollama（本机离线）", protocol: "openai", baseUrl: "http://127.0.0.1:11434/v1", model: "qwen2.5:14b", keyOptional: true },
+  { id: "custom", label: "自定义（OpenAI / Anthropic 兼容）", protocol: "openai", baseUrl: "", model: "" },
+];
 
 /**
  * 设置 › 智能体：任务交给 agent 时在哪个目录跑、是否受管，以及托管会话的
@@ -32,7 +64,7 @@ export function AgentRunPanel({
    * 有本机运行时就存在运行时里：定时任务在没有页面的时候也要知道交给谁、
    * 在哪个目录跑。没有（演示版）就存在这个浏览器里。
    */
-  runtime?: Pick<RuntimeTaskPort, "settings" | "saveSettings" | "browser"> | null;
+  runtime?: Pick<RuntimeTaskPort, "settings" | "saveSettings" | "browser" | "apiAgent" | "saveApiAgent" | "testApiAgent"> | null;
   notify: (message: string) => void;
   /** 桌面版：打开终端去登录。 */
   openTerminal?: () => void;
@@ -53,6 +85,32 @@ export function AgentRunPanel({
   const [browser, setBrowser] = useState<RuntimeBrowser | null>(null);
   const [browserError, setBrowserError] = useState<string | null>(null);
   const [browserChecking, setBrowserChecking] = useState(false);
+  const [apiCfg, setApiCfg] = useState<RuntimeApiAgent | null>(null);
+  const [apiPreset, setApiPreset] = useState("deepseek");
+  const [apiProtocol, setApiProtocol] = useState<"openai" | "anthropic">("openai");
+  const [apiBaseUrl, setApiBaseUrl] = useState("https://api.deepseek.com/v1");
+  const [apiModel, setApiModel] = useState("deepseek-chat");
+  const [apiKeyDraft, setApiKeyDraft] = useState("");
+  const [apiBusy, setApiBusy] = useState(false);
+  const [apiTestResult, setApiTestResult] = useState<string | null>(null);
+
+  const loadApiAgent = useCallback(async () => {
+    if (!runtime?.apiAgent) return;
+    try {
+      const cfg = await runtime.apiAgent();
+      setApiCfg(cfg);
+      setApiPreset(cfg.preset || "deepseek");
+      setApiProtocol(cfg.protocol);
+      setApiBaseUrl(cfg.baseUrl);
+      setApiModel(cfg.model);
+    } catch {
+      // Ignore on older runtimes without /api/console/api-agent
+    }
+  }, [runtime]);
+
+  useEffect(() => {
+    void loadApiAgent();
+  }, [loadApiAgent]);
 
   const loadBrowser = useCallback(async () => {
     if (!runtime) return;
@@ -257,7 +315,148 @@ export function AgentRunPanel({
         </p>
       )}
 
-      {chosen && chosen.installed && chosen.signedIn === false && (
+      {settings.agent === "api" && runtime?.saveApiAgent && (
+        <div className="setting-row agent-api-config">
+          <div className="agent-api-head">
+            <strong>
+              <KeyRound size={14} aria-hidden="true" /> {t("API 模型配置（支持国产模型与自定义接口）")}
+            </strong>
+            <small>
+              {apiCfg?.configured
+                ? t("已就绪：无需安装外部 CLI，直接通过 Nissewyn 受管终端、Unzoo 浏览器和插件工具执行任务。")
+                : t("选一个厂商预设并填入 API Key，密钥仅存在本机受保护文件中，不会发送给我们的服务器。")}
+            </small>
+          </div>
+          <div className="agent-api-grid">
+            <label>
+              <span>{t("厂商预设")}</span>
+              <select
+                value={apiPreset}
+                onChange={(event) => {
+                  const id = event.target.value;
+                  setApiPreset(id);
+                  const preset = API_PRESETS.find((p) => p.id === id);
+                  if (preset && id !== "custom") {
+                    setApiProtocol(preset.protocol);
+                    setApiBaseUrl(preset.baseUrl);
+                    setApiModel(preset.model);
+                  }
+                }}
+              >
+                {API_PRESETS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>{t("接口协议")}</span>
+              <select value={apiProtocol} onChange={(e) => setApiProtocol(e.target.value === "anthropic" ? "anthropic" : "openai")}>
+                <option value="openai">{t("OpenAI 兼容（/chat/completions）")}</option>
+                <option value="anthropic">{t("Anthropic 兼容（/v1/messages）")}</option>
+              </select>
+            </label>
+            <label>
+              <span>Base URL</span>
+              <input
+                type="text"
+                value={apiBaseUrl}
+                spellCheck={false}
+                placeholder="https://api.deepseek.com/v1"
+                onChange={(e) => setApiBaseUrl(e.target.value)}
+              />
+            </label>
+            <label>
+              <span>{t("模型名")}</span>
+              <input
+                type="text"
+                value={apiModel}
+                spellCheck={false}
+                placeholder="deepseek-chat"
+                onChange={(e) => setApiModel(e.target.value)}
+              />
+            </label>
+            <label className="agent-api-key-field">
+              <span>
+                API Key {apiCfg?.apiKeySet ? <small>{t("（已保存）")}</small> : null}
+              </span>
+              <input
+                type="password"
+                value={apiKeyDraft}
+                autoComplete="off"
+                placeholder={
+                  apiPreset === "ollama"
+                    ? t("本机 Ollama 可留空")
+                    : apiCfg?.apiKeySet
+                      ? t("已保存在本机，留空保持不变")
+                      : t("粘贴你的 API Key")
+                }
+                onChange={(e) => setApiKeyDraft(e.target.value)}
+              />
+            </label>
+          </div>
+          <div className="agent-api-actions">
+            <button
+              type="button"
+              disabled={apiBusy}
+              onClick={async () => {
+                if (!runtime?.saveApiAgent) return;
+                setApiBusy(true);
+                setApiTestResult(null);
+                try {
+                  const saved = await runtime.saveApiAgent({
+                    preset: apiPreset,
+                    protocol: apiProtocol,
+                    baseUrl: apiBaseUrl.trim(),
+                    model: apiModel.trim(),
+                    apiKey: apiKeyDraft.trim() || undefined,
+                  });
+                  setApiCfg(saved);
+                  setApiKeyDraft("");
+                  notify(t("API 模型配置已保存"));
+                  void loadAgents(true);
+                } catch (err) {
+                  notify(t("保存失败：{error}", { error: err instanceof Error ? err.message : String(err) }));
+                } finally {
+                  setApiBusy(false);
+                }
+              }}
+            >
+              {t("保存配置")}
+            </button>
+            {runtime?.testApiAgent && (
+              <button
+                type="button"
+                disabled={apiBusy}
+                onClick={async () => {
+                  if (!runtime?.testApiAgent) return;
+                  setApiBusy(true);
+                  setApiTestResult(null);
+                  try {
+                    const res = await runtime.testApiAgent({
+                      protocol: apiProtocol,
+                      baseUrl: apiBaseUrl.trim(),
+                      model: apiModel.trim(),
+                      apiKey: apiKeyDraft.trim() || undefined,
+                    });
+                    setApiTestResult(t("连接成功（{ms}ms）：{reply}", { ms: res.latencyMs, reply: res.reply }));
+                  } catch (err) {
+                    setApiTestResult(t("连接失败：{error}", { error: err instanceof Error ? err.message : String(err) }));
+                  } finally {
+                    setApiBusy(false);
+                  }
+                }}
+              >
+                {t("测试连接")}
+              </button>
+            )}
+            {apiTestResult && <span className="agent-api-test-msg">{apiTestResult}</span>}
+          </div>
+        </div>
+      )}
+
+      {chosen && chosen.id !== "api" && chosen.installed && chosen.signedIn === false && (
         <div className="setting-row agent-run-signin" role="status">
           <span>
             <strong>

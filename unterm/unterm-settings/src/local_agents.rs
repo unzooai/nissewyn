@@ -53,13 +53,26 @@ impl LocalAgent {
     }
 }
 
-static LOCAL_AGENTS: &[LocalAgent] = &[LocalAgent {
-    id: "agy",
-    name: "Antigravity CLI (agy)",
-    vendor: "Google",
-    homepage: "https://antigravity.google/docs/cli",
-    find: find_agy,
-}];
+static LOCAL_AGENTS: &[LocalAgent] = &[
+    LocalAgent {
+        id: "agy",
+        name: "Antigravity CLI (agy)",
+        vendor: "Google",
+        homepage: "https://antigravity.google/docs/cli",
+        find: find_agy,
+    },
+    LocalAgent {
+        id: "api",
+        name: "API Model (BYOK)",
+        vendor: "OpenAI / Anthropic / China AI",
+        homepage: "https://nissewyn.com/",
+        find: find_api_agent,
+    },
+];
+
+fn find_api_agent() -> Option<PathBuf> {
+    crate::agent_run::cli_binary_path()
+}
 
 pub fn local_agents() -> &'static [LocalAgent] {
     LOCAL_AGENTS
@@ -110,6 +123,7 @@ pub fn signed_in_with(
     let any_env = |keys: &[&str]| keys.iter().any(|key| env(key).is_some());
     let file = |path: PathBuf| std::fs::metadata(path).map(|m| m.is_file() && m.len() > 0).unwrap_or(false);
     match id {
+        "api" => Some((crate::api_agent::is_configured(), "api_key")),
         "claude-code" => {
             if any_env(&["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"]) {
                 return Some((true, "api_key"));
