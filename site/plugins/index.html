@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plugin Guide &amp; Development — Nissewyn</title>
+<meta name="description" content="How to install, configure, and build local plugins for Nissewyn with unzoo-plugin.json, control pages, settings forms, and MCP tools.">
+<link rel="canonical" href="https://nissewyn.com/plugins/">
+<meta name="theme-color" content="#13273f">
+<link rel="icon" href="/favicon.png">
+<link rel="icon" href="/mark.svg" type="image/svg+xml">
+<link rel="alternate" hreflang="en" href="https://nissewyn.com/plugins/">
+<link rel="alternate" hreflang="zh" href="https://nissewyn.com/zh/plugins/">
+<link rel="stylesheet" href="/styles.css?v=5">
+</head>
+<body>
+
+<nav class="nav"><div class="wrap">
+  <a class="brand" href="/"><img src="/mark.svg" alt="">Nissewyn</a>
+  <div class="nav-links">
+    <a href="/#how" class="hide-sm">How it works</a>
+    <a href="/plugins/" class="hide-sm">Plugins</a>
+    <a href="/#safety" class="hide-sm">Safety</a>
+    <a href="https://github.com/unzooai/nissewyn">GitHub</a>
+    <a class="lang" href="/zh/plugins/" hreflang="zh" lang="zh">中文</a>
+    <a class="nav-cta" href="/#download">Download v0.1.6</a>
+  </div>
+</div></nav>
+
+<header class="doc-hero">
+  <div class="wrap">
+    <span class="eyebrow">Plugin Guide · Developer Docs</span>
+    <h1>Build &amp; run local plugins in Nissewyn.</h1>
+    <p class="lede">A skill teaches an agent how to do a task. A plugin is a local program with its own control page, persistent state, settings form, and MCP tools — governed by the same approval rules.</p>
+    <div class="cta">
+      <a class="btn primary" href="#quickstart">5-minute quickstart</a>
+      <a class="btn" href="https://github.com/unzooai/nissewyn/tree/main/examples/plugins/notes">Notes template on GitHub</a>
+    </div>
+  </div>
+</header>
+
+<section id="use"><div class="wrap">
+  <div class="kicker">Using plugins</div>
+  <h2>Add any local plugin folder in seconds.</h2>
+  <div class="flow">
+    <div><h3>Open Plugins</h3><p>Go to <b>Plugins</b> in Nissewyn and click <b>Add plugin</b> in the left sidebar.</p></div>
+    <div><h3>Paste folder path</h3><p>Point to any folder containing <code>unzoo-plugin.json</code> (e.g. <code>plugins/xtools</code> or <code>examples/plugins/notes</code>).</p></div>
+    <div><h3>Bind roles &amp; settings</h3><p>Assign an Unzoo Browser identity and/or AI agent + model in the <b>Settings</b> tab.</p></div>
+    <div><h3>Turn it on</h3><p>Flip the switch in the header. Nissewyn launches the daemon, mounts its page, and exposes its MCP tools.</p></div>
+  </div>
+</div></section>
+
+<section id="quickstart" class="alt"><div class="wrap">
+  <div class="kicker">Quickstart</div>
+  <h2>One manifest, any language.</h2>
+  <p class="sub">Python, Node.js, Go, Rust — anything that serves HTTP on <code>UNZOO_PLUGIN_PORT</code> and/or speaks MCP JSON-RPC over stdio works out of the box.</p>
+  <div class="doc-grid">
+    <div class="card">
+      <h3>Folder layout</h3>
+      <pre class="doc-pre">my-plugin/
+├── unzoo-plugin.json   # Manifest (required)
+├── server.py           # Control page + /api/ping
+├── mcp_server.py       # Stdio MCP tools (optional)
+└── i18n/en.json        # Translations (optional)</pre>
+      <h3 style="margin-top:20px">Runtime environment variables</h3>
+      <ul class="doc-list">
+        <li><code>UNZOO_PLUGIN_ID</code> — plugin identifier</li>
+        <li><code>UNZOO_PLUGIN_DIR</code> — plugin folder path</li>
+        <li><code>UNZOO_PLUGIN_DATA</code> — persistent data folder</li>
+        <li><code>UNZOO_PLUGIN_PORT</code> — localhost HTTP port</li>
+        <li><code>UNZOO_PLUGIN_ROLES</code> — JSON role bindings</li>
+        <li><code>UNZOO_PLUGIN_SETTINGS</code> — JSON settings map</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Minimal <code>unzoo-plugin.json</code></h3>
+      <pre class="doc-pre">{
+  "id": "notes",
+  "name": "Notes",
+  "version": "0.1.0",
+  "description": "Local notes page and MCP tools.",
+  "run": {
+    "command": ["python3", "{dir}/server.py"],
+    "health": "/api/ping"
+  },
+  "page": "/",
+  "mcp": {
+    "command": ["python3", "{dir}/mcp_server.py"],
+    "tools": {
+      "list_notes": "read",
+      "add_note": "change"
+    }
+  },
+  "roles": {
+    "account": { "kind": "browser", "label": "Browser identity" },
+    "writer": { "kind": "agent", "label": "Writer" }
+  }
+}</pre>
+    </div>
+  </div>
+</div></section>
+
+<section id="spec"><div class="wrap">
+  <div class="kicker">Capabilities</div>
+  <h2>Declarative settings, risk tags, and i18n built in.</h2>
+  <div class="grid3">
+    <div class="card">
+      <h3>Auto-generated settings</h3>
+      <p>Declare <code>settings</code> in the manifest with types <code>bool</code>, <code>number</code>, <code>text</code>, <code>textarea</code>, <code>choice</code>, <code>list</code>, or <code>range</code>. Nissewyn renders the form, validates values, and restarts the plugin on save.</p>
+    </div>
+    <div class="card">
+      <h3>MCP risk governance</h3>
+      <p>Tag each MCP tool in <code>mcp.tools</code> with <code>read</code>, <code>change</code>, <code>run</code>, <code>send</code>, <code>pay</code>, or <code>delete</code>. Undeclared tools default to <code>send</code> and ask for user approval.</p>
+    </div>
+    <div class="card">
+      <h3>Bilingual UI (i18n)</h3>
+      <p>Point <code>i18n</code> to a JSON translation map for manifest labels. Nissewyn also opens your control page with <code>?lang=en</code> or <code>?lang=zh-CN</code>.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="alt"><div class="wrap">
+  <div class="kicker">Build with AI</div>
+  <h2>Let your agent write a plugin for you.</h2>
+  <p class="sub">Paste this prompt into Claude Code, Codex, Antigravity CLI, or OpenCode inside Nissewyn:</p>
+  <pre class="doc-pre">Read docs/plugin-development.md and examples/plugins/notes/.
+Build a new Nissewyn plugin in ~/my-plugins/rss-digest with:
+- unzoo-plugin.json (settings + MCP tools tagged read/change)
+- a local control page on UNZOO_PLUGIN_PORT storing state in UNZOO_PLUGIN_DATA
+- a stdio MCP server exposing list_feeds and add_feed.</pre>
+  <div class="cta" style="margin-top:24px">
+    <a class="btn primary" href="https://github.com/unzooai/nissewyn/blob/main/docs/plugin-development.md">Full Markdown Reference</a>
+    <a class="btn" href="/#download">Download Nissewyn v0.1.6</a>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <span>© 2026 Nissewyn · made by <a href="https://unzoo.ai/en/">Unzoo</a></span>
+  <div class="right">
+    <a href="/">Home</a>
+    <a href="https://github.com/unzooai/nissewyn/releases">Releases</a>
+    <a href="https://github.com/unzooai/nissewyn">GitHub</a>
+    <a href="/zh/plugins/" hreflang="zh" lang="zh">中文</a>
+  </div>
+</div></footer>
+
+</body>
+</html>

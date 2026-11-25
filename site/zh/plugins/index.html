@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>插件使用与开发指南 — Nissewyn</title>
+<meta name="description" content="如何在 Nissewyn 中安装、配置并开发自己的本地插件：unzoo-plugin.json 清单规范、控制页面、设置表单与 MCP 工具。">
+<link rel="canonical" href="https://nissewyn.com/zh/plugins/">
+<meta name="theme-color" content="#13273f">
+<link rel="icon" href="/favicon.png">
+<link rel="icon" href="/mark.svg" type="image/svg+xml">
+<link rel="alternate" hreflang="en" href="https://nissewyn.com/plugins/">
+<link rel="alternate" hreflang="zh" href="https://nissewyn.com/zh/plugins/">
+<link rel="stylesheet" href="/styles.css?v=5">
+</head>
+<body>
+
+<nav class="nav"><div class="wrap">
+  <a class="brand" href="/zh/"><img src="/mark.svg" alt="">Nissewyn</a>
+  <div class="nav-links">
+    <a href="/zh/#how" class="hide-sm">怎么用</a>
+    <a href="/zh/plugins/" class="hide-sm">插件指南</a>
+    <a href="/zh/#safety" class="hide-sm">安全</a>
+    <a href="https://github.com/unzooai/nissewyn">GitHub</a>
+    <a class="lang" href="/plugins/" hreflang="en" lang="en">English</a>
+    <a class="nav-cta" href="/zh/#download">下载 v0.1.6</a>
+  </div>
+</div></nav>
+
+<header class="doc-hero">
+  <div class="wrap">
+    <span class="eyebrow">插件指南 · 开发者文档</span>
+    <h1>在 Nissewyn 里使用与开发本地插件。</h1>
+    <p class="lede">技能（Skill）教智能体怎么做一件事；插件（Plugin）是运行在 Nissewyn 旁边的本地程序，拥有独立的控制页面、持久化数据、可视化设置表单和受安全规矩约束的 MCP 工具。</p>
+    <div class="cta">
+      <a class="btn primary" href="#quickstart">5 分钟快速上手</a>
+      <a class="btn" href="https://github.com/unzooai/nissewyn/tree/main/examples/plugins/notes">查看 Notes 模板</a>
+    </div>
+  </div>
+</header>
+
+<section id="use"><div class="wrap">
+  <div class="kicker">使用插件</div>
+  <h2>四步接入任意本地插件。</h2>
+  <div class="flow">
+    <div><h3>打开插件页</h3><p>进入 Nissewyn 侧栏的 <b>插件</b> 页面，点击左下角 <b>添加插件</b>。</p></div>
+    <div><h3>填入文件夹路径</h3><p>粘贴包含 <code>unzoo-plugin.json</code> 的目录路径（如 <code>plugins/xtools</code> 或 <code>examples/plugins/notes</code>）。</p></div>
+    <div><h3>绑定角色与设置</h3><p>在 <b>设置</b> 页为插件指定 Unzoo 浏览器身份和写稿/执行智能体与模型。</p></div>
+    <div><h3>打开开关启动</h3><p>开启右上角开关，Nissewyn 自动拉起后台进程、加载控制页面并挂载 MCP 工具。</p></div>
+  </div>
+</div></section>
+
+<section id="quickstart" class="alt"><div class="wrap">
+  <div class="kicker">快速开发</div>
+  <h2>一份清单文件，语言不限。</h2>
+  <p class="sub">Python、Node.js、Go、Rust 都可以——只要在 <code>UNZOO_PLUGIN_PORT</code> 提供 HTTP 页面，并通过 stdio 实现 MCP JSON-RPC 即可。</p>
+  <div class="doc-grid">
+    <div class="card">
+      <h3>目录结构</h3>
+      <pre class="doc-pre">my-plugin/
+├── unzoo-plugin.json   # 插件清单（必需）
+├── server.py           # 控制页面 + /api/ping
+├── mcp_server.py       # stdio MCP 工具（可选）
+└── i18n/en.json        # 多语言翻译（可选）</pre>
+      <h3 style="margin-top:20px">运行时注入的环境变量</h3>
+      <ul class="doc-list">
+        <li><code>UNZOO_PLUGIN_ID</code> — 插件 ID</li>
+        <li><code>UNZOO_PLUGIN_DIR</code> — 插件目录绝对路径</li>
+        <li><code>UNZOO_PLUGIN_DATA</code> — 独立持久化数据目录</li>
+        <li><code>UNZOO_PLUGIN_PORT</code> — 分配的本机 HTTP 端口</li>
+        <li><code>UNZOO_PLUGIN_ROLES</code> — JSON 格式的角色绑定</li>
+        <li><code>UNZOO_PLUGIN_SETTINGS</code> — JSON 格式的设置项</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>最简 <code>unzoo-plugin.json</code></h3>
+      <pre class="doc-pre">{
+  "id": "notes",
+  "name": "Notes",
+  "version": "0.1.0",
+  "description": "本地笔记控制页与 MCP 工具示例。",
+  "run": {
+    "command": ["python3", "{dir}/server.py"],
+    "health": "/api/ping"
+  },
+  "page": "/",
+  "mcp": {
+    "command": ["python3", "{dir}/mcp_server.py"],
+    "tools": {
+      "list_notes": "read",
+      "add_note": "change"
+    }
+  },
+  "roles": {
+    "account": { "kind": "browser", "label": "浏览器身份" },
+    "writer": { "kind": "agent", "label": "写稿智能体" }
+  }
+}</pre>
+    </div>
+  </div>
+</div></section>
+
+<section id="spec"><div class="wrap">
+  <div class="kicker">核心能力</div>
+  <h2>设置表单、风险治理与多语言开箱即用。</h2>
+  <div class="grid3">
+    <div class="card">
+      <h3>声明式设置表单</h3>
+      <p>在清单 <code>settings</code> 里声明 <code>bool</code>、<code>number</code>、<code>text</code>、<code>textarea</code>、<code>choice</code>、<code>list</code>、<code>range</code> 字段，Nissewyn 自动渲染界面、校验范围，保存后自动重启插件读取新配置。</p>
+    </div>
+    <div class="card">
+      <h3>MCP 风险分级</h3>
+      <p>在 <code>mcp.tools</code> 中为每个工具标注 <code>read</code>、<code>change</code>、<code>run</code>、<code>send</code>、<code>pay</code> 或 <code>delete</code>；未标注的工具默认按 <code>send</code> 处理，执行前先问你。</p>
+    </div>
+    <div class="card">
+      <h3>多语言界面（i18n）</h3>
+      <p>通过 <code>i18n</code> 指定翻译 JSON 即可自动切换清单文案；控制页面打开时也会带上 <code>?lang=zh-CN</code> 或 <code>?lang=en</code> 参数。</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="alt"><div class="wrap">
+  <div class="kicker">让 AI 帮你写插件</div>
+  <h2>直接交给智能体生成专属插件。</h2>
+  <p class="sub">在 Nissewyn 里把下面这段话发给 Claude Code、Codex、Antigravity CLI 或 OpenCode：</p>
+  <pre class="doc-pre">请阅读 docs/plugin-development.md 和 examples/plugins/notes/，
+在 ~/my-plugins/rss-digest 创建一个新的 Nissewyn 插件：
+- 写好 unzoo-plugin.json（含设置项与按 read/change 标注的 MCP 工具）
+- 用 UNZOO_PLUGIN_PORT 启动控制页面，数据存到 UNZOO_PLUGIN_DATA
+- 提供 stdio MCP 服务，暴露 list_feeds 和 add_feed 两个工具。</pre>
+  <div class="cta" style="margin-top:24px">
+    <a class="btn primary" href="https://github.com/unzooai/nissewyn/blob/main/docs/plugin-development.md">查看完整 Markdown 文档</a>
+    <a class="btn" href="/zh/#download">下载 Nissewyn v0.1.6</a>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <span>© 2026 Nissewyn · <a href="https://unzoo.ai/zh/">Unzoo</a> 出品</span>
+  <div class="right">
+    <a href="/zh/">首页</a>
+    <a href="https://github.com/unzooai/nissewyn/releases">版本发布</a>
+    <a href="https://github.com/unzooai/nissewyn">GitHub</a>
+    <a href="/plugins/" hreflang="en" lang="en">English</a>
+  </div>
+</div></footer>
+
+</body>
+</html>
