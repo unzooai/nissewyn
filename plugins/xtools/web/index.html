@@ -114,10 +114,12 @@ function header(){
     <button onclick="load()">${T('刷新')}</button></header>
     <div class="status ${cls} ${t.state==='working'?'live':''}"><b><span class="dot">${icon}</span> ${esc(t.text||'')}</b>
       ${S.warmup?`<span class="pill warn">${T('养号期 · {stage}',{stage:esc(S.warmup.name)})}</span>`:''}
+      ${S.slow?`<span class="pill warn" title="${esc(T('X 一周内多次限流,自动放慢'))}">${T('放慢到 {pct}% · 到 {until}',{pct:S.slow.pct,until:esc(S.slow.until)})}</span>`:''}
       <span class="soft">${esc(t.detail||'')}</span><span class="grow"></span>
       ${t.next&&t.state!=='off'?`<span class="soft">${T('下一件:{what}',{what:esc(t.next)})}</span>`:''}
       <span class="muted">${beat}</span>
-      ${S.halted?`<button onclick="resume()">${T('恢复')}</button>`:''}</div></div>`;
+      ${S.halted?`<button onclick="resume()">${T('恢复')}</button>`:''}</div>
+    ${S.profile_shared?`<p class="hint">${T('X 账号现在用的浏览器身份也是 AI 助手上网用的,X 会把助手的浏览也算在这个账号头上。建议到 Nissewyn › 插件 › Xtools › 设置 › 账号与模型,给 X 账号单独选一个只登录 X 的身份。')}</p>`:''}</div>`;
 }
 function ago(ts){const s=Math.max(0,Math.round(Date.now()/1000-ts));return s<60?T('{n} 秒前',{n:s}):T('{n} 分钟前',{n:Math.round(s/60)})}
 // The status line stays live: every 10 seconds, only the header is redrawn (nothing you are editing moves).
