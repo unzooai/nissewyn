@@ -1,6 +1,6 @@
 [package]
 name = "nissewyn"
-version = "0.1.6"
+version = "0.1.7"
 description = "Nissewyn — the desktop client"
 edition = "2021"
 license = "BUSL-1.1"

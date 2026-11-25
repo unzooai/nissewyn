@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Changelog — Nissewyn</title>
+<meta name="description" content="Release history and updates for Nissewyn: built-in API Agent, Qwen & Kimi Code CLI, macOS signed DMG, terminal command blocks, and plugins.">
+<link rel="canonical" href="https://nissewyn.com/changelog/">
+<meta name="theme-color" content="#13273f">
+<link rel="icon" href="/favicon.png">
+<link rel="icon" href="/mark.svg" type="image/svg+xml">
+<link rel="alternate" hreflang="en" href="https://nissewyn.com/changelog/">
+<link rel="alternate" hreflang="zh" href="https://nissewyn.com/zh/changelog/">
+<link rel="stylesheet" href="/styles.css?v=6">
+</head>
+<body>
+
+<nav class="nav"><div class="wrap">
+  <a class="brand" href="/"><img src="/mark.svg" alt="">Nissewyn</a>
+  <div class="nav-links">
+    <a href="/#agents" class="hide-sm">Agents</a>
+    <a href="/plugins/" class="hide-sm">Plugins</a>
+    <a href="/changelog/" class="hide-sm">Changelog</a>
+    <a href="https://github.com/unzooai/nissewyn">GitHub</a>
+    <a class="lang" href="/zh/changelog/" hreflang="zh" lang="zh">中文</a>
+    <a class="nav-cta" href="/#download">Download v0.1.7</a>
+  </div>
+</div></nav>
+
+<header class="doc-hero">
+  <div class="wrap">
+    <span class="eyebrow">Release Notes</span>
+    <h1>What's new in Nissewyn.</h1>
+    <p class="lede">Every desktop release, runtime upgrade, and plugin capability — built in the open.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/unzooai/nissewyn/releases/download/v0.1.7/Nissewyn_0.1.7_aarch64.dmg">Download v0.1.7 (macOS)</a>
+      <a class="btn" href="https://github.com/unzooai/nissewyn/releases">All GitHub Releases</a>
+    </div>
+  </div>
+</header>
+
+<section><div class="wrap"><div class="releases">
+  <article class="card release-card">
+    <div class="release-head">
+      <h2>v0.1.7</h2>
+      <span class="dl-ver">Latest · macOS Signed DMG</span>
+    </div>
+    <ul class="release-list">
+      <li><b>Built-in API Model (BYOK) agent</b>: Run tasks with OpenAI-compatible and Anthropic-compatible APIs directly inside Nissewyn — no external CLI required. Includes 12 one-click presets (DeepSeek, Qwen, Kimi, GLM, MiniMax, Doubao/Ark, SiliconFlow, OpenAI, Anthropic, OpenRouter, local Ollama, Custom) with connection testing, full MCP tool calling, and approval governance.</li>
+      <li><b>Chinese CLI agents via ACP</b>: Added native hosted support for <b>Qwen Code CLI</b> (<code>qwen --acp</code>) and <b>Kimi Code CLI</b> (<code>kimi acp</code>) alongside Claude Code, Codex, Antigravity CLI, and OpenCode.</li>
+      <li><b>macOS Unzoo Browser detection &amp; onboarding</b>: Auto-detects <code>/Applications/Unzoo Browser.app</code> and <code>~/Applications/</code>, supports <code>setup-mcp.sh</code>, and provides direct download guidance when Unzoo Browser is not installed.</li>
+      <li><b>Plugin Guide &amp; Developer Docs</b>: Published <code>docs/plugin-development.md</code> and bilingual <code>/plugins/</code> pages on nissewyn.com.</li>
+    </ul>
+  </article>
+
+  <article class="card release-card">
+    <div class="release-head">
+      <h2>v0.1.6</h2>
+      <span class="dl-ver muted">macOS &amp; Terminal</span>
+    </div>
+    <ul class="release-list">
+      <li>First Developer ID signed macOS (Apple Silicon) <code>.app</code> and <code>.dmg</code> bundle with sidecar <code>nissewyn-service</code> and <code>nissewyn-cli</code>.</li>
+      <li>Terminal command blocks: recognize each command, jump up/down, highlight failed commands, and hand failures to an agent in one click.</li>
+      <li>Xtools v2.4 human-like browsing (clicks links naturally instead of reloading whole pages) and polished plugin list refresh UX.</li>
+      <li>Ctrl+C console-helper fix so background services stay alive on interrupt.</li>
+    </ul>
+  </article>
+
+  <article class="card release-card">
+    <div class="release-head">
+      <h2>v0.1.5 – v0.1.3</h2>
+      <span class="dl-ver muted">Runtime &amp; Plugins</span>
+    </div>
+    <ul class="release-list">
+      <li>Synced <code>unterm</code> runtime to v0.72.0 and added high-throughput terminal output batching (~3x lower UI CPU).</li>
+      <li>App-wide network proxy settings for terminals, agents, plugins, and child tools.</li>
+      <li>Plugin manifest i18n (EN / 中文) and Xtools human schedule pacing.</li>
+      <li>Configurable terminal starting folder and raw byte replay for full-screen TUI apps.</li>
+    </ul>
+  </article>
+</div></div></section>
+
+<footer><div class="wrap">
+  <span>© 2026 Nissewyn · made by <a href="https://unzoo.ai/en/">Unzoo</a></span>
+  <div class="right">
+    <a href="/">Home</a>
+    <a href="/plugins/">Plugins</a>
+    <a href="https://github.com/unzooai/nissewyn/releases">Releases</a>
+    <a href="https://github.com/unzooai/nissewyn">GitHub</a>
+    <a href="/zh/changelog/" hreflang="zh" lang="zh">中文</a>
+  </div>
+</div></footer>
+
+</body>
+</html>

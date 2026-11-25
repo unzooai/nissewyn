@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>更新日志 — Nissewyn</title>
+<meta name="description" content="Nissewyn 版本发布记录：内置 API Agent（支持国产模型）、通义千问与 Kimi CLI、macOS 签名安装包、终端命令块与插件系统。">
+<link rel="canonical" href="https://nissewyn.com/zh/changelog/">
+<meta name="theme-color" content="#13273f">
+<link rel="icon" href="/favicon.png">
+<link rel="icon" href="/mark.svg" type="image/svg+xml">
+<link rel="alternate" hreflang="en" href="https://nissewyn.com/changelog/">
+<link rel="alternate" hreflang="zh" href="https://nissewyn.com/zh/changelog/">
+<link rel="stylesheet" href="/styles.css?v=6">
+</head>
+<body>
+
+<nav class="nav"><div class="wrap">
+  <a class="brand" href="/zh/"><img src="/mark.svg" alt="">Nissewyn</a>
+  <div class="nav-links">
+    <a href="/zh/#agents" class="hide-sm">智能体</a>
+    <a href="/zh/plugins/" class="hide-sm">插件指南</a>
+    <a href="/zh/changelog/" class="hide-sm">更新日志</a>
+    <a href="https://github.com/unzooai/nissewyn">GitHub</a>
+    <a class="lang" href="/changelog/" hreflang="en" lang="en">English</a>
+    <a class="nav-cta" href="/zh/#download">下载 v0.1.7</a>
+  </div>
+</div></nav>
+
+<header class="doc-hero">
+  <div class="wrap">
+    <span class="eyebrow">版本发布记录</span>
+    <h1>Nissewyn 更新日志。</h1>
+    <p class="lede">每一次桌面版发布、内核升级与插件能力演进，全部公开可查。</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/unzooai/nissewyn/releases/download/v0.1.7/Nissewyn_0.1.7_aarch64.dmg">下载 v0.1.7（macOS）</a>
+      <a class="btn" href="https://github.com/unzooai/nissewyn/releases">全部 GitHub Releases</a>
+    </div>
+  </div>
+</header>
+
+<section><div class="wrap"><div class="releases">
+  <article class="card release-card">
+    <div class="release-head">
+      <h2>v0.1.7</h2>
+      <span class="dl-ver">最新版 · macOS 签名 DMG</span>
+    </div>
+    <ul class="release-list">
+      <li><b>内置 API Model (BYOK) 智能体</b>：无需安装外部 CLI，原生支持 OpenAI 兼容与 Anthropic 兼容协议。内置 12 组一键预设（DeepSeek、通义千问 Qwen、Kimi、智谱 GLM、MiniMax、豆包 / 火山方舟、硅基流动、OpenAI、Anthropic、OpenRouter、本机 Ollama、自定义），支持连通性测试、完整 MCP 工具调用与审批治理。</li>
+      <li><b>原生支持国产 CLI（ACP 托管）</b>：新增 <b>Qwen Code CLI</b>（<code>qwen --acp</code>）与 <b>Kimi Code CLI</b>（<code>kimi acp</code>），与 Claude Code、Codex、Antigravity CLI、OpenCode 并列可选。</li>
+      <li><b>macOS Unzoo 浏览器探测与引导</b>：自动识别 <code>/Applications/Unzoo Browser.app</code> 与 <code>~/Applications/</code>，兼容 <code>setup-mcp.sh</code>，未安装时提供一键下载引导。</li>
+      <li><b>插件使用与开发指南</b>：新增 <code>docs/plugin-development.md</code> 与官网中英文 <code>/plugins/</code> 文档页。</li>
+    </ul>
+  </article>
+
+  <article class="card release-card">
+    <div class="release-head">
+      <h2>v0.1.6</h2>
+      <span class="dl-ver muted">macOS 与终端升级</span>
+    </div>
+    <ul class="release-list">
+      <li>首个 Developer ID 签名的 macOS（Apple Silicon）<code>.app</code> 与 <code>.dmg</code> 安装包，内置 <code>nissewyn-service</code> 与 <code>nissewyn-cli</code>。</li>
+      <li>终端命令块：自动识别每条命令、上下跳转、高亮失败命令并一键交给智能体排查。</li>
+      <li>Xtools v2.4 拟人化浏览（进站后点链接走动，不再反复刷新整页）与插件列表刷新按钮体验优化。</li>
+      <li>修复终端按 Ctrl+C 导致后台服务丢失控制台的问题。</li>
+    </ul>
+  </article>
+
+  <article class="card release-card">
+    <div class="release-head">
+      <h2>v0.1.5 – v0.1.3</h2>
+      <span class="dl-ver muted">内核与插件生态</span>
+    </div>
+    <ul class="release-list">
+      <li><code>unterm</code> 内核同步至 v0.72.0，终端高频刷屏合并读取使页面 CPU 降至约三分之一。</li>
+      <li>新增全局网络代理设置，统一覆盖终端、智能体与插件子进程。</li>
+      <li>插件清单支持中英双语（i18n），Xtools 支持按人的作息随机浏览与发帖。</li>
+      <li>支持自定义终端启动文件夹，以及全屏终端程序按字节原样回放。</li>
+    </ul>
+  </article>
+</div></div></section>
+
+<footer><div class="wrap">
+  <span>© 2026 Nissewyn · <a href="https://unzoo.ai/zh/">Unzoo</a> 出品</span>
+  <div class="right">
+    <a href="/zh/">首页</a>
+    <a href="/zh/plugins/">插件指南</a>
+    <a href="https://github.com/unzooai/nissewyn/releases">版本发布</a>
+    <a href="https://github.com/unzooai/nissewyn">GitHub</a>
+    <a href="/changelog/" hreflang="en" lang="en">English</a>
+  </div>
+</div></footer>
+
+</body>
+</html>

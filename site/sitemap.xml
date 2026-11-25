@@ -2,4 +2,8 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://nissewyn.com/</loc></url>
   <url><loc>https://nissewyn.com/zh/</loc></url>
+  <url><loc>https://nissewyn.com/plugins/</loc></url>
+  <url><loc>https://nissewyn.com/zh/plugins/</loc></url>
+  <url><loc>https://nissewyn.com/changelog/</loc></url>
+  <url><loc>https://nissewyn.com/zh/changelog/</loc></url>
 </urlset>
