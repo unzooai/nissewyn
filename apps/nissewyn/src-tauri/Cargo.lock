@@ -2199,7 +2199,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "nissewyn"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "rfd",
  "serde",
@@ -4232,7 +4232,7 @@ checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
 
 [[package]]
 name = "unterm-protocol"
-version = "0.71.31"
+version = "0.72.0"
 dependencies = [
  "dirs-next",
  "serde",
