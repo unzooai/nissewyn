@@ -65,7 +65,7 @@ struct Shipped {
 }
 
 fn shipped() -> Option<Shipped> {
-    let path = std::env::current_exe().ok()?.parent()?.join("mcp-instructions.md");
+    let path = unterm_protocol::bundled_resource("mcp-instructions.md")?;
     let text = std::fs::read_to_string(path).ok()?;
     parse_shipped(&text)
 }

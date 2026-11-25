@@ -27669,7 +27669,50 @@ body {
   position: sticky;
   top: 16px;
 }
-.plugins-list .skills-heading { margin-bottom: 4px; }
+.plugins-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 8px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--clarity-line);
+}
+.plugins-list-header > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--clarity-soft);
+  letter-spacing: 0.02em;
+}
+.plugins-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--clarity-soft);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.plugins-refresh-btn:hover:not(:disabled) {
+  background: var(--clarity-panel-soft);
+  border-color: var(--clarity-line);
+  color: var(--clarity-ink);
+}
+.plugins-refresh-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.plugins-refresh-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.plugins-view .is-spinning {
+  animation: clarity-spin 850ms linear infinite;
+}
 .plugins-item {
   display: flex;
   align-items: center;
@@ -27745,6 +27788,15 @@ body {
   color: var(--clarity-ink);
   font-size: 13px;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.plugins-log button:hover:not(:disabled), .plugins-actions button:hover:not(:disabled) {
+  background: var(--clarity-panel-soft);
+  border-color: var(--clarity-line-strong);
+}
+.plugins-log button:disabled, .plugins-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .plugins-add button[type="submit"]:not(:disabled), .plugins-role button[type="submit"]:not(:disabled) {
   background: var(--clarity-blue);

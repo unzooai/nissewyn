@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nissewyn — the little AI helper that lives in your computer</title>
-<meta name="description" content="Nissewyn gives Claude Code, Codex and other AI agents a terminal that stays, a real browser with your sign-ins, and rules you set. It works while you sleep, and nothing leaves your computer.">
+<meta name="description" content="Nissewyn gives Claude Code, Codex, Antigravity CLI and OpenCode a persistent terminal, a real browser with your sign-ins, local plugins, and rules you set. Available for macOS and Windows.">
 <link rel="canonical" href="https://nissewyn.com/">
 <meta name="theme-color" content="#13273f">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Nissewyn">
 <meta property="og:url" content="https://nissewyn.com/">
 <meta property="og:title" content="Nissewyn — the little AI helper that lives in your computer">
-<meta property="og:description" content="It works while you sleep. Nothing leaves home. A terminal that stays, a real browser with your sign-ins, and rules you set — for the AI agents you already pay for.">
+<meta property="og:description" content="It works while you sleep. Nothing leaves home. A terminal that stays, a real browser with your sign-ins, local plugins, and rules you set — for the AI agents you already pay for.">
 <meta property="og:image" content="https://nissewyn.com/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.png">
@@ -20,7 +20,7 @@
 <link rel="alternate" hreflang="en" href="https://nissewyn.com/">
 <link rel="alternate" hreflang="zh" href="https://nissewyn.com/zh/">
 <link rel="alternate" hreflang="x-default" href="https://nissewyn.com/">
-<link rel="stylesheet" href="/styles.css?v=3">
+<link rel="stylesheet" href="/styles.css?v=4">
 </head>
 <body>
 
@@ -29,11 +29,11 @@
   <div class="nav-links">
     <a href="#night" class="hide-sm">While you sleep</a>
     <a href="#how" class="hide-sm">How it works</a>
+    <a href="#plugins" class="hide-sm">Plugins</a>
     <a href="#safety" class="hide-sm">Safety</a>
-    <a href="#status" class="hide-sm">Status</a>
     <a href="https://github.com/unzooai/nissewyn">GitHub</a>
     <a class="lang" href="/zh/" hreflang="zh" lang="zh">中文</a>
-    <a class="nav-cta" href="mailto:dev@unzoo.ai?subject=Nissewyn%20early%20access">Early access</a>
+    <a class="nav-cta" href="#download">Download v0.1.6</a>
   </div>
 </div></nav>
 
@@ -42,13 +42,13 @@
   <div class="wrap">
     <div class="hero-grid">
       <div>
-        <span class="eyebrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 12l-7.4 3.1L12 22l-2.6-6.9L2 12l7.4-3.1z"/></svg>Preview for Windows · source-available</span>
+        <span class="eyebrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 12l-7.4 3.1L12 22l-2.6-6.9L2 12l7.4-3.1z"/></svg>v0.1.6 · macOS &amp; Windows · source-available</span>
         <h1>The little AI helper that lives in your <em>computer</em>.</h1>
-        <p class="lede"><strong>It works while you sleep. Nothing leaves home.</strong> Your AI agents are already smart — what they lack is a place to work. Nissewyn gives them a terminal that stays, a real browser with your sign-ins, and rules you set, all on your own computer.</p>
+        <p class="lede"><strong>It works while you sleep. Nothing leaves home.</strong> Your AI agents are already smart — what they lack is a place to work. Nissewyn gives them a terminal that stays, a real browser with your sign-ins, local plugins, and rules you set, all on your own computer.</p>
         <p class="agents">Works with <b>Claude Code</b>, <b>Codex</b>, <b>Antigravity CLI</b> and <b>OpenCode</b>, on the subscriptions you already have.</p>
         <div class="cta">
-          <a class="btn primary" href="mailto:dev@unzoo.ai?subject=Nissewyn%20early%20access">Get early access</a>
-          <a class="btn" href="https://github.com/unzooai/nissewyn">View the source</a>
+          <a class="btn primary" href="#download">Download v0.1.6</a>
+          <a class="btn" href="https://github.com/unzooai/nissewyn">View on GitHub</a>
         </div>
       </div>
       <figure class="portrait">
@@ -58,7 +58,7 @@
 
     <div class="stage">
       <div class="mock" role="img" aria-label="Nissewyn: a conversation on the left, the agent's terminal and browser on the right, and a question asking before it clicks Send">
-        <div class="mock-bar"><span></span><span></span><span></span><b><img src="/mark.svg" alt="">Nissewyn</b></div>
+        <div class="mock-bar"><span></span><span></span><span></span><b><img src="/mark.svg" alt="">Nissewyn · Tasks · Terminal · Plugins · Settings</b></div>
         <div class="mock-body">
           <div class="convo">
             <div class="bubble">Pull last month's invoices from the billing portal, total them in a spreadsheet, and draft an email to Dana.</div>
@@ -76,13 +76,13 @@
             </div>
           </div>
           <div class="computer">
-            <div class="tab">Terminal</div>
-<div class="term"><span class="p">PS ~/invoices&gt;</span> python total.py .
+            <div class="tab">Terminal · Command blocks</div>
+<div class="term"><span class="p">~/invoices $</span> python total.py .   <span class="d">[✓ 0.4s]</span>
 <span class="d">reading 14 files…</span>
 total  € 18,420.50
 saved  invoices-oct.xlsx
-<span class="p">PS ~/invoices&gt;</span> █</div>
-            <div class="tab">Browser</div>
+<span class="p">~/invoices $</span> █</div>
+            <div class="tab">Browser · Unzoo identity</div>
             <div class="browser">
               <div class="url">mail · signed in as you</div>
               <div class="page">
@@ -107,7 +107,7 @@ saved  invoices-oct.xlsx
     <div class="card">
       <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg></div>
       <h3>A terminal that stays</h3>
-      <p>Terminals live in a background service. Close the app and they keep running; the build, the server, the long download are still there next time. Watch the agent's terminal right inside Nissewyn and take over whenever you like.</p>
+      <p>Terminals live in a background service. Close the app and builds, servers and downloads keep running. Jump between command blocks, spot failed commands, hand a failure to an agent in one click, and run full-screen TUI tools without glitching.</p>
     </div>
     <div class="card">
       <div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></div>
@@ -154,16 +154,50 @@ saved  invoices-oct.xlsx
     <div><h3>It keeps going</h3><p>On a schedule, or when a page, a folder, your mail or your calendar changes.</p></div>
   </div>
   <div class="grid3">
-    <div class="card"><h3>Skills</h3><p>Built-in terminal and browser skills in the open Agent Skills format. Once a job works, save it as a skill and reuse it with one sentence.</p></div>
+    <div class="card"><h3>Built-in Skills</h3><p>10+ built-in skills in the open Agent Skills format — terminal, browser, deliverables, content repurposing, short-video pipeline and newsletter digests. Save any completed job as a reusable skill.</p></div>
     <div class="card"><h3>One hub, many helpers</h3><p>Your main agent can hand part of the work to another — Claude Code passing a chunk to Codex. Standing helpers own an area and remember what they did.</p></div>
     <div class="card"><h3>From your phone</h3><p>On the same Wi-Fi or over Tailscale: read conversations, approve, take over and start tasks. No cloud relay.</p></div>
-    <div class="card"><h3>Learns when to bother you</h3><p>Reply “stop telling me about deliveries” once, and the next report on that comes folded. Quiet hours at night.</p></div>
+    <div class="card"><h3>Terminal built for agents</h3><p>Set a default start folder, jump across command blocks, highlight failed commands and send them straight to an agent, with batched high-speed output and app-wide proxy support.</p></div>
     <div class="card"><h3>For your other AI apps too</h3><p>The terminal and browser are offered over MCP, so Claude Desktop, Cursor and others can use them — under the same rules.</p></div>
-    <div class="card"><h3>English and Chinese</h3><p>The app, the phone page and the agent's questions follow your language.</p></div>
+    <div class="card"><h3>English and Chinese</h3><p>The app, plugins, phone page and the agent's questions follow your language automatically.</p></div>
   </div>
 </div></section>
 
-<section id="safety"><div class="wrap">
+<section id="plugins"><div class="wrap">
+  <div class="kicker">Plugins</div>
+  <h2>Extend Nissewyn with local apps and tools.</h2>
+  <p class="sub">Skills teach an agent how to do a task. When a workflow needs its own control page, persistent state, or background daemon, it becomes a plugin — with per-role browser identities, agent/model bindings, i18n, and MCP tools under the same safety rules.</p>
+  <div class="plugin-grid">
+    <div class="card plugin-card featured">
+      <div class="plugin-head">
+        <h3>Xtools — X Growth Assistant</h3>
+        <span class="plugin-badge">Included · v2.4</span>
+      </div>
+      <p>Learns your voice, posts on your audience's schedule, browses feeds naturally like a human by clicking links instead of reloading pages, replies early under peer posts, and reviews performance every week.</p>
+      <div class="plugin-pills">
+        <span>Human-like browsing</span>
+        <span>Dedicated browser identity</span>
+        <span>Agent + model binding</span>
+        <span>EN / 中文 UI</span>
+        <span>8 MCP tools</span>
+      </div>
+    </div>
+    <div class="card plugin-card">
+      <div class="plugin-head">
+        <h3>Build your own</h3>
+        <span class="plugin-badge">unzoo-plugin.json</span>
+      </div>
+      <p>Any local folder with a manifest can add a control page, settings form, logs and MCP tools. Start from the bundled <code>examples/plugins/notes</code> template.</p>
+      <div class="plugin-pills">
+        <span>Local HTTP page</span>
+        <span>Auto-generated settings</span>
+        <span>MCP risk tags</span>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section id="safety" class="alt"><div class="wrap">
   <div class="kicker">Safety</div>
   <h2>It asks about the one click that matters.</h2>
   <p class="sub">Asking at every step trains you to click “Allow” without reading. Nissewyn looks at what an action will actually do, and asks only when it leaves your computer, costs money or can't be undone.</p>
@@ -181,7 +215,7 @@ saved  invoices-oct.xlsx
   </div>
 </div></section>
 
-<section class="alt" id="private"><div class="wrap">
+<section id="private"><div class="wrap">
   <div class="kicker">Private by design</div>
   <h2>Everything stays on your computer.</h2>
   <p class="sub">Tasks, conversations, mail passwords, calendar addresses and browser sign-ins never pass through our servers — there are none in the personal edition. Secrets live in the system credential store and are never handed to the agents.</p>
@@ -191,17 +225,17 @@ saved  invoices-oct.xlsx
   </div>
 </div></section>
 
-<section id="unzoo"><div class="wrap">
+<section id="unzoo" class="alt"><div class="wrap">
   <div class="kicker">Made by Unzoo</div>
   <h2>Unzoo Browser gives AI hands on the web. Nissewyn gives it a whole computer.</h2>
-  <p class="sub">Every browser step in Nissewyn runs in Unzoo Browser — the same browser, identities and task recipes you may already use from Claude, Cursor or Codex. Nissewyn adds the terminal, conversations, schedules and the rules around them.</p>
+  <p class="sub">Every browser step in Nissewyn runs in Unzoo Browser — the same browser, identities and task recipes you may already use from Claude, Cursor or Codex. Nissewyn adds the terminal, conversations, schedules, plugins and the rules around them.</p>
   <div class="family">
     <div class="card"><span class="tag">Unzoo Browser</span><h3>The browser your AI can use</h3><p>A Chromium browser with tools any AI client can call over MCP: research, forms, downloads, many separate work identities.</p><div class="links"><a href="https://unzoo.ai/en/">Learn more</a><a href="https://unzoo.ai/en/download">Download</a><a href="https://unzoo.ai/en/pricing">Pricing</a></div></div>
-    <div class="card one"><span class="tag">Nissewyn</span><h3>The agent's computer</h3><p>Unzoo Browser plus a terminal that stays, conversations that are tasks, schedules, helpers, your phone — and one set of rules over all of it. Agents' browser identities come from your Unzoo plan.</p><div class="links"><a href="mailto:dev@unzoo.ai?subject=Nissewyn%20early%20access">Get early access</a><a href="https://github.com/unzooai/nissewyn">Source</a></div></div>
+    <div class="card one"><span class="tag">Nissewyn</span><h3>The agent's computer</h3><p>Unzoo Browser plus a terminal that stays, conversations that are tasks, schedules, plugins, helpers, your phone — and one set of rules over all of it. Agents' browser identities come from your Unzoo plan.</p><div class="links"><a href="#download">Download v0.1.6</a><a href="https://github.com/unzooai/nissewyn">Source</a></div></div>
   </div>
 </div></section>
 
-<section id="compare" class="alt"><div class="wrap">
+<section id="compare"><div class="wrap">
   <div class="kicker">Where it fits</div>
   <h2>Not a chat app, not a cloud agent, not just a browser.</h2>
   <div class="table-wrap"><table>
@@ -216,25 +250,61 @@ saved  invoices-oct.xlsx
   </table></div>
 </div></section>
 
+<section id="download" class="alt"><div class="wrap">
+  <div class="kicker">Download</div>
+  <h2>Get Nissewyn v0.1.6.</h2>
+  <p class="sub">Install on your own machine and connect the AI agents you already use. Source-available under BSL 1.1.</p>
+  <div class="dl-grid">
+    <div class="card dl-card recommended">
+      <div class="dl-head">
+        <h3>macOS (Apple Silicon)</h3>
+        <span class="dl-ver">v0.1.6 · Signed</span>
+      </div>
+      <p>Universal runtime with signed <code>.dmg</code> installer for macOS 12+ (M1 / M2 / M3 / M4). Includes the background service, CLI and built-in skills.</p>
+      <p class="dl-meta">Nissewyn_0.1.6_aarch64.dmg · ~26 MB</p>
+      <a class="btn primary" href="https://github.com/unzooai/nissewyn/releases/download/v0.1.6/Nissewyn_0.1.6_aarch64.dmg">Download for macOS</a>
+    </div>
+    <div class="card dl-card">
+      <div class="dl-head">
+        <h3>Windows (x64)</h3>
+        <span class="dl-ver muted">MSI / Source</span>
+      </div>
+      <p>Windows 10 / 11 desktop client with ConPTY background terminal service, Windows Credential Manager integration, and English / Chinese installer.</p>
+      <p class="dl-meta">Check GitHub Releases or build with <code>build-installer.ps1</code></p>
+      <a class="btn" href="https://github.com/unzooai/nissewyn/releases/latest">View Releases</a>
+    </div>
+    <div class="card dl-card">
+      <div class="dl-head">
+        <h3>Build from source</h3>
+        <span class="dl-ver muted">BSL 1.1</span>
+      </div>
+      <p>Inspect the code, run tests, or package your own macOS / Windows build directly from the repository.</p>
+      <div class="dl-code">git clone https://github.com/unzooai/nissewyn.git</div>
+      <a class="btn" href="https://github.com/unzooai/nissewyn">Browse GitHub</a>
+    </div>
+  </div>
+</div></section>
+
 <section id="status"><div class="wrap">
   <div class="kicker">Status</div>
   <h2>Where we are today.</h2>
-  <p class="sub">Nissewyn is in preview. It runs every day on our own machines with real agents; it is not yet a polished, signed download.</p>
+  <p class="sub">Nissewyn v0.1.6 runs every day on our own machines with real agents, signed macOS builds, persistent terminals and local plugins.</p>
   <div class="status">
     <div class="card"><h3>Works today</h3><ul class="check">
-      <li>Windows installer (English and Chinese)</li>
+      <li>Signed macOS (Apple Silicon) DMG &amp; Windows MSI installer</li>
       <li>Conversations as tasks, with follow-ups and approvals in place</li>
-      <li>Live terminal and browser inside the app; take over any time</li>
+      <li>Persistent terminal with command blocks, start folder &amp; full-screen TUI support</li>
+      <li>Live Unzoo Browser inside the app with per-agent identities; take over any time</li>
       <li>Claude Code, Codex, Antigravity CLI and OpenCode</li>
-      <li>Schedules, and runs when a page, folder, mail or calendar changes</li>
-      <li>Helpers, skills, plugins, phone access, MCP for other AI apps</li>
-      <li>Send / pay / delete checks with a reviewer</li>
+      <li>Plugin system with i18n, settings &amp; MCP tools (Xtools &amp; Notes included)</li>
+      <li>Schedules, triggers (page, folder, mail, calendar), phone access &amp; app-wide proxy</li>
+      <li>Send / pay / delete checks with an independent reviewer</li>
     </ul></div>
     <div class="card"><h3>Next</h3><ul class="soon">
-      <li>Signed Windows installer</li>
-      <li>macOS and Linux packages</li>
-      <li>Turning a recording into a skill</li>
+      <li>Signed Windows installer &amp; Linux packages</li>
+      <li>Turning a recording into a reusable skill</li>
       <li>Desktop apps, beyond terminal and browser</li>
+      <li>Plugin directory and one-click install</li>
       <li>Enterprise edition: team policies, server-side runs, SSO</li>
     </ul></div>
   </div>
@@ -253,9 +323,9 @@ saved  invoices-oct.xlsx
 <section class="final"><div class="wrap">
   <img class="moon" src="/mark.svg" width="120" height="120" alt="">
   <h2>Give your agents a computer.</h2>
-  <p class="sub">We're letting people in a few at a time. Tell us what you'd have your little helper do.</p>
+  <p class="sub">Download v0.1.6 for macOS, inspect the source on GitHub, or tell us what you'd have your little helper do.</p>
   <div class="cta">
-    <a class="btn primary" href="mailto:dev@unzoo.ai?subject=Nissewyn%20early%20access">Get early access</a>
+    <a class="btn primary" href="https://github.com/unzooai/nissewyn/releases/latest">Download v0.1.6</a>
     <a class="btn" href="https://github.com/unzooai/nissewyn">Read the code</a>
   </div>
 </div></section>
@@ -267,6 +337,7 @@ saved  invoices-oct.xlsx
     <a href="https://unzoo.ai/en/">Unzoo Browser</a>
     <a href="https://unzoo.ai/en/privacy">Privacy</a>
     <a href="https://unzoo.ai/en/terms">Terms</a>
+    <a href="https://github.com/unzooai/nissewyn/releases">Releases</a>
     <a href="https://github.com/unzooai/nissewyn">GitHub</a>
     <a href="mailto:dev@unzoo.ai">dev@unzoo.ai</a>
     <a href="/zh/" hreflang="zh" lang="zh">中文</a>

@@ -32,8 +32,7 @@ fn builtin_dir() -> Option<PathBuf> {
     if let Some(dir) = std::env::var_os("UNTERM_BUILTIN_SKILLS").map(PathBuf::from) {
         return dir.is_dir().then_some(dir);
     }
-    let exe = std::env::current_exe().ok()?;
-    let dir = exe.parent()?.join("skills");
+    let dir = unterm_protocol::bundled_resource("skills")?;
     dir.is_dir().then_some(dir)
 }
 

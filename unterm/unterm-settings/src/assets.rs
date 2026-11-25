@@ -46,8 +46,8 @@ pub fn product_logo() -> Option<Vec<u8>> {
     if unterm_protocol::is_standalone() {
         return None;
     }
-    let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    std::fs::read(dir.join("brand-logo.svg")).ok()
+    let path = unterm_protocol::bundled_resource("brand-logo.svg")?;
+    std::fs::read(path).ok()
 }
 
 #[cfg(test)]

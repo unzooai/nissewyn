@@ -138,7 +138,9 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
   const [dir, setDir] = useState("");
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [log, setLog] = useState("");
+  const [logLoading, setLogLoading] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -148,6 +150,24 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
       setError(errorText(failure));
     }
   }, [runtime]);
+
+  const refresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    const started = Date.now();
+    try {
+      setData(await runtime.plugins());
+      setError(null);
+    } catch (failure) {
+      setError(errorText(failure));
+    } finally {
+      const elapsed = Date.now() - started;
+      if (elapsed < 320) {
+        await new Promise((resolve) => window.setTimeout(resolve, 320 - elapsed));
+      }
+      setRefreshing(false);
+    }
+  }, [refreshing, runtime]);
 
   useEffect(() => {
     void load();
@@ -175,14 +195,27 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
     return () => window.clearInterval(timer);
   }, [load]);
 
-  const loadLog = useCallback(async () => {
-    if (!plugin) return;
-    try {
-      setLog(await runtime.pluginLog(plugin.id));
-    } catch (failure) {
-      setLog(errorText(failure));
-    }
-  }, [plugin, runtime]);
+  const loadLog = useCallback(
+    async (manual = false) => {
+      if (!plugin) return;
+      if (manual) setLogLoading(true);
+      const started = Date.now();
+      try {
+        setLog(await runtime.pluginLog(plugin.id));
+      } catch (failure) {
+        setLog(errorText(failure));
+      } finally {
+        if (manual) {
+          const elapsed = Date.now() - started;
+          if (elapsed < 320) {
+            await new Promise((resolve) => window.setTimeout(resolve, 320 - elapsed));
+          }
+          setLogLoading(false);
+        }
+      }
+    },
+    [plugin, runtime],
+  );
 
   useEffect(() => {
     if (tab === "log") void loadLog();
@@ -218,10 +251,17 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
   return (
     <section className="plugins-view" aria-label={t("插件")}>
       <aside className="plugins-list">
-        <div className="skills-heading">
+        <div className="plugins-list-header">
           <span>{t("插件")}</span>
-          <button type="button" onClick={() => void load()} aria-label={t("重新检查")} title={t("重新检查")} disabled={busy}>
-            <RefreshCw size={14} aria-hidden="true" />
+          <button
+            type="button"
+            className="plugins-refresh-btn"
+            onClick={() => void refresh()}
+            aria-label={t("重新检查")}
+            title={t("重新检查")}
+            disabled={busy || refreshing}
+          >
+            <RefreshCw size={14} aria-hidden="true" className={refreshing ? "is-spinning" : undefined} />
           </button>
         </div>
         {error ? <p className="plugins-error">{error}</p> : null}
@@ -363,8 +403,8 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
 
             {effectiveTab === "log" ? (
               <div className="plugins-log">
-                <button type="button" onClick={() => void loadLog()}>
-                  <RefreshCw size={14} aria-hidden="true" />
+                <button type="button" onClick={() => void loadLog(true)} disabled={logLoading}>
+                  <RefreshCw size={14} aria-hidden="true" className={logLoading ? "is-spinning" : undefined} />
                   {t("刷新")}
                 </button>
                 <pre>{log || t("还没有输出")}</pre>

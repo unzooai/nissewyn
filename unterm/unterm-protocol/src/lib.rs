@@ -165,11 +165,33 @@ fn valid_product_name(name: &str) -> Option<String> {
     (!name.is_empty() && name.len() <= 64 && !name.chars().any(char::is_control)).then(|| name.to_string())
 }
 
+/// Locate a bundled data file or directory shipped with the executable:
+/// checks `<exe dir>/<rel>` first (Windows / Linux flat install), then
+/// `<exe dir>/../Resources/<rel>` on macOS `.app` bundles.
+pub fn bundled_resource(rel: impl AsRef<std::path::Path>) -> Option<std::path::PathBuf> {
+    let rel = rel.as_ref();
+    let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    let beside = dir.join(rel);
+    if beside.exists() {
+        return Some(beside);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if dir.file_name().is_some_and(|n| n == "MacOS") {
+            let resources = dir.parent()?.join("Resources").join(rel);
+            if resources.exists() {
+                return Some(resources);
+            }
+        }
+    }
+    None
+}
+
 fn installed_product_name() -> Option<String> {
     static NAME: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
     NAME.get_or_init(|| {
-        let exe = std::env::current_exe().ok()?;
-        let text = std::fs::read_to_string(exe.parent()?.join(PRODUCT_FILE)).ok()?;
+        let path = bundled_resource(PRODUCT_FILE)?;
+        let text = std::fs::read_to_string(path).ok()?;
         valid_product_name(text.lines().next()?)
     })
     .clone()
