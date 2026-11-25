@@ -32,4 +32,19 @@ export const enPage12: Record<string, string> = {
   "例如 .corp.example, intranet": "e.g. .corp.example, intranet",
   "已经开着的终端和插件不受影响：新开的终端会用上，插件在“插件”页重启一下。":
     "Terminals and plugins already running aren't affected: new terminals use it, and plugins need a restart on the Plugins page.",
+  // Terminal › command blocks
+  "命令没有成功（退出码 {code}）": "Command failed (exit code {code})",
+  "交给智能体看看": "Ask the agent",
+  "关闭": "Close",
+  "上一条命令": "Previous command",
+  "下一条命令": "Next command",
+  "上一条命令（Ctrl+↑）": "Previous command (Ctrl+↑)",
+  "下一条命令（Ctrl+↓）": "Next command (Ctrl+↓)",
+  "上一条失败的命令": "Previous failed command",
+  "上一条失败的命令（共 {count} 条）": "Previous failed command ({count} in all)",
+  "这条命令在终端里没有成功（退出码 {code}），帮我找出原因并修好。":
+    "This command failed in the terminal (exit code {code}). Find out why and fix it.",
+  "文件夹：{cwd}": "Folder: {cwd}",
+  "命令：{command}": "Command: {command}",
+  "输出（最后一部分）：": "Output (the last part):",
 };

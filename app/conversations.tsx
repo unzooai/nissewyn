@@ -100,6 +100,8 @@ export type ConversationsProps = {
   onSelect: (taskId: string | null) => void;
   /** 每变一次就开一段新对话（顶栏的“新建”）。 */
   newNonce: number;
+  /** Filled into the new conversation's box when `newNonce` changes; the person still sends it. */
+  newText?: string;
   onStart: (request: string) => Promise<string | null>;
   onFollowUp: (taskId: string, text: string) => Promise<void>;
   onStop: (taskId: string) => Promise<void>;
@@ -196,14 +198,25 @@ function shortTime(iso: string): string {
 
 // ---- a new conversation -------------------------------------------------
 
-function NewConversation({ onStart, onSelect, newNonce, notice, agentName }: ConversationsProps) {
+let seededNonce = -1;
+
+function NewConversation({ onStart, onSelect, newNonce, newText, notice, agentName }: ConversationsProps) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    // Once per request: coming back to an empty new conversation later starts empty.
+    if (newText && seededNonce !== newNonce) {
+      seededNonce = newNonce;
+      // A request handed over from elsewhere, filled in once per new conversation.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setText(newText);
+    }
     input.current?.focus();
+    // Only a new conversation takes the text, not a later change of it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newNonce]);
 
   async function send() {
