@@ -6,8 +6,8 @@ export const enPage13: Record<string, string> = {
   "已加入 {name}": "Joined {name}",
   "公司自己部署了 Nissewyn Server 时，在这里加入。加入后，公司可以为这台电脑设定智能体的规则，并保存操作记录的副本。公司拿不到你的模型账号、浏览器登录和密码。":
     "If your company runs its own Nissewyn Server, join it here. Your company can then set the rules agents follow on this computer and keep a copy of the activity record. It never gets your model accounts, browser sign-ins or passwords.",
-  "{name} 的管理员已把这台电脑移出组织（{when}）。要重新加入，请向管理员要一个新的加入码。":
-    "An admin at {name} removed this computer from the organization ({when}). To join again, ask your admin for a new join code.",
+  "{name} 的管理员已把这台电脑移出组织（{when}）。要重新加入，请用公司账号再登录一次，或向管理员要一个新的加入码。":
+    "An admin at {name} removed this computer from the organization ({when}). To join again, sign in with your company account again or ask your admin for a new join code.",
   "知道了": "Got it",
   "服务器：{server}": "Server: {server}",
   "这台电脑：{name}": "This computer: {name}",
@@ -55,4 +55,21 @@ export const enPage13: Record<string, string> = {
   "没能保存：{detail}": "Couldn't save: {detail}",
   "服务器出错了：{detail}": "The server ran into an error: {detail}",
   "只有 Nissewyn 桌面版能加入组织": "Only the Nissewyn desktop app can join an organization",
+  "已登录。可以关掉这个页面，回到 Nissewyn。": "You're signed in. You can close this tab and go back to Nissewyn.",
+  "没有登录成功。回到 Nissewyn 看原因。": "Sign-in didn't finish. Go back to Nissewyn to see why.",
+  "登录为 {who}": "Signed in as {who}",
+  "已在浏览器里打开公司的登录页。登录后，这里会自动完成加入。":
+    "Your company's sign-in page is open in your browser. Once you sign in, this computer joins automatically.",
+  "浏览器没有打开？把这个地址复制到浏览器里：": "Browser didn't open? Copy this address into it:",
+  "加入码（不用公司账号时）": "Join code (instead of your company account)",
+  "服务器地址向公司的 IT 管理员要。公司开了单点登录时，用公司账号登录就行；否则填管理员给的加入码。":
+    "Get the server address from your IT admin. If your company has single sign-on, just sign in with your company account; otherwise enter the join code your admin gave you.",
+  "用公司账号登录": "Sign in with company account",
+  "用加入码加入": "Join with code",
+  "这个服务器没有开单点登录，请用管理员给的加入码": "This server doesn't have single sign-on set up. Use the join code from your admin.",
+  "没有登录成功：{detail}": "Sign-in didn't finish: {detail}",
+  "没有登录成功，请再试一次": "Sign-in didn't finish. Try again.",
+  "等了 10 分钟还没有登录完成，请再试一次": "Sign-in didn't finish within 10 minutes. Try again.",
+  "这次登录已经过期，请再登录一次": "This sign-in expired. Sign in again.",
+  "登录没有开始，请再点一次“用公司账号登录”": "Sign-in didn't start. Click “Sign in with company account” again.",
 };

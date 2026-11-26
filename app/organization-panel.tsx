@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, RefreshCw } from "lucide-react";
+import { Building2, LogIn, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { dateLocale, t } from "./i18n";
 import {
@@ -9,6 +9,9 @@ import {
   orgJoin,
   orgLeave,
   orgRefresh,
+  orgSsoBegin,
+  orgSsoCancel,
+  orgSsoWait,
   orgStatus,
   type OrgError,
   type OrgStatus,
@@ -21,8 +24,9 @@ const RECHECK_MS = 10 * 60 * 1000;
  * 设置 › 组织（只在桌面版里）。
  *
  * 公司自己部署了 Nissewyn Server（企业版）时，这台电脑在这里加入：填服务器
- * 地址和管理员给的加入码。设备密钥在系统的密钥库里，服务器只有公钥；公司
- * 拿不到模型账号、浏览器登录和密码。被管理员移出后回到“未加入”，说一次。
+ * 地址，然后用公司账号登录（系统浏览器里），或者填管理员给的加入码。设备
+ * 密钥在系统的密钥库里，服务器只有公钥；公司拿不到模型账号、浏览器登录和
+ * 密码。被管理员移出后回到“未加入”，说一次。
  */
 export function OrganizationPanel({ notify }: { notify: (message: string) => void }) {
   const [status, setStatus] = useState<OrgStatus | null>(null);
@@ -31,6 +35,8 @@ export function OrganizationPanel({ notify }: { notify: (message: string) => voi
   const [server, setServer] = useState("");
   const [code, setCode] = useState("");
   const [confirmLeave, setConfirmLeave] = useState(false);
+  /** The sign-in page's address while the browser is out signing in. */
+  const [signingIn, setSigningIn] = useState<string | null>(null);
 
   const check = useCallback(async () => {
     try {
@@ -67,6 +73,28 @@ export function OrganizationPanel({ notify }: { notify: (message: string) => voi
       setCode("");
       notify(t("这台电脑已加入 {name}", { name: joined.membership?.organization.name ?? "" }));
     });
+
+  async function signIn() {
+    setBusy(true);
+    setError(null);
+    try {
+      setSigningIn(await orgSsoBegin(server));
+      setBusy(false);
+      const joined = await orgSsoWait({
+        done: t("已登录。可以关掉这个页面，回到 Nissewyn。"),
+        failed: t("没有登录成功。回到 Nissewyn 看原因。"),
+      });
+      setStatus(joined);
+      setCode("");
+      notify(t("这台电脑已加入 {name}", { name: joined.membership?.organization.name ?? "" }));
+    } catch (failure) {
+      const problem = orgError(failure);
+      if (problem.code !== "sso_cancelled") setError(problem);
+    } finally {
+      setBusy(false);
+      setSigningIn(null);
+    }
+  }
 
   const refresh = () =>
     act(async () => {
@@ -107,7 +135,7 @@ export function OrganizationPanel({ notify }: { notify: (message: string) => voi
       {removed && (
         <div className="org-removed" role="status">
           <p>
-            {t("{name} 的管理员已把这台电脑移出组织（{when}）。要重新加入，请向管理员要一个新的加入码。", {
+            {t("{name} 的管理员已把这台电脑移出组织（{when}）。要重新加入，请用公司账号再登录一次，或向管理员要一个新的加入码。", {
               name: removed.organization,
               when: formatWhen(removed.at),
             })}
@@ -133,6 +161,12 @@ export function OrganizationPanel({ notify }: { notify: (message: string) => voi
                   {t("这台电脑：{name}", { name: membership.device_name })}
                 </small>
                 <small>
+                  {membership.user && (
+                    <>
+                      {t("登录为 {who}", { who: membership.user.email ?? membership.user.name ?? "" })}
+                      {" · "}
+                    </>
+                  )}
                   {t("加入于 {when}", { when: formatWhen(membership.joined_at) })}
                   {" · "}
                   {membership.last_contact
@@ -162,6 +196,17 @@ export function OrganizationPanel({ notify }: { notify: (message: string) => voi
             )}
           </div>
         </>
+      ) : signingIn ? (
+        <div className="org-signing-in" role="status">
+          <p>{t("已在浏览器里打开公司的登录页。登录后，这里会自动完成加入。")}</p>
+          <p className="proxy-note">{t("浏览器没有打开？把这个地址复制到浏览器里：")}</p>
+          <code className="org-sign-in-url">{signingIn}</code>
+          <div className="phone-actions">
+            <button type="button" onClick={() => void orgSsoCancel()}>
+              {t("取消")}
+            </button>
+          </div>
+        </div>
       ) : (
         <form
           className="proxy-form"
@@ -187,7 +232,7 @@ export function OrganizationPanel({ notify }: { notify: (message: string) => voi
               </span>
             </label>
             <label>
-              <strong>{t("加入码")}</strong>
+              <strong>{t("加入码（不用公司账号时）")}</strong>
               <span className="agent-run-input">
                 <input
                   type="text"
@@ -206,10 +251,14 @@ export function OrganizationPanel({ notify }: { notify: (message: string) => voi
           <div className="proxy-footer">
             <p className="proxy-note">
               <Building2 size={14} aria-hidden="true" />
-              {t("服务器地址和加入码向公司的 IT 管理员要。加入码有使用次数和有效期，用完或过期后要再要一个。")}
+              {t("服务器地址向公司的 IT 管理员要。公司开了单点登录时，用公司账号登录就行；否则填管理员给的加入码。")}
             </p>
+            <button type="button" className="primary" disabled={busy || !server.trim()} onClick={() => void signIn()}>
+              <LogIn size={14} aria-hidden="true" />
+              {t("用公司账号登录")}
+            </button>
             <button type="submit" disabled={busy || !server.trim() || !code.trim()}>
-              {busy ? t("正在加入…") : t("加入")}
+              {busy ? t("正在加入…") : t("用加入码加入")}
             </button>
           </div>
         </form>
@@ -257,6 +306,18 @@ export function explain(error: OrgError): string {
       return t("没能保存：{detail}", { detail });
     case "server_error":
       return t("服务器出错了：{detail}", { detail });
+    case "sso_off":
+      return t("这个服务器没有开单点登录，请用管理员给的加入码");
+    case "sso_failed":
+      return detail
+        ? t("没有登录成功：{detail}", { detail })
+        : t("没有登录成功，请再试一次");
+    case "sso_timeout":
+      return t("等了 10 分钟还没有登录完成，请再试一次");
+    case "bad_sso_code":
+      return t("这次登录已经过期，请再登录一次");
+    case "sso_not_started":
+      return t("登录没有开始，请再点一次“用公司账号登录”");
     case "desktop_only":
       return t("只有 Nissewyn 桌面版能加入组织");
     default:
