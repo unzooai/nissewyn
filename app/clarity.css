@@ -27836,7 +27836,8 @@ body {
 }
 .plugins-add-open:hover { color: var(--clarity-ink); border-color: var(--clarity-blue); }
 .plugins-add { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
-.plugins-add-actions { display: flex; gap: 6px; }
+.plugins-add-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.plugins-add-actions .plugins-add-choose { flex-basis: 100%; }
 .plugins-add-actions button { flex: 1; }
 .plugins-add input, .plugins-role input, .plugins-role select {
   padding: 7px 9px;

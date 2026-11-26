@@ -32,6 +32,7 @@ export const enPage11: Record<string, string> = {
   "推理强度": "Reasoning effort",
   "插件": "Plugins",
   "插件文件夹的路径": "Path to the plugin folder",
+  "选择文件夹…": "Choose folder…",
   "改本机的东西": "Changes things on this computer",
   "日志": "Log",
   "有自己的控制页面和状态，也给智能体提供工具；每个角色可以单独指定账号和模型。": "Each has its own control page and state, and gives agents tools. Every role can have its own account and model.",
