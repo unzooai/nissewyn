@@ -18,6 +18,7 @@ export type SettingsSectionId =
   | "agents"
   | "data"
   | "connectors"
+  | "organization"
   | "security";
 
 export type OnboardingStepId = "agent" | "profile" | "connectors" | "security" | "task";

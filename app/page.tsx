@@ -248,6 +248,7 @@ import { Conversations, type ConversationPlan } from "./conversations";
 import { SkillsPanel } from "./skills-panel";
 import { ClientsPanel } from "./clients-panel";
 import { PhonePanel } from "./phone-panel";
+import { OrganizationPanel } from "./organization-panel";
 import { TerminalPanel } from "./terminal-panel";
 import { TellRulesPanel } from "./tell-rules-panel";
 import { ProxyPanel } from "./proxy-panel";
@@ -1163,6 +1164,12 @@ const settingsSections: Array<{
     icon: Link2,
   },
   {
+    id: "organization",
+    label: t("组织"),
+    description: t("公司的 Nissewyn Server"),
+    icon: Building2,
+  },
+  {
     id: "security",
     label: t("安全"),
     description: t("边界与审计"),
@@ -1649,10 +1656,14 @@ export default function HomePage() {
   const [runtimeChecking, setRuntimeChecking] = useState(false);
   const [runtimeBrowser, setRuntimeBrowser] = useState<RuntimeBrowser | null>(null);
   const runtimeUsage = useMemo(() => (runtimeSnapshot ? usageSummary(runtimeSnapshot) : null), [runtimeSnapshot]);
+  // Only known in the browser: false for the server render, then the truth.
+  const [desktopApp, setDesktopApp] = useState(false);
+  useEffect(() => setDesktopApp(inDesktopApp()), []);
   // 设置的各节，按单机版说：没有团队；用量是 token；连接器是本机能力。
+  // 组织（加入公司的 Nissewyn Server）只有桌面版能做：设备密钥在系统密钥库里。
   const visibleSettingsSections = runtimeMode
     ? settingsSections
-        .filter((section) => section.id !== "team")
+        .filter((section) => section.id !== "team" && (section.id !== "organization" || desktopApp))
         .map((section) =>
           section.id === "usage"
             ? { ...section, description: t("智能体 token") }
@@ -1660,11 +1671,8 @@ export default function HomePage() {
               ? { ...section, label: t("能力"), description: t("终端、浏览器与智能体") }
               : section,
         )
-    : settingsSections;
+    : settingsSections.filter((section) => section.id !== "organization");
   const runtimeSent = useRef(new Map<string, string>());
-  // Only known in the browser: false for the server render, then the truth.
-  const [desktopApp, setDesktopApp] = useState(false);
-  useEffect(() => setDesktopApp(inDesktopApp()), []);
   // 桌面版：登录系统后在后台启动服务。null：还没读到，或这个系统不支持。
   const [autostart, setAutostartState] = useState<boolean | null>(null);
   useEffect(() => {
@@ -14521,6 +14529,8 @@ export default function HomePage() {
               </div>
             </section>
             )}
+
+            {runtimeMode && desktopApp && <OrganizationPanel notify={setNotice} />}
 
             <section className="settings-trust-center" id="settings-security">
               <header className="settings-trust-heading">

@@ -94,3 +94,42 @@ export async function revealPath(path: string): Promise<void> {
   if (!invoke) throw new Error(t("只有 Nissewyn 桌面版能打开本机文件夹"));
   await invoke("reveal_path", { path });
 }
+
+// ---- Settings › Organization (desktop app only; see src-tauri/src/org.rs) --------
+
+export type OrgMembership = {
+  server: string;
+  device_id: string;
+  device_name: string;
+  organization: { id: string; name: string };
+  joined_at: number;
+  last_contact: number | null;
+  problem: OrgError | null;
+};
+export type OrgStatus = {
+  membership: OrgMembership | null;
+  removed: { organization: string; at: number; message: string } | null;
+};
+/** A stable `code` the page words, and the server's or system's own `detail`. */
+export type OrgError = { code: string; detail: string };
+
+/** The `{code, detail}` a failed org command rejects with, from whatever was thrown. */
+export function orgError(failure: unknown): OrgError {
+  if (failure && typeof failure === "object" && "code" in failure) {
+    const { code, detail } = failure as Partial<OrgError>;
+    return { code: String(code), detail: String(detail ?? "") };
+  }
+  return { code: "other", detail: failure instanceof Error ? failure.message : String(failure) };
+}
+
+async function org<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  const invoke = tauri()?.core?.invoke;
+  if (!invoke) throw { code: "desktop_only", detail: "" } satisfies OrgError;
+  return (await invoke(command, args)) as T;
+}
+
+export const orgStatus = () => org<OrgStatus>("org_status");
+export const orgRefresh = () => org<OrgStatus>("org_refresh");
+export const orgJoin = (server: string, code: string) => org<OrgStatus>("org_join", { server, code });
+export const orgLeave = () => org<{ status: OrgStatus; server_not_told: boolean }>("org_leave");
+export const orgDismissRemoved = () => org<OrgStatus>("org_dismiss_removed");

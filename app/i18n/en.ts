@@ -11,6 +11,7 @@ import { enPage9 } from "./en-page-9";
 import { enPage10 } from "./en-page-10";
 import { enPage11 } from "./en-page-11";
 import { enPage12 } from "./en-page-12";
+import { enPage13 } from "./en-page-13";
 
 /**
  * English, keyed by the Chinese source text (see ./index.ts).
@@ -23,6 +24,7 @@ export const en: Record<string, string> = {
   ...enPage10,
   ...enPage11,
   ...enPage12,
+  ...enPage13,
   ...enPage9,
   ...enPage1,
   ...enPage2,

@@ -17,6 +17,8 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
+mod org;
+
 #[derive(Clone, Debug, Serialize)]
 struct CoreConnection {
     base: String,
@@ -454,6 +456,46 @@ async fn core_connection(state: tauri::State<'_, Connection>) -> Result<CoreConn
     Ok(found)
 }
 
+// ---- Settings › Organization (see org.rs) ---------------------------------------
+
+/// One membership change at a time: a join, a check and a leave never interleave.
+struct OrgState(tokio::sync::Mutex<org::Org>);
+
+fn org_state() -> OrgState {
+    let dir = unterm_protocol::state_dir().or_else(|| dirs_home().map(|h| h.join(".nissewyn"))).unwrap_or_default();
+    OrgState(tokio::sync::Mutex::new(org::Org::new(dir, Box::new(org::SystemKeyStore))))
+}
+
+#[tauri::command]
+async fn org_status(state: tauri::State<'_, OrgState>) -> Result<org::OrgStatus, org::OrgError> {
+    Ok(state.0.lock().await.status())
+}
+
+#[tauri::command]
+async fn org_check(state: tauri::State<'_, OrgState>, server: String) -> Result<org::ServerInfo, org::OrgError> {
+    state.0.lock().await.check(&server).await
+}
+
+#[tauri::command]
+async fn org_join(state: tauri::State<'_, OrgState>, server: String, code: String) -> Result<org::OrgStatus, org::OrgError> {
+    state.0.lock().await.join(&server, &code).await
+}
+
+#[tauri::command]
+async fn org_refresh(state: tauri::State<'_, OrgState>) -> Result<org::OrgStatus, org::OrgError> {
+    Ok(state.0.lock().await.refresh().await)
+}
+
+#[tauri::command]
+async fn org_leave(state: tauri::State<'_, OrgState>) -> Result<org::Left, org::OrgError> {
+    state.0.lock().await.leave().await
+}
+
+#[tauri::command]
+async fn org_dismiss_removed(state: tauri::State<'_, OrgState>) -> Result<org::OrgStatus, org::OrgError> {
+    state.0.lock().await.dismiss_removed()
+}
+
 fn port_of(base: &str) -> u16 {
     base.rsplit(':').next().and_then(|p| p.parse().ok()).unwrap_or(0)
 }
@@ -474,6 +516,7 @@ fn main() {
     }
     tauri::Builder::default()
         .manage(Connection(Mutex::new(None)))
+        .manage(org_state())
         .setup(|_| {
             // Start the Core while the window is still painting.
             std::thread::spawn(|| {
@@ -483,7 +526,19 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![core_connection, reveal_path, pick_folder, autostart_get, autostart_set])
+        .invoke_handler(tauri::generate_handler![
+            core_connection,
+            reveal_path,
+            pick_folder,
+            autostart_get,
+            autostart_set,
+            org_status,
+            org_check,
+            org_join,
+            org_refresh,
+            org_leave,
+            org_dismiss_removed
+        ])
         .run(tauri::generate_context!())
         .expect("Nissewyn could not start");
 }

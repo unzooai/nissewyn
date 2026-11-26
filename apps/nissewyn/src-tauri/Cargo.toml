@@ -20,6 +20,26 @@ serde_json = "1"
 # has to agree on.
 unterm-protocol = { path = "../../../unterm/unterm-protocol" }
 rfd = "0.15"
+# Settings › Organization: joining a company's own Nissewyn Server.
+# native-tls: the system's TLS, so a company's internal root CA is trusted
+# the way the rest of the computer trusts it.
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+sha2 = "0.10"
+hex = "0.4"
+base64 = "0.22"
+# The device key in the system's key store; same crate and backends as the
+# runtime's profile secrets (unterm-profile).
+keyring = { version = "2.3", default-features = false, features = [
+  "platform-macos",
+  "platform-windows",
+  "linux-secret-service-rt-async-io-crypto-rust",
+] }
+tokio = { version = "1", features = ["sync"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [profile.release]
 strip = true
