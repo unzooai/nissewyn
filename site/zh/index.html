@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nissewyn — 住在你电脑里的 AI 小帮手</title>
-<meta name="description" content="Nissewyn 给 Claude Code、Codex、通义千问 Qwen Code、Kimi Code、Antigravity CLI、OpenCode 以及 DeepSeek / Qwen / Kimi / GLM / 豆包等 API 模型一台电脑：不会断的终端、带你登录状态的真浏览器、本地插件与你定的规矩。">
+<title>小尼（Nissewyn）— 住在你电脑里的 AI 小帮手</title>
+<meta name="description" content="小尼（Nissewyn）给 Claude Code、Codex、通义千问 Qwen Code、Kimi Code、Antigravity CLI、OpenCode 以及 DeepSeek / Qwen / Kimi / GLM / 豆包等 API 模型一台电脑：不会断的终端、带你登录状态的真浏览器、本地插件与你定的规矩。">
 <link rel="canonical" href="https://nissewyn.com/zh/">
 <meta name="theme-color" content="#13273f">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Nissewyn">
+<meta property="og:site_name" content="小尼 Nissewyn">
 <meta property="og:url" content="https://nissewyn.com/zh/">
-<meta property="og:title" content="Nissewyn — 住在你电脑里的 AI 小帮手">
+<meta property="og:title" content="小尼（Nissewyn）— 住在你电脑里的 AI 小帮手">
 <meta property="og:description" content="你睡觉时它干活，数据不出门。持久终端、真浏览器、本地插件、国产模型与 API 开箱即用、你定的安全规矩。">
 <meta property="og:image" content="https://nissewyn.com/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -20,12 +20,12 @@
 <link rel="alternate" hreflang="en" href="https://nissewyn.com/">
 <link rel="alternate" hreflang="zh" href="https://nissewyn.com/zh/">
 <link rel="alternate" hreflang="x-default" href="https://nissewyn.com/">
-<link rel="stylesheet" href="/styles.css?v=6">
+<link rel="stylesheet" href="/styles.css?v=7">
 </head>
 <body>
 
 <nav class="nav"><div class="wrap">
-  <a class="brand" href="/zh/"><img src="/mark.svg" alt="">Nissewyn</a>
+  <a class="brand" href="/zh/"><img src="/mark.svg" alt="">小尼 Nissewyn</a>
   <div class="nav-links">
     <a href="#agents" class="hide-sm">智能体</a>
     <a href="/zh/plugins/" class="hide-sm">插件指南</a>
@@ -42,9 +42,9 @@
   <div class="wrap">
     <div class="hero-grid">
       <div>
-        <span class="eyebrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 12l-7.4 3.1L12 22l-2.6-6.9L2 12l7.4-3.1z"/></svg>v0.1.7 · 支持 macOS 与 Windows · 源码公开</span>
-        <h1>住在你电脑里的 AI <em>小帮手</em>。</h1>
-        <p class="lede"><strong>你睡觉时它干活，数据不出门。</strong>智能体已经够聪明了，缺的是一个干活的地方。Nissewyn 给它们一个不会断的终端、一个带你登录状态的真浏览器、可扩展的本地插件，以及你定的规矩——都在你自己的电脑上。</p>
+        <span class="eyebrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 12l-7.4 3.1L12 22l-2.6-6.9L2 12l7.4-3.1z"/></svg>v0.1.7 · 支持 macOS / Windows / Linux · 源码公开</span>
+        <h1><em>小尼</em>，住在你电脑里的 AI 小帮手。</h1>
+        <p class="lede"><strong>你睡觉时它干活，数据不出门。</strong>智能体已经够聪明了，缺的是一个干活的地方。小尼（Nissewyn）给它们一个不会断的终端、一个带你登录状态的真浏览器、可扩展的本地插件，以及你定的规矩——都在你自己的电脑上。</p>
         <p class="agents">支持 <b>Claude Code</b>、<b>Codex</b>、<b>通义千问 Qwen Code</b>、<b>Kimi Code</b>、<b>Antigravity CLI</b>、<b>OpenCode</b>，以及免装 CLI 的 <b>API 模型</b>（DeepSeek / Qwen / Kimi / GLM / 豆包 / Ollama 等）。</p>
         <div class="cta">
           <a class="btn primary" href="#download">下载 v0.1.7</a>
@@ -293,6 +293,15 @@ saved  发票-10月.xlsx
       <p>适用于 macOS 12 及以上的 M 系列芯片（M1 / M2 / M3 / M4）签名 <code>.dmg</code> 安装包，内置后台服务、API Agent、CLI 与全套技能。</p>
       <p class="dl-meta">Nissewyn_0.1.7_aarch64.dmg · 约 26 MB</p>
       <a class="btn primary" href="https://github.com/unzooai/nissewyn/releases/download/v0.1.7/Nissewyn_0.1.7_aarch64.dmg">下载 macOS 版</a>
+    </div>
+    <div class="card dl-card">
+      <div class="dl-head">
+        <h3>Linux（x86_64）</h3>
+        <span class="dl-ver">.deb · .AppImage</span>
+      </div>
+      <p>提供 Ubuntu / Debian <code>.deb</code> 安装包与便携 <code>.AppImage</code>，内置后台服务、API Agent 与命令行工具。</p>
+      <p class="dl-meta">前往 GitHub Releases 下载，或运行 <code>bash apps/nissewyn/build-linux.sh</code></p>
+      <a class="btn" href="https://github.com/unzooai/nissewyn/releases/latest">下载 Linux 版</a>
     </div>
     <div class="card dl-card">
       <div class="dl-head">

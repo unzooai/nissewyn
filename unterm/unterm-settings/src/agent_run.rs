@@ -119,6 +119,14 @@ fn unzoo_service_path() -> Option<std::path::PathBuf> {
             );
         }
     }
+    #[cfg(target_os = "linux")]
+    {
+        candidates.push(std::path::PathBuf::from("/usr/bin/unzoo-service"));
+        candidates.push(std::path::PathBuf::from("/opt/unzoo-browser/unzoo-service"));
+        if let Some(home) = std::env::var_os("HOME").map(std::path::PathBuf::from) {
+            candidates.push(home.join(".local").join("bin").join("unzoo-service"));
+        }
+    }
     candidates.into_iter().find(|p| p.is_file())
 }
 
