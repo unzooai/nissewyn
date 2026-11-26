@@ -1,0 +1,96 @@
+name: release-windows
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach Windows MSI installers to (e.g. v0.1.7)"
+        required: true
+        default: "v0.1.7"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2022
+    env:
+      RUSTUP_WINDOWS_PATH_ADD_BIN: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            unterm -> target
+            apps/nissewyn/src-tauri -> target
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Prepare optional Windows signing certificate
+        shell: pwsh
+        env:
+          UNZOO_SIGN_PFX_B64: ${{ secrets.UNZOO_SIGN_PFX_B64 }}
+          UNZOO_SIGN_PFX_PASSWORD: ${{ secrets.UNZOO_SIGN_PFX_PASSWORD }}
+        run: |
+          if ($env:UNZOO_SIGN_PFX_B64) {
+            $pfx = Join-Path $env:RUNNER_TEMP "unzoo-sign.pfx"
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:UNZOO_SIGN_PFX_B64))
+            "UNZOO_SIGN_PFX=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Write-Host "Loaded signing certificate from secrets."
+          } else {
+            Write-Host "No UNZOO_SIGN_PFX_B64 secret configured; building unsigned MSI."
+          }
+
+      - name: Build Windows MSI installers (en-US & zh-CN)
+        shell: pwsh
+        env:
+          UNZOO_SIGN_PFX_PASSWORD: ${{ secrets.UNZOO_SIGN_PFX_PASSWORD }}
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps\nissewyn\build-installer.ps1
+
+      - name: Upload Windows MSI installers to GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ steps.tag.outputs.name }}
+        run: |
+          $dir = "apps\nissewyn\src-tauri\target\release\bundle\msi"
+          $msis = Get-ChildItem $dir -Filter *.msi | ForEach-Object { $_.FullName }
+          if (-not $msis -or $msis.Count -eq 0) {
+            throw "No MSI artifacts found in $dir"
+          }
+          Write-Host "Uploading MSI artifacts to $($env:TAG_NAME):"
+          $msis | ForEach-Object { Write-Host "  $_" }
+          gh release view $env:TAG_NAME *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG_NAME @msis --clobber
+          } else {
+            gh release create $env:TAG_NAME @msis --title "Nissewyn $($env:TAG_NAME)" --generate-notes
+          }
+          if ($LASTEXITCODE -ne 0) { throw "gh release upload failed" }
