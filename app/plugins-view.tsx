@@ -1,8 +1,9 @@
 "use client";
 
-import { FolderPlus, Puzzle, RefreshCw, RotateCcw, ScrollText, Settings2, Trash2 } from "lucide-react";
+import { FolderOpen, FolderPlus, Puzzle, RefreshCw, RotateCcw, ScrollText, Settings2, Trash2 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { locale, t } from "./i18n";
+import { inDesktopApp, pickFolder } from "./lib/core-connection";
 import type {
   RuntimeAgentModel,
   RuntimePlugin,
@@ -237,8 +238,8 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
     }
   }
 
-  async function add() {
-    const folder = dir.trim();
+  async function add(chosen?: string) {
+    const folder = (chosen ?? dir).trim();
     if (!folder) return;
     await act(async () => {
       const id = await runtime.addPlugin(folder);
@@ -247,6 +248,19 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
       setDir("");
       setAdding(false);
     }, t("加好了。看一下它要什么，再打开它。"));
+  }
+
+  /** The system's folder picker (desktop app); a chosen folder is added at once. */
+  async function choose() {
+    try {
+      const picked = await pickFolder(dir);
+      if (picked) {
+        setDir(picked);
+        await add(picked);
+      }
+    } catch (failure) {
+      notify(t("没能打开文件夹选择：{error}", { error: errorText(failure) }));
+    }
   }
 
   const effectiveTab = plugin && tab === "page" && !plugin.hasPage ? "settings" : tab;
@@ -311,6 +325,12 @@ export function PluginsView({ runtime, notify }: { runtime: Port; notify: (messa
               aria-label={t("插件文件夹的路径")}
             />
             <div className="plugins-add-actions">
+              {inDesktopApp() && (
+                <button type="button" className="plugins-add-choose" onClick={() => void choose()} disabled={busy}>
+                  <FolderOpen size={13} aria-hidden="true" />
+                  {t("选择文件夹…")}
+                </button>
+              )}
               <button type="submit" disabled={busy || !dir.trim()}>
                 {t("添加")}
               </button>
