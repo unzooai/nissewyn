@@ -458,42 +458,91 @@ async fn core_connection(state: tauri::State<'_, Connection>) -> Result<CoreConn
 
 // ---- Settings › Organization (see org.rs) ---------------------------------------
 
-/// One membership change at a time: a join, a check and a leave never interleave.
-struct OrgState(tokio::sync::Mutex<org::Org>);
+/// One membership change at a time: a join, a check and a leave never
+/// interleave. A sign-in waiting for the browser holds none of it: the page
+/// keeps working (and can cancel) while the person signs in.
+struct OrgState {
+    org: tokio::sync::Mutex<org::Org>,
+    sso: Mutex<Option<org::SsoPending>>,
+    cancel: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+}
 
 fn org_state() -> OrgState {
     let dir = unterm_protocol::state_dir().or_else(|| dirs_home().map(|h| h.join(".nissewyn"))).unwrap_or_default();
-    OrgState(tokio::sync::Mutex::new(org::Org::new(dir, Box::new(org::SystemKeyStore))))
+    OrgState {
+        org: tokio::sync::Mutex::new(org::Org::new(dir, Box::new(org::SystemKeyStore))),
+        sso: Mutex::new(None),
+        cancel: Mutex::new(None),
+    }
 }
 
 #[tauri::command]
 async fn org_status(state: tauri::State<'_, OrgState>) -> Result<org::OrgStatus, org::OrgError> {
-    Ok(state.0.lock().await.status())
+    Ok(state.org.lock().await.status())
 }
 
 #[tauri::command]
 async fn org_check(state: tauri::State<'_, OrgState>, server: String) -> Result<org::ServerInfo, org::OrgError> {
-    state.0.lock().await.check(&server).await
+    state.org.lock().await.check(&server).await
 }
 
 #[tauri::command]
 async fn org_join(state: tauri::State<'_, OrgState>, server: String, code: String) -> Result<org::OrgStatus, org::OrgError> {
-    state.0.lock().await.join(&server, &code).await
+    state.org.lock().await.join(&server, &code).await
+}
+
+/// Joining by signing in, part one: opens the server's sign-in page in the
+/// system browser and returns its address (for "the browser did not open").
+#[tauri::command]
+async fn org_sso_begin(state: tauri::State<'_, OrgState>, server: String) -> Result<String, org::OrgError> {
+    let pending = state.org.lock().await.begin_sso(&server).await?;
+    let url = pending.url.clone();
+    // A newer sign-in replaces an older one still waiting.
+    if let Some(cancel) = state.cancel.lock().unwrap().take() {
+        let _ = cancel.send(());
+    }
+    *state.sso.lock().unwrap() = Some(pending);
+    if let Err(e) = open::that_detached(&url) {
+        eprintln!("nissewyn: could not open the browser: {e}");
+    }
+    Ok(url)
+}
+
+/// Part two: waits for the browser to come back, then joins.
+#[tauri::command]
+async fn org_sso_wait(state: tauri::State<'_, OrgState>, page: org::SsoPage) -> Result<org::OrgStatus, org::OrgError> {
+    let pending = state.sso.lock().unwrap().take().ok_or_else(|| org::OrgError {
+        code: "sso_not_started".into(),
+        detail: String::new(),
+    })?;
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    *state.cancel.lock().unwrap() = Some(tx);
+    let code = org::wait_for_browser(&pending, &page, rx, org::SSO_WAIT).await;
+    state.cancel.lock().unwrap().take();
+    state.org.lock().await.finish_sso(&pending, &code?).await
+}
+
+#[tauri::command]
+fn org_sso_cancel(state: tauri::State<'_, OrgState>) {
+    state.sso.lock().unwrap().take();
+    if let Some(cancel) = state.cancel.lock().unwrap().take() {
+        let _ = cancel.send(());
+    }
 }
 
 #[tauri::command]
 async fn org_refresh(state: tauri::State<'_, OrgState>) -> Result<org::OrgStatus, org::OrgError> {
-    Ok(state.0.lock().await.refresh().await)
+    Ok(state.org.lock().await.refresh().await)
 }
 
 #[tauri::command]
 async fn org_leave(state: tauri::State<'_, OrgState>) -> Result<org::Left, org::OrgError> {
-    state.0.lock().await.leave().await
+    state.org.lock().await.leave().await
 }
 
 #[tauri::command]
 async fn org_dismiss_removed(state: tauri::State<'_, OrgState>) -> Result<org::OrgStatus, org::OrgError> {
-    state.0.lock().await.dismiss_removed()
+    state.org.lock().await.dismiss_removed()
 }
 
 fn port_of(base: &str) -> u16 {
@@ -535,6 +584,9 @@ fn main() {
             org_status,
             org_check,
             org_join,
+            org_sso_begin,
+            org_sso_wait,
+            org_sso_cancel,
             org_refresh,
             org_leave,
             org_dismiss_removed

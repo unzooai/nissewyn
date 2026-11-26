@@ -28341,6 +28341,32 @@ body {
   margin: 0;
 }
 
+.org-group .proxy-footer > button.primary {
+  border-color: var(--clarity-blue);
+  background: var(--clarity-blue);
+  color: #fff;
+}
+
+.org-signing-in {
+  margin: 14px 22px 20px;
+  font-size: 13px;
+}
+
+.org-signing-in p {
+  margin: 0 0 8px;
+}
+
+.org-sign-in-url {
+  display: block;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--clarity-line-strong);
+  border-radius: 7px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 /* Settings › Preferences › Network proxy */
 .proxy-group > .skills-intro,
 .proxy-group > .skills-empty {

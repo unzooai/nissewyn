@@ -102,6 +102,8 @@ export type OrgMembership = {
   device_id: string;
   device_name: string;
   organization: { id: string; name: string };
+  /** Who signed in to join; null when it joined with a join code. */
+  user?: { email: string | null; name: string | null } | null;
   joined_at: number;
   last_contact: number | null;
   problem: OrgError | null;
@@ -131,5 +133,10 @@ async function org<T>(command: string, args?: Record<string, unknown>): Promise<
 export const orgStatus = () => org<OrgStatus>("org_status");
 export const orgRefresh = () => org<OrgStatus>("org_refresh");
 export const orgJoin = (server: string, code: string) => org<OrgStatus>("org_join", { server, code });
+/** Joining by signing in: opens the sign-in page in the system browser and returns its address. */
+export const orgSsoBegin = (server: string) => org<string>("org_sso_begin", { server });
+/** Waits for the browser to come back; `page` is what that tab then says, in the person's language. */
+export const orgSsoWait = (page: { done: string; failed: string }) => org<OrgStatus>("org_sso_wait", { page });
+export const orgSsoCancel = () => org<void>("org_sso_cancel");
 export const orgLeave = () => org<{ status: OrgStatus; server_not_told: boolean }>("org_leave");
 export const orgDismissRemoved = () => org<OrgStatus>("org_dismiss_removed");

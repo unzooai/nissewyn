@@ -1,8 +1,14 @@
 //! Settings › Organization: this computer joins a company's own Nissewyn
 //! Server (the enterprise edition, which the company runs itself).
 //!
-//! Joining takes the server's address and a join code from an admin. The
-//! computer makes an ed25519 key of its own; the private half goes into the
+//! Joining takes the server's address and either a join code from an admin
+//! or a sign-in with the company account: the system browser opens the
+//! server's sign-in page, and after the person signs in at the company's
+//! identity provider the browser comes back to a loopback address on this
+//! computer with a one-time code, which only this computer can use (PKCE).
+//! No token from the identity provider ever reaches this computer.
+//!
+//! Either way the computer makes an ed25519 key of its own; the private half goes into the
 //! system's key store (Credential Manager, Keychain, Secret Service) and never
 //! leaves it, the server keeps only the public half. Every later request is
 //! signed with it (`METHOD\nPATH?QUERY\nUNIX-SECONDS\nsha256-hex(body)`).
@@ -15,6 +21,8 @@
 
 use std::path::PathBuf;
 use std::time::Duration;
+
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use base64::Engine;
 use ed25519_dalek::{Signer, SigningKey};
@@ -35,6 +43,21 @@ pub struct Organization {
     pub name: String,
 }
 
+/// The person this computer joined as, when it joined by signing in.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Person {
+    pub email: Option<String>,
+    pub name: Option<String>,
+}
+
+impl Person {
+    fn from_json(v: &serde_json::Value) -> Option<Person> {
+        let text = |k: &str| v[k].as_str().map(str::to_string).filter(|s| !s.is_empty());
+        let p = Person { email: text("email"), name: text("name") };
+        (p.email.is_some() || p.name.is_some()).then_some(p)
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Membership {
     /// `https://nissewyn.acme.example`, no trailing slash.
@@ -42,6 +65,9 @@ pub struct Membership {
     pub device_id: String,
     pub device_name: String,
     pub organization: Organization,
+    /// Who signed in to join; none when it joined with a join code.
+    #[serde(default)]
+    pub user: Option<Person>,
     /// Unix seconds.
     pub joined_at: i64,
     /// When the server last said this computer is in, unix seconds.
@@ -84,6 +110,8 @@ pub type OrgResult<T> = Result<T, OrgError>;
 pub struct ServerInfo {
     pub server: String,
     pub version: String,
+    /// The server offers signing in with the company account.
+    pub sso: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -196,6 +224,8 @@ fn refusal(status: u16, body: &serde_json::Value) -> OrgError {
         (426, _) => OrgError::new("protocol_mismatch", message),
         (_, "bad_join_code") => OrgError::new("bad_join_code", message),
         (_, "key_in_use") => OrgError::new("key_in_use", message),
+        (_, "bad_sso_code") => OrgError::new("bad_sso_code", message),
+        (_, "sso_off") => OrgError::new("sso_off", message),
         (_, "device_removed") => OrgError::new("device_removed", message),
         (_, "device_refused") => OrgError::new("device_refused", message),
         _ if message.is_empty() => OrgError::new("server_error", format!("HTTP {status}")),
@@ -293,7 +323,11 @@ impl Org {
         if body["database"] != "ok" {
             return Err(OrgError::new("server_degraded", body["database"].as_str().unwrap_or_default()));
         }
-        Ok(ServerInfo { server, version: body["version"].as_str().unwrap_or_default().to_string() })
+        Ok(ServerInfo {
+            server,
+            version: body["version"].as_str().unwrap_or_default().to_string(),
+            sso: body["sso"].as_bool().unwrap_or(false),
+        })
     }
 
     /// Join with a code from an admin.
@@ -305,20 +339,63 @@ impl Org {
             return Err(OrgError::new("code_missing", ""));
         }
         let info = self.check(typed_server).await?;
+        self.enroll(&info.server, serde_json::json!({ "code": code.trim() })).await
+    }
+
+    /// The first half of joining by signing in: a loopback address to come
+    /// back to and the server's sign-in page to open in the browser.
+    pub async fn begin_sso(&self, typed_server: &str) -> OrgResult<SsoPending> {
+        if self.read().membership.is_some() {
+            return Err(OrgError::new("already_joined", ""));
+        }
+        let info = self.check(typed_server).await?;
+        if !info.sso {
+            return Err(OrgError::new("sso_off", ""));
+        }
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .map_err(|e| OrgError::new("sso_failed", e.to_string()))?;
+        let port = listener.local_addr().map_err(|e| OrgError::new("sso_failed", e.to_string()))?.port();
+        let verifier = random_token(32);
+        let state = random_token(16);
+        let mut url = reqwest::Url::parse(&format!("{}/sso/desktop", info.server))
+            .map_err(|e| OrgError::new("server_unreadable", e.to_string()))?;
+        url.query_pairs_mut()
+            .append_pair("redirect_uri", &format!("http://127.0.0.1:{port}/callback"))
+            .append_pair("state", &state)
+            .append_pair("code_challenge", &pkce_challenge(&verifier))
+            .append_pair("code_challenge_method", "S256");
+        Ok(SsoPending { listener, server: info.server, state, verifier, url: url.into() })
+    }
+
+    /// The second half: the one-time code the browser brought back, traded
+    /// (with the verifier only this computer has) for a device.
+    pub async fn finish_sso(&self, pending: &SsoPending, code: &str) -> OrgResult<OrgStatus> {
+        if self.read().membership.is_some() {
+            return Err(OrgError::new("already_joined", ""));
+        }
+        self.enroll(&pending.server, serde_json::json!({ "sso_code": code, "code_verifier": pending.verifier })).await
+    }
+
+    /// A new device key, its public half sent with how this computer may
+    /// join (`how`: a join code, or a sign-in's code and verifier).
+    async fn enroll(&self, server: &str, how: serde_json::Value) -> OrgResult<OrgStatus> {
         let key = SigningKey::generate(&mut rand_core::OsRng);
         let engine = base64::engine::general_purpose::STANDARD;
         // Into the key store first: a computer that joined must be able to prove it.
         self.keys.save(&engine.encode(key.to_bytes())).map_err(|e| OrgError::new("key_store", e))?;
         let name = device_name();
-        let body = serde_json::json!({
-            "code": code.trim(),
+        let mut body = serde_json::json!({
             "public_key": engine.encode(key.verifying_key().to_bytes()),
             "name": name,
             "os": std::env::consts::OS,
             "app_version": env!("CARGO_PKG_VERSION"),
             "protocol": PROTOCOL_VERSION,
         });
-        let sent = self.http.post(format!("{}/api/v1/devices/enroll", info.server)).json(&body).send().await;
+        if let (Some(body), Some(how)) = (body.as_object_mut(), how.as_object()) {
+            body.extend(how.clone());
+        }
+        let sent = self.http.post(format!("{server}/api/v1/devices/enroll")).json(&body).send().await;
         let (status, answer) = match sent {
             Ok(res) => Self::answer(res).await,
             Err(e) => {
@@ -331,13 +408,14 @@ impl Org {
             return Err(refusal(status, &answer));
         }
         let membership = Membership {
-            server: info.server,
+            server: server.to_string(),
             device_id: answer["device_id"].as_str().unwrap_or_default().to_string(),
             device_name: name,
             organization: Organization {
                 id: answer["organization"]["id"].as_str().unwrap_or_default().to_string(),
                 name: answer["organization"]["name"].as_str().unwrap_or_default().to_string(),
             },
+            user: Person::from_json(&answer["user"]),
             joined_at: now(),
             last_contact: Some(now()),
             problem: None,
@@ -377,6 +455,7 @@ impl Org {
                 if let Some(name) = body["organization"]["name"].as_str() {
                     m.organization.name = name.to_string();
                 }
+                m.user = Person::from_json(&body["user"]);
                 m.last_contact = Some(now());
                 m.problem = None;
                 saved.membership = Some(m);
@@ -420,6 +499,117 @@ impl Org {
         self.write(&saved)?;
         Ok(self.status())
     }
+}
+
+// ---- signing in: the browser comes back to this computer ---------------------------
+
+/// How long a person has to sign in before the wait gives up.
+pub const SSO_WAIT: Duration = Duration::from_secs(10 * 60);
+
+/// A sign-in in progress: where the browser comes back to, and what only
+/// this computer knows.
+pub struct SsoPending {
+    listener: tokio::net::TcpListener,
+    server: String,
+    state: String,
+    verifier: String,
+    /// The server's sign-in page, for the browser.
+    pub url: String,
+}
+
+/// What the browser tab shows when it comes back, in the person's language
+/// (the page passes it in).
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct SsoPage {
+    pub done: String,
+    pub failed: String,
+}
+
+fn random_token(bytes: usize) -> String {
+    let mut raw = vec![0u8; bytes];
+    rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut raw);
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(raw)
+}
+
+fn pkce_challenge(verifier: &str) -> String {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()))
+}
+
+/// Waits for the browser to come back with a code, until `cancel` fires or
+/// `limit` passes. Other requests (a favicon, a wrong state) are answered and
+/// the wait goes on.
+pub async fn wait_for_browser(
+    pending: &SsoPending,
+    page: &SsoPage,
+    mut cancel: tokio::sync::oneshot::Receiver<()>,
+    limit: Duration,
+) -> OrgResult<String> {
+    let accept = async {
+        loop {
+            let Ok((stream, _)) = pending.listener.accept().await else { continue };
+            if let Some(outcome) = serve_one(stream, &pending.state, page).await {
+                return outcome;
+            }
+        }
+    };
+    tokio::select! {
+        outcome = accept => outcome,
+        Ok(()) = &mut cancel => Err(OrgError::new("sso_cancelled", "")),
+        _ = tokio::time::sleep(limit) => Err(OrgError::new("sso_timeout", "")),
+    }
+}
+
+/// One request to the loopback address. `None`: not the sign-in coming
+/// back, keep waiting.
+async fn serve_one(mut stream: tokio::net::TcpStream, state: &str, page: &SsoPage) -> Option<OrgResult<String>> {
+    let mut buf = Vec::with_capacity(2048);
+    let read = tokio::time::timeout(Duration::from_secs(5), async {
+        let mut chunk = [0u8; 2048];
+        while !buf.windows(4).any(|w| w == b"\r\n\r\n") && buf.len() < 16 * 1024 {
+            match stream.read(&mut chunk).await {
+                Ok(0) | Err(_) => break,
+                Ok(n) => buf.extend_from_slice(&chunk[..n]),
+            }
+        }
+    })
+    .await;
+    if read.is_err() {
+        return None;
+    }
+    let head = String::from_utf8_lossy(&buf);
+    let target = head.lines().next().and_then(|l| l.strip_prefix("GET ")).and_then(|l| l.split(' ').next()).unwrap_or("");
+    let url = reqwest::Url::parse(&format!("http://127.0.0.1{target}")).ok();
+    let Some(url) = url.filter(|u| u.path() == "/callback") else {
+        respond(&mut stream, "404 Not Found", "").await;
+        return None;
+    };
+    let q: std::collections::HashMap<String, String> = url.query_pairs().into_owned().collect();
+    if q.get("state").map(String::as_str) != Some(state) {
+        // Not this sign-in's: an old tab, or someone else's page trying its luck.
+        respond(&mut stream, "400 Bad Request", &page.failed).await;
+        return None;
+    }
+    if let Some(code) = q.get("code").filter(|c| !c.is_empty()) {
+        respond(&mut stream, "200 OK", &page.done).await;
+        return Some(Ok(code.clone()));
+    }
+    let why = q.get("error_description").or(q.get("error")).cloned().unwrap_or_default();
+    respond(&mut stream, "200 OK", &format!("{}\n\n{why}", page.failed)).await;
+    Some(Err(OrgError::new("sso_failed", why)))
+}
+
+async fn respond(stream: &mut tokio::net::TcpStream, status: &str, text: &str) {
+    let esc = text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('\n', "<br>");
+    let body = format!(
+        "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Nissewyn</title>\
+         <body style=\"font:16px/1.5 system-ui,sans-serif;max-width:34rem;margin:4rem auto;padding:0 1rem\"><p>{esc}</p></body>"
+    );
+    let res = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\nCache-Control: no-store\r\n\r\n{body}",
+        body.len()
+    );
+    let _ = stream.write_all(res.as_bytes()).await;
+    let _ = stream.shutdown().await;
 }
 
 #[cfg(test)]
@@ -479,6 +669,63 @@ mod tests {
         assert_eq!(refusal(502, &serde_json::Value::Null), OrgError::new("server_error", "HTTP 502"));
     }
 
+    fn page() -> SsoPage {
+        SsoPage { done: "Signed in".into(), failed: "Not signed in".into() }
+    }
+
+    async fn pending() -> SsoPending {
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        SsoPending { listener, server: "http://127.0.0.1:9".into(), state: "st".into(), verifier: "v".into(), url: String::new() }
+    }
+
+    fn base(p: &SsoPending) -> String {
+        format!("http://127.0.0.1:{}", p.listener.local_addr().unwrap().port())
+    }
+
+    #[test]
+    fn the_pkce_example_from_rfc_7636() {
+        assert_eq!(pkce_challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"), "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+    }
+
+    #[tokio::test]
+    async fn the_browser_comes_back_with_a_code() {
+        let p = pending().await;
+        let at = base(&p);
+        let browser = tokio::spawn(async move {
+            let http = reqwest::Client::new();
+            // What a browser asks on its own, and an old tab's return: answered, ignored.
+            assert_eq!(http.get(format!("{at}/favicon.ico")).send().await.unwrap().status(), 404);
+            assert_eq!(http.get(format!("{at}/callback?state=old&code=x")).send().await.unwrap().status(), 400);
+            let res = http.get(format!("{at}/callback?state=st&code=c%2B1")).send().await.unwrap();
+            res.text().await.unwrap()
+        });
+        let (_tx, rx) = tokio::sync::oneshot::channel();
+        assert_eq!(wait_for_browser(&p, &page(), rx, Duration::from_secs(10)).await.unwrap(), "c+1");
+        assert!(browser.await.unwrap().contains("Signed in"));
+    }
+
+    #[tokio::test]
+    async fn a_failed_sign_in_says_why() {
+        let p = pending().await;
+        let at = base(&p);
+        tokio::spawn(async move {
+            reqwest::get(format!("{at}/callback?state=st&error=sso_failed&error_description=User+not+assigned+%3Cb%3E")).await.unwrap();
+        });
+        let (_tx, rx) = tokio::sync::oneshot::channel();
+        let e = wait_for_browser(&p, &page(), rx, Duration::from_secs(10)).await.unwrap_err();
+        assert_eq!(e, OrgError::new("sso_failed", "User not assigned <b>"));
+    }
+
+    #[tokio::test]
+    async fn waiting_can_be_cancelled_or_run_out() {
+        let p = pending().await;
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        tx.send(()).unwrap();
+        assert_eq!(wait_for_browser(&p, &page(), rx, Duration::from_secs(10)).await.unwrap_err().code, "sso_cancelled");
+        let (_tx, rx) = tokio::sync::oneshot::channel();
+        assert_eq!(wait_for_browser(&p, &page(), rx, Duration::from_millis(50)).await.unwrap_err().code, "sso_timeout");
+    }
+
     fn scratch() -> PathBuf {
         let dir = std::env::temp_dir().join(format!("nissewyn-org-test-{}", rand_core::RngCore::next_u64(&mut rand_core::OsRng)));
         std::fs::create_dir_all(&dir).unwrap();
@@ -506,6 +753,30 @@ mod tests {
         assert!(left.server_not_told);
         assert!(left.status.membership.is_none());
         assert_eq!(org.keys.load().unwrap(), None);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// Signing in for real: a Nissewyn Server with single sign-on at
+    /// `NISSEWYN_TEST_SERVER`; the sign-in page's address is written to
+    /// `NISSEWYN_TEST_SSO_URL_FILE` for a browser (or a person) to finish.
+    #[tokio::test]
+    #[ignore]
+    async fn signs_in_at_a_real_server() {
+        let server = std::env::var("NISSEWYN_TEST_SERVER").expect("NISSEWYN_TEST_SERVER");
+        let out = std::env::var("NISSEWYN_TEST_SSO_URL_FILE").expect("NISSEWYN_TEST_SSO_URL_FILE");
+        let dir = scratch();
+        let org = Org::new(dir.clone(), Box::new(MemoryKeys::default()));
+        let pending = org.begin_sso(&server).await.unwrap();
+        std::fs::write(&out, &pending.url).unwrap();
+        let (_tx, rx) = tokio::sync::oneshot::channel();
+        let code = wait_for_browser(&pending, &page(), rx, Duration::from_secs(300)).await.unwrap();
+        let joined = org.finish_sso(&pending, &code).await.unwrap().membership.unwrap();
+        let who = joined.user.clone().expect("joined as a person");
+        println!("joined {} as {:?} ({:?})", joined.organization.name, who.email, who.name);
+        assert!(who.email.is_some());
+        // The code was good once.
+        assert_eq!(org.leave().await.unwrap().server_not_told, false);
+        assert_eq!(org.enroll(&pending.server, serde_json::json!({"sso_code": code, "code_verifier": pending.verifier})).await.unwrap_err().code, "bad_sso_code");
         let _ = std::fs::remove_dir_all(dir);
     }
 

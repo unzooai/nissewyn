@@ -36,7 +36,11 @@ keyring = { version = "2.3", default-features = false, features = [
   "platform-windows",
   "linux-secret-service-rt-async-io-crypto-rust",
 ] }
-tokio = { version = "1", features = ["sync"] }
+# sync: one membership change at a time; net/io-util/time/macros: the
+# loopback address the browser comes back to after signing in.
+tokio = { version = "1", features = ["sync", "net", "io-util", "time", "macros"] }
+# The system browser, for signing in with the company account.
+open = "5"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
