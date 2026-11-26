@@ -28183,6 +28183,39 @@ body {
 .terminal-page-screen:hover .terminal-page-zoom, .terminal-page-zoom:focus-within { opacity: 1; }
 .terminal-page-zoom span { min-width: 18px; text-align: center; }
 
+/* Settings › Organization (organization-panel.tsx); the form is the proxy panel's */
+.org-group > .clients-list,
+.org-group > .proxy-problem,
+.org-group > .phone-actions,
+.org-group > .org-removed {
+  margin: 14px 22px 0;
+}
+
+.org-group > .phone-actions {
+  margin-bottom: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.org-group > .phone-actions > span {
+  font-size: 13px;
+}
+
+.org-removed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--clarity-red);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.org-removed p {
+  margin: 0;
+}
+
 /* Settings › Preferences › Network proxy */
 .proxy-group > .skills-intro,
 .proxy-group > .skills-empty {
@@ -28305,3 +28338,14 @@ body {
 }
 .terminal-page-failed .terminal-page-failed-close:hover { background: rgba(236, 231, 220, 0.1); color: #ece7dc; }
 .terminal-page-zoom .terminal-page-zoom-failed { gap: 3px; color: #ff8a7f; }
+
+.org-removed button {
+  flex: none;
+  padding: 6px 12px;
+  border: 1px solid var(--clarity-line-strong);
+  border-radius: 7px;
+  background: var(--clarity-panel);
+  color: var(--clarity-ink);
+  font-size: 13px;
+  cursor: pointer;
+}
